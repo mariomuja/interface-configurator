@@ -78,7 +78,7 @@ import { DocumentationComponent } from './components/documentation/documentation
       background: rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(10px);
       border-radius: 12px;
-      padding: 12px 16px;
+      padding: 20px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       transition: all 0.3s ease;
       box-shadow: none;
@@ -99,9 +99,9 @@ import { DocumentationComponent } from './components/documentation/documentation
     }
     
     .profile-text {
-      margin: 0;
-      font-size: 11px;
-      line-height: 1.5;
+      margin: 0 0 12px 0;
+      font-size: 13px;
+      line-height: 1.6;
       color: white;
     }
     
@@ -124,13 +124,13 @@ import { DocumentationComponent } from './components/documentation/documentation
     .github-link {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
+      gap: 8px;
+      padding: 8px 16px;
       background: rgba(255, 255, 255, 0.2);
       color: white;
       text-decoration: none;
       border-radius: 6px;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 500;
       transition: all 0.2s ease;
       align-self: flex-start;
@@ -138,14 +138,14 @@ import { DocumentationComponent } from './components/documentation/documentation
     }
     
     .github-link mat-icon {
-      font-size: 14px;
-      width: 14px;
-      height: 14px;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
     }
     
     .github-link:hover {
       background: rgba(255, 255, 255, 0.3);
-      transform: translateX(4px);
+      transform: translateY(-2px);
       border-color: rgba(255, 255, 255, 0.5);
     }
     
@@ -181,7 +181,7 @@ import { DocumentationComponent } from './components/documentation/documentation
       }
       
       .profile-text {
-        font-size: 10px;
+        font-size: 12px;
       }
     }
   `]
