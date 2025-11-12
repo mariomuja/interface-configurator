@@ -75,19 +75,21 @@ import { DocumentationComponent } from './components/documentation/documentation
     .profile-card {
       flex: 0 0 auto;
       max-width: 420px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
+      min-width: 0;
+      background: #f5f5f5;
       border-radius: 12px;
       padding: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(0, 0, 0, 0.12);
       transition: all 0.3s ease;
-      box-shadow: none;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       margin: 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .profile-card:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: #eeeeee;
+      border-color: rgba(0, 0, 0, 0.2);
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
@@ -96,13 +98,17 @@ import { DocumentationComponent } from './components/documentation/documentation
       display: flex;
       flex-direction: column;
       gap: 8px;
+      min-width: 0;
     }
     
     .profile-text {
       margin: 0 0 12px 0;
       font-size: 13px;
       line-height: 1.6;
-      color: white;
+      color: rgba(0, 0, 0, 0.87);
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
     }
     
     .profile-text strong {
@@ -110,14 +116,14 @@ import { DocumentationComponent } from './components/documentation/documentation
     }
     
     .profile-text a {
-      color: #ffd700;
+      color: #1976d2;
       text-decoration: none;
       font-weight: 500;
       transition: all 0.2s ease;
     }
     
     .profile-text a:hover {
-      color: #ffed4e;
+      color: #1565c0;
       text-decoration: underline;
     }
     
@@ -126,15 +132,15 @@ import { DocumentationComponent } from './components/documentation/documentation
       align-items: center;
       gap: 8px;
       padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
+      background: rgba(0, 0, 0, 0.05);
+      color: rgba(0, 0, 0, 0.87);
       text-decoration: none;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 500;
       transition: all 0.2s ease;
       align-self: flex-start;
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(0, 0, 0, 0.12);
     }
     
     .github-link mat-icon {
@@ -144,9 +150,9 @@ import { DocumentationComponent } from './components/documentation/documentation
     }
     
     .github-link:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(0, 0, 0, 0.1);
       transform: translateY(-2px);
-      border-color: rgba(255, 255, 255, 0.5);
+      border-color: rgba(0, 0, 0, 0.2);
     }
     
     main {
