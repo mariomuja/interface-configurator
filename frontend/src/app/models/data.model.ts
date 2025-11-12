@@ -23,6 +23,7 @@ export interface ProcessLog {
   level: 'info' | 'warning' | 'error';
   message: string;
   details?: string;
+  component?: string;
 }
 
 

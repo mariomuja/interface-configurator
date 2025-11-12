@@ -37,13 +37,28 @@
   width: 100%;
 }
 
+.log-filter-container {
+  margin-bottom: 16px;
+}
+
+.component-filter {
+  width: 250px;
+}
+
 .table-container {
   max-height: 400px;
   overflow: auto;
 }
 
+.log-table-container {
+  max-height: 500px;
+  overflow: auto;
+}
+
 .data-table, .log-table {
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .data-table th, .data-table td,
@@ -58,6 +73,67 @@
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+/* Resizable table styles */
+.resizable-table {
+  table-layout: fixed;
+}
+
+.resizable-header {
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+}
+
+.resizable-header:hover {
+  background-color: #e0e0e0;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background-color: transparent;
+  z-index: 2;
+  transition: background-color 0.2s;
+}
+
+.resize-handle:hover {
+  background-color: #3f51b5;
+}
+
+.resizable-header:hover .resize-handle {
+  background-color: rgba(63, 81, 181, 0.3);
+}
+
+.resizable-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.resizable-header[mat-sort-header] {
+  cursor: pointer;
+}
+
+.resizable-header[mat-sort-header] .header-content {
+  cursor: pointer;
+}
+
+.resizable-header[mat-sort-header] .resize-handle {
+  cursor: col-resize;
 }
 
 @media (max-width: 1200px) {

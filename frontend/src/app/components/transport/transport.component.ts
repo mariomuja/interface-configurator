@@ -1,6 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -8,6 +9,10 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
+import { FormsModule } from '@angular/forms';
 import { TransportService } from '../../services/transport.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription } from 'rxjs';
@@ -18,29 +23,40 @@ import { switchMap } from 'rxjs/operators';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatTableModule,
+    MatSortModule,
     MatButtonModule,
     MatCardModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatSlideToggleModule,
     MatIconModule,
-    MatChipsModule
+    MatChipsModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    MatInputModule
   ],
   templateUrl: './transport.component.html',
   styleUrl: './transport.component.css'
 })
-export class TransportComponent implements OnInit, OnDestroy {
+export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
+  @ViewChild(MatSort) sort!: MatSort;
+  
   csvData: CsvRecord[] = [];
   sqlData: SqlRecord[] = [];
   processLogs: ProcessLog[] = [];
+  logDataSource = new MatTableDataSource<ProcessLog & { component?: string }>([]);
   isLoading = false;
   isTransporting = false;
   private refreshSubscription?: Subscription;
+  
+  selectedComponent: string = 'all';
+  availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
 
   csvDisplayedColumns: string[] = ['id', 'name', 'email', 'age', 'city', 'salary'];
   sqlDisplayedColumns: string[] = ['id', 'name', 'email', 'age', 'city', 'salary', 'createdAt'];
-  logDisplayedColumns: string[] = ['timestamp', 'level', 'message', 'details'];
+  logDisplayedColumns: string[] = ['timestamp', 'level', 'component', 'message', 'details'];
 
   constructor(
     private transportService: TransportService,
@@ -52,6 +68,66 @@ export class TransportComponent implements OnInit, OnDestroy {
     this.loadSqlData();
     this.loadProcessLogs();
     this.startAutoRefresh();
+  }
+  
+  ngAfterViewInit(): void {
+    if (this.sort) {
+      this.logDataSource.sort = this.sort;
+    }
+    this.setupResizableColumns();
+  }
+  
+  setupResizableColumns(): void {
+    // Wait for table to render
+    setTimeout(() => {
+      const table = document.querySelector('.resizable-table');
+      if (!table) return;
+      
+      const headers = table.querySelectorAll('.resizable-header');
+      headers.forEach((header, index) => {
+        const handle = header.querySelector('.resize-handle') as HTMLElement;
+        if (!handle) return;
+        
+        let startX = 0;
+        let startWidth = 0;
+        let isResizing = false;
+        
+        const startResize = (e: MouseEvent) => {
+          isResizing = true;
+          startX = e.pageX;
+          const th = header as HTMLElement;
+          startWidth = th.offsetWidth;
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+          e.preventDefault();
+        };
+        
+        const doResize = (e: MouseEvent) => {
+          if (!isResizing) return;
+          const diff = e.pageX - startX;
+          const newWidth = Math.max(100, startWidth + diff);
+          (header as HTMLElement).style.width = `${newWidth}px`;
+          
+          // Update all cells in this column
+          const cells = table.querySelectorAll(`td:nth-child(${index + 1})`);
+          cells.forEach(cell => {
+            (cell as HTMLElement).style.width = `${newWidth}px`;
+          });
+        };
+        
+        const stopResize = () => {
+          if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+          }
+        };
+        
+        handle.addEventListener('mousedown', startResize);
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+      });
+    }, 100);
   }
 
   ngOnDestroy(): void {
@@ -90,14 +166,57 @@ export class TransportComponent implements OnInit, OnDestroy {
   loadProcessLogs(): void {
     this.transportService.getProcessLogs().subscribe({
       next: (logs) => {
-        this.processLogs = logs.sort((a, b) => 
+        // Enrich logs with component information
+        const enrichedLogs = logs.map(log => ({
+          ...log,
+          component: this.extractComponent(log.message, log.details)
+        }));
+        
+        this.processLogs = enrichedLogs.sort((a, b) => 
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
+        
+        this.updateLogDataSource();
       },
       error: (error) => {
         console.error('Error loading process logs:', error);
       }
     });
+  }
+  
+  extractComponent(message: string, details?: string): string {
+    const text = `${message} ${details || ''}`.toLowerCase();
+    
+    if (text.includes('azure function') || text.includes('function triggered') || text.includes('chunk')) {
+      return 'Azure Function';
+    } else if (text.includes('blob storage') || text.includes('blob') || text.includes('csv file detected')) {
+      return 'Blob Storage';
+    } else if (text.includes('sql server') || text.includes('database') || text.includes('transaction') || text.includes('connection')) {
+      return 'SQL Server';
+    } else if (text.includes('vercel') || text.includes('api')) {
+      return 'Vercel API';
+    }
+    
+    return 'Unknown';
+  }
+  
+  updateLogDataSource(): void {
+    let filtered = [...this.processLogs];
+    
+    if (this.selectedComponent && this.selectedComponent !== 'all') {
+      filtered = filtered.filter(log => log.component === this.selectedComponent);
+    }
+    
+    this.logDataSource.data = filtered;
+    this.logDataSource.sort = this.sort;
+  }
+  
+  onComponentFilterChange(): void {
+    this.updateLogDataSource();
+  }
+  
+  announceSortChange(sortState: Sort): void {
+    // This is called when sort changes
   }
 
   startTransport(): void {

@@ -14,5 +14,6 @@ terraform.tfvars
 .DS_Store
 frontend/.angular/
 azure-functions/function-app.zip
+HANDOVER_EMAIL.md
 
 

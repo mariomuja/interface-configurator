@@ -144,12 +144,12 @@ resource "azurerm_linux_function_app" "main" {
 
   site_config {
     application_stack {
-      node_version = "20"
+      dotnet_version = "8.0"
     }
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"              = "node"
+    "FUNCTIONS_WORKER_RUNTIME"              = "dotnet-isolated"
     "AzureWebJobsStorage"                   = azurerm_storage_account.functions.primary_connection_string
     "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING" = azurerm_storage_account.functions.primary_connection_string
     "AZURE_STORAGE_CONNECTION_STRING"       = azurerm_storage_account.main.primary_connection_string
@@ -174,23 +174,24 @@ resource "azurerm_linux_function_app" "main" {
 # This null_resource ensures the Functions code is deployed as part of Terraform
 resource "null_resource" "deploy_function_app" {
   # Trigger redeployment when Function App or code changes
-  triggers = {
-    function_app_id = azurerm_linux_function_app.main.id
-    function_code_hash = filebase64sha256("${path.module}/../azure-functions/ProcessCsvBlobTrigger/index.js")
-    function_json_hash = filebase64sha256("${path.module}/../azure-functions/ProcessCsvBlobTrigger/function.json")
-    host_json_hash = filebase64sha256("${path.module}/../azure-functions/host.json")
-    package_json_hash = filebase64sha256("${path.module}/../azure-functions/package.json")
-  }
+        triggers = {
+          function_app_id = azurerm_linux_function_app.main.id
+          function_code_hash = filebase64sha256("${path.module}/../azure-functions/ProcessCsvBlobTrigger/ProcessCsvBlobTrigger.cs")
+          host_json_hash = filebase64sha256("${path.module}/../azure-functions/host.json")
+          csproj_hash = filebase64sha256("${path.module}/../azure-functions/ProcessCsvBlobTrigger/ProcessCsvBlobTrigger.csproj")
+        }
 
-  # Create deployment package
-  provisioner "local-exec" {
-    command = <<-EOT
-      cd ${path.module}/../azure-functions
-      if (Test-Path function-app.zip) { Remove-Item function-app.zip -Force }
-      Compress-Archive -Path host.json,package.json,package-lock.json,node_modules,ProcessCsvBlobTrigger -DestinationPath function-app.zip -Force
-    EOT
-    interpreter = ["PowerShell", "-Command"]
-  }
+        # Build and create deployment package
+        provisioner "local-exec" {
+          command = <<-EOT
+            cd ${path.module}/../azure-functions/ProcessCsvBlobTrigger
+            dotnet publish -c Release -o ./bin/publish
+            cd ${path.module}/../azure-functions
+            if (Test-Path function-app.zip) { Remove-Item function-app.zip -Force }
+            Compress-Archive -Path host.json,ProcessCsvBlobTrigger/bin/publish/* -DestinationPath function-app.zip -Force
+          EOT
+          interpreter = ["PowerShell", "-Command"]
+        }
 
   # Deploy to Azure Functions
   provisioner "local-exec" {

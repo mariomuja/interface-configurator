@@ -108,28 +108,71 @@
 
   <mat-card class="log-card">
     <mat-card-header>
-      <mat-card-title>Prozess-Logs ({{ processLogs.length }} Einträge)</mat-card-title>
+      <mat-card-title>Prozess-Logs ({{ logDataSource.data.length }} Einträge)</mat-card-title>
     </mat-card-header>
     <mat-card-content>
-      <div class="table-container">
-        <table mat-table [dataSource]="processLogs" class="log-table">
+      <div class="log-filter-container">
+        <mat-form-field appearance="outline" class="component-filter">
+          <mat-label>Azure-Komponente filtern</mat-label>
+          <mat-select [(ngModel)]="selectedComponent" (selectionChange)="onComponentFilterChange()">
+            <mat-option value="all">Alle Komponenten</mat-option>
+            <mat-option value="Azure Function">Azure Function</mat-option>
+            <mat-option value="Blob Storage">Blob Storage</mat-option>
+            <mat-option value="SQL Server">SQL Server</mat-option>
+            <mat-option value="Vercel API">Vercel API</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div class="table-container log-table-container">
+        <table mat-table [dataSource]="logDataSource" matSort class="log-table resizable-table">
           <ng-container matColumnDef="timestamp">
-            <th mat-header-cell *matHeaderCellDef>Zeitstempel</th>
-            <td mat-cell *matCellDef="let row">{{ row.timestamp | date:'short' }}</td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="timestamp" class="resizable-header">
+              <div class="header-content">
+                <span>Zeitstempel</span>
+                <div class="resize-handle"></div>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">{{ row.timestamp | date:'short' }}</td>
           </ng-container>
           <ng-container matColumnDef="level">
-            <th mat-header-cell *matHeaderCellDef>Level</th>
-            <td mat-cell *matCellDef="let row">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="level" class="resizable-header">
+              <div class="header-content">
+                <span>Level</span>
+                <div class="resize-handle"></div>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">
               <mat-chip [color]="getLevelColor(row.level)">{{ row.level }}</mat-chip>
             </td>
           </ng-container>
+          <ng-container matColumnDef="component">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="component" class="resizable-header">
+              <div class="header-content">
+                <span>Azure-Komponente</span>
+                <div class="resize-handle"></div>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">
+              <mat-chip>{{ row.component || 'Unknown' }}</mat-chip>
+            </td>
+          </ng-container>
           <ng-container matColumnDef="message">
-            <th mat-header-cell *matHeaderCellDef>Nachricht</th>
-            <td mat-cell *matCellDef="let row">{{ row.message }}</td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="message" class="resizable-header">
+              <div class="header-content">
+                <span>Nachricht</span>
+                <div class="resize-handle"></div>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">{{ row.message }}</td>
           </ng-container>
           <ng-container matColumnDef="details">
-            <th mat-header-cell *matHeaderCellDef>Details</th>
-            <td mat-cell *matCellDef="let row">{{ row.details || '-' }}</td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="details" class="resizable-header">
+              <div class="header-content">
+                <span>Details</span>
+                <div class="resize-handle"></div>
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">{{ row.details || '-' }}</td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="logDisplayedColumns"></tr>
           <tr mat-row *matRowDef="let row; columns: logDisplayedColumns"></tr>
