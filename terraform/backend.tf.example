@@ -1,0 +1,19 @@
+# Terraform Backend Configuration Example
+# Uncomment and configure if you want to use remote state storage
+# This enables state locking and team collaboration
+
+# terraform {
+#   backend "azurerm" {
+#     resource_group_name  = "rg-terraform-state"
+#     storage_account_name = "stterraformstate"
+#     container_name       = "tfstate"
+#     key                  = "infrastructure.terraform.tfstate"
+#   }
+# }
+
+# To use remote state:
+# 1. Create a storage account for Terraform state
+# 2. Create a container named "tfstate"
+# 3. Uncomment and configure the backend block above
+# 4. Run: terraform init -migrate-state
+

@@ -1,14 +1,47 @@
+# Terraform Variables Example
 # Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars with real secrets!
 
-resource_group_name = "rg-infrastructure-as-code"
+# Azure Authentication (Service Principal)
+# Option 1: Provide values here in terraform.tfvars
+# Option 2: Use environment variables (ARM_SUBSCRIPTION_ID, ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID)
+# If using environment variables, you can omit these lines or leave them as null
+subscription_id = "your-azure-subscription-id"  # or null if using ARM_SUBSCRIPTION_ID
+client_id       = "your-service-principal-client-id"  # or null if using ARM_CLIENT_ID
+client_secret   = "your-service-principal-client-secret"  # or null if using ARM_CLIENT_SECRET
+tenant_id       = "your-azure-tenant-id"  # or null if using ARM_TENANT_ID
+
+# Resource Group
+resource_group_name = "rg-infrastructure"
 location            = "West Europe"
+environment         = "prod"
 
-# SQL Server credentials
-sql_admin_login     = "sqladmin"
-sql_admin_password  = "YourSecurePassword123!"
+# SQL Database Configuration
+sql_admin_login    = "sql_admin"
+sql_admin_password = "CHANGE_ME_STRONG_PASSWORD"
+sql_database_name  = "app_database"
+sql_license_type   = "LicenseIncluded"  # LicenseIncluded or BasePrice
+sql_sku_name       = "S0"  # S0, S1, P1, GP_S_Gen5_2, BC_Gen5_2, etc.
+sql_max_size_gb    = 2  # Maximum database size in GB
+sql_zone_redundant  = false  # Enable zone redundancy (requires Premium tier)
 
-# Optional: Allow your current IP
-allow_current_ip    = true
-current_ip_address  = "YOUR_IP_ADDRESS"
+# Firewall Configuration
+allow_current_ip   = false
+current_ip_address = ""  # Your current IP address if allow_current_ip = true
 
+# Backend API runs on Vercel Serverless Functions, not Azure App Service
+# backend_app_plan_name = "plan-backend-app"
+# backend_app_name      = "app-backend"
+# backend_sku_name      = "B1"  # Basic tier, upgrade to S1/P1V2 for production
 
+# Functions (optional)
+enable_function_app    = false
+functions_app_plan_name = "plan-funcs-app"
+functions_app_name      = "func-app"
+functions_sku_name      = "Y1"  # Consumption plan
+
+# Security
+jwt_secret = "CHANGE_ME_GENERATE_STRONG_RANDOM_SECRET"
+
+# CORS Configuration
+cors_allowed_origins = []  # Add your application URLs here

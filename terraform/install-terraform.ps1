@@ -29,3 +29,4 @@ Write-Host "Please restart your terminal or run: `$env:Path += ';$installPath'" 
 & "$installPath\terraform.exe" version
 
 
+
