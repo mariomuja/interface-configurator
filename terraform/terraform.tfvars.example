@@ -12,7 +12,7 @@ client_secret   = "your-service-principal-client-secret"  # or null if using ARM
 tenant_id       = "your-azure-tenant-id"  # or null if using ARM_TENANT_ID
 
 # Resource Group
-resource_group_name = "rg-infrastructure"
+resource_group_name = "rg-infrastructure-as-code"
 location            = "West Europe"
 environment         = "prod"
 
