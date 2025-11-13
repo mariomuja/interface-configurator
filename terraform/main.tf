@@ -191,10 +191,11 @@ resource "azurerm_linux_function_app" "main" {
     "AZURE_SQL_PASSWORD" = var.sql_admin_password
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
     
-    # Note: PROJECT and SCM_DO_BUILD_DURING_DEPLOYMENT are NOT set here
-    # These settings are for GitHub Source Control Deployment, not ZIP deployment
-    # ZIP deployment uses pre-compiled DLLs and doesn't need these settings
-    # If you need GitHub Source Control, configure it separately via Azure Portal or Azure CLI
+    # GitHub Source Control Deployment Settings (for Azure Deployment Center)
+    # PROJECT: Path to the .csproj file relative to repository root
+    "PROJECT" = length(var.github_repo_url) > 0 ? "${var.github_repo_path}/ProcessCsvBlobTrigger.csproj" : null
+    # Enable build during deployment for GitHub source control
+    "SCM_DO_BUILD_DURING_DEPLOYMENT" = length(var.github_repo_url) > 0 ? "true" : null
   }
 
   tags = {
