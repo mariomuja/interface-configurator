@@ -203,8 +203,8 @@ jobs:
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
           echo "Resource Group: rg-infrastructure-as-code"
           
-          # CRITICAL: Remove WEBSITE_RUN_FROM_PACKAGE and WEBSITE_USE_ZIP if they exist
-          # These settings block ZIP deployment
+          # CRITICAL: Remove settings that block ZIP deployment
+          # These settings are for GitHub Source Control, not ZIP deployment
           echo "Checking for blocking app settings..."
           ALL_SETTINGS=$(az functionapp config appsettings list \
             --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
@@ -213,31 +213,47 @@ jobs:
           
           RUN_FROM_PACKAGE=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_RUN_FROM_PACKAGE") | .value' 2>/dev/null || echo "")
           USE_ZIP=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_USE_ZIP") | .value' 2>/dev/null || echo "")
+          SCM_BUILD=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="SCM_DO_BUILD_DURING_DEPLOYMENT") | .value' 2>/dev/null || echo "")
+          PROJECT=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="PROJECT") | .value' 2>/dev/null || echo "")
+          
+          SETTINGS_TO_REMOVE=()
           
           if [ -n "$RUN_FROM_PACKAGE" ] && [ "$RUN_FROM_PACKAGE" != "null" ] && [ "$RUN_FROM_PACKAGE" != "" ]; then
             echo "⚠️  WEBSITE_RUN_FROM_PACKAGE is set to: $RUN_FROM_PACKAGE"
-            echo "Removing WEBSITE_RUN_FROM_PACKAGE..."
-            az functionapp config appsettings delete \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --setting-names WEBSITE_RUN_FROM_PACKAGE \
-              --output none || echo "⚠️  Failed to remove WEBSITE_RUN_FROM_PACKAGE"
-            echo "✅ WEBSITE_RUN_FROM_PACKAGE removed"
-            sleep 5
+            SETTINGS_TO_REMOVE+=("WEBSITE_RUN_FROM_PACKAGE")
           fi
           
           if [ -n "$USE_ZIP" ] && [ "$USE_ZIP" != "null" ] && [ "$USE_ZIP" != "" ]; then
-            echo "⚠️  WEBSITE_USE_ZIP is set, removing it..."
+            echo "⚠️  WEBSITE_USE_ZIP is set"
+            SETTINGS_TO_REMOVE+=("WEBSITE_USE_ZIP")
+          fi
+          
+          # SCM_DO_BUILD_DURING_DEPLOYMENT and PROJECT are for GitHub Source Control
+          # They cause "Bad Request" during ZIP deployment because Azure tries to build
+          # but the ZIP only contains compiled DLLs, not source code
+          if [ -n "$SCM_BUILD" ] && [ "$SCM_BUILD" != "null" ] && [ "$SCM_BUILD" != "" ]; then
+            echo "⚠️  SCM_DO_BUILD_DURING_DEPLOYMENT is set to: $SCM_BUILD"
+            echo "    This setting is for GitHub Source Control, not ZIP deployment"
+            SETTINGS_TO_REMOVE+=("SCM_DO_BUILD_DURING_DEPLOYMENT")
+          fi
+          
+          if [ -n "$PROJECT" ] && [ "$PROJECT" != "null" ] && [ "$PROJECT" != "" ]; then
+            echo "⚠️  PROJECT is set to: $PROJECT"
+            echo "    This setting is for GitHub Source Control, not ZIP deployment"
+            SETTINGS_TO_REMOVE+=("PROJECT")
+          fi
+          
+          # Remove all blocking settings at once
+          if [ ${#SETTINGS_TO_REMOVE[@]} -gt 0 ]; then
+            echo "Removing blocking settings: ${SETTINGS_TO_REMOVE[*]}"
             az functionapp config appsettings delete \
               --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
               --resource-group rg-infrastructure-as-code \
-              --setting-names WEBSITE_USE_ZIP \
-              --output none || echo "⚠️  Failed to remove WEBSITE_USE_ZIP"
-            echo "✅ WEBSITE_USE_ZIP removed"
+              --setting-names "${SETTINGS_TO_REMOVE[@]}" \
+              --output none || echo "⚠️  Failed to remove some settings"
+            echo "✅ Blocking settings removed"
             sleep 5
-          fi
-          
-          if [ -z "$RUN_FROM_PACKAGE" ] && [ -z "$USE_ZIP" ]; then
+          else
             echo "✅ No blocking app settings found"
           fi
           
