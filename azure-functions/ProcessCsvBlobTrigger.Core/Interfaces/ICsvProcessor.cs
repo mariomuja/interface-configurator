@@ -12,5 +12,17 @@ public class ProcessingResult
     public int ChunksProcessed { get; set; }
     public string? ErrorMessage { get; set; }
     public Exception? Exception { get; set; }
+
+    public static ProcessingResult Failure(string errorMessage, Exception? exception = null)
+    {
+        return new ProcessingResult
+        {
+            Success = false,
+            RecordsProcessed = 0,
+            ChunksProcessed = 0,
+            ErrorMessage = errorMessage,
+            Exception = exception
+        };
+    }
 }
 

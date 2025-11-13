@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Models;
 using ProcessCsvBlobTrigger.Data;
@@ -7,127 +8,270 @@ namespace ProcessCsvBlobTrigger.Services;
 
 public class DataServiceAdapter : IDataService
 {
-    private readonly ApplicationDbContext _context;
-    private readonly LoggingService _loggingService;
+    private readonly ApplicationDbContext? _context;
+    private readonly ILoggingService? _loggingService;
+    private readonly ILogger<DataServiceAdapter>? _logger;
 
-    public DataServiceAdapter(ApplicationDbContext context, LoggingService loggingService)
+    public DataServiceAdapter(
+        ApplicationDbContext? context, 
+        ILoggingService? loggingService,
+        ILogger<DataServiceAdapter>? logger = null)
     {
-        _context = context;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
         _loggingService = loggingService;
+        _logger = logger;
+    }
+
+    private async Task SafeLogAsync(string level, string message, string? details = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (_loggingService != null)
+            {
+                await _loggingService.LogAsync(level, message, details, cancellationToken);
+            }
+            else if (_logger != null)
+            {
+                switch (level.ToLowerInvariant())
+                {
+                    case "error":
+                        _logger.LogError("{Message} | Details: {Details}", message, details);
+                        break;
+                    case "warning":
+                        _logger.LogWarning("{Message} | Details: {Details}", message, details);
+                        break;
+                    default:
+                        _logger.LogInformation("{Message} | Details: {Details}", message, details);
+                        break;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{level}] {message} | {details ?? "N/A"}");
+            }
+        }
+        catch
+        {
+            // Fail-safe: If logging fails, try console
+            try
+            {
+                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{level}] {message} | {details ?? "N/A"}");
+            }
+            catch
+            {
+                // Last resort failed, ignore
+            }
+        }
     }
 
     public async Task EnsureDatabaseCreatedAsync(CancellationToken cancellationToken = default)
     {
+        if (_context == null)
+        {
+            await SafeLogAsync("error", "Database context is null", null, cancellationToken);
+            throw new InvalidOperationException("Database context is not available");
+        }
+
         try
         {
-            await _loggingService.LogAsync("info", "Checking database schema", 
-                $"Database: {_context.Database.GetConnectionString()?.Split(';').FirstOrDefault()}");
+            var connectionString = _context.Database?.GetConnectionString();
+            var dbName = connectionString?.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault(s => s.StartsWith("Database=", StringComparison.OrdinalIgnoreCase))
+                ?.Split('=').LastOrDefault() ?? "Unknown";
+
+            await SafeLogAsync("info", "Checking database schema", 
+                $"Database: {dbName}", cancellationToken);
+
+            if (_context.Database == null)
+            {
+                throw new InvalidOperationException("Database is not available");
+            }
 
             await _context.Database.EnsureCreatedAsync(cancellationToken);
 
-            await _loggingService.LogAsync("info", "Database schema verified", 
-                "TransportData and ProcessLogs tables are ready");
+            await SafeLogAsync("info", "Database schema verified", 
+                "TransportData and ProcessLogs tables are ready", cancellationToken);
         }
         catch (Exception ex)
         {
-            await _loggingService.LogAsync("error", "Error ensuring database created", 
-                $"Error: {ex.Message}");
+            var errorMessage = ex?.Message ?? "Unknown error";
+            await SafeLogAsync("error", "Error ensuring database created", 
+                $"Error: {errorMessage}", cancellationToken);
             throw;
         }
     }
 
     public async Task ProcessChunksAsync(List<List<TransportData>> chunks, CancellationToken cancellationToken = default)
     {
-        var totalRecords = chunks.Sum(chunk => chunk.Count);
+        if (_context == null)
+        {
+            await SafeLogAsync("error", "Database context is null", null, cancellationToken);
+            throw new InvalidOperationException("Database context is not available");
+        }
+
+        if (chunks == null || chunks.Count == 0)
+        {
+            await SafeLogAsync("warning", "No chunks to process", null, cancellationToken);
+            return;
+        }
+
+        var totalRecords = chunks.Sum(chunk => chunk?.Count ?? 0);
         var totalProcessed = 0;
 
-        await _loggingService.LogAsync("info", "Starting sequential chunk processing", 
-            $"Total chunks to process: {chunks.Count}, Strategy: Sequential with transactions");
+        await SafeLogAsync("info", "Starting sequential chunk processing", 
+            $"Total chunks to process: {chunks.Count}, Strategy: Sequential with transactions", cancellationToken);
 
         for (int i = 0; i < chunks.Count; i++)
         {
             var chunkNumber = i + 1;
             var chunk = chunks[i];
 
-            await _loggingService.LogAsync("info", 
+            if (chunk == null || chunk.Count == 0)
+            {
+                await SafeLogAsync("warning", 
+                    $"Chunk {chunkNumber}/{chunks.Count} is null or empty", 
+                    "Skipping empty chunk", cancellationToken);
+                continue;
+            }
+
+            var recordIds = chunk.Where(r => r != null).Select(r => r.Id.ToString()).Take(10);
+            var recordIdsStr = string.Join(", ", recordIds);
+            if (chunk.Count > 10)
+            {
+                recordIdsStr += $", ... ({chunk.Count} total)";
+            }
+
+            await SafeLogAsync("info", 
                 $"Chunk {chunkNumber}/{chunks.Count} processing started", 
-                $"Chunk size: {chunk.Count} records, Record IDs: {string.Join(", ", chunk.Select(r => r.Id))}");
+                $"Chunk size: {chunk.Count} records, Record IDs: {recordIdsStr}", cancellationToken);
 
             try
             {
                 await InsertChunkAsync(chunk, chunkNumber, chunks.Count, cancellationToken);
                 totalProcessed += chunk.Count;
 
-                await _loggingService.LogAsync("info", 
+                await SafeLogAsync("info", 
                     $"Chunk {chunkNumber}/{chunks.Count} processing completed", 
-                    $"Records inserted: {chunk.Count}, Total processed so far: {totalProcessed}/{totalRecords}");
+                    $"Records inserted: {chunk.Count}, Total processed so far: {totalProcessed}/{totalRecords}", cancellationToken);
             }
             catch (Exception chunkError)
             {
-                await _loggingService.LogAsync("error", 
+                var errorMessage = chunkError?.Message ?? "Unknown error";
+                await SafeLogAsync("error", 
                     $"Chunk {chunkNumber}/{chunks.Count} processing failed", 
-                    $"Error: {chunkError.Message}, Chunk size: {chunk.Count}, Records: {string.Join(", ", chunk.Select(r => r.Id))}");
+                    $"Error: {errorMessage}, Chunk size: {chunk.Count}, Records: {recordIdsStr}", cancellationToken);
                 throw;
             }
         }
 
-        await _loggingService.LogAsync("info", "All chunks processed successfully", 
-            $"Total chunks: {chunks.Count}, Total records: {totalRecords}, Total processed: {totalProcessed}");
+        await SafeLogAsync("info", "All chunks processed successfully", 
+            $"Total chunks: {chunks.Count}, Total records: {totalRecords}, Total processed: {totalProcessed}", cancellationToken);
     }
 
     private async Task InsertChunkAsync(List<TransportData> chunk, int chunkNumber, int totalChunks, CancellationToken cancellationToken)
     {
+        if (_context == null)
+        {
+            await SafeLogAsync("error", "Database context is null", null, cancellationToken);
+            throw new InvalidOperationException("Database context is not available");
+        }
+
+        if (chunk == null || chunk.Count == 0)
+        {
+            await SafeLogAsync("warning", 
+                $"Chunk {chunkNumber}/{totalChunks} is null or empty", 
+                "Skipping empty chunk", cancellationToken);
+            return;
+        }
+
         try
         {
-            await _loggingService.LogAsync("info", 
+            await SafeLogAsync("info", 
                 $"Chunk {chunkNumber}/{totalChunks} - Starting database transaction", 
-                $"Records: {chunk.Count}");
+                $"Records: {chunk.Count}", cancellationToken);
+
+            if (_context.Database == null)
+            {
+                throw new InvalidOperationException("Database is not available");
+            }
 
             using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             try
             {
-                // Convert Core models to Function App models
-                var transportDataEntities = chunk.Select(td => new Models.TransportData
+                // Convert Core models to Function App models with null-safety
+                var transportDataEntities = chunk
+                    .Where(td => td != null)
+                    .Select(td => new Models.TransportData
+                    {
+                        Id = td.Id,
+                        Name = td.Name ?? string.Empty,
+                        Email = td.Email ?? string.Empty,
+                        Age = td.Age,
+                        City = td.City ?? string.Empty,
+                        Salary = td.Salary,
+                        CreatedAt = td.CreatedAt
+                    })
+                    .ToList();
+
+                if (transportDataEntities.Count == 0)
                 {
-                    Id = td.Id,
-                    Name = td.Name,
-                    Email = td.Email,
-                    Age = td.Age,
-                    City = td.City,
-                    Salary = td.Salary,
-                    CreatedAt = td.CreatedAt
-                }).ToList();
+                    await SafeLogAsync("warning", 
+                        $"Chunk {chunkNumber}/{totalChunks} - No valid records to insert", 
+                        "All records were null", cancellationToken);
+                    await transaction.RollbackAsync(cancellationToken);
+                    return;
+                }
 
                 _context.TransportData.AddRange(transportDataEntities);
                 await _context.SaveChangesAsync(cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
 
-                await _loggingService.LogAsync("info", 
+                await SafeLogAsync("info", 
                     $"Chunk {chunkNumber}/{totalChunks} - Transaction committed", 
-                    $"Records inserted: {chunk.Count}, Transaction status: Committed");
+                    $"Records inserted: {transportDataEntities.Count}, Transaction status: Committed", cancellationToken);
             }
             catch (Exception ex)
             {
-                await _loggingService.LogAsync("error", 
+                var errorMessage = ex?.Message ?? "Unknown error";
+                await SafeLogAsync("error", 
                     $"Chunk {chunkNumber}/{totalChunks} - Transaction error occurred", 
-                    $"Error: {ex.Message}, Attempting rollback");
+                    $"Error: {errorMessage}, Attempting rollback", cancellationToken);
 
-                await transaction.RollbackAsync(cancellationToken);
-
-                await _loggingService.LogAsync("error", 
-                    $"Chunk {chunkNumber}/{totalChunks} - Transaction rolled back", 
-                    $"Error: {ex.Message}, Records in chunk: {chunk.Count}");
+                try
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    await SafeLogAsync("error", 
+                        $"Chunk {chunkNumber}/{totalChunks} - Transaction rolled back", 
+                        $"Error: {errorMessage}, Records in chunk: {chunk.Count}", cancellationToken);
+                }
+                catch (Exception rollbackEx)
+                {
+                    await SafeLogAsync("error", 
+                        $"Chunk {chunkNumber}/{totalChunks} - Rollback failed", 
+                        $"Rollback error: {rollbackEx?.Message ?? "Unknown"}", cancellationToken);
+                }
 
                 throw;
             }
         }
         catch (Exception ex)
         {
-            await _loggingService.LogAsync("error", 
+            var errorMessage = ex?.Message ?? "Unknown error";
+            var stackTrace = ex?.StackTrace;
+            var stackTraceStr = "N/A";
+            
+            if (!string.IsNullOrWhiteSpace(stackTrace))
+            {
+                stackTraceStr = stackTrace.Length > 500 
+                    ? stackTrace.Substring(0, 500) + "... [truncated]" 
+                    : stackTrace;
+            }
+
+            await SafeLogAsync("error", 
                 $"Error processing chunk {chunkNumber}/{totalChunks}", 
-                $"Error: {ex.Message}, Stack: {(ex.StackTrace != null && ex.StackTrace.Length > 500 ? ex.StackTrace.Substring(0, 500) : ex.StackTrace ?? "N/A")}");
+                $"Error: {errorMessage}, Stack: {stackTraceStr}", cancellationToken);
             throw;
         }
     }

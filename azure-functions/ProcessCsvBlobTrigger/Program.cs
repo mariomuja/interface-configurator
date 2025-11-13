@@ -42,8 +42,16 @@ try
             services.AddScoped<ICsvProcessor, CsvProcessor>();
 
             // Register adapters (bridge between Core and Function App)
-            services.AddScoped<ILoggingService, LoggingServiceAdapter>();
-            services.AddScoped<IDataService, DataServiceAdapter>();
+            // LoggingServiceAdapter requires both ApplicationDbContext and ILogger
+            services.AddScoped<ILoggingService>(sp => 
+                new LoggingServiceAdapter(
+                    sp.GetRequiredService<ApplicationDbContext>(),
+                    sp.GetService<ILogger<LoggingServiceAdapter>>()));
+            services.AddScoped<IDataService>(sp =>
+                new DataServiceAdapter(
+                    sp.GetRequiredService<ApplicationDbContext>(),
+                    sp.GetService<ILoggingService>(),
+                    sp.GetService<ILogger<DataServiceAdapter>>()));
 
             // Register Function App services (for backward compatibility if needed)
             services.AddScoped<LoggingService>();

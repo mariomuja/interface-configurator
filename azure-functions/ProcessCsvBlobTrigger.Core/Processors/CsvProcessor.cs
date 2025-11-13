@@ -27,34 +27,117 @@ public class CsvProcessor : ICsvProcessor
 
     public async Task<ProcessingResult> ProcessCsvAsync(byte[] blobContent, string blobName, CancellationToken cancellationToken = default)
     {
+        // Fail-safe: Validate inputs
+        if (blobContent == null)
+        {
+            var nullError = "Blob content is null";
+            _logger.LogError(nullError);
+            try
+            {
+                await _loggingService.LogAsync("error", "CSV processing failed", 
+                    $"File: {blobName ?? "Unknown"}, Error: {nullError}", cancellationToken);
+            }
+            catch { }
+            return ProcessingResult.Failure(nullError, new ArgumentNullException(nameof(blobContent)));
+        }
+
         var blobSize = blobContent.Length;
-        _logger.LogInformation("Processing CSV blob: {BlobName} ({BlobSize} bytes)", blobName, blobSize);
+        var safeBlobName = blobName ?? "Unknown";
+        
+        try
+        {
+            _logger.LogInformation("Processing CSV blob: {BlobName} ({BlobSize} bytes)", safeBlobName, blobSize);
+        }
+        catch { }
 
         try
         {
             // Initialize database tables on first run
-            await _loggingService.LogAsync("info", "Initializing database schema",
-                "Checking and creating tables if needed", cancellationToken);
+            try
+            {
+                await _loggingService.LogAsync("info", "Initializing database schema",
+                    "Checking and creating tables if needed", cancellationToken);
+            }
+            catch { }
+
             await _dataService.EnsureDatabaseCreatedAsync(cancellationToken);
-            await _loggingService.LogAsync("info", "Database schema initialized",
-                "TransportData and ProcessLogs tables ready", cancellationToken);
+            
+            try
+            {
+                await _loggingService.LogAsync("info", "Database schema initialized",
+                    "TransportData and ProcessLogs tables ready", cancellationToken);
+            }
+            catch { }
 
             // Read blob content
-            await _loggingService.LogAsync("info", "Reading blob content from storage", 
-                $"File: {blobName}", cancellationToken);
-            var csvContent = Encoding.UTF8.GetString(blobContent);
-            var contentLength = csvContent.Length;
-            await _loggingService.LogAsync("info", "Blob content read successfully",
-                $"File: {blobName}, Content length: {contentLength} characters", cancellationToken);
+            try
+            {
+                await _loggingService.LogAsync("info", "Reading blob content from storage", 
+                    $"File: {safeBlobName}", cancellationToken);
+            }
+            catch { }
+
+            string csvContent;
+            try
+            {
+                csvContent = Encoding.UTF8.GetString(blobContent);
+            }
+            catch (Exception ex)
+            {
+                var encodingError = $"Failed to decode blob content: {ex.Message}";
+                _logger.LogError(ex, encodingError);
+                try
+                {
+                    await _loggingService.LogAsync("error", "Blob content decoding failed",
+                        $"File: {safeBlobName}, Error: {encodingError}", cancellationToken);
+                }
+                catch { }
+                return ProcessingResult.Failure(encodingError, ex);
+            }
+
+            var contentLength = csvContent?.Length ?? 0;
+            
+            try
+            {
+                await _loggingService.LogAsync("info", "Blob content read successfully",
+                    $"File: {safeBlobName}, Content length: {contentLength} characters", cancellationToken);
+            }
+            catch { }
 
             // Parse CSV
-            await _loggingService.LogAsync("info", "Starting CSV parsing", $"File: {blobName}", cancellationToken);
-            var records = _csvProcessingService.ParseCsv(csvContent);
-
-            if (records.Count == 0)
+            try
             {
-                await _loggingService.LogAsync("warning", "CSV file is empty or invalid",
-                    $"File: {blobName}, Content length: {contentLength} characters", cancellationToken);
+                await _loggingService.LogAsync("info", "Starting CSV parsing", 
+                    $"File: {safeBlobName}", cancellationToken);
+            }
+            catch { }
+
+            List<Dictionary<string, string>> records;
+            try
+            {
+                records = _csvProcessingService.ParseCsv(csvContent ?? string.Empty);
+            }
+            catch (Exception ex)
+            {
+                var parseError = $"CSV parsing failed: {ex.Message}";
+                _logger.LogError(ex, parseError);
+                try
+                {
+                    await _loggingService.LogAsync("error", "CSV parsing failed",
+                        $"File: {safeBlobName}, Error: {parseError}", cancellationToken);
+                }
+                catch { }
+                return ProcessingResult.Failure(parseError, ex);
+            }
+
+            if (records == null || records.Count == 0)
+            {
+                try
+                {
+                    await _loggingService.LogAsync("warning", "CSV file is empty or invalid",
+                        $"File: {safeBlobName}, Content length: {contentLength} characters", cancellationToken);
+                }
+                catch { }
                 return new ProcessingResult
                 {
                     Success = true,
@@ -64,24 +147,72 @@ public class CsvProcessor : ICsvProcessor
             }
 
             // Create chunks
-            await _loggingService.LogAsync("info", "CSV parsing completed",
-                $"File: {blobName}, Records parsed: {records.Count}, Content length: {contentLength} characters", cancellationToken);
-            await _loggingService.LogAsync("info", "Starting chunk creation",
-                $"Total records: {records.Count}, Chunk size: 100", cancellationToken);
+            try
+            {
+                await _loggingService.LogAsync("info", "CSV parsing completed",
+                    $"File: {safeBlobName}, Records parsed: {records.Count}, Content length: {contentLength} characters", cancellationToken);
+                await _loggingService.LogAsync("info", "Starting chunk creation",
+                    $"Total records: {records.Count}, Chunk size: 100", cancellationToken);
+            }
+            catch { }
 
-            var chunks = _csvProcessingService.CreateChunks(records);
+            List<List<TransportData>> chunks;
+            try
+            {
+                chunks = _csvProcessingService.CreateChunks(records);
+            }
+            catch (Exception ex)
+            {
+                var chunkError = $"Chunk creation failed: {ex.Message}";
+                _logger.LogError(ex, chunkError);
+                try
+                {
+                    await _loggingService.LogAsync("error", "Chunk creation failed",
+                        $"File: {safeBlobName}, Error: {chunkError}", cancellationToken);
+                }
+                catch { }
+                return ProcessingResult.Failure(chunkError, ex);
+            }
 
-            await _loggingService.LogAsync("info", "Chunk creation completed",
-                $"Total chunks: {chunks.Count}, Chunk size: 100, Total records: {records.Count}", cancellationToken);
+            if (chunks == null || chunks.Count == 0)
+            {
+                try
+                {
+                    await _loggingService.LogAsync("warning", "No chunks created",
+                        $"File: {safeBlobName}, Records: {records.Count}", cancellationToken);
+                }
+                catch { }
+                return new ProcessingResult
+                {
+                    Success = true,
+                    RecordsProcessed = records.Count,
+                    ChunksProcessed = 0
+                };
+            }
+
+            try
+            {
+                await _loggingService.LogAsync("info", "Chunk creation completed",
+                    $"Total chunks: {chunks.Count}, Chunk size: 100, Total records: {records.Count}", cancellationToken);
+            }
+            catch { }
 
             // Process chunks
             await _dataService.ProcessChunksAsync(chunks, cancellationToken);
 
-            await _loggingService.LogAsync("info", "CSV processing completed successfully",
-                $"File: {blobName}, Total records: {records.Count}, Chunks processed: {chunks.Count}, Status: Success", cancellationToken);
+            try
+            {
+                await _loggingService.LogAsync("info", "CSV processing completed successfully",
+                    $"File: {safeBlobName}, Total records: {records.Count}, Chunks processed: {chunks.Count}, Status: Success", cancellationToken);
+            }
+            catch { }
 
-            _logger.LogInformation("Successfully processed {RecordCount} records from {BlobName} in {ChunkCount} chunks",
-                records.Count, blobName, chunks.Count);
+            try
+            {
+                _logger.LogInformation("Successfully processed {RecordCount} records from {BlobName} in {ChunkCount} chunks",
+                    records.Count, safeBlobName, chunks.Count);
+            }
+            catch { }
 
             return new ProcessingResult
             {
@@ -92,13 +223,36 @@ public class CsvProcessor : ICsvProcessor
         }
         catch (Exception error)
         {
-            var errorMessage = error.Message;
-            var errorStack = error.StackTrace ?? string.Empty;
+            var errorMessage = error?.Message ?? "Unknown error";
+            var errorStack = error?.StackTrace;
+            var stackTraceStr = "N/A";
 
-            await _loggingService.LogAsync("error", "CSV processing failed",
-                $"File: {blobName}, Error: {errorMessage}, Stack: {errorStack.Substring(0, Math.Min(500, errorStack.Length))}", cancellationToken);
+            if (!string.IsNullOrWhiteSpace(errorStack))
+            {
+                try
+                {
+                    stackTraceStr = errorStack.Length > 500 
+                        ? errorStack.Substring(0, 500) + "... [truncated]" 
+                        : errorStack;
+                }
+                catch
+                {
+                    stackTraceStr = "Error reading stack trace";
+                }
+            }
 
-            _logger.LogError(error, "Error processing CSV {BlobName}: {ErrorMessage}", blobName, errorMessage);
+            try
+            {
+                await _loggingService.LogAsync("error", "CSV processing failed",
+                    $"File: {safeBlobName}, Error: {errorMessage}, Stack: {stackTraceStr}", cancellationToken);
+            }
+            catch { }
+
+            try
+            {
+                _logger.LogError(error, "Error processing CSV {BlobName}: {ErrorMessage}", safeBlobName, errorMessage);
+            }
+            catch { }
 
             return new ProcessingResult
             {
