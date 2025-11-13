@@ -211,6 +211,8 @@ jobs:
             --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
             --output tsv 2>/dev/null || echo "")
           
+          SETTINGS_REMOVED=false
+          
           if [ -n "$RUN_FROM_PACKAGE" ]; then
             echo "⚠️  WEBSITE_RUN_FROM_PACKAGE is set, removing it..."
             az functionapp config appsettings delete \
@@ -219,7 +221,7 @@ jobs:
               --setting-names WEBSITE_RUN_FROM_PACKAGE \
               --output none
             echo "✅ WEBSITE_RUN_FROM_PACKAGE removed"
-            sleep 5  # Wait a moment for the change to propagate
+            SETTINGS_REMOVED=true
           else
             echo "✅ WEBSITE_RUN_FROM_PACKAGE is not set"
           fi
@@ -239,7 +241,34 @@ jobs:
               --setting-names WEBSITE_USE_ZIP \
               --output none
             echo "✅ WEBSITE_USE_ZIP removed"
-            sleep 5
+            SETTINGS_REMOVED=true
+          fi
+          
+          # If we removed settings, restart the Function App and wait longer
+          if [ "$SETTINGS_REMOVED" = true ]; then
+            echo "Restarting Function App to ensure settings are propagated..."
+            az functionapp restart \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --output none
+            echo "Waiting 30 seconds for Function App to restart and settings to propagate..."
+            sleep 30
+            
+            # Verify settings are actually removed
+            echo "Verifying settings are removed..."
+            REMAINING_RUN_FROM_PACKAGE=$(az functionapp config appsettings list \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
+              --output tsv 2>/dev/null || echo "")
+            
+            if [ -n "$REMAINING_RUN_FROM_PACKAGE" ]; then
+              echo "❌ ERROR: WEBSITE_RUN_FROM_PACKAGE is still set after removal!"
+              echo "Value: $REMAINING_RUN_FROM_PACKAGE"
+              exit 1
+            else
+              echo "✅ Verified: WEBSITE_RUN_FROM_PACKAGE is not set"
+            fi
           fi
           
           # Check Function App status before deployment
