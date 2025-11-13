@@ -79,7 +79,7 @@ jobs:
       - name: 'Deploy to Azure Functions via Kudu API'
         shell: bash
         run: |
-          set -euo pipefail  # Exit on error, undefined vars, pipe failures
+          set -eo pipefail  # Exit on error, pipe failures (removed -u to avoid issues with GitHub secret masking)
           echo "Extracting credentials from publish profile..."
           
           # Check if secret is set
@@ -89,8 +89,8 @@ jobs:
             exit 1
           fi
           
-          # Store secret in variable safely
-          PUBLISH_PROFILE_XML="${SECRET_VALUE}"
+          # Store secret in variable safely, trim whitespace
+          PUBLISH_PROFILE_XML=$(echo -n "${SECRET_VALUE}" | tr -d '\r')
           
           # Verify we got content - use wc for safer length check
           PROFILE_LENGTH=$(echo -n "$PUBLISH_PROFILE_XML" | wc -c)
