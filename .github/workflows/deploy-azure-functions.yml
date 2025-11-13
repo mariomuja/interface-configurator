@@ -157,34 +157,70 @@ jobs:
           fi
           
           echo "ZIP file size: $(du -h "$ZIP_PATH" | cut -f1)"
+          echo "ZIP file absolute path: $(realpath "$ZIP_PATH")"
+          
+          # Verify ZIP file is valid
+          echo "Verifying ZIP file integrity..."
+          if ! unzip -t "$ZIP_PATH" > /dev/null 2>&1; then
+            echo "❌ ERROR: ZIP file is corrupted or invalid!"
+            exit 1
+          fi
+          echo "✅ ZIP file is valid"
+          
+          # List first few files in ZIP for debugging
+          echo "First 20 files in ZIP:"
+          unzip -l "$ZIP_PATH" | head -25
+          
+          # Check if critical files exist
+          if ! unzip -l "$ZIP_PATH" | grep -q "host.json"; then
+            echo "❌ ERROR: host.json not found in ZIP!"
+            exit 1
+          fi
+          if ! unzip -l "$ZIP_PATH" | grep -q "ProcessCsvBlobTrigger.dll"; then
+            echo "❌ ERROR: ProcessCsvBlobTrigger.dll not found in ZIP!"
+            exit 1
+          fi
+          
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
           echo "Resource Group: rg-infrastructure-as-code"
           
-          # Use Azure CLI for deployment
+          # Check Function App status before deployment
+          echo "Checking Function App status..."
+          az functionapp show \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --query "{State:state, DefaultHostName:defaultHostName, Kind:kind}" \
+            --output table || echo "⚠️  Could not get Function App status"
+          
+          # Use Azure CLI for deployment with verbose output
           # Azure CLI handles the upload and deployment automatically
-          az functionapp deployment source config-zip \
+          echo "Starting deployment..."
+          DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
             --resource-group rg-infrastructure-as-code \
             --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
             --src "$ZIP_PATH" \
             --timeout 600 \
-            --output table
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Deployment successful!"
-            echo "Waiting 90 seconds for deployment to complete and Functions to register..."
-            sleep 90
-            
-            # Verify deployment by checking Function App status
-            echo "Verifying Function App status..."
-            az functionapp show \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --query "{State:state, DefaultHostName:defaultHostName}" \
-              --output table || echo "⚠️  Could not verify Function App status"
-          else
-            echo "❌ Deployment failed"
+            --output json 2>&1) || {
+            echo "❌ Deployment failed!"
+            echo "Error output:"
+            echo "$DEPLOY_OUTPUT"
             exit 1
-          fi
+          }
+          
+          echo "✅ Deployment successful!"
+          echo "Deployment output:"
+          echo "$DEPLOY_OUTPUT" | jq '.' || echo "$DEPLOY_OUTPUT"
+          
+          echo "Waiting 90 seconds for deployment to complete and Functions to register..."
+          sleep 90
+          
+          # Verify deployment by checking Function App status
+          echo "Verifying Function App status..."
+          az functionapp show \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --query "{State:state, DefaultHostName:defaultHostName}" \
+            --output table || echo "⚠️  Could not verify Function App status"
 
       - name: 'Verify deployment'
         shell: bash
