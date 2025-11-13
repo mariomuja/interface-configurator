@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Processors;
 using ProcessCsvBlobTrigger.Core.Services;
