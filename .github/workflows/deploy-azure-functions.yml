@@ -367,6 +367,48 @@ jobs:
           echo "Waiting 90 seconds for deployment to complete and Functions to register..."
           sleep 90
           
+          # CRITICAL: Verify files were actually deployed
+          echo "Verifying deployment by checking if files exist..."
+          PUBLISH_CREDS=$(az functionapp deployment list-publishing-credentials \
+            --resource-group rg-infrastructure-as-code \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --query "{username:publishingUserName, password:publishingPassword}" \
+            --output json 2>/dev/null || echo "")
+          
+          if [ -n "$PUBLISH_CREDS" ]; then
+            USERNAME=$(echo "$PUBLISH_CREDS" | jq -r '.username' || echo "")
+            PASSWORD=$(echo "$PUBLISH_CREDS" | jq -r '.password' || echo "")
+            
+            if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
+              AUTH=$(echo -n "${USERNAME}:${PASSWORD}" | base64 -w 0)
+              
+              # Check if host.json exists
+              HTTP_CODE=$(curl -s -o /tmp/host-check.txt -w "%{http_code}" \
+                -H "Authorization: Basic ${AUTH}" \
+                "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/vfs/site/wwwroot/host.json")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Verified: host.json exists in deployment"
+              else
+                echo "❌ ERROR: host.json not found after deployment (HTTP $HTTP_CODE)"
+                echo "Deployment may have failed silently!"
+                exit 1
+              fi
+              
+              # Check if ProcessCsvBlobTrigger.dll exists
+              HTTP_CODE=$(curl -s -o /tmp/dll-check.txt -w "%{http_code}" \
+                -H "Authorization: Basic ${AUTH}" \
+                "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/vfs/site/wwwroot/ProcessCsvBlobTrigger.dll")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Verified: ProcessCsvBlobTrigger.dll exists in deployment"
+              else
+                echo "⚠️  WARNING: ProcessCsvBlobTrigger.dll not found (HTTP $HTTP_CODE)"
+                echo "This might be OK if DLLs are in a subdirectory"
+              fi
+            fi
+          fi
+          
           # Verify deployment by checking Function App status
           echo "Verifying Function App status..."
           az functionapp show \
