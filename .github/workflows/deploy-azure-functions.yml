@@ -203,100 +203,6 @@ jobs:
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
           echo "Resource Group: rg-infrastructure-as-code"
           
-          # CRITICAL: Remove WEBSITE_RUN_FROM_PACKAGE if it exists (blocks ZIP deployment)
-          echo "Checking for WEBSITE_RUN_FROM_PACKAGE setting..."
-          
-          # Stop Function App first to ensure settings can be changed
-          echo "Stopping Function App to allow settings changes..."
-          az functionapp stop \
-            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-            --resource-group rg-infrastructure-as-code \
-            --output none 2>/dev/null || echo "Function App may already be stopped"
-          
-          sleep 5
-          
-          # Get all app settings
-          echo "Getting current app settings..."
-          ALL_SETTINGS=$(az functionapp config appsettings list \
-            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-            --resource-group rg-infrastructure-as-code \
-            --output json 2>/dev/null || echo "[]")
-          
-          RUN_FROM_PACKAGE=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_RUN_FROM_PACKAGE") | .value' 2>/dev/null || echo "")
-          USE_ZIP=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_USE_ZIP") | .value' 2>/dev/null || echo "")
-          
-          SETTINGS_REMOVED=false
-          
-          if [ -n "$RUN_FROM_PACKAGE" ] && [ "$RUN_FROM_PACKAGE" != "null" ]; then
-            echo "⚠️  WEBSITE_RUN_FROM_PACKAGE is set to: $RUN_FROM_PACKAGE"
-            echo "Removing WEBSITE_RUN_FROM_PACKAGE..."
-            az functionapp config appsettings delete \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --setting-names WEBSITE_RUN_FROM_PACKAGE \
-              --output none
-            
-            # Verify removal
-            sleep 3
-            VERIFY_RUN_FROM_PACKAGE=$(az functionapp config appsettings list \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
-              --output tsv 2>/dev/null || echo "")
-            
-            if [ -n "$VERIFY_RUN_FROM_PACKAGE" ] && [ "$VERIFY_RUN_FROM_PACKAGE" != "null" ]; then
-              echo "❌ ERROR: Failed to remove WEBSITE_RUN_FROM_PACKAGE!"
-              echo "Still set to: $VERIFY_RUN_FROM_PACKAGE"
-              exit 1
-            else
-              echo "✅ WEBSITE_RUN_FROM_PACKAGE removed successfully"
-              SETTINGS_REMOVED=true
-            fi
-          else
-            echo "✅ WEBSITE_RUN_FROM_PACKAGE is not set"
-          fi
-          
-          if [ -n "$USE_ZIP" ] && [ "$USE_ZIP" != "null" ]; then
-            echo "⚠️  WEBSITE_USE_ZIP is set, removing it..."
-            az functionapp config appsettings delete \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --setting-names WEBSITE_USE_ZIP \
-              --output none
-            echo "✅ WEBSITE_USE_ZIP removed"
-            SETTINGS_REMOVED=true
-          fi
-          
-          # Start Function App and wait for it to be ready
-          if [ "$SETTINGS_REMOVED" = true ]; then
-            echo "Starting Function App..."
-            az functionapp start \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --output none
-            
-            echo "Waiting 45 seconds for Function App to start and settings to fully propagate..."
-            sleep 45
-            
-            # Final verification
-            echo "Final verification of settings removal..."
-            FINAL_CHECK=$(az functionapp config appsettings list \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group rg-infrastructure-as-code \
-              --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_USE_ZIP']" \
-              --output json 2>/dev/null || echo "[]")
-            
-            BLOCKING_SETTINGS=$(echo "$FINAL_CHECK" | jq -r '.[] | select(.value != null and .value != "") | .name' 2>/dev/null || echo "")
-            
-            if [ -n "$BLOCKING_SETTINGS" ]; then
-              echo "❌ ERROR: Blocking settings still present after removal!"
-              echo "$BLOCKING_SETTINGS"
-              exit 1
-            else
-              echo "✅ Verified: No blocking settings found"
-            fi
-          fi
-          
           # Check Function App status before deployment
           echo "Checking Function App status..."
           az functionapp show \
@@ -305,7 +211,7 @@ jobs:
             --query "{State:state, DefaultHostName:defaultHostName, Kind:kind}" \
             --output table || echo "⚠️  Could not get Function App status"
           
-          # Use direct file upload via Azure CLI (bypasses WEBSITE_RUN_FROM_PACKAGE check)
+          # Deploy via Azure CLI
           echo "Starting deployment via Azure CLI..."
           
           # Use functionapp deployment (Function Apps are different from regular Web Apps)
@@ -320,9 +226,9 @@ jobs:
               echo "Azure CLI error:"
               echo "$DEPLOY_OUTPUT"
               
-              # Wait additional time for Azure to fully propagate settings removal
-              echo "Waiting additional 60 seconds for Azure to fully propagate settings removal..."
-              sleep 60
+                    # Wait additional time for deployment to process
+                    echo "Waiting additional 60 seconds for deployment to process..."
+                    sleep 60
               
               # Try Kudu API with sync deployment (not async)
               echo "Extracting credentials from publish profile for Kudu API..."
