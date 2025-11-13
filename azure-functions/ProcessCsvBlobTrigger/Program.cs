@@ -2,6 +2,9 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ProcessCsvBlobTrigger.Core.Interfaces;
+using ProcessCsvBlobTrigger.Core.Processors;
+using ProcessCsvBlobTrigger.Core.Services;
 using ProcessCsvBlobTrigger.Data;
 using ProcessCsvBlobTrigger.Services;
 
@@ -34,9 +37,15 @@ try
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
-            // Register services
-            services.AddScoped<CsvProcessingService>();
-            services.AddScoped<DataService>();
+            // Register Core services
+            services.AddScoped<ProcessCsvBlobTrigger.Core.Interfaces.ICsvProcessingService, ProcessCsvBlobTrigger.Core.Services.CsvProcessingService>();
+            services.AddScoped<ICsvProcessor, CsvProcessor>();
+
+            // Register adapters (bridge between Core and Function App)
+            services.AddScoped<ILoggingService, LoggingServiceAdapter>();
+            services.AddScoped<IDataService, DataServiceAdapter>();
+
+            // Register Function App services (for backward compatibility if needed)
             services.AddScoped<LoggingService>();
         })
         .Build();
@@ -54,4 +63,3 @@ catch (Exception ex)
     }
     throw;
 }
-

@@ -37,3 +37,4 @@ Nach dem Setzen des Secrets kannst du das Deployment auslösen:
 
 Nach dem Deployment sollte die Function App den Code enthalten.
 
+

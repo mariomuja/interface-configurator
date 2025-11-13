@@ -1,0 +1,19 @@
+{
+  "mssql.connections": [
+    {
+      "server": "sql-csvtransportud3e1cem.database.windows.net",
+      "database": "csvtransportdb",
+      "authenticationType": "SqlLogin",
+      "user": "sqladmin",
+      "password": "InfrastructureAsCode2024!Secure",
+      "encrypt": true,
+      "trustServerCertificate": false,
+      "emptyPasswordInput": false,
+      "savePassword": true
+    }
+  ],
+  "mssql.enableSqlCmd": true,
+  "mssql.enableIntelliSense": true
+}
+
+
