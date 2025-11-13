@@ -279,29 +279,36 @@ jobs:
             --query "{State:state, DefaultHostName:defaultHostName, Kind:kind}" \
             --output table || echo "⚠️  Could not get Function App status"
           
-          # Try Azure CLI deployment first, fallback to Kudu API if it fails
-          echo "Starting deployment via Azure CLI..."
-          DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
+          # Use direct file upload via Azure CLI (bypasses WEBSITE_RUN_FROM_PACKAGE check)
+          echo "Starting deployment via Azure CLI (direct upload)..."
+          
+          # Try using webapp deployment which might handle this better
+          DEPLOY_OUTPUT=$(az webapp deployment source config-zip \
             --resource-group rg-infrastructure-as-code \
             --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
             --src "$ZIP_PATH" \
             --timeout 600 \
             --output json 2>&1) || {
-            echo "⚠️  Azure CLI deployment failed, trying Kudu API..."
-            echo "Azure CLI error:"
-            echo "$DEPLOY_OUTPUT"
+            echo "⚠️  webapp deployment failed, trying functionapp deployment..."
             
-            # Fallback to Kudu API
-            echo "Extracting credentials from publish profile for Kudu API..."
-            PUBLISH_PROFILE=$(az functionapp deployment list-publishing-profiles \
+            # Try functionapp deployment with explicit slot
+            DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
               --resource-group rg-infrastructure-as-code \
               --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --xml 2>/dev/null || echo "")
-            
-            if [ -z "$PUBLISH_PROFILE" ]; then
-              echo "❌ Could not get publish profile. Trying alternative method..."
-              # Use Kudu API with basic auth from Service Principal
-              # Get Function App publishing credentials
+              --src "$ZIP_PATH" \
+              --timeout 600 \
+              --slot production \
+              --output json 2>&1) || {
+              echo "⚠️  Function App deployment failed, trying Kudu API with longer wait..."
+              echo "Azure CLI error:"
+              echo "$DEPLOY_OUTPUT"
+              
+              # Wait additional time for Azure to fully propagate settings removal
+              echo "Waiting additional 60 seconds for Azure to fully propagate settings removal..."
+              sleep 60
+              
+              # Try Kudu API with sync deployment (not async)
+              echo "Extracting credentials from publish profile for Kudu API..."
               PUBLISH_CREDS=$(az functionapp deployment list-publishing-credentials \
                 --resource-group rg-infrastructure-as-code \
                 --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
@@ -315,39 +322,40 @@ jobs:
               
               USERNAME=$(echo "$PUBLISH_CREDS" | jq -r '.username' || echo "")
               PASSWORD=$(echo "$PUBLISH_CREDS" | jq -r '.password' || echo "")
-            else
-              # Extract from XML publish profile
-              USERNAME=$(echo "$PUBLISH_PROFILE" | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
-              PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
-            fi
-            
-            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-              echo "❌ Could not extract credentials for Kudu API"
-              exit 1
-            fi
-            
-            echo "Deploying via Kudu API..."
-            AUTH=$(echo -n "${USERNAME}:${PASSWORD}" | base64 -w 0)
-            KUDU_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy?isAsync=true"
-            
-            HTTP_CODE=$(curl -s -o /tmp/kudu-response.txt -w "%{http_code}" \
-              -X POST \
-              -H "Authorization: Basic ${AUTH}" \
-              -H "Content-Type: application/zip" \
-              --data-binary @"${ZIP_PATH}" \
-              "${KUDU_URL}")
-            
-            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment successful via Kudu API (HTTP $HTTP_CODE)"
-              cat /tmp/kudu-response.txt
-            else
-              echo "❌ Kudu API deployment also failed (HTTP $HTTP_CODE)"
-              cat /tmp/kudu-response.txt
-              exit 1
-            fi
-            
-            # Skip to verification
-            DEPLOY_OUTPUT="Deployed via Kudu API"
+              
+              if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+                echo "❌ Could not extract credentials for Kudu API"
+                exit 1
+              fi
+              
+              echo "Deploying via Kudu API (sync mode)..."
+              AUTH=$(echo -n "${USERNAME}:${PASSWORD}" | base64 -w 0)
+              # Use sync deployment (no isAsync) - this might work better
+              KUDU_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy"
+              
+              HTTP_CODE=$(curl -s -o /tmp/kudu-response.txt -w "%{http_code}" \
+                -X POST \
+                -H "Authorization: Basic ${AUTH}" \
+                -H "Content-Type: application/zip" \
+                --data-binary @"${ZIP_PATH}" \
+                "${KUDU_URL}")
+              
+              if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+                echo "✅ Deployment successful via Kudu API (HTTP $HTTP_CODE)"
+                cat /tmp/kudu-response.txt
+                DEPLOY_OUTPUT="Deployed via Kudu API"
+              else
+                echo "❌ Kudu API deployment also failed (HTTP $HTTP_CODE)"
+                cat /tmp/kudu-response.txt
+                echo ""
+                echo "Trying to get more details about the error..."
+                # Try to get deployment logs
+                curl -s -H "Authorization: Basic ${AUTH}" \
+                  "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments" \
+                  | jq '.' 2>/dev/null | head -50 || true
+                exit 1
+              fi
+            }
           }
           
           if [ "$DEPLOY_OUTPUT" != "Deployed via Kudu API" ]; then
