@@ -177,3 +177,21 @@ variable "cors_allowed_origins" {
   type        = list(string)
   default     = []
 }
+
+variable "github_repo_url" {
+  description = "GitHub repository URL for source control deployment (e.g., https://github.com/owner/repo)"
+  type        = string
+  default     = ""
+}
+
+variable "github_branch" {
+  description = "GitHub branch for source control deployment"
+  type        = string
+  default     = "main"
+}
+
+variable "github_repo_path" {
+  description = "Path to the Function App code in the repository (e.g., azure-functions/ProcessCsvBlobTrigger)"
+  type        = string
+  default     = "azure-functions/ProcessCsvBlobTrigger"
+}

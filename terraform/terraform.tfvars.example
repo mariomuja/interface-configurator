@@ -40,6 +40,13 @@ functions_app_plan_name = "plan-funcs-app"
 functions_app_name      = "func-app"
 functions_sku_name      = "Y1"  # Consumption plan (will be migrated to EP1 Flex Consumption before Sep 2028)
 
+# GitHub Source Control (optional - enables continuous deployment from GitHub)
+# If provided, Function App will automatically deploy from GitHub repository
+# Leave empty to use GitHub Actions deployment instead
+github_repo_url  = ""  # e.g., "https://github.com/mariomuja/infrastructure-as-code"
+github_branch    = "main"
+github_repo_path = "azure-functions/ProcessCsvBlobTrigger"  # Path to Function App code in repo
+
 # Security
 jwt_secret = "CHANGE_ME_GENERATE_STRONG_RANDOM_SECRET"
 

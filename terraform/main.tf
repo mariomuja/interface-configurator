@@ -171,6 +171,9 @@ resource "azurerm_linux_function_app" "main" {
       dotnet_version = "8.0"
     }
     
+    # Note: scm_type is automatically set based on source control configuration
+    # It cannot be manually configured in Terraform
+    
     dynamic "cors" {
       for_each = length(var.cors_allowed_origins) > 0 ? [1] : []
       content {
@@ -196,10 +199,20 @@ resource "azurerm_linux_function_app" "main" {
   }
 }
 
-# Note: Function App code deployment is handled by GitHub Actions
-# Terraform only creates the infrastructure (Function App, Storage, etc.)
-# See .github/workflows/deploy-azure-functions.yml for deployment workflow
+# GitHub Source Control Configuration (if github_repo_url is provided)
+# Note: Terraform doesn't have a direct resource for Linux Function App source control
+# The source control is configured via Azure CLI after terraform apply
+# Or configure manually in Azure Portal: Function App → Deployment Center → GitHub
 #
-# To enable GitHub deployment:
-# 1. Configure GitHub source control in Azure Portal (one-time setup)
-# 2. GitHub Actions will automatically deploy on push to main branch
+# To configure GitHub source control after terraform apply:
+# az functionapp deployment source config \
+#   --name <function-app-name> \
+#   --resource-group <resource-group> \
+#   --repo-url <github-repo-url> \
+#   --branch <branch> \
+#   --manual-integration
+#
+# Or use Azure Portal: Function App → Deployment Center → Authorize GitHub
+
+# Note: If github_repo_url is not provided, code deployment is handled by GitHub Actions
+# See .github/workflows/deploy-azure-functions.yml for GitHub Actions deployment workflow
