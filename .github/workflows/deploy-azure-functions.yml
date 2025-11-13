@@ -79,68 +79,41 @@ jobs:
       - name: 'Deploy to Azure Functions via Kudu API'
         shell: bash
         run: |
-          set -eo pipefail  # Exit on error, pipe failures (removed -u to avoid issues with GitHub secret masking)
+          set -eo pipefail
           echo "Extracting credentials from publish profile..."
           
-          # Check if secret is set
-          SECRET_VALUE="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
-          if [ -z "${SECRET_VALUE:-}" ]; then
-            echo "❌ ERROR: AZURE_FUNCTIONAPP_PUBLISH_PROFILE secret is not set!"
+          # Write secret to temp file to avoid variable issues
+          echo '${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}' > /tmp/publish-profile.xml
+          
+          # Verify file exists and has content
+          if [ ! -s /tmp/publish-profile.xml ]; then
+            echo "❌ ERROR: AZURE_FUNCTIONAPP_PUBLISH_PROFILE secret is not set or empty!"
             exit 1
           fi
           
-          # Store secret in variable safely, trim whitespace
-          PUBLISH_PROFILE_XML=$(echo -n "${SECRET_VALUE}" | tr -d '\r')
-          
-          # Verify we got content - use wc for safer length check
-          PROFILE_LENGTH=$(echo -n "$PUBLISH_PROFILE_XML" | wc -c)
+          PROFILE_LENGTH=$(wc -c < /tmp/publish-profile.xml)
           if [ "$PROFILE_LENGTH" -lt 100 ]; then
             echo "❌ ERROR: Publish profile seems too short ($PROFILE_LENGTH chars)"
             echo "First 200 chars:"
-            echo "$PUBLISH_PROFILE_XML" | head -c 200 || true
+            head -c 200 /tmp/publish-profile.xml || true
             exit 1
           fi
           
           echo "Publish profile loaded ($PROFILE_LENGTH characters)"
           
-          # Extract username - use Zip Deploy profile (most reliable)
-          USERNAME=""
-          # Try to find userName in Zip Deploy profile
-          USERNAME_LINE=$(echo "$PUBLISH_PROFILE_XML" | grep -i 'ZipDeploy' | grep -o 'userName="[^"]*"' | head -n 1 || true)
-          if [ -n "$USERNAME_LINE" ]; then
-            USERNAME=$(echo "$USERNAME_LINE" | cut -d'"' -f2 || true)
-          fi
+          # Extract username from Zip Deploy profile
+          USERNAME=$(grep -i 'ZipDeploy' /tmp/publish-profile.xml | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2 || grep -o 'userName="[^"]*"' /tmp/publish-profile.xml | head -n 1 | cut -d'"' -f2 || echo "")
           
-          # Fallback: try any userName
-          if [ -z "$USERNAME" ]; then
-            USERNAME_LINE=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -n 1 || true)
-            if [ -n "$USERNAME_LINE" ]; then
-              USERNAME=$(echo "$USERNAME_LINE" | cut -d'"' -f2 || true)
-            fi
-          fi
-          
-          # Extract password - use Zip Deploy profile
-          PASSWORD=""
-          PASSWORD_LINE=$(echo "$PUBLISH_PROFILE_XML" | grep -i 'ZipDeploy' | grep -o 'userPWD="[^"]*"' | head -n 1 || true)
-          if [ -n "$PASSWORD_LINE" ]; then
-            PASSWORD=$(echo "$PASSWORD_LINE" | cut -d'"' -f2 || true)
-          fi
-          
-          # Fallback: try any userPWD
-          if [ -z "$PASSWORD" ]; then
-            PASSWORD_LINE=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -n 1 || true)
-            if [ -n "$PASSWORD_LINE" ]; then
-              PASSWORD=$(echo "$PASSWORD_LINE" | cut -d'"' -f2 || true)
-            fi
-          fi
+          # Extract password from Zip Deploy profile
+          PASSWORD=$(grep -i 'ZipDeploy' /tmp/publish-profile.xml | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2 || grep -o 'userPWD="[^"]*"' /tmp/publish-profile.xml | head -n 1 | cut -d'"' -f2 || echo "")
           
           # Verify extraction
-          if [ -z "${USERNAME:-}" ] || [ -z "${PASSWORD:-}" ]; then
+          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
             echo "❌ ERROR: Could not extract credentials from publish profile"
-            echo "Username extracted: $([ -z "${USERNAME:-}" ] && echo 'NO' || echo 'YES')"
-            echo "Password extracted: $([ -z "${PASSWORD:-}" ] && echo 'NO' || echo 'YES')"
+            echo "Username extracted: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES')"
+            echo "Password extracted: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES')"
             echo "First 500 chars of publish profile (for debugging):"
-            echo "$PUBLISH_PROFILE_XML" | head -c 500 || true
+            head -c 500 /tmp/publish-profile.xml || true
             echo ""
             exit 1
           fi
