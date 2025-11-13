@@ -190,8 +190,12 @@ resource "azurerm_linux_function_app" "main" {
     "AZURE_SQL_USER" = var.sql_admin_login
     "AZURE_SQL_PASSWORD" = var.sql_admin_password
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
-    # Code deployment is handled by GitHub Actions
-    # See .github/workflows/deploy-azure-functions.yml
+    
+    # GitHub Source Control Deployment Settings
+    # PROJECT: Path to the .csproj file relative to repository root
+    "PROJECT" = length(var.github_repo_url) > 0 ? "${var.github_repo_path}/ProcessCsvBlobTrigger.csproj" : null
+    # Enable build during deployment for GitHub source control
+    "SCM_DO_BUILD_DURING_DEPLOYMENT" = length(var.github_repo_url) > 0 ? "true" : null
   }
 
   tags = {
