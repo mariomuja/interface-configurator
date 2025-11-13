@@ -175,12 +175,16 @@ jobs:
           
           # Upload ZIP - Kudu will respect SCM_DO_BUILD_DURING_DEPLOYMENT=false setting
           echo "Uploading ZIP to ${KUDU_URL}..."
-          HTTP_CODE=$(curl -v -s -o /tmp/response.txt -w "%{http_code}" \
+          
+          # Run curl with verbose output to debug file, HTTP code to variable, response body to file
+          curl -v -s -o /tmp/response.txt -w "%{http_code}" \
             -X POST \
             -H "Authorization: Basic ${AUTH}" \
             -H "Content-Type: application/zip" \
             --data-binary @"${ZIP_PATH}" \
-            "${KUDU_URL}" 2>&1 | tee /tmp/curl-debug.txt || echo "000")
+            "${KUDU_URL}" > /tmp/http_code.txt 2> /tmp/curl-debug.txt || echo "000" > /tmp/http_code.txt
+          
+          HTTP_CODE=$(cat /tmp/http_code.txt | tr -d '\n\r')
           
           echo ""
           echo "=== Curl Debug Output ==="
@@ -190,6 +194,13 @@ jobs:
           cat /tmp/response.txt || true
           echo ""
           echo "HTTP Status: ${HTTP_CODE}"
+          
+          # Verify HTTP_CODE is numeric
+          if ! [[ "${HTTP_CODE}" =~ ^[0-9]+$ ]]; then
+            echo "❌ ERROR: Invalid HTTP status code: ${HTTP_CODE}"
+            echo "This might indicate a connection or authentication issue."
+            exit 1
+          fi
           
           if [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]; then
             echo "✅ Deployment successful!"
