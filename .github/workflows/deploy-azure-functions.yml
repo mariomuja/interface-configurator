@@ -252,17 +252,83 @@ jobs:
           # Deploy via Azure CLI
           echo "Starting deployment via Azure CLI..."
           
+          # Get more details about the Function App before deployment
+          echo "Getting detailed Function App information..."
+          az functionapp show \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --output json > /tmp/function-app-info.json 2>&1 || echo "⚠️  Could not get Function App details"
+          
+          echo "Function App details:"
+          cat /tmp/function-app-info.json | jq '{name, state, defaultHostName, kind, httpsOnly, enabled, siteConfig}' 2>/dev/null || cat /tmp/function-app-info.json
+          
+          # List all app settings for debugging
+          echo ""
+          echo "Current app settings (first 20):"
+          az functionapp config appsettings list \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --output table 2>&1 | head -25 || echo "⚠️  Could not list app settings"
+          
           # Use functionapp deployment (Function Apps are different from regular Web Apps)
           # Note: az webapp deployment was removed - Function Apps should use az functionapp deployment
+          echo ""
+          echo "Attempting deployment with verbose output..."
           DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
             --resource-group rg-infrastructure-as-code \
             --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
             --src "$ZIP_PATH" \
             --timeout 600 \
-            --output json 2>&1) || {
+            --output json \
+            --verbose 2>&1) || {
               echo "⚠️  Function App deployment failed, trying Kudu API with longer wait..."
-              echo "Azure CLI error:"
+              echo ""
+              echo "=== Azure CLI Error Details ==="
+              echo "Full error output:"
               echo "$DEPLOY_OUTPUT"
+              echo ""
+              
+              # Try to extract more details from the error
+              if echo "$DEPLOY_OUTPUT" | grep -q "Bad Request"; then
+                echo "=== Bad Request Details ==="
+                echo "This usually means:"
+                echo "1. Invalid ZIP file format or structure"
+                echo "2. Missing required files (host.json, functions.metadata)"
+                echo "3. Function App configuration issue"
+                echo "4. WEBSITE_RUN_FROM_PACKAGE or WEBSITE_USE_ZIP still set"
+                echo ""
+                
+                # Check if settings were actually removed
+                echo "Verifying settings removal..."
+                FINAL_CHECK=$(az functionapp config appsettings list \
+                  --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+                  --resource-group rg-infrastructure-as-code \
+                  --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_USE_ZIP']" \
+                  --output json 2>/dev/null || echo "[]")
+                
+                BLOCKING_SETTINGS=$(echo "$FINAL_CHECK" | jq -r '.[] | select(.value != null and .value != "") | .name' 2>/dev/null || echo "")
+                
+                if [ -n "$BLOCKING_SETTINGS" ]; then
+                  echo "❌ ERROR: Blocking settings still present!"
+                  echo "$BLOCKING_SETTINGS"
+                  echo "This is likely the cause of the Bad Request error!"
+                else
+                  echo "✅ No blocking settings found"
+                fi
+                
+                # Check ZIP file details
+                echo ""
+                echo "=== ZIP File Details ==="
+                echo "ZIP file size: $(du -h "$ZIP_PATH" | cut -f1)"
+                echo "ZIP file exists: $([ -f "$ZIP_PATH" ] && echo "YES" || echo "NO")"
+                echo "ZIP file readable: $([ -r "$ZIP_PATH" ] && echo "YES" || echo "NO")"
+                echo ""
+                echo "First 10 files in ZIP:"
+                unzip -l "$ZIP_PATH" 2>/dev/null | head -15 || echo "Could not list ZIP contents"
+              fi
+              
+              echo ""
+              echo "=== Attempting Kudu API Deployment ==="
               
                     # Wait additional time for deployment to process
                     echo "Waiting additional 60 seconds for deployment to process..."
