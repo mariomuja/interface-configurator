@@ -9,7 +9,7 @@ export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
     id: 'overview',
     title: 'Übersicht',
     content: `
-      <h2>Infrastructure as Code - CSV zu SQL Server Transport</h2>
+      <h2>CSV zu SQL Server Transport</h2>
       <p>Diese Anwendung demonstriert einen vollständigen Daten-Transport-Workflow von CSV-Dateien in eine SQL Server Datenbank unter Verwendung von Infrastructure as Code (IaC) Prinzipien.</p>
       <h3>Funktionsweise:</h3>
       <ol>

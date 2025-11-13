@@ -14,7 +14,7 @@ import { DocumentationComponent } from './components/documentation/documentation
   template: `
     <mat-toolbar color="primary" class="app-toolbar">
       <div class="toolbar-content">
-        <span class="app-title">Infrastructure as Code - CSV to SQL Server Transport</span>
+        <span class="app-title">CSV to SQL Server Transport</span>
       </div>
     </mat-toolbar>
     <main style="padding: 20px;">
