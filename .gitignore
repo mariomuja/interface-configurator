@@ -18,3 +18,6 @@ HANDOVER_EMAIL.md
 publish-profile.xml
 
 
+
+# Azure Service Principal Credentials (sensitive)
+azure-credentials.json
