@@ -88,22 +88,50 @@ jobs:
           find . -type d -name "runtimes" -exec rm -rf {} + 2>/dev/null || true
           
           # Create ZIP with all files (use absolute path to avoid issues)
+          # Important: Create ZIP from current directory (publish folder) with all files
           ZIP_PATH="$(pwd)/../function-app.zip"
+          echo "Creating ZIP from: $(pwd)"
+          echo "ZIP will be created at: $ZIP_PATH"
+          
+          # List files before creating ZIP
+          echo "Files to be included in ZIP:"
+          find . -type f | head -20
+          
+          # Create ZIP - include all files from current directory
           zip -r "$ZIP_PATH" . -q
           cd ..
+          
           echo "Package created at: $ZIP_PATH"
           echo "Package size: $(du -h function-app.zip | cut -f1)"
+          echo ""
           echo "Package contents (first 50 files):"
           unzip -l function-app.zip | head -50
           
-          # Verify ZIP contains critical files
-          if ! unzip -l function-app.zip | grep -q "ProcessCsvBlobTrigger.dll"; then
-            echo "❌ ERROR: ZIP does not contain ProcessCsvBlobTrigger.dll!"
+          # Verify ZIP contains critical files (check exact paths)
+          echo ""
+          echo "Verifying critical files in ZIP..."
+          if unzip -l function-app.zip | grep -qE "(^|\s)host\.json(\s|$)"; then
+            echo "✅ host.json found in ZIP"
+          else
+            echo "❌ ERROR: ZIP does not contain host.json!"
+            echo "ZIP contents:"
+            unzip -l function-app.zip | grep -i "host\|json" || true
             exit 1
           fi
           
-          if ! unzip -l function-app.zip | grep -q "host.json"; then
-            echo "❌ ERROR: ZIP does not contain host.json!"
+          if unzip -l function-app.zip | grep -qE "(^|\s)functions\.metadata(\s|$)"; then
+            echo "✅ functions.metadata found in ZIP"
+          else
+            echo "❌ ERROR: ZIP does not contain functions.metadata!"
+            exit 1
+          fi
+          
+          if unzip -l function-app.zip | grep -q "ProcessCsvBlobTrigger.dll"; then
+            echo "✅ ProcessCsvBlobTrigger.dll found in ZIP"
+          else
+            echo "❌ ERROR: ZIP does not contain ProcessCsvBlobTrigger.dll!"
+            echo "DLL files in ZIP:"
+            unzip -l function-app.zip | grep "\.dll" | head -10 || true
             exit 1
           fi
           
