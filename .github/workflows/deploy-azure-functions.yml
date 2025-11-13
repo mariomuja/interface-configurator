@@ -203,6 +203,44 @@ jobs:
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
           echo "Resource Group: rg-infrastructure-as-code"
           
+          # CRITICAL: Remove WEBSITE_RUN_FROM_PACKAGE and WEBSITE_USE_ZIP if they exist
+          # These settings block ZIP deployment
+          echo "Checking for blocking app settings..."
+          ALL_SETTINGS=$(az functionapp config appsettings list \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --output json 2>/dev/null || echo "[]")
+          
+          RUN_FROM_PACKAGE=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_RUN_FROM_PACKAGE") | .value' 2>/dev/null || echo "")
+          USE_ZIP=$(echo "$ALL_SETTINGS" | jq -r '.[] | select(.name=="WEBSITE_USE_ZIP") | .value' 2>/dev/null || echo "")
+          
+          if [ -n "$RUN_FROM_PACKAGE" ] && [ "$RUN_FROM_PACKAGE" != "null" ] && [ "$RUN_FROM_PACKAGE" != "" ]; then
+            echo "⚠️  WEBSITE_RUN_FROM_PACKAGE is set to: $RUN_FROM_PACKAGE"
+            echo "Removing WEBSITE_RUN_FROM_PACKAGE..."
+            az functionapp config appsettings delete \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --setting-names WEBSITE_RUN_FROM_PACKAGE \
+              --output none || echo "⚠️  Failed to remove WEBSITE_RUN_FROM_PACKAGE"
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE removed"
+            sleep 5
+          fi
+          
+          if [ -n "$USE_ZIP" ] && [ "$USE_ZIP" != "null" ] && [ "$USE_ZIP" != "" ]; then
+            echo "⚠️  WEBSITE_USE_ZIP is set, removing it..."
+            az functionapp config appsettings delete \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --setting-names WEBSITE_USE_ZIP \
+              --output none || echo "⚠️  Failed to remove WEBSITE_USE_ZIP"
+            echo "✅ WEBSITE_USE_ZIP removed"
+            sleep 5
+          fi
+          
+          if [ -z "$RUN_FROM_PACKAGE" ] && [ -z "$USE_ZIP" ]; then
+            echo "✅ No blocking app settings found"
+          fi
+          
           # Check Function App status before deployment
           echo "Checking Function App status..."
           az functionapp show \
