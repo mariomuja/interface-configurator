@@ -89,7 +89,7 @@ jobs:
           fi
           
           # Store secret in variable safely
-          PUBLISH_PROFILE_XML='${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}'
+          PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
           
           # Verify we got content
           PROFILE_LENGTH=${#PUBLISH_PROFILE_XML}
