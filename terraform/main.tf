@@ -211,7 +211,7 @@ resource "azurerm_linux_function_app" "main" {
 # Uses AzAPI provider to configure GitHub source control for Linux Function App
 resource "azapi_resource" "function_app_sourcecontrol" {
   count     = var.enable_function_app && length(var.github_repo_url) > 0 ? 1 : 0
-  type      = "Microsoft.Web/sites/sourcecontrols@2024-04-01"
+  type      = "Microsoft.Web/sites/sourcecontrols@2022-03-01"
   name      = "web"
   parent_id = azurerm_linux_function_app.main[0].id
 
