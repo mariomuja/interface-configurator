@@ -29,23 +29,25 @@ jobs:
       - name: 'Resolve Project Dependencies'
         shell: bash
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet restore
-          popd
+          cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          pwd
+          ls -la
+          echo "Restoring dependencies..."
+          dotnet restore ProcessCsvBlobTrigger.csproj
 
       - name: 'Build .NET Function App'
         shell: bash
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build --configuration Release --no-restore
-          popd
+          cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          echo "Building project..."
+          dotnet build ProcessCsvBlobTrigger.csproj --configuration Release --no-restore
 
       - name: 'Publish .NET Function App'
         shell: bash
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish --configuration Release --output ./publish --no-build
-          popd
+          cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          echo "Publishing project..."
+          dotnet publish ProcessCsvBlobTrigger.csproj --configuration Release --output ./publish --no-build
 
       - name: 'Create deployment package'
         shell: bash
