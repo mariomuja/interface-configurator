@@ -434,30 +434,51 @@ jobs:
                 cat /tmp/kudu-response.txt
                 echo ""
                 echo "Trying to get more details about the error..."
-                # Try to get deployment logs
-                LATEST_DEPLOYMENT=$(curl -s -H "Authorization: Basic ${AUTH}" \
-                  "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments" \
-                  | jq '.[0]' 2>/dev/null || echo "")
                 
-                if [ -n "$LATEST_DEPLOYMENT" ]; then
+                # Try to get latest deployment (fail-safe)
+                LATEST_DEPLOYMENT=$(curl -s -H "Authorization: Basic ${AUTH}" \
+                  "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments?top=1" \
+                  2>/dev/null | jq '.[0] // empty' 2>/dev/null || echo "")
+                
+                if [ -n "$LATEST_DEPLOYMENT" ] && [ "$LATEST_DEPLOYMENT" != "null" ] && [ "$LATEST_DEPLOYMENT" != "[]" ] && [ "$LATEST_DEPLOYMENT" != "" ]; then
                   echo "Latest deployment:"
-                  echo "$LATEST_DEPLOYMENT" | jq '.'
+                  echo "$LATEST_DEPLOYMENT" | jq '.' 2>/dev/null || echo "$LATEST_DEPLOYMENT"
                   
-                  DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT" | jq -r '.id' || echo "")
-                  if [ -n "$DEPLOYMENT_ID" ]; then
+                  DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT" | jq -r '.id // empty' 2>/dev/null || echo "")
+                  
+                  # Only try to get logs if we have a valid, non-null deployment ID
+                  if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ] && [ "$DEPLOYMENT_ID" != "" ]; then
                     echo ""
                     echo "Deployment log URL:"
                     echo "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log"
                     
+                    # Try to get logs (fail-safe - don't fail if logs unavailable)
                     DEPLOYMENT_LOG=$(curl -s -H "Authorization: Basic ${AUTH}" \
-                      "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log" 2>/dev/null || echo "")
+                      "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log" \
+                      2>/dev/null || echo "")
                     
-                    if [ -n "$DEPLOYMENT_LOG" ]; then
+                    if [ -n "$DEPLOYMENT_LOG" ] && [ "$DEPLOYMENT_LOG" != "null" ] && [ "$DEPLOYMENT_LOG" != "" ]; then
+                      # Check if response is an error JSON
+                      ERROR_CLASS=$(echo "$DEPLOYMENT_LOG" | jq -r '.ClassName // empty' 2>/dev/null || echo "")
+                      if [ -z "$ERROR_CLASS" ] || [ "$ERROR_CLASS" = "null" ]; then
+                        echo ""
+                        echo "Deployment log content:"
+                        echo "$DEPLOYMENT_LOG" | head -200
+                      else
+                        echo ""
+                        echo "⚠️  Deployment log not available: $(echo "$DEPLOYMENT_LOG" | jq -r '.Message // "Unknown error"' 2>/dev/null || echo "Unknown")"
+                      fi
+                    else
                       echo ""
-                      echo "Deployment log content:"
-                      echo "$DEPLOYMENT_LOG" | head -200
+                      echo "⚠️  Deployment logs not available (this may be normal)"
                     fi
+                  else
+                    echo ""
+                    echo "⚠️  Could not extract valid deployment ID from response"
                   fi
+                else
+                  echo ""
+                  echo "⚠️  Could not retrieve deployment information"
                 fi
                 exit 1
               fi
