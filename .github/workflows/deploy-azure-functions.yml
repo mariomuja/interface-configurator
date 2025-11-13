@@ -76,60 +76,25 @@ jobs:
           echo "Package contents:"
           unzip -l function-app.zip | head -30
 
-      - name: 'Extract credentials from publish profile'
+      - name: 'Deploy to Azure Functions via Kudu API'
         shell: bash
         run: |
           echo "Extracting credentials from publish profile..."
           PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
           
-          # Use Python to parse XML (more reliable than sed/grep)
-          python3 << 'EOF'
-          import sys
-          import re
+          # Simple extraction using grep and cut (most compatible)
+          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
+          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
           
-          xml = sys.stdin.read()
-          
-          # Extract userName
-          username_match = re.search(r'userName="([^"]*)"', xml)
-          username = username_match.group(1) if username_match else None
-          
-          # Extract userPWD
-          password_match = re.search(r'userPWD="([^"]*)"', xml)
-          password = password_match.group(1) if password_match else None
-          
-          if not username or not password:
-              print("❌ Could not extract credentials from publish profile", file=sys.stderr)
-              sys.exit(1)
-          
-          print(f"USERNAME={username}")
-          print(f"PASSWORD={password}")
-          EOF <<< "$PUBLISH_PROFILE_XML" > credentials.env
-          
-          source credentials.env
-          echo "Username extracted: ${USERNAME:0:10}..."
-          echo "Password extracted: ${PASSWORD:0:10}..."
-
-      - name: 'Deploy to Azure Functions via Kudu API'
-        shell: bash
-        env:
-          USERNAME: ${{ secrets.AZURE_FUNCTIONAPP_USERNAME }}
-          PASSWORD: ${{ secrets.AZURE_FUNCTIONAPP_PASSWORD }}
-        run: |
           if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-            echo "❌ Credentials not found in environment"
-            echo "Trying to extract from publish profile..."
-            
-            PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
-            
-            # Simple extraction using basic tools
-            USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
-            PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
-            
-            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-              echo "❌ Could not extract credentials"
-              exit 1
-            fi
+            echo "❌ Could not extract credentials from publish profile"
+            echo "Publish profile length: ${#PUBLISH_PROFILE_XML}"
+            echo "Username found: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES')"
+            echo "Password found: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES')"
+            exit 1
           fi
+          
+          echo "Credentials extracted successfully"
           
           echo "Deploying ZIP package via Kudu API..."
           ZIP_PATH="${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/function-app.zip"
