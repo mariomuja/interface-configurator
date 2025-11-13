@@ -203,6 +203,45 @@ jobs:
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
           echo "Resource Group: rg-infrastructure-as-code"
           
+          # CRITICAL: Remove WEBSITE_RUN_FROM_PACKAGE if it exists (blocks ZIP deployment)
+          echo "Checking for WEBSITE_RUN_FROM_PACKAGE setting..."
+          RUN_FROM_PACKAGE=$(az functionapp config appsettings list \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [ -n "$RUN_FROM_PACKAGE" ]; then
+            echo "⚠️  WEBSITE_RUN_FROM_PACKAGE is set, removing it..."
+            az functionapp config appsettings delete \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --setting-names WEBSITE_RUN_FROM_PACKAGE \
+              --output none
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE removed"
+            sleep 5  # Wait a moment for the change to propagate
+          else
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE is not set"
+          fi
+          
+          # Also check and remove WEBSITE_USE_ZIP if it exists
+          USE_ZIP=$(az functionapp config appsettings list \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --query "[?name=='WEBSITE_USE_ZIP'].value" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [ -n "$USE_ZIP" ]; then
+            echo "⚠️  WEBSITE_USE_ZIP is set, removing it..."
+            az functionapp config appsettings delete \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --resource-group rg-infrastructure-as-code \
+              --setting-names WEBSITE_USE_ZIP \
+              --output none
+            echo "✅ WEBSITE_USE_ZIP removed"
+            sleep 5
+          fi
+          
           # Check Function App status before deployment
           echo "Checking Function App status..."
           az functionapp show \
