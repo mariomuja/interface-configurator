@@ -51,6 +51,13 @@ jobs:
         shell: bash
         run: |
           cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish'
+          # Verify required files exist
+          echo "Checking required files..."
+          ls -la host.json
+          ls -la functions.metadata
+          ls -la ProcessCsvBlobTrigger.dll || echo "WARNING: ProcessCsvBlobTrigger.dll not found"
+          ls -la extensions.json || echo "WARNING: extensions.json not found"
+          
           # Exclude unnecessary files to reduce package size
           find . -name "Microsoft.CodeAnalysis*.dll" -delete
           find . -name "Microsoft.CodeAnalysis*.pdb" -delete
@@ -59,9 +66,13 @@ jobs:
           find . -name "*.xml" -delete
           find . -name "*.pdb" -delete
           find . -type d -name "runtimes" -exec rm -rf {} + 2>/dev/null || true
+          
+          # Create ZIP with all files
           zip -r ../function-app.zip . -q
           cd ..
           echo "Package size: $(du -h function-app.zip | cut -f1)"
+          echo "Package contents:"
+          unzip -l function-app.zip | head -30
 
       - name: 'Run Azure Functions Action'
         uses: Azure/functions-action@v1
@@ -77,4 +88,16 @@ jobs:
         run: |
           echo "Function App deployed successfully!"
           echo "Function App Name: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
+          echo "Waiting 30 seconds for Functions to be registered..."
+          sleep 30
+          
+      - name: 'List deployed functions'
+        shell: bash
+        run: |
+          echo "Checking deployed functions..."
+          az functionapp function list \
+            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+            --resource-group rg-infrastructure-as-code \
+            --output table || echo "Functions not yet visible (may take a few minutes)"
+
 
