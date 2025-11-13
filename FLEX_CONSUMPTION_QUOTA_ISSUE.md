@@ -67,3 +67,4 @@ az vm list-usage --location "West Europe" --query "[?name.value=='ElasticPremium
 - [Azure Quota Limits](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits)
 - [Flex Consumption Documentation](https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-how-to)
 
+

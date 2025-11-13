@@ -139,3 +139,5 @@ Die Outputs zeigen:
 - Rotiere regelmäßig die Storage Account Keys
 - Überprüfe regelmäßig die Vercel Environment Variables auf veraltete Werte
 
+
+

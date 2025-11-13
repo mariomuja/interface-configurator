@@ -92,3 +92,4 @@ terraform output function_app_name
 
 Dann `.github/workflows/deploy-azure-functions.yml` aktualisieren.
 
+

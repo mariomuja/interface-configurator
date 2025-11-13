@@ -111,3 +111,4 @@ Die Event Grid Subscription sollte automatisch durch Terraform erstellt werden. 
 4. Überprüfe, dass Daten in der `TransportData` Tabelle erscheinen
 
 
+

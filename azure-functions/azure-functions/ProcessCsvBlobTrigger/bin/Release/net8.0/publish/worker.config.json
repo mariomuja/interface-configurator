@@ -1,0 +1,10 @@
+{
+  "description": {
+    "language": "dotnet-isolated",
+    "extensions": [ ".dll" ],
+    "defaultExecutablePath": "{WorkerRoot}ProcessCsvBlobTrigger.exe",
+    "defaultWorkerPath": "ProcessCsvBlobTrigger.dll",
+    "workerIndexing": "true",
+    "canUsePlaceholder": true
+  }
+}
