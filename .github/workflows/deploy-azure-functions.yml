@@ -82,12 +82,14 @@ jobs:
           echo "Extracting publish profile..."
           PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
           
-          # Extract username and password from publish profile XML
-          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -oP '(?<=userName=")[^"]*' | head -1)
-          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -oP '(?<=userPWD=")[^"]*' | head -1)
+          # Extract username and password from publish profile XML using sed (more compatible than grep -oP)
+          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -1)
+          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -1)
           
           if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
             echo "❌ Could not extract credentials from publish profile"
+            echo "Username found: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES')"
+            echo "Password found: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES')"
             exit 1
           fi
           
