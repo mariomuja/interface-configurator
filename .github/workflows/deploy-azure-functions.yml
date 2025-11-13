@@ -340,18 +340,72 @@ jobs:
                 "${KUDU_URL}")
               
               if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-                echo "✅ Deployment successful via Kudu API (HTTP $HTTP_CODE)"
+                echo "✅ Deployment accepted via Kudu API (HTTP $HTTP_CODE)"
                 cat /tmp/kudu-response.txt
+                
+                # Wait a moment and check deployment status
+                echo "Waiting 10 seconds for deployment to process..."
+                sleep 10
+                
+                # Get the latest deployment ID from response
+                DEPLOYMENT_ID=$(cat /tmp/kudu-response.txt | jq -r '.id' 2>/dev/null || echo "")
+                
+                if [ -n "$DEPLOYMENT_ID" ]; then
+                  echo "Checking deployment logs for ID: $DEPLOYMENT_ID"
+                  DEPLOYMENT_LOG=$(curl -s -H "Authorization: Basic ${AUTH}" \
+                    "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log" 2>/dev/null || echo "")
+                  
+                  if [ -n "$DEPLOYMENT_LOG" ]; then
+                    echo "Deployment log:"
+                    echo "$DEPLOYMENT_LOG" | head -100
+                  fi
+                  
+                  # Check deployment status
+                  DEPLOYMENT_STATUS=$(curl -s -H "Authorization: Basic ${AUTH}" \
+                    "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID" 2>/dev/null | jq -r '.status' || echo "")
+                  
+                  if [ "$DEPLOYMENT_STATUS" = "4" ]; then
+                    echo "❌ Deployment failed (status: 4)"
+                    exit 1
+                  elif [ "$DEPLOYMENT_STATUS" = "3" ]; then
+                    echo "⚠️  Deployment completed but may have errors (status: 3)"
+                    echo "Checking if files were deployed..."
+                  else
+                    echo "✅ Deployment status: $DEPLOYMENT_STATUS"
+                  fi
+                fi
+                
                 DEPLOY_OUTPUT="Deployed via Kudu API"
               else
-                echo "❌ Kudu API deployment also failed (HTTP $HTTP_CODE)"
+                echo "❌ Kudu API deployment failed (HTTP $HTTP_CODE)"
                 cat /tmp/kudu-response.txt
                 echo ""
                 echo "Trying to get more details about the error..."
                 # Try to get deployment logs
-                curl -s -H "Authorization: Basic ${AUTH}" \
+                LATEST_DEPLOYMENT=$(curl -s -H "Authorization: Basic ${AUTH}" \
                   "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments" \
-                  | jq '.' 2>/dev/null | head -50 || true
+                  | jq '.[0]' 2>/dev/null || echo "")
+                
+                if [ -n "$LATEST_DEPLOYMENT" ]; then
+                  echo "Latest deployment:"
+                  echo "$LATEST_DEPLOYMENT" | jq '.'
+                  
+                  DEPLOYMENT_ID=$(echo "$LATEST_DEPLOYMENT" | jq -r '.id' || echo "")
+                  if [ -n "$DEPLOYMENT_ID" ]; then
+                    echo ""
+                    echo "Deployment log URL:"
+                    echo "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log"
+                    
+                    DEPLOYMENT_LOG=$(curl -s -H "Authorization: Basic ${AUTH}" \
+                      "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/deployments/$DEPLOYMENT_ID/log" 2>/dev/null || echo "")
+                    
+                    if [ -n "$DEPLOYMENT_LOG" ]; then
+                      echo ""
+                      echo "Deployment log content:"
+                      echo "$DEPLOYMENT_LOG" | head -200
+                    fi
+                  fi
+                fi
                 exit 1
               fi
             }
