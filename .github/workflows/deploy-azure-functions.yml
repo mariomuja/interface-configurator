@@ -76,14 +76,44 @@ jobs:
           echo "Package contents:"
           unzip -l function-app.zip | head -30
 
-      - name: 'Run Azure Functions Action'
-        uses: Azure/functions-action@v1
-        id: fa
-        with:
-          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/function-app.zip'
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
-          scm-do-build-during-deployment: false
+      - name: 'Deploy to Azure Functions via Kudu API'
+        shell: bash
+        run: |
+          echo "Extracting publish profile..."
+          PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
+          
+          # Extract username and password from publish profile XML
+          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -oP '(?<=userName=")[^"]*' | head -1)
+          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -oP '(?<=userPWD=")[^"]*' | head -1)
+          
+          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+            echo "❌ Could not extract credentials from publish profile"
+            exit 1
+          fi
+          
+          echo "Deploying ZIP package via Kudu API..."
+          ZIP_PATH="${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/function-app.zip"
+          KUDU_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy"
+          
+          # Create base64 auth
+          AUTH=$(echo -n "$USERNAME:$PASSWORD" | base64)
+          
+          # Upload ZIP
+          curl -X POST \
+            -H "Authorization: Basic $AUTH" \
+            -H "Content-Type: application/zip" \
+            --data-binary @"$ZIP_PATH" \
+            "$KUDU_URL" \
+            --fail \
+            --show-error \
+            --write-out "\nHTTP Status: %{http_code}\n"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi
 
       - name: 'Verify deployment'
         shell: bash
