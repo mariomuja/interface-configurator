@@ -156,27 +156,35 @@ jobs:
           # Use sync deployment with build disabled via query parameter
           KUDU_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy"
           
+          # Verify ZIP file exists
+          if [ ! -f "$ZIP_PATH" ]; then
+            echo "❌ ERROR: ZIP file not found at $ZIP_PATH"
+            exit 1
+          fi
+          
+          echo "ZIP file size: $(du -h "$ZIP_PATH" | cut -f1)"
+          
           # Create base64 auth
-          AUTH=$(echo -n "$USERNAME:$PASSWORD" | base64 -w 0)
+          AUTH=$(echo -n "${USERNAME}:${PASSWORD}" | base64 -w 0)
           
           # Upload ZIP - Kudu will respect SCM_DO_BUILD_DURING_DEPLOYMENT=false setting
           HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
             -X POST \
-            -H "Authorization: Basic $AUTH" \
+            -H "Authorization: Basic ${AUTH}" \
             -H "Content-Type: application/zip" \
-            --data-binary @"$ZIP_PATH" \
-            "$KUDU_URL")
+            --data-binary @"${ZIP_PATH}" \
+            "${KUDU_URL}" || echo "000")
           
-          cat /tmp/response.txt
+          cat /tmp/response.txt || true
           echo ""
-          echo "HTTP Status: $HTTP_CODE"
+          echo "HTTP Status: ${HTTP_CODE}"
           
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          if [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]; then
             echo "✅ Deployment successful!"
             echo "Waiting 30 seconds for deployment to complete..."
             sleep 30
           else
-            echo "❌ Deployment failed with HTTP $HTTP_CODE"
+            echo "❌ Deployment failed with HTTP ${HTTP_CODE}"
             exit 1
           fi
 
