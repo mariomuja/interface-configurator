@@ -168,17 +168,36 @@ jobs:
           echo "✅ ZIP file is valid"
           
           # List first few files in ZIP for debugging
-          echo "First 20 files in ZIP:"
-          unzip -l "$ZIP_PATH" | head -25
+          echo "First 30 files in ZIP:"
+          unzip -l "$ZIP_PATH" | head -35
           
-          # Check if critical files exist
-          if ! unzip -l "$ZIP_PATH" | grep -q "host.json"; then
+          # Check if critical files exist (with better pattern matching)
+          echo ""
+          echo "Checking for critical files..."
+          ZIP_CONTENTS=$(unzip -l "$ZIP_PATH")
+          
+          if echo "$ZIP_CONTENTS" | grep -qE "(^|\s)host\.json(\s|$)"; then
+            echo "✅ host.json found in ZIP"
+          else
             echo "❌ ERROR: host.json not found in ZIP!"
+            echo "Files containing 'host' or 'json':"
+            echo "$ZIP_CONTENTS" | grep -i "host\|json" || echo "None found"
             exit 1
           fi
-          if ! unzip -l "$ZIP_PATH" | grep -q "ProcessCsvBlobTrigger.dll"; then
+          
+          if echo "$ZIP_CONTENTS" | grep -q "ProcessCsvBlobTrigger.dll"; then
+            echo "✅ ProcessCsvBlobTrigger.dll found in ZIP"
+          else
             echo "❌ ERROR: ProcessCsvBlobTrigger.dll not found in ZIP!"
+            echo "DLL files in ZIP:"
+            echo "$ZIP_CONTENTS" | grep "\.dll" | head -10 || echo "None found"
             exit 1
+          fi
+          
+          if echo "$ZIP_CONTENTS" | grep -qE "(^|\s)functions\.metadata(\s|$)"; then
+            echo "✅ functions.metadata found in ZIP"
+          else
+            echo "⚠️  WARNING: functions.metadata not found in ZIP"
           fi
           
           echo "Deploying to Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
@@ -192,24 +211,82 @@ jobs:
             --query "{State:state, DefaultHostName:defaultHostName, Kind:kind}" \
             --output table || echo "⚠️  Could not get Function App status"
           
-          # Use Azure CLI for deployment with verbose output
-          # Azure CLI handles the upload and deployment automatically
-          echo "Starting deployment..."
+          # Try Azure CLI deployment first, fallback to Kudu API if it fails
+          echo "Starting deployment via Azure CLI..."
           DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
             --resource-group rg-infrastructure-as-code \
             --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
             --src "$ZIP_PATH" \
             --timeout 600 \
             --output json 2>&1) || {
-            echo "❌ Deployment failed!"
-            echo "Error output:"
+            echo "⚠️  Azure CLI deployment failed, trying Kudu API..."
+            echo "Azure CLI error:"
             echo "$DEPLOY_OUTPUT"
-            exit 1
+            
+            # Fallback to Kudu API
+            echo "Extracting credentials from publish profile for Kudu API..."
+            PUBLISH_PROFILE=$(az functionapp deployment list-publishing-profiles \
+              --resource-group rg-infrastructure-as-code \
+              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+              --xml 2>/dev/null || echo "")
+            
+            if [ -z "$PUBLISH_PROFILE" ]; then
+              echo "❌ Could not get publish profile. Trying alternative method..."
+              # Use Kudu API with basic auth from Service Principal
+              # Get Function App publishing credentials
+              PUBLISH_CREDS=$(az functionapp deployment list-publishing-credentials \
+                --resource-group rg-infrastructure-as-code \
+                --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
+                --query "{username:publishingUserName, password:publishingPassword}" \
+                --output json 2>/dev/null || echo "")
+              
+              if [ -z "$PUBLISH_CREDS" ]; then
+                echo "❌ Could not get publishing credentials"
+                exit 1
+              fi
+              
+              USERNAME=$(echo "$PUBLISH_CREDS" | jq -r '.username' || echo "")
+              PASSWORD=$(echo "$PUBLISH_CREDS" | jq -r '.password' || echo "")
+            else
+              # Extract from XML publish profile
+              USERNAME=$(echo "$PUBLISH_PROFILE" | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
+              PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
+            fi
+            
+            if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+              echo "❌ Could not extract credentials for Kudu API"
+              exit 1
+            fi
+            
+            echo "Deploying via Kudu API..."
+            AUTH=$(echo -n "${USERNAME}:${PASSWORD}" | base64 -w 0)
+            KUDU_URL="https://${{ env.AZURE_FUNCTIONAPP_NAME }}.scm.azurewebsites.net/api/zipdeploy?isAsync=true"
+            
+            HTTP_CODE=$(curl -s -o /tmp/kudu-response.txt -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Basic ${AUTH}" \
+              -H "Content-Type: application/zip" \
+              --data-binary @"${ZIP_PATH}" \
+              "${KUDU_URL}")
+            
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "✅ Deployment successful via Kudu API (HTTP $HTTP_CODE)"
+              cat /tmp/kudu-response.txt
+            else
+              echo "❌ Kudu API deployment also failed (HTTP $HTTP_CODE)"
+              cat /tmp/kudu-response.txt
+              exit 1
+            fi
+            
+            # Skip to verification
+            DEPLOY_OUTPUT="Deployed via Kudu API"
           }
           
-          echo "✅ Deployment successful!"
-          echo "Deployment output:"
-          echo "$DEPLOY_OUTPUT" | jq '.' || echo "$DEPLOY_OUTPUT"
+          if [ "$DEPLOY_OUTPUT" != "Deployed via Kudu API" ]; then
+            echo "✅ Deployment successful via Azure CLI!"
+            echo "Deployment output:"
+            echo "$DEPLOY_OUTPUT" | jq '.' 2>/dev/null || echo "$DEPLOY_OUTPUT"
+          fi
           
           echo "Waiting 90 seconds for deployment to complete and Functions to register..."
           sleep 90
