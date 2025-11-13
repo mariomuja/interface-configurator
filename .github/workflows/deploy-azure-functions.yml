@@ -79,46 +79,56 @@ jobs:
       - name: 'Deploy to Azure Functions via Kudu API'
         shell: bash
         run: |
+          set -e  # Exit on error
           echo "Extracting credentials from publish profile..."
           
-          # Check if secret is set
+          # Check if secret is set (using env var to avoid issues)
           if [ -z "${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}" ]; then
             echo "❌ ERROR: AZURE_FUNCTIONAPP_PUBLISH_PROFILE secret is not set!"
             exit 1
           fi
           
-          PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
+          # Store secret in variable safely
+          PUBLISH_PROFILE_XML='${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}'
           
-          # Debug: Check if we have content (without printing sensitive data)
-          if [ ${#PUBLISH_PROFILE_XML} -lt 100 ]; then
-            echo "❌ ERROR: Publish profile seems too short (${#PUBLISH_PROFILE_XML} chars)"
+          # Verify we got content
+          PROFILE_LENGTH=${#PUBLISH_PROFILE_XML}
+          if [ "$PROFILE_LENGTH" -lt 100 ]; then
+            echo "❌ ERROR: Publish profile seems too short ($PROFILE_LENGTH chars)"
             exit 1
           fi
           
-          echo "Publish profile loaded (${#PUBLISH_PROFILE_XML} characters)"
+          echo "Publish profile loaded ($PROFILE_LENGTH characters)"
           
-          # Extract username and password using grep and cut (compatible method)
-          # Method 1: Standard grep with cut
-          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2)
-          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2)
+          # Extract username - try multiple methods
+          USERNAME=""
+          if command -v grep >/dev/null 2>&1; then
+            USERNAME=$(printf '%s\n' "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2 || true)
+          fi
           
-          # Method 2: Alternative using sed if grep fails
           if [ -z "$USERNAME" ]; then
-            echo "⚠️  Trying alternative extraction method for username..."
-            USERNAME=$(echo "$PUBLISH_PROFILE_XML" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -n 1)
+            USERNAME=$(printf '%s\n' "$PUBLISH_PROFILE_XML" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -n 1 || true)
+          fi
+          
+          # Extract password - try multiple methods
+          PASSWORD=""
+          if command -v grep >/dev/null 2>&1; then
+            PASSWORD=$(printf '%s\n' "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2 || true)
           fi
           
           if [ -z "$PASSWORD" ]; then
-            echo "⚠️  Trying alternative extraction method for password..."
-            PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -n 1)
+            PASSWORD=$(printf '%s\n' "$PUBLISH_PROFILE_XML" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -n 1 || true)
           fi
           
+          # Verify extraction
           if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
             echo "❌ ERROR: Could not extract credentials from publish profile"
-            echo "Username extracted: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES (length: '${#USERNAME}')')"
-            echo "Password extracted: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES (length: '${#PASSWORD}')')"
-            echo "First 200 chars of publish profile:"
-            echo "$PUBLISH_PROFILE_XML" | head -c 200
+            USERNAME_LEN=${#USERNAME}
+            PASSWORD_LEN=${#PASSWORD}
+            echo "Username extracted: $([ -z "$USERNAME" ] && echo 'NO' || echo "YES (length: $USERNAME_LEN)")"
+            echo "Password extracted: $([ -z "$PASSWORD" ] && echo 'NO' || echo "YES (length: $PASSWORD_LEN)")"
+            echo "First 200 chars of publish profile (for debugging):"
+            printf '%s\n' "$PUBLISH_PROFILE_XML" | head -c 200 || true
             echo ""
             exit 1
           fi
