@@ -55,26 +55,59 @@ jobs:
           cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish'
           # Verify required files exist
           echo "Checking required files..."
-          ls -la host.json
-          ls -la functions.metadata
-          ls -la ProcessCsvBlobTrigger.dll || echo "WARNING: ProcessCsvBlobTrigger.dll not found"
+          ls -la host.json || echo "ERROR: host.json not found!"
+          ls -la functions.metadata || echo "ERROR: functions.metadata not found!"
+          ls -la ProcessCsvBlobTrigger.dll || echo "ERROR: ProcessCsvBlobTrigger.dll not found!"
+          ls -la ProcessCsvBlobTrigger.Core.dll || echo "WARNING: ProcessCsvBlobTrigger.Core.dll not found (might be OK)"
           ls -la extensions.json || echo "WARNING: extensions.json not found"
           
+          # Verify Core assembly is present
+          if [ ! -f "ProcessCsvBlobTrigger.dll" ]; then
+            echo "❌ ERROR: ProcessCsvBlobTrigger.dll is missing!"
+            exit 1
+          fi
+          
+          if [ ! -f "host.json" ]; then
+            echo "❌ ERROR: host.json is missing!"
+            exit 1
+          fi
+          
+          if [ ! -f "functions.metadata" ]; then
+            echo "❌ ERROR: functions.metadata is missing!"
+            exit 1
+          fi
+          
           # Exclude unnecessary files to reduce package size
-          find . -name "Microsoft.CodeAnalysis*.dll" -delete
-          find . -name "Microsoft.CodeAnalysis*.pdb" -delete
-          find . -name "*.Designer.dll" -delete
-          find . -name "*.Designer.pdb" -delete
-          find . -name "*.xml" -delete
-          find . -name "*.pdb" -delete
+          echo "Cleaning up unnecessary files..."
+          find . -name "Microsoft.CodeAnalysis*.dll" -delete || true
+          find . -name "Microsoft.CodeAnalysis*.pdb" -delete || true
+          find . -name "*.Designer.dll" -delete || true
+          find . -name "*.Designer.pdb" -delete || true
+          find . -name "*.xml" -delete || true
+          find . -name "*.pdb" -delete || true
           find . -type d -name "runtimes" -exec rm -rf {} + 2>/dev/null || true
           
-          # Create ZIP with all files
-          zip -r ../function-app.zip . -q
+          # Create ZIP with all files (use absolute path to avoid issues)
+          ZIP_PATH="$(pwd)/../function-app.zip"
+          zip -r "$ZIP_PATH" . -q
           cd ..
+          echo "Package created at: $ZIP_PATH"
           echo "Package size: $(du -h function-app.zip | cut -f1)"
-          echo "Package contents:"
-          unzip -l function-app.zip | head -30
+          echo "Package contents (first 50 files):"
+          unzip -l function-app.zip | head -50
+          
+          # Verify ZIP contains critical files
+          if ! unzip -l function-app.zip | grep -q "ProcessCsvBlobTrigger.dll"; then
+            echo "❌ ERROR: ZIP does not contain ProcessCsvBlobTrigger.dll!"
+            exit 1
+          fi
+          
+          if ! unzip -l function-app.zip | grep -q "host.json"; then
+            echo "❌ ERROR: ZIP does not contain host.json!"
+            exit 1
+          fi
+          
+          echo "✅ ZIP package verified successfully"
 
       - name: 'Deploy to Azure Functions via Kudu API'
         shell: bash
