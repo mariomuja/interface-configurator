@@ -14,6 +14,10 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    azapi = {
+      source  = "azure/azapi"
+      version = "~> 1.0"
+    }
   }
 }
 
@@ -204,19 +208,24 @@ resource "azurerm_linux_function_app" "main" {
 }
 
 # GitHub Source Control Configuration (if github_repo_url is provided)
-# Note: Terraform doesn't have a direct resource for Linux Function App source control
-# The source control is configured via Azure CLI after terraform apply
-# Or configure manually in Azure Portal: Function App → Deployment Center → GitHub
-#
-# To configure GitHub source control after terraform apply:
-# az functionapp deployment source config \
-#   --name <function-app-name> \
-#   --resource-group <resource-group> \
-#   --repo-url <github-repo-url> \
-#   --branch <branch> \
-#   --manual-integration
-#
-# Or use Azure Portal: Function App → Deployment Center → Authorize GitHub
+# Uses AzAPI provider to configure GitHub source control for Linux Function App
+resource "azapi_resource" "function_app_sourcecontrol" {
+  count     = var.enable_function_app && length(var.github_repo_url) > 0 ? 1 : 0
+  type      = "Microsoft.Web/sites/sourcecontrols@2024-04-01"
+  name      = "web"
+  parent_id = azurerm_linux_function_app.main[0].id
 
-# Note: If github_repo_url is not provided, code deployment is handled by GitHub Actions
-# See .github/workflows/deploy-azure-functions.yml for GitHub Actions deployment workflow
+  body = jsonencode({
+    properties = {
+      repoUrl             = var.github_repo_url
+      branch              = var.github_branch
+      isManualIntegration = false
+      # For Linux Function Apps, we use Kudu deployment (not GitHub Actions)
+      isGitHubAction = false
+    }
+  })
+
+  depends_on = [
+    azurerm_linux_function_app.main
+  ]
+}
