@@ -80,21 +80,53 @@ jobs:
         shell: bash
         run: |
           echo "Extracting credentials from publish profile..."
-          PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
           
-          # Simple extraction using grep and cut (most compatible)
-          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
-          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
-          
-          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-            echo "❌ Could not extract credentials from publish profile"
-            echo "Publish profile length: ${#PUBLISH_PROFILE_XML}"
-            echo "Username found: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES')"
-            echo "Password found: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES')"
+          # Check if secret is set
+          if [ -z "${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}" ]; then
+            echo "❌ ERROR: AZURE_FUNCTIONAPP_PUBLISH_PROFILE secret is not set!"
             exit 1
           fi
           
-          echo "Credentials extracted successfully"
+          PUBLISH_PROFILE_XML="${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}"
+          
+          # Debug: Check if we have content (without printing sensitive data)
+          if [ ${#PUBLISH_PROFILE_XML} -lt 100 ]; then
+            echo "❌ ERROR: Publish profile seems too short (${#PUBLISH_PROFILE_XML} chars)"
+            exit 1
+          fi
+          
+          echo "Publish profile loaded (${#PUBLISH_PROFILE_XML} characters)"
+          
+          # Extract username and password using grep and cut
+          USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2)
+          PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2)
+          
+          # Verify extraction
+          if [ -z "$USERNAME" ]; then
+            echo "❌ ERROR: Could not extract username from publish profile"
+            echo "Trying alternative extraction method..."
+            USERNAME=$(echo "$PUBLISH_PROFILE_XML" | grep -oP 'userName="\K[^"]*' | head -n 1 || echo "")
+          fi
+          
+          if [ -z "$PASSWORD" ]; then
+            echo "❌ ERROR: Could not extract password from publish profile"
+            echo "Trying alternative extraction method..."
+            PASSWORD=$(echo "$PUBLISH_PROFILE_XML" | grep -oP 'userPWD="\K[^"]*' | head -n 1 || echo "")
+          fi
+          
+          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+            echo "❌ ERROR: Could not extract credentials from publish profile"
+            echo "Username extracted: $([ -z "$USERNAME" ] && echo 'NO' || echo 'YES (length: '${#USERNAME}')')"
+            echo "Password extracted: $([ -z "$PASSWORD" ] && echo 'NO' || echo 'YES (length: '${#PASSWORD}')')"
+            echo "First 200 chars of publish profile:"
+            echo "$PUBLISH_PROFILE_XML" | head -c 200
+            echo ""
+            exit 1
+          fi
+          
+          echo "✅ Credentials extracted successfully"
+          echo "Username length: ${#USERNAME}"
+          echo "Password length: ${#PASSWORD}"
           
           echo "Deploying ZIP package via Kudu API..."
           ZIP_PATH="${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/function-app.zip"
