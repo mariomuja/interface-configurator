@@ -1,0 +1,80 @@
+name: Deploy Azure Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'azure-functions/**'
+      - '.github/workflows/deploy-azure-functions.yml'
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: func-appe1mz5h  # Will be updated from Terraform outputs
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions/ProcessCsvBlobTrigger'
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@v4
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 'Resolve Project Dependencies'
+        shell: bash
+        run: |
+          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet restore
+          popd
+
+      - name: 'Build .NET Function App'
+        shell: bash
+        run: |
+          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet build --configuration Release --no-restore
+          popd
+
+      - name: 'Publish .NET Function App'
+        shell: bash
+        run: |
+          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet publish --configuration Release --output ./publish --no-build
+          popd
+
+      - name: 'Create deployment package'
+        shell: bash
+        run: |
+          cd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish'
+          # Exclude unnecessary files to reduce package size
+          find . -name "Microsoft.CodeAnalysis*.dll" -delete
+          find . -name "Microsoft.CodeAnalysis*.pdb" -delete
+          find . -name "*.Designer.dll" -delete
+          find . -name "*.Designer.pdb" -delete
+          find . -name "*.xml" -delete
+          find . -name "*.pdb" -delete
+          find . -type d -name "runtimes" -exec rm -rf {} + 2>/dev/null || true
+          zip -r ../function-app.zip . -q
+          cd ..
+          echo "Package size: $(du -h function-app.zip | cut -f1)"
+
+      - name: 'Run Azure Functions Action'
+        uses: Azure/functions-action@v1
+        id: fa
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/function-app.zip'
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          scm-do-build-during-deployment: false
+
+      - name: 'Verify deployment'
+        shell: bash
+        run: |
+          echo "Function App deployed successfully!"
+          echo "Function App Name: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
+

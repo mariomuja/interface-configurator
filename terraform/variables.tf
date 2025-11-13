@@ -154,9 +154,9 @@ variable "functions_app_name" {
 }
 
 variable "functions_sku_name" {
-  description = "SKU name for Functions app service plan"
+  description = "SKU name for Functions app service plan. Use 'Y1' for Consumption (current), 'EP1' for Flex Consumption (migration required before Sep 2028)"
   type        = string
-  default     = "Y1"
+  default     = "Y1"  # Consumption Plan (will be migrated to EP1 Flex Consumption before Sep 2028)
 }
 
 variable "enable_function_app" {

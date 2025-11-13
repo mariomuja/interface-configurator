@@ -15,5 +15,6 @@ terraform.tfvars
 frontend/.angular/
 azure-functions/function-app.zip
 HANDOVER_EMAIL.md
+publish-profile.xml
 
 

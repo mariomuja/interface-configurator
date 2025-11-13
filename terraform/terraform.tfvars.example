@@ -38,7 +38,7 @@ current_ip_address = ""  # Your current IP address if allow_current_ip = true
 enable_function_app    = false
 functions_app_plan_name = "plan-funcs-app"
 functions_app_name      = "func-app"
-functions_sku_name      = "Y1"  # Consumption plan
+functions_sku_name      = "Y1"  # Consumption plan (will be migrated to EP1 Flex Consumption before Sep 2028)
 
 # Security
 jwt_secret = "CHANGE_ME_GENERATE_STRONG_RANDOM_SECRET"

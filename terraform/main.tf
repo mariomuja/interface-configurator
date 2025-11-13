@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 }
 
@@ -87,6 +91,16 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
   end_ip_address   = "0.0.0.0"
 }
 
+# SQL Server Firewall Rule - Allow All IPs (for Vercel Serverless Functions)
+# Note: This allows connections from any IP address
+# For production, consider restricting to specific IP ranges
+resource "azurerm_mssql_firewall_rule" "allow_all_ips" {
+  name             = "AllowAllIPs"
+  server_id        = azurerm_mssql_server.main.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "255.255.255.255"
+}
+
 # SQL Server Firewall Rule - Allow current IP (if provided)
 resource "azurerm_mssql_firewall_rule" "current_ip" {
   count            = var.allow_current_ip && var.current_ip_address != "" ? 1 : 0
@@ -129,12 +143,13 @@ resource "azurerm_storage_account" "functions" {
 }
 
 # App Service Plan for Azure Functions
+# Currently using Consumption Plan (Y1) - will migrate to Flex Consumption (EP1) before Sep 2028
 resource "azurerm_service_plan" "functions" {
   name                = "${var.functions_app_plan_name}${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = var.functions_sku_name
+  sku_name            = var.functions_sku_name  # Y1 for Consumption (current), EP1 for Flex Consumption (future)
 
   tags = {
     Environment = var.environment
@@ -153,7 +168,7 @@ resource "azurerm_linux_function_app" "main" {
 
   site_config {
     application_stack {
-      node_version = "20"
+      dotnet_version = "8.0"
     }
     
     dynamic "cors" {
@@ -165,12 +180,26 @@ resource "azurerm_linux_function_app" "main" {
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "node"
-    "NODE_ENV"                 = var.environment
-    "DATABASE_URL"             = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${var.sql_database_name};Persist Security Info=False;User ID=${var.sql_admin_login};Password=${var.sql_admin_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+    "FUNCTIONS_WORKER_RUNTIME" = "dotnet-isolated"
+    "AZURE_FUNCTIONS_ENVIRONMENT" = var.environment
+    "AZURE_SQL_SERVER" = azurerm_mssql_server.main.fully_qualified_domain_name
+    "AZURE_SQL_DATABASE" = var.sql_database_name
+    "AZURE_SQL_USER" = var.sql_admin_login
+    "AZURE_SQL_PASSWORD" = var.sql_admin_password
+    "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
+    # Code deployment is handled by GitHub Actions
+    # See .github/workflows/deploy-azure-functions.yml
   }
 
   tags = {
     Environment = var.environment
   }
 }
+
+# Note: Function App code deployment is handled by GitHub Actions
+# Terraform only creates the infrastructure (Function App, Storage, etc.)
+# See .github/workflows/deploy-azure-functions.yml for deployment workflow
+#
+# To enable GitHub deployment:
+# 1. Configure GitHub source control in Azure Portal (one-time setup)
+# 2. GitHub Actions will automatically deploy on push to main branch
