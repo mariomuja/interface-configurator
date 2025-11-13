@@ -137,49 +137,13 @@ jobs:
           
           echo "✅ ZIP package verified successfully"
 
-      - name: 'Install Azure CLI'
-        shell: bash
-        run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-          az --version
-
-      - name: 'Extract Publish Profile Credentials'
-        shell: bash
-        run: |
-          set -eo pipefail
-          echo "Extracting credentials from publish profile..."
-          
-          # Write secret to temp file
-          echo '${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}' > /tmp/publish-profile.xml
-          
-          # Verify file exists and has content
-          if [ ! -s /tmp/publish-profile.xml ]; then
-            echo "❌ ERROR: AZURE_FUNCTIONAPP_PUBLISH_PROFILE secret is not set or empty!"
-            exit 1
-          fi
-          
-          # Extract username and password from Zip Deploy profile
-          USERNAME=$(grep -i 'ZipDeploy' /tmp/publish-profile.xml | grep -o 'userName="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
-          PASSWORD=$(grep -i 'ZipDeploy' /tmp/publish-profile.xml | grep -o 'userPWD="[^"]*"' | head -n 1 | cut -d'"' -f2 || echo "")
-          
-          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-            echo "❌ ERROR: Could not extract credentials from publish profile"
-            exit 1
-          fi
-          
-          # Save credentials to environment file for next step
-          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
-          echo "PASSWORD=$PASSWORD" >> $GITHUB_ENV
-          
-          echo "✅ Credentials extracted successfully"
-          echo "Username length: $(echo -n "$USERNAME" | wc -c)"
-          echo "Password length: $(echo -n "$PASSWORD" | wc -c)"
+      - name: 'Azure Login'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: 'Deploy to Azure Functions via Azure CLI'
         shell: bash
-        env:
-          USERNAME: ${{ env.USERNAME }}
-          PASSWORD: ${{ env.PASSWORD }}
         run: |
           set -eo pipefail
           echo "Deploying ZIP package via Azure CLI..."
