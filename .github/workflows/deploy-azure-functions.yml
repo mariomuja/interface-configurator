@@ -291,13 +291,12 @@ jobs:
             --output json 2>&1) || {
             echo "⚠️  webapp deployment failed, trying functionapp deployment..."
             
-            # Try functionapp deployment with explicit slot
+            # Try functionapp deployment (without slot - Function App doesn't have slots by default)
             DEPLOY_OUTPUT=$(az functionapp deployment source config-zip \
               --resource-group rg-infrastructure-as-code \
               --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
               --src "$ZIP_PATH" \
               --timeout 600 \
-              --slot production \
               --output json 2>&1) || {
               echo "⚠️  Function App deployment failed, trying Kudu API with longer wait..."
               echo "Azure CLI error:"
