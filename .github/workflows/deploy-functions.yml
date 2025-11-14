@@ -67,43 +67,33 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Temporarily disable Run from Package
+      - name: Deploy to Azure Functions (Run from Package)
         run: |
-          echo "Temporarily disabling WEBSITE_RUN_FROM_PACKAGE for deployment..."
-          az functionapp config appsettings set \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --settings WEBSITE_RUN_FROM_PACKAGE="" \
-            --output none
-        continue-on-error: false
-
-      - name: Deploy to Azure Functions
-        run: |
+          echo "Deploying ZIP package..."
           az functionapp deployment source config-zip \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
             --src function-app.zip \
             --timeout 600
+          echo ""
+          echo "Deployment completed. Azure automatically uploads the ZIP to Blob Storage"
+          echo "and sets WEBSITE_RUN_FROM_PACKAGE to the blob URL."
         continue-on-error: false
       
-      - name: Re-enable Run from Package
+      - name: Sync Function Triggers
         run: |
-          echo "Re-enabling WEBSITE_RUN_FROM_PACKAGE..."
-          az functionapp config appsettings set \
+          echo "Synchronizing function triggers (required for Linux Consumption Plan)..."
+          az functionapp function keys list \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --settings WEBSITE_RUN_FROM_PACKAGE="1" \
-            --output none
-        continue-on-error: false
-      
-      - name: Restart Function App
-        run: |
-          echo "Restarting Function App to ensure new deployment is loaded..."
+            --output none || true
+          # Force trigger sync by restarting
+          echo "Restarting Function App to sync triggers..."
           az functionapp restart \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
           echo "Waiting for Function App to be ready..."
-          sleep 15
+          sleep 20
         continue-on-error: false
       
       - name: Verify deployment
