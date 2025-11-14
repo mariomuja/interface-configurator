@@ -1,24 +1,59 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "func",
-			"label": "func: host start",
-			"command": "host start",
-			"problemMatcher": "$func-node-watch",
-			"isBackground": true,
-			"dependsOn": "npm install (functions)"
-		},
-		{
-			"type": "shell",
-			"label": "npm install (functions)",
-			"command": "npm install"
-		},
-		{
-			"type": "shell",
-			"label": "npm prune (functions)",
-			"command": "npm prune --production",
-			"problemMatcher": []
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "dotnet test",
+      "args": [
+        "ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj",
+        "--logger",
+        "console;verbosity=detailed"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests with Report",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/run-tests.ps1"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Generate Test Report",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/generate-test-report.ps1",
+        "-OpenReport"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
 }
