@@ -37,8 +37,29 @@ jobs:
         run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj --configuration Release --output ./publish --no-build
         continue-on-error: false
 
+      - name: Verify publish output
+        run: |
+          echo "Checking publish output structure..."
+          ls -la ./publish/
+          echo ""
+          echo "Checking for required files..."
+          test -f ./publish/ProcessCsvBlobTrigger.dll && echo "✓ ProcessCsvBlobTrigger.dll found" || echo "✗ ProcessCsvBlobTrigger.dll missing"
+          test -f ./publish/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
+          test -f ./publish/worker.config.json && echo "✓ worker.config.json found" || echo "✗ worker.config.json missing"
+          test -f ./publish/functions.metadata && echo "✓ functions.metadata found" || echo "✗ functions.metadata missing"
+        continue-on-error: false
+
       - name: Create deployment package
         run: cd publish && zip -r ../function-app.zip . && cd ..
+        continue-on-error: false
+      
+      - name: Verify ZIP package
+        run: |
+          echo "ZIP package size:"
+          ls -lh function-app.zip
+          echo ""
+          echo "ZIP package contents:"
+          unzip -l function-app.zip | head -20
         continue-on-error: false
 
       - name: Azure Login
@@ -46,13 +67,43 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure Functions (Run from Package)
+      - name: Temporarily disable Run from Package
+        run: |
+          echo "Temporarily disabling WEBSITE_RUN_FROM_PACKAGE for deployment..."
+          az functionapp config appsettings set \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --settings WEBSITE_RUN_FROM_PACKAGE="" \
+            --output none
+        continue-on-error: false
+
+      - name: Deploy to Azure Functions
         run: |
           az functionapp deployment source config-zip \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
             --src function-app.zip \
             --timeout 600
+        continue-on-error: false
+      
+      - name: Re-enable Run from Package
+        run: |
+          echo "Re-enabling WEBSITE_RUN_FROM_PACKAGE..."
+          az functionapp config appsettings set \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --settings WEBSITE_RUN_FROM_PACKAGE="1" \
+            --output none
+        continue-on-error: false
+      
+      - name: Restart Function App
+        run: |
+          echo "Restarting Function App to ensure new deployment is loaded..."
+          az functionapp restart \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+          echo "Waiting for Function App to be ready..."
+          sleep 15
         continue-on-error: false
       
       - name: Verify deployment
@@ -67,6 +118,13 @@ jobs:
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
             --query defaultHostName \
             --output tsv
+          echo ""
+          echo "Checking Function App status..."
+          az functionapp show \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "{state: state, hostNames: defaultHostName}" \
+            --output table
 
       # Note: Required GitHub secrets:
       # 1. AZURE_CREDENTIALS: Service Principal credentials (JSON format)
