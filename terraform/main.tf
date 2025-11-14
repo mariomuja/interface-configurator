@@ -14,10 +14,6 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
-    azapi = {
-      source  = "azure/azapi"
-      version = "~> 1.0"
-    }
   }
 }
 
@@ -175,9 +171,6 @@ resource "azurerm_linux_function_app" "main" {
       dotnet_version = "8.0"
     }
     
-    # Note: scm_type is automatically set based on source control configuration
-    # It cannot be manually configured in Terraform
-    
     dynamic "cors" {
       for_each = length(var.cors_allowed_origins) > 0 ? [1] : []
       content {
@@ -194,12 +187,9 @@ resource "azurerm_linux_function_app" "main" {
     "AZURE_SQL_USER" = var.sql_admin_login
     "AZURE_SQL_PASSWORD" = var.sql_admin_password
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
-    
-    # GitHub Source Control Deployment Settings (for Azure Deployment Center)
-    # PROJECT: Path to the .csproj file relative to repository root
-    "PROJECT" = length(var.github_repo_url) > 0 ? "${var.github_repo_path}/ProcessCsvBlobTrigger.csproj" : null
-    # Enable build during deployment for GitHub source control
-    "SCM_DO_BUILD_DURING_DEPLOYMENT" = length(var.github_repo_url) > 0 ? "true" : null
+    # Note: WEBSITE_RUN_FROM_PACKAGE is automatically set by Azure during ZIP deployment
+    # For Linux Consumption Plan, Azure sets it to the Blob Storage URL (not "1")
+    # This is the recommended approach for Linux Consumption Plan
   }
 
   tags = {
@@ -207,25 +197,3 @@ resource "azurerm_linux_function_app" "main" {
   }
 }
 
-# GitHub Source Control Configuration (if github_repo_url is provided)
-# Uses AzAPI provider to configure GitHub source control for Linux Function App
-resource "azapi_resource" "function_app_sourcecontrol" {
-  count     = var.enable_function_app && length(var.github_repo_url) > 0 ? 1 : 0
-  type      = "Microsoft.Web/sites/sourcecontrols@2022-03-01"
-  name      = "web"
-  parent_id = azurerm_linux_function_app.main[0].id
-
-  body = jsonencode({
-    properties = {
-      repoUrl             = var.github_repo_url
-      branch              = var.github_branch
-      isManualIntegration = false
-      # For Linux Function Apps, we use Kudu deployment (not GitHub Actions)
-      isGitHubAction = false
-    }
-  })
-
-  depends_on = [
-    azurerm_linux_function_app.main
-  ]
-}
