@@ -76,19 +76,121 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Verify Function App exists
+        run: |
+          echo "Verifying Function App exists..."
+          az functionapp show \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "{name: name, state: state, runtime: siteConfig.linuxFxVersion}" \
+            --output table || (echo "ERROR: Function App not found!" && exit 1)
+        continue-on-error: false
+
       - name: Deploy to Azure Functions (Run from Package)
         run: |
           echo "Deploying ZIP package..."
+          echo "ZIP file path: $(pwd)/function-app.zip"
+          echo "ZIP file size: $(ls -lh function-app.zip | awk '{print $5}')"
+          echo "ZIP file exists: $(test -f function-app.zip && echo 'YES' || echo 'NO')"
+          echo ""
+          
+          # Use absolute path for ZIP file
+          ZIP_PATH=$(realpath function-app.zip)
+          echo "Absolute ZIP path: $ZIP_PATH"
+          
+          # Deploy with verbose output
           az functionapp deployment source config-zip \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --src function-app.zip \
-            --timeout 600
+            --src "$ZIP_PATH" \
+            --timeout 600 \
+            --verbose || {
+              echo "ERROR: Deployment failed!"
+              echo "Checking Function App status..."
+              az functionapp show \
+                --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+                --query "{name: name, state: state}" \
+                --output table
+              exit 1
+            }
+          
           echo ""
-          echo "Deployment completed. Azure automatically uploads the ZIP to Blob Storage"
+          echo "✅ Deployment completed successfully!"
+          echo "Azure automatically uploads the ZIP to Blob Storage"
           echo "and should set WEBSITE_RUN_FROM_PACKAGE to the blob URL."
         continue-on-error: false
       
+      - name: Alternative Deployment (if config-zip failed)
+        if: failure()
+        run: |
+          echo "⚠ Primary deployment method failed, trying alternative method..."
+          
+          # Get storage account info
+          STORAGE_CONNECTION=$(az functionapp config appsettings list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[?name=='AzureWebJobsStorage'].value" \
+            -o tsv)
+          STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
+          
+          if [ -z "$STORAGE_ACCOUNT" ]; then
+            echo "ERROR: Could not get storage account name"
+            exit 1
+          fi
+          
+          # Get storage account key
+          STORAGE_KEY=$(az storage account keys list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --account-name $STORAGE_ACCOUNT \
+            --query "[0].value" \
+            -o tsv)
+          
+          # Create container if it doesn't exist
+          az storage container create \
+            --name function-releases \
+            --account-name $STORAGE_ACCOUNT \
+            --account-key $STORAGE_KEY \
+            --public-access off \
+            --fail-on-exist false || true
+          
+          # Upload ZIP to blob storage
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          BLOB_NAME="function-app-${TIMESTAMP}.zip"
+          
+          echo "Uploading ZIP to blob storage: $BLOB_NAME"
+          az storage blob upload \
+            --account-name $STORAGE_ACCOUNT \
+            --account-key $STORAGE_KEY \
+            --container-name function-releases \
+            --name "$BLOB_NAME" \
+            --file function-app.zip \
+            --overwrite
+          
+          # Generate SAS token (valid for 10 years)
+          EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
+          SAS_TOKEN=$(az storage container generate-sas \
+            --name function-releases \
+            --account-name $STORAGE_ACCOUNT \
+            --account-key $STORAGE_KEY \
+            --permissions r \
+            --expiry $EXPIRY \
+            -o tsv)
+          
+          PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${BLOB_NAME}?${SAS_TOKEN}"
+          
+          # Set WEBSITE_RUN_FROM_PACKAGE
+          echo "Setting WEBSITE_RUN_FROM_PACKAGE to blob URL..."
+          az functionapp config appsettings set \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
+            --output none
+          
+          echo "✅ Alternative deployment completed!"
+          echo "Package URL: ${PACKAGE_URL:0:100}..."
+        continue-on-error: true
+
       - name: Ensure WEBSITE_RUN_FROM_PACKAGE is set
         run: |
           echo "Checking if WEBSITE_RUN_FROM_PACKAGE is set..."
@@ -98,8 +200,8 @@ jobs:
             --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
             -o tsv)
           
-          if [ -z "$PACKAGE_URL" ] || [ "$PACKAGE_URL" == "None" ]; then
-            echo "⚠ WEBSITE_RUN_FROM_PACKAGE not set. Finding latest deployment package..."
+          if [ -z "$PACKAGE_URL" ] || [ "$PACKAGE_URL" == "None" ] || [ "$PACKAGE_URL" == "" ]; then
+            echo "⚠ WEBSITE_RUN_FROM_PACKAGE not set. Using alternative deployment method..."
             
             # Get storage account name from connection string
             STORAGE_CONNECTION=$(az functionapp config appsettings list \
@@ -109,6 +211,11 @@ jobs:
               -o tsv)
             STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
             
+            if [ -z "$STORAGE_ACCOUNT" ]; then
+              echo "ERROR: Could not get storage account name"
+              exit 1
+            fi
+            
             # Get storage account key
             STORAGE_KEY=$(az storage account keys list \
               --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
@@ -116,50 +223,75 @@ jobs:
               --query "[0].value" \
               -o tsv)
             
-            # Find latest package in function-releases container
-            LATEST_PACKAGE=$(az storage blob list \
+            # Create container if it doesn't exist
+            az storage container create \
+              --name function-releases \
               --account-name $STORAGE_ACCOUNT \
-              --container-name function-releases \
               --account-key $STORAGE_KEY \
-              --query "sort_by(@, &properties.lastModified)[-1].name" \
+              --public-access off \
+              --fail-on-exist false || true
+            
+            # Upload ZIP to blob storage
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            BLOB_NAME="function-app-${TIMESTAMP}.zip"
+            
+            echo "Uploading ZIP to blob storage: $BLOB_NAME"
+            az storage blob upload \
+              --account-name $STORAGE_ACCOUNT \
+              --account-key $STORAGE_KEY \
+              --container-name function-releases \
+              --name "$BLOB_NAME" \
+              --file function-app.zip \
+              --overwrite
+            
+            # Generate SAS token (valid for 10 years)
+            EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
+            SAS_TOKEN=$(az storage container generate-sas \
+              --name function-releases \
+              --account-name $STORAGE_ACCOUNT \
+              --account-key $STORAGE_KEY \
+              --permissions r \
+              --expiry $EXPIRY \
               -o tsv)
             
-            if [ -n "$LATEST_PACKAGE" ]; then
-              # Generate SAS token (valid for 10 years)
-              EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
-              SAS_TOKEN=$(az storage container generate-sas \
-                --name function-releases \
-                --account-name $STORAGE_ACCOUNT \
-                --account-key $STORAGE_KEY \
-                --permissions r \
-                --expiry $EXPIRY \
-                -o tsv)
-              
-              PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${LATEST_PACKAGE}?${SAS_TOKEN}"
-              
-              echo "Setting WEBSITE_RUN_FROM_PACKAGE to: $PACKAGE_URL"
-              az functionapp config appsettings set \
-                --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-                --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-                --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
-                --output none
-              
-              echo "✅ WEBSITE_RUN_FROM_PACKAGE set successfully"
-            else
-              echo "⚠ Could not find deployment package. Azure should set this automatically."
-            fi
+            PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${BLOB_NAME}?${SAS_TOKEN}"
+            
+            echo "Setting WEBSITE_RUN_FROM_PACKAGE to: ${PACKAGE_URL:0:100}..."
+            az functionapp config appsettings set \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+              --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
+              --output none
+            
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE set successfully"
           else
             echo "✅ WEBSITE_RUN_FROM_PACKAGE is already set: ${PACKAGE_URL:0:80}..."
           fi
         continue-on-error: false
       
+      - name: Restart Function App
+        run: |
+          echo "Restarting Function App to load new deployment..."
+          az functionapp restart \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+          
+          echo "Waiting for Function App to be ready..."
+          sleep 45
+          
+          # Check Function App state
+          STATE=$(az functionapp show \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "state" \
+            -o tsv)
+          
+          echo "Function App state: $STATE"
+        continue-on-error: false
+
       - name: Sync Function Triggers
         run: |
           echo "Synchronizing function triggers (required for Linux Consumption Plan)..."
-          
-          # Wait a bit for deployment to complete
-          echo "Waiting for deployment to settle..."
-          sleep 10
           
           # Trigger sync by calling the admin API (this forces Azure to discover functions)
           MASTER_KEY=$(az functionapp keys list \
@@ -181,28 +313,48 @@ jobs:
               --fail-with-body || echo "⚠ Sync triggers API call failed (this is OK if functions are not yet discovered)"
           fi
           
-          # Force trigger sync by restarting
-          echo "Restarting Function App to sync triggers..."
-          az functionapp restart \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
-          
-          echo "Waiting for Function App to be ready..."
-          sleep 30
-          
-          # Verify functions are loaded
+          # Wait a bit more for sync to complete
+          sleep 15
+        continue-on-error: false
+
+      - name: Verify Functions are loaded
+        run: |
           echo "Checking if functions are loaded..."
-          FUNCTIONS_COUNT=$(az functionapp function list \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --query "length(@)" \
-            -o tsv 2>/dev/null || echo "0")
           
-          if [ "$FUNCTIONS_COUNT" -gt "0" ]; then
-            echo "✅ Found $FUNCTIONS_COUNT function(s)"
-          else
-            echo "⚠ No functions found yet. This may be normal - functions may take a few minutes to appear."
-            echo "Check the Function App logs in Azure Portal for details."
+          # Try multiple times as functions may take time to appear
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          FUNCTIONS_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            FUNCTIONS_COUNT=$(az functionapp function list \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+              --query "length(@)" \
+              -o tsv 2>/dev/null || echo "0")
+            
+            if [ "$FUNCTIONS_COUNT" -gt "0" ]; then
+              echo "✅ Found $FUNCTIONS_COUNT function(s)!"
+              az functionapp function list \
+                --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+                --query "[].{Name: name, Status: invokeUrlTemplate}" \
+                --output table
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "Attempt $RETRY_COUNT/$MAX_RETRIES: No functions found yet, waiting..."
+              sleep 10
+            fi
+          done
+          
+          if [ "$FUNCTIONS_COUNT" -eq "0" ]; then
+            echo "⚠ WARNING: No functions found after $MAX_RETRIES attempts"
+            echo "This may be normal - functions may take a few minutes to appear."
+            echo "Please check:"
+            echo "1. Function App logs in Azure Portal (Log stream)"
+            echo "2. WEBSITE_RUN_FROM_PACKAGE is set correctly"
+            echo "3. Function App is running (not stopped)"
           fi
         continue-on-error: false
       
