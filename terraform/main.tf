@@ -189,8 +189,13 @@ resource "azurerm_linux_function_app" "main" {
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
     # Disable placeholder mode to ensure functions are loaded
     "WEBSITE_USE_PLACEHOLDER" = "0"
-    # Note: WEBSITE_RUN_FROM_PACKAGE is set by deployment workflow
-    # For Linux Consumption Plan, this should be set to Blob Storage URL
+    # Note: WEBSITE_RUN_FROM_PACKAGE is set by deployment workflow and should NOT be removed
+    # Terraform will ignore this setting if it's managed by the deployment workflow
+  }
+  
+  # Prevent Terraform from removing WEBSITE_RUN_FROM_PACKAGE
+  lifecycle {
+    ignore_changes = [app_settings["WEBSITE_RUN_FROM_PACKAGE"]]
   }
 
   tags = {
