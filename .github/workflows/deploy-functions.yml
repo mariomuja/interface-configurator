@@ -115,6 +115,13 @@ jobs:
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
             --query "{state: state, hostNames: defaultHostName}" \
             --output table
+          echo ""
+          echo "Checking WEBSITE_RUN_FROM_PACKAGE setting..."
+          az functionapp config appsettings list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].{Name: name, Value: value}" \
+            --output table
 
       # Note: Required GitHub secrets:
       # 1. AZURE_CREDENTIALS: Service Principal credentials (JSON format)
