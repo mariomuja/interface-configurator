@@ -61,9 +61,18 @@ public class LoggingServiceAdapter : ILoggingService
                 Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] {logMessage}");
             }
         }
-        catch
+        catch (Exception consoleLogEx)
         {
-            // Ignore console logging errors - we tried our best
+            // If even console logging fails, try to write to stderr as absolute last resort
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"Critical: Failed to log to console: {consoleLogEx.Message}");
+            }
+            catch
+            {
+                // Absolute last resort - if even Debug.WriteLine fails, we can't do anything
+                // This should never happen, but we handle it gracefully
+            }
         }
 
         // Try database logging (fail-safe with timeout and null checks)
@@ -93,8 +102,32 @@ public class LoggingServiceAdapter : ILoggingService
                     return; // Database not available, console logging already done
                 }
             }
-            catch
+            catch (Exception connEx)
             {
+                // Log connection check failure but don't fail the function
+                try
+                {
+                    if (_logger != null)
+                    {
+                        _logger.LogWarning(connEx, "Cannot verify database connection: {ErrorMessage}", connEx.Message);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Warning: Cannot verify database connection: {connEx.Message}");
+                    }
+                }
+                catch (Exception nestedLogEx)
+                {
+                    // If error logging fails, try console as last resort
+                    try
+                    {
+                        Console.Error.WriteLine($"Warning: Failed to log connection check error: {nestedLogEx.Message}");
+                    }
+                    catch
+                    {
+                        // Absolute last resort - if even Console.Error fails, we can't do anything
+                    }
+                }
                 return; // Cannot verify connection, skip database logging
             }
 
@@ -112,16 +145,59 @@ public class LoggingServiceAdapter : ILoggingService
                     {
                         await _context.Database.EnsureCreatedAsync(cts.Token);
                     }
+                    catch (Exception createEx)
+                    {
+                        // Log table creation failure but don't fail the function
+                        try
+                        {
+                            if (_logger != null)
+                            {
+                                _logger.LogWarning(createEx, "Table creation failed: {ErrorMessage}", createEx.Message);
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine($"Warning: Table creation failed: {createEx.Message}");
+                            }
+                        }
+                catch (Exception nestedLogEx)
+                {
+                    // If error logging fails, try console as last resort
+                    try
+                    {
+                        Console.Error.WriteLine($"Warning: Failed to log table creation error: {nestedLogEx.Message}");
+                        Console.Error.WriteLine($"Original error: {createEx.Message}");
+                    }
                     catch
                     {
-                        // Table creation failed, skip database logging
-                        return;
+                        // Absolute last resort - if even Console.Error fails, we can't do anything
+                    }
+                }
+                return; // Table creation failed, skip database logging
                     }
                 }
             }
-            catch
+            catch (Exception tableCheckEx)
             {
-                // Cannot check table existence, try to log anyway (table might exist)
+                // Log table check failure but continue - table might exist
+                try
+                {
+                    if (_logger != null)
+                    {
+                        _logger.LogDebug(tableCheckEx, "Cannot check table existence: {ErrorMessage}", tableCheckEx.Message);
+                    }
+                }
+                catch (Exception nestedLogEx)
+                {
+                    // If error logging fails, try console as last resort
+                    try
+                    {
+                        Console.Error.WriteLine($"Warning: Failed to log table check error: {nestedLogEx.Message}");
+                    }
+                    catch
+                    {
+                        // Absolute last resort - if even Console.Error fails, we can't do anything
+                    }
+                }
             }
 
             // Create log entity with null-safe operations
@@ -166,9 +242,19 @@ public class LoggingServiceAdapter : ILoggingService
                     Console.Error.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] WARNING: {errorMsg}");
                 }
             }
-            catch
+            catch (Exception errorLogEx)
             {
-                // Ignore error logging errors
+                // If error logging fails, try console as last resort
+                try
+                {
+                    var originalError = dbEx?.Message ?? "Unknown database error";
+                    Console.Error.WriteLine($"Critical: Failed to log database error: {errorLogEx.Message}");
+                    Console.Error.WriteLine($"Original database error: {originalError}");
+                }
+                catch
+                {
+                    // Absolute last resort - if even Console.Error fails, we can't do anything
+                }
             }
         }
         catch (Exception ex)
@@ -186,9 +272,19 @@ public class LoggingServiceAdapter : ILoggingService
                     Console.Error.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] WARNING: {errorMsg}");
                 }
             }
-            catch
+            catch (Exception errorLogEx)
             {
-                // Ignore error logging errors
+                // If error logging fails, try console as last resort
+                try
+                {
+                    var originalError = ex?.Message ?? "Unknown error";
+                    Console.Error.WriteLine($"Critical: Failed to log error: {errorLogEx.Message}");
+                    Console.Error.WriteLine($"Original error: {originalError}");
+                }
+                catch
+                {
+                    // Absolute last resort - if even Console.Error fails, we can't do anything
+                }
             }
         }
         finally

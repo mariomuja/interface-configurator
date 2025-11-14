@@ -37,7 +37,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("error", "CSV processing failed", 
                     $"File: {blobName ?? "Unknown"}, Error: {nullError}", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log error to database: {ErrorMessage}", logEx.Message);
+            }
             return ProcessingResult.Failure(nullError, new ArgumentNullException(nameof(blobContent)));
         }
 
@@ -48,7 +51,11 @@ public class CsvProcessor : ICsvProcessor
         {
             _logger.LogInformation("Processing CSV blob: {BlobName} ({BlobSize} bytes)", safeBlobName, blobSize);
         }
-        catch { }
+        catch (Exception logEx)
+        {
+            // Log to console as fallback if ILogger fails
+            Console.Error.WriteLine($"Failed to log information: {logEx.Message}");
+        }
 
         try
         {
@@ -58,7 +65,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Initializing database schema",
                     "Checking and creating tables if needed", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log database initialization start: {ErrorMessage}", logEx.Message);
+            }
 
             await _dataService.EnsureDatabaseCreatedAsync(cancellationToken);
             
@@ -67,7 +77,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Database schema initialized",
                     "TransportData and ProcessLogs tables ready", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log database initialization completion: {ErrorMessage}", logEx.Message);
+            }
 
             // Read blob content
             try
@@ -75,7 +88,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Reading blob content from storage", 
                     $"File: {safeBlobName}", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log blob read start: {ErrorMessage}", logEx.Message);
+            }
 
             string csvContent;
             try
@@ -91,7 +107,10 @@ public class CsvProcessor : ICsvProcessor
                     await _loggingService.LogAsync("error", "Blob content decoding failed",
                         $"File: {safeBlobName}, Error: {encodingError}", cancellationToken);
                 }
-                catch { }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log encoding error to database: {ErrorMessage}", logEx.Message);
+                }
                 return ProcessingResult.Failure(encodingError, ex);
             }
 
@@ -102,7 +121,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Blob content read successfully",
                     $"File: {safeBlobName}, Content length: {contentLength} characters", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log blob read success: {ErrorMessage}", logEx.Message);
+            }
 
             // Parse CSV
             try
@@ -110,7 +132,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Starting CSV parsing", 
                     $"File: {safeBlobName}", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log CSV parsing start: {ErrorMessage}", logEx.Message);
+            }
 
             List<Dictionary<string, string>> records;
             try
@@ -126,7 +151,10 @@ public class CsvProcessor : ICsvProcessor
                     await _loggingService.LogAsync("error", "CSV parsing failed",
                         $"File: {safeBlobName}, Error: {parseError}", cancellationToken);
                 }
-                catch { }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log parsing error to database: {ErrorMessage}", logEx.Message);
+                }
                 return ProcessingResult.Failure(parseError, ex);
             }
 
@@ -137,7 +165,10 @@ public class CsvProcessor : ICsvProcessor
                     await _loggingService.LogAsync("warning", "CSV file is empty or invalid",
                         $"File: {safeBlobName}, Content length: {contentLength} characters", cancellationToken);
                 }
-                catch { }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log empty CSV warning to database: {ErrorMessage}", logEx.Message);
+                }
                 return new ProcessingResult
                 {
                     Success = true,
@@ -154,7 +185,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Starting chunk creation",
                     $"Total records: {records.Count}, Chunk size: 100", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log chunk creation start: {ErrorMessage}", logEx.Message);
+            }
 
             List<List<TransportData>> chunks;
             try
@@ -170,7 +204,10 @@ public class CsvProcessor : ICsvProcessor
                     await _loggingService.LogAsync("error", "Chunk creation failed",
                         $"File: {safeBlobName}, Error: {chunkError}", cancellationToken);
                 }
-                catch { }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log chunk creation error to database: {ErrorMessage}", logEx.Message);
+                }
                 return ProcessingResult.Failure(chunkError, ex);
             }
 
@@ -181,7 +218,10 @@ public class CsvProcessor : ICsvProcessor
                     await _loggingService.LogAsync("warning", "No chunks created",
                         $"File: {safeBlobName}, Records: {records.Count}", cancellationToken);
                 }
-                catch { }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log no chunks warning to database: {ErrorMessage}", logEx.Message);
+                }
                 return new ProcessingResult
                 {
                     Success = true,
@@ -195,7 +235,10 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "Chunk creation completed",
                     $"Total chunks: {chunks.Count}, Chunk size: 100, Total records: {records.Count}", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log chunk creation completion: {ErrorMessage}", logEx.Message);
+            }
 
             // Process chunks
             await _dataService.ProcessChunksAsync(chunks, cancellationToken);
@@ -205,14 +248,21 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("info", "CSV processing completed successfully",
                     $"File: {safeBlobName}, Total records: {records.Count}, Chunks processed: {chunks.Count}, Status: Success", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log processing success to database: {ErrorMessage}", logEx.Message);
+            }
 
             try
             {
                 _logger.LogInformation("Successfully processed {RecordCount} records from {BlobName} in {ChunkCount} chunks",
                     records.Count, safeBlobName, chunks.Count);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                // Log to console as fallback if ILogger fails
+                Console.Error.WriteLine($"Failed to log success information: {logEx.Message}");
+            }
 
             return new ProcessingResult
             {
@@ -246,13 +296,22 @@ public class CsvProcessor : ICsvProcessor
                 await _loggingService.LogAsync("error", "CSV processing failed",
                     $"File: {safeBlobName}, Error: {errorMessage}, Stack: {stackTraceStr}", cancellationToken);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                // Log to ILogger as fallback if database logging fails
+                _logger.LogWarning(logEx, "Failed to log processing error to database: {ErrorMessage}", logEx.Message);
+            }
 
             try
             {
                 _logger.LogError(error, "Error processing CSV {BlobName}: {ErrorMessage}", safeBlobName, errorMessage);
             }
-            catch { }
+            catch (Exception logEx)
+            {
+                // Log to console as final fallback if ILogger also fails
+                Console.Error.WriteLine($"Failed to log error: {logEx.Message}");
+                Console.Error.WriteLine($"Original error: {errorMessage}");
+            }
 
             return new ProcessingResult
             {
