@@ -77,7 +77,71 @@ jobs:
             --timeout 600
           echo ""
           echo "Deployment completed. Azure automatically uploads the ZIP to Blob Storage"
-          echo "and sets WEBSITE_RUN_FROM_PACKAGE to the blob URL."
+          echo "and should set WEBSITE_RUN_FROM_PACKAGE to the blob URL."
+        continue-on-error: false
+      
+      - name: Ensure WEBSITE_RUN_FROM_PACKAGE is set
+        run: |
+          echo "Checking if WEBSITE_RUN_FROM_PACKAGE is set..."
+          PACKAGE_URL=$(az functionapp config appsettings list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" \
+            -o tsv)
+          
+          if [ -z "$PACKAGE_URL" ] || [ "$PACKAGE_URL" == "None" ]; then
+            echo "⚠ WEBSITE_RUN_FROM_PACKAGE not set. Finding latest deployment package..."
+            
+            # Get storage account name from connection string
+            STORAGE_CONNECTION=$(az functionapp config appsettings list \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+              --query "[?name=='AzureWebJobsStorage'].value" \
+              -o tsv)
+            STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
+            
+            # Get storage account key
+            STORAGE_KEY=$(az storage account keys list \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --account-name $STORAGE_ACCOUNT \
+              --query "[0].value" \
+              -o tsv)
+            
+            # Find latest package in function-releases container
+            LATEST_PACKAGE=$(az storage blob list \
+              --account-name $STORAGE_ACCOUNT \
+              --container-name function-releases \
+              --account-key $STORAGE_KEY \
+              --query "sort_by(@, &properties.lastModified)[-1].name" \
+              -o tsv)
+            
+            if [ -n "$LATEST_PACKAGE" ]; then
+              # Generate SAS token (valid for 10 years)
+              EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
+              SAS_TOKEN=$(az storage container generate-sas \
+                --name function-releases \
+                --account-name $STORAGE_ACCOUNT \
+                --account-key $STORAGE_KEY \
+                --permissions r \
+                --expiry $EXPIRY \
+                -o tsv)
+              
+              PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${LATEST_PACKAGE}?${SAS_TOKEN}"
+              
+              echo "Setting WEBSITE_RUN_FROM_PACKAGE to: $PACKAGE_URL"
+              az functionapp config appsettings set \
+                --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+                --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
+                --output none
+              
+              echo "✅ WEBSITE_RUN_FROM_PACKAGE set successfully"
+            else
+              echo "⚠ Could not find deployment package. Azure should set this automatically."
+            fi
+          else
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE is already set: ${PACKAGE_URL:0:80}..."
+          fi
         continue-on-error: false
       
       - name: Sync Function Triggers
