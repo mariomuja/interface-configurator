@@ -1,0 +1,79 @@
+name: Deploy Azure Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'azure-functions/**'
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: '' # Set this in repository secrets or update manually
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions/ProcessCsvBlobTrigger'
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj
+        continue-on-error: false
+
+      - name: Build
+        run: dotnet build ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj --configuration Release --no-restore
+        continue-on-error: false
+
+      - name: Publish
+        run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj --configuration Release --output ./publish --no-build
+        continue-on-error: false
+
+      - name: Create deployment package
+        run: cd publish && zip -r ../function-app.zip . && cd ..
+        continue-on-error: false
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Functions (Run from Package)
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --src function-app.zip \
+            --timeout 600
+        continue-on-error: false
+      
+      - name: Verify deployment
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "Function App: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}"
+          echo "Resource Group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
+          echo ""
+          echo "Function App URL:"
+          az functionapp show \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query defaultHostName \
+            --output tsv
+
+      # Note: Required GitHub secrets:
+      # 1. AZURE_CREDENTIALS: Service Principal credentials (JSON format)
+      #    Create with: az ad sp create-for-rbac --name "github-actions" --role contributor --scopes /subscriptions/{subscription-id}/resourceGroups/{resource-group} --sdk-auth
+      # 2. AZURE_RESOURCE_GROUP: Resource group name (e.g., "rg-infrastructure-as-code")
+      # 3. AZURE_FUNCTIONAPP_NAME: Function app name (get from terraform output function_app_name)
+      #
+      # This workflow uses "Run from Package" mode (WEBSITE_RUN_FROM_PACKAGE=1),
+      # which is Microsoft's recommended deployment method for Azure Functions.
+
