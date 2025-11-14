@@ -47,6 +47,15 @@ jobs:
           test -f ./publish/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
           test -f ./publish/worker.config.json && echo "✓ worker.config.json found" || echo "✗ worker.config.json missing"
           test -f ./publish/functions.metadata && echo "✓ functions.metadata found" || echo "✗ functions.metadata missing"
+          echo ""
+          echo "Verifying host.json configuration..."
+          if grep -q "extensionBundle" ./publish/host.json 2>/dev/null; then
+            echo "⚠ WARNING: host.json contains extensionBundle - this should be removed for dotnet-isolated"
+            echo "host.json content:"
+            cat ./publish/host.json
+          else
+            echo "✓ host.json does not contain extensionBundle (correct for dotnet-isolated)"
+          fi
         continue-on-error: false
 
       - name: Create deployment package
@@ -147,17 +156,54 @@ jobs:
       - name: Sync Function Triggers
         run: |
           echo "Synchronizing function triggers (required for Linux Consumption Plan)..."
-          az functionapp function keys list \
+          
+          # Wait a bit for deployment to complete
+          echo "Waiting for deployment to settle..."
+          sleep 10
+          
+          # Trigger sync by calling the admin API (this forces Azure to discover functions)
+          MASTER_KEY=$(az functionapp keys list \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --output none || true
+            --query "masterKey" \
+            -o tsv)
+          
+          if [ -z "$MASTER_KEY" ] || [ "$MASTER_KEY" == "None" ]; then
+            echo "⚠ Could not retrieve master key, skipping API sync"
+          else
+            # Call admin API to sync triggers
+            echo "Calling sync triggers API..."
+            curl -X POST \
+              "https://${{ secrets.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/admin/host/synctriggers" \
+              -H "x-functions-key: $MASTER_KEY" \
+              -H "Content-Type: application/json" \
+              --max-time 30 \
+              --fail-with-body || echo "⚠ Sync triggers API call failed (this is OK if functions are not yet discovered)"
+          fi
+          
           # Force trigger sync by restarting
           echo "Restarting Function App to sync triggers..."
           az functionapp restart \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+          
           echo "Waiting for Function App to be ready..."
-          sleep 20
+          sleep 30
+          
+          # Verify functions are loaded
+          echo "Checking if functions are loaded..."
+          FUNCTIONS_COUNT=$(az functionapp function list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "length(@)" \
+            -o tsv 2>/dev/null || echo "0")
+          
+          if [ "$FUNCTIONS_COUNT" -gt "0" ]; then
+            echo "✅ Found $FUNCTIONS_COUNT function(s)"
+          else
+            echo "⚠ No functions found yet. This may be normal - functions may take a few minutes to appear."
+            echo "Check the Function App logs in Azure Portal for details."
+          fi
         continue-on-error: false
       
       - name: Verify deployment
