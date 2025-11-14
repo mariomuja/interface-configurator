@@ -1,3 +1,5 @@
+// TEMPORARILY DISABLED - Testing with minimal function
+/*
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Storage.Blobs;
 using Microsoft.Extensions.Logging;
@@ -40,4 +42,5 @@ public class ProcessCsvBlobTriggerFunction
             result.RecordsProcessed, name, result.ChunksProcessed);
     }
 }
+*/
 
