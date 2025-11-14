@@ -30,6 +30,19 @@ bicep/
 └── README.md              # This file
 ```
 
+## Naming Conventions
+
+**IMPORTANT:** Always use descriptive, self-documenting names for Azure resources that explain what the resource does.
+
+Use the naming pattern: `{project}-{env}-{resource-type}-{purpose}`
+
+**Examples:**
+- Function Apps: `infra-prod-func-csv-processor` (not `func-apprigklebtsay2o`)
+- Storage Accounts: `infraprodstcsvblobs` (not `stapprigklebtsay2o`)
+- SQL Servers: `infra-prod-sql-main` (not `sql-infrastructurerigklebtsay2o`)
+
+See `NAMING_CONVENTIONS.md` in the project root for detailed naming guidelines.
+
 ## Resources Deployed
 
 The Bicep template deploys the following Azure resources:

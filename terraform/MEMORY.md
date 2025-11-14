@@ -9,6 +9,23 @@
 
 verwendet werden.
 
+## Naming Conventions
+
+**IMPORTANT:** Always use descriptive, self-documenting names for Azure resources that explain what the resource does.
+
+### Problem
+Generic names with random suffixes (e.g., `func-apprigklebtsay2o`) make it difficult to understand resource purpose and manage deployments.
+
+### Solution
+Use descriptive naming patterns: `{project}-{env}-{resource-type}-{purpose}`
+
+**Examples:**
+- Function Apps: `infra-prod-func-csv-processor` (not `func-apprigklebtsay2o`)
+- Storage Accounts: `infraprodstcsvblobs` (not `stapprigklebtsay2o`)
+- SQL Servers: `infra-prod-sql-main` (not `sql-infrastructurerigklebtsay2o`)
+
+See `NAMING_CONVENTIONS.md` in the project root for detailed naming guidelines.
+
 ## Coding Standards
 
 **CRITICAL**: Siehe [CODING_STANDARDS.md](../CODING_STANDARDS.md) für wichtige Regeln:
