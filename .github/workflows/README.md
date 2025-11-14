@@ -106,3 +106,4 @@ Die Function App wird von Terraform erstellt und verwaltet. Der Workflow deploye
 - [Azure Functions Run from Package](https://learn.microsoft.com/en-us/azure/azure-functions/run-functions-from-deployment-package)
 - [Azure Functions Deployment](https://learn.microsoft.com/en-us/azure/azure-functions/functions-deployment-technologies)
 
+

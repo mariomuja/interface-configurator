@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": {
+      "value": "rg-infrastructure-as-code-dev"
+    },
+    "location": {
+      "value": "West Europe"
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "sqlSkuName": {
+      "value": "S0"
+    },
+    "enableFunctionApp": {
+      "value": true
+    }
+  }
+}
+
