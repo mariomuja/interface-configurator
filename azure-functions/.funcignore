@@ -1,0 +1,11 @@
+*.git*
+*.vscode*
+*.vs*
+*.idea*
+node_modules
+test
+Test
+*.md
+*.log
+.DS_Store
+
