@@ -12,7 +12,7 @@ Es gibt mehrere Möglichkeiten, Test-Ergebnisse übersichtlich anzuzeigen:
 4. **VS Code Test Explorer** - Integrierte Test-Ansicht
 5. **Console-Output** - Standard dotnet test Ausgabe
 
-## Option 1: PowerShell-Script für Console-Ausgabe
+## Option 1: PowerShell-Script für Console-Ausgabe (EMPFOHLEN ⭐)
 
 ### Verwendung
 

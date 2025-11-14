@@ -17,8 +17,9 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 
 $originalLocation = Get-Location
 $testProjectPath = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests"
-$coverageDir = Join-Path $PSScriptRoot $OutputDir "coverage"
-$reportDir = Join-Path $PSScriptRoot $OutputDir "report"
+$outputBaseDir = Join-Path $PSScriptRoot $OutputDir
+$coverageDir = Join-Path $outputBaseDir "coverage"
+$reportDir = Join-Path $outputBaseDir "report"
 
 Set-Location $testProjectPath
 
@@ -69,7 +70,7 @@ if ($coverageFile) {
             -classfilters:"-*Tests*"
     }
     
-    Write-Host "`n✓ Report generiert!" -ForegroundColor Green
+    Write-Host "`n[OK] Report generiert!" -ForegroundColor Green
     Write-Host "Report-Verzeichnis: $reportDir" -ForegroundColor Cyan
     
     $indexFile = Join-Path $reportDir "index.html"
@@ -95,5 +96,5 @@ if (Test-Path $htmlTestFile) {
 
 Set-Location $originalLocation
 
-Write-Host "`n✓ Fertig!" -ForegroundColor Green
+Write-Host "`n[OK] Fertig!" -ForegroundColor Green
 

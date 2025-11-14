@@ -83,30 +83,83 @@ if ($failed -gt 0) {
     Write-Host " Tests" -ForegroundColor Red
 }
 
-# Gruppiere nach Test-Klasse
+# Parse Test-Namen und extrahiere getestete Klassen/Methoden
+$parsedTests = @()
+foreach ($test in $testResults) {
+    $parts = $test.Name -split '\.'
+    if ($parts.Count -ge 2) {
+        $testMethod = $parts[-1]
+        $testClass = $parts[-2]
+        
+        # Extrahiere getestete Klasse
+        $testedClass = ""
+        if ($testClass -match "^(.+?)Tests$") {
+            $testedClass = $matches[1]
+        }
+        
+        # Extrahiere getestete Methode
+        $testedMethod = ""
+        if ($testMethod -match "^(.+?)_") {
+            $testedMethod = $matches[1]
+        }
+        
+        $parsedTests += [PSCustomObject]@{
+            Original = $test
+            TestClass = $testClass
+            TestMethod = $testMethod
+            TestedClass = $testedClass
+            TestedMethod = $testedMethod
+        }
+    }
+}
+
+# Zeige getestete Klassen
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Test-Details (nach Klasse)" -ForegroundColor Cyan
+Write-Host "  Getestete Objekte/Methoden" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-$grouped = $testResults | Group-Object {
-    if ($_.Name -match "^(.+?)\.(.+?)\.") {
-        $matches[1] + "." + $matches[2]
-    } else {
-        "Other"
+$testedClasses = $parsedTests | Where-Object { $_.TestedClass -ne "" } | 
+    Select-Object -Unique TestedClass | 
+    Sort-Object TestedClass
+
+foreach ($class in $testedClasses) {
+    $classTests = $parsedTests | Where-Object { $_.TestedClass -eq $class.TestedClass }
+    $passedCount = ($classTests | Where-Object { $_.Original.Status -eq "PASSED" }).Count
+    $totalCount = $classTests.Count
+    
+    Write-Host "[$($class.TestedClass)]" -ForegroundColor Magenta
+    Write-Host "  $totalCount Tests (Bestanden: $passedCount)" -ForegroundColor Gray
+    
+    # Gruppiere nach getesteten Methoden
+    $methods = $classTests | Select-Object -Unique TestedMethod | Sort-Object TestedMethod
+    foreach ($method in $methods) {
+        if ($method.TestedMethod -ne "") {
+            $methodTests = $classTests | Where-Object { $_.TestedMethod -eq $method.TestedMethod }
+            $methodPassed = ($methodTests | Where-Object { $_.Original.Status -eq "PASSED" }).Count
+            
+            Write-Host "    -> $($method.TestedMethod)() [$methodPassed/$($methodTests.Count)]" -ForegroundColor Yellow
+        }
     }
-} | Sort-Object Name
+    Write-Host ""
+}
+
+# Zeige alle Tests im Detail
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Alle Tests (nach Test-Klasse)" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
+
+$grouped = $parsedTests | Group-Object TestClass | Sort-Object Name
 
 foreach ($group in $grouped) {
     Write-Host "[$($group.Name)]" -ForegroundColor Magenta
     
-    foreach ($test in $group.Group | Sort-Object Name) {
-        $status = if ($test.Status -eq "PASSED") { "[PASS]" } else { "[FAIL]" }
-        $color = if ($test.Status -eq "PASSED") { "Green" } else { "Red" }
+    foreach ($test in $group.Group | Sort-Object TestMethod) {
+        $status = if ($test.Original.Status -eq "PASSED") { "[PASS]" } else { "[FAIL]" }
+        $color = if ($test.Original.Status -eq "PASSED") { "Green" } else { "Red" }
         
-        $methodName = $test.Name -replace "^.+\.", ""
         Write-Host "  $status " -NoNewline -ForegroundColor $color
-        Write-Host $methodName -ForegroundColor White -NoNewline
-        Write-Host " ($($test.Duration))" -ForegroundColor Gray
+        Write-Host $test.TestMethod -ForegroundColor White -NoNewline
+        Write-Host " ($($test.Original.Duration))" -ForegroundColor Gray
     }
     Write-Host ""
 }
