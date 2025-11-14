@@ -1,0 +1,28 @@
+# Test Results
+TestResults/
+*.trx
+*.html
+coverage/
+*.coverage
+*.coveragexml
+
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache
+.vs/
+
+# Azure Functions
+local.settings.json
+.azurefunctions/
+
