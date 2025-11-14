@@ -9,15 +9,23 @@
 
 verwendet werden.
 
+## Coding Standards
+
+**CRITICAL**: Siehe [CODING_STANDARDS.md](../CODING_STANDARDS.md) für wichtige Regeln:
+- ⚠️ **NIEMALS** leere catch-Blöcke verwenden (`catch { }`)
+- Alle Exceptions müssen geloggt werden
+- Logging-Fehler müssen ebenfalls geloggt werden
+
 ## Function App Deployment
 
-Die Azure Functions werden automatisch über Terraform deployed:
+Die Azure Functions werden über **GitHub Actions** deployed:
 
-1. **ZIP-Archiv wird erstellt**: `data.archive_file.function_app` erstellt ein ZIP aus dem publish-Ordner
-2. **Deployment über Azure CLI**: `null_resource.deploy_function_app` verwendet `az functionapp deployment source config-zip`
-3. **Trigger**: Deployment wird ausgelöst wenn:
-   - Function App erstellt/geändert wird
-   - ZIP-Datei sich ändert (Hash-basiert)
+1. **Terraform** erstellt nur die Infrastruktur (Function App, Storage, etc.)
+2. **GitHub Actions** deployed den Code automatisch bei jedem Push
+3. **Run from Package**: `WEBSITE_RUN_FROM_PACKAGE=1` aktiviert die empfohlene Deployment-Methode
+4. **Workflow**: `.github/workflows/deploy-functions.yml` baut und deployed den Code
+
+Siehe auch: [GITHUB_ACTIONS_DEPLOYMENT.md](../GITHUB_ACTIONS_DEPLOYMENT.md)
 
 ## Ressourcen-Management
 
