@@ -170,9 +170,11 @@ jobs:
         continue-on-error: false
       
 
-      - name: Verify WEBSITE_RUN_FROM_PACKAGE is set
+      - name: Set Required App Settings
         run: |
-          echo "Verifying WEBSITE_RUN_FROM_PACKAGE is set..."
+          echo "Setting required app settings..."
+          
+          # Verify WEBSITE_RUN_FROM_PACKAGE is set
           PACKAGE_URL=$(az functionapp config appsettings list \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
@@ -185,6 +187,16 @@ jobs:
           else
             echo "✅ WEBSITE_RUN_FROM_PACKAGE is set: ${PACKAGE_URL:0:80}..."
           fi
+          
+          # Disable placeholder mode to ensure functions are loaded
+          echo "Disabling placeholder mode..."
+          az functionapp config appsettings set \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --settings WEBSITE_USE_PLACEHOLDER="0" \
+            --output none
+          
+          echo "✅ App settings configured"
         continue-on-error: false
       
       - name: Restart Function App
@@ -235,12 +247,35 @@ jobs:
           sleep 15
         continue-on-error: false
 
+      - name: Check Function App Logs
+        run: |
+          echo "=== Checking Function App Logs ==="
+          echo "Getting recent logs (this may take a moment)..."
+          
+          # Enable logging if not already enabled
+          az webapp log config \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --application-logging filesystem \
+            --detailed-error-messages true \
+            --failed-request-tracing true \
+            --web-server-logging filesystem \
+            --output none || true
+          
+          # Get logs from log stream (last 100 lines)
+          echo "Recent log entries:"
+          timeout 30 az webapp log tail \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --filter Error,Warning || echo "Could not retrieve logs (this is OK)"
+        continue-on-error: true
+
       - name: Verify Functions are loaded
         run: |
           echo "Checking if functions are loaded..."
           
           # Try multiple times as functions may take time to appear
-          MAX_RETRIES=5
+          MAX_RETRIES=6
           RETRY_COUNT=0
           FUNCTIONS_COUNT=0
           
@@ -262,17 +297,33 @@ jobs:
             else
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "Attempt $RETRY_COUNT/$MAX_RETRIES: No functions found yet, waiting..."
-              sleep 10
+              sleep 15
             fi
           done
           
           if [ "$FUNCTIONS_COUNT" -eq "0" ]; then
             echo "⚠ WARNING: No functions found after $MAX_RETRIES attempts"
-            echo "This may be normal - functions may take a few minutes to appear."
+            echo ""
+            echo "Diagnostic information:"
+            echo "1. Function App state:"
+            az functionapp show \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+              --query "{name: name, state: state, kind: kind}" \
+              --output table
+            echo ""
+            echo "2. App Settings:"
+            az functionapp config appsettings list \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+              --query "[?name=='FUNCTIONS_WORKER_RUNTIME' || name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_USE_PLACEHOLDER'].{Name: name, Value: value}" \
+              --output table
+            echo ""
             echo "Please check:"
-            echo "1. Function App logs in Azure Portal (Log stream)"
-            echo "2. WEBSITE_RUN_FROM_PACKAGE is set correctly"
-            echo "3. Function App is running (not stopped)"
+            echo "- Function App logs in Azure Portal (Log stream)"
+            echo "- WEBSITE_RUN_FROM_PACKAGE is set correctly"
+            echo "- Function App is running (not stopped)"
+            echo "- Run the diagnose-functions.yml workflow for more details"
           fi
         continue-on-error: false
       

@@ -1,0 +1,62 @@
+name: Diagnose Azure Functions
+
+on:
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: '' # Set this in repository secrets
+  AZURE_RESOURCE_GROUP: '' # Set this in repository secrets
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Check Function App Status
+        run: |
+          echo "=== Function App Status ==="
+          az functionapp show \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "{name: name, state: state, kind: kind, runtime: siteConfig.linuxFxVersion}" \
+            --output table
+
+      - name: Check App Settings
+        run: |
+          echo "=== App Settings ==="
+          az functionapp config appsettings list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[?name=='FUNCTIONS_WORKER_RUNTIME' || name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_USE_PLACEHOLDER' || name=='AzureWebJobsStorage'].{Name: name, Value: value}" \
+            --output table
+
+      - name: Check Functions
+        run: |
+          echo "=== Functions List ==="
+          az functionapp function list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[].{Name: name, Status: invokeUrlTemplate}" \
+            --output table || echo "No functions found or error occurred"
+
+      - name: Check Deployment Status
+        run: |
+          echo "=== Deployment Status ==="
+          az functionapp deployment list \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --query "[0].{Id: id, Status: status, Active: active}" \
+            --output table || echo "No deployments found"
+
+      - name: Get Recent Logs
+        run: |
+          echo "=== Recent Logs (last 50 lines) ==="
+          az webapp log tail \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
+            --lines 50 || echo "Could not retrieve logs"
+

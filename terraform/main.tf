@@ -187,9 +187,10 @@ resource "azurerm_linux_function_app" "main" {
     "AZURE_SQL_USER" = var.sql_admin_login
     "AZURE_SQL_PASSWORD" = var.sql_admin_password
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
-    # Note: WEBSITE_RUN_FROM_PACKAGE is automatically set by Azure during ZIP deployment
-    # For Linux Consumption Plan, Azure sets it to the Blob Storage URL (not "1")
-    # This is the recommended approach for Linux Consumption Plan
+    # Disable placeholder mode to ensure functions are loaded
+    "WEBSITE_USE_PLACEHOLDER" = "0"
+    # Note: WEBSITE_RUN_FROM_PACKAGE is set by deployment workflow
+    # For Linux Consumption Plan, this should be set to Blob Storage URL
   }
 
   tags = {
