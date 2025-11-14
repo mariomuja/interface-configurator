@@ -21,7 +21,7 @@ public class ProcessCsvBlobTriggerFunction
 
     [Function("ProcessCsvBlobTrigger")]
     public async Task Run(
-        [BlobTrigger("csv-uploads/{name}")] byte[] blobContent,
+        [BlobTrigger("csv-uploads/{name}", Connection = "AzureWebJobsStorage")] byte[] blobContent,
         string name,
         FunctionContext context)
     {
