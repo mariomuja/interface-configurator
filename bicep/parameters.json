@@ -1,0 +1,82 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": {
+      "value": "rg-infrastructure-as-code"
+    },
+    "location": {
+      "value": "Central US"
+    },
+    "sqlLocation": {
+      "value": ""
+    },
+    "environment": {
+      "value": "prod"
+    },
+    "storageAccountName": {
+      "value": "stapp"
+    },
+    "sqlServerName": {
+      "value": "sql-infrastructure"
+    },
+    "sqlDatabaseName": {
+      "value": "app_database"
+    },
+    "sqlAdminLogin": {
+      "value": "sqladmin"
+    },
+    "sqlAdminPassword": {
+      "value": "InfrastructureAsCode2024!Secure"
+    },
+    "sqlLicenseType": {
+      "value": "LicenseIncluded"
+    },
+    "sqlSkuName": {
+      "value": "S0"
+    },
+    "sqlMaxSizeGb": {
+      "value": 2
+    },
+    "sqlZoneRedundant": {
+      "value": false
+    },
+    "allowCurrentIp": {
+      "value": false
+    },
+    "currentIpAddress": {
+      "value": ""
+    },
+    "functionsStorageName": {
+      "value": "stfuncsapp"
+    },
+    "functionsAppPlanName": {
+      "value": "plan-funcs-app"
+    },
+    "functionsAppName": {
+      "value": "func-app"
+    },
+    "functionsSkuName": {
+      "value": "Y1"
+    },
+    "enableFunctionApp": {
+      "value": true
+    },
+    "jwtSecret": {
+      "value": ""
+    },
+    "corsAllowedOrigins": {
+      "value": []
+    },
+    "githubRepoUrl": {
+      "value": ""
+    },
+    "githubBranch": {
+      "value": "main"
+    },
+    "githubRepoPath": {
+      "value": "azure-functions/ProcessCsvBlobTrigger"
+    }
+  }
+}
+

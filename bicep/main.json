@@ -1,0 +1,441 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "2532435993188487119"
+    }
+  },
+  "parameters": {
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "rg-infrastructure-as-code",
+      "allowedValues": [
+        "rg-infrastructure-as-code"
+      ],
+      "metadata": {
+        "description": "Name of the resource group"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "West Europe",
+      "metadata": {
+        "description": "Azure region for resources"
+      }
+    },
+    "sqlLocation": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure region for SQL Server (if different from main location, leave empty to use main location)"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "prod",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name (e.g., dev, staging, prod)"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "stapp",
+      "metadata": {
+        "description": "Base name for storage account (suffix will be added)"
+      }
+    },
+    "sqlServerName": {
+      "type": "string",
+      "defaultValue": "sql-infrastructure",
+      "metadata": {
+        "description": "Base name for SQL Server (suffix will be added)"
+      }
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "defaultValue": "app_database",
+      "metadata": {
+        "description": "Name of the SQL database"
+      }
+    },
+    "sqlAdminLogin": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SQL Server administrator login"
+      }
+    },
+    "sqlAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SQL Server administrator password"
+      }
+    },
+    "sqlLicenseType": {
+      "type": "string",
+      "defaultValue": "LicenseIncluded",
+      "allowedValues": [
+        "LicenseIncluded",
+        "BasePrice"
+      ],
+      "metadata": {
+        "description": "SQL Database license type (LicenseIncluded or BasePrice)"
+      }
+    },
+    "sqlSkuName": {
+      "type": "string",
+      "defaultValue": "S0",
+      "metadata": {
+        "description": "SQL Database SKU name (e.g., S0, S1, P1, GP_S_Gen5_2, BC_Gen5_2)"
+      }
+    },
+    "sqlMaxSizeGb": {
+      "type": "int",
+      "defaultValue": 2,
+      "metadata": {
+        "description": "Maximum size in GB for SQL Database"
+      }
+    },
+    "sqlZoneRedundant": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable zone redundancy for SQL Database"
+      }
+    },
+    "allowCurrentIp": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Allow current IP address to access SQL Server"
+      }
+    },
+    "currentIpAddress": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Current IP address for SQL firewall rule"
+      }
+    },
+    "functionsStorageName": {
+      "type": "string",
+      "defaultValue": "stfuncsapp",
+      "metadata": {
+        "description": "Base name for Functions storage account (suffix will be added)"
+      }
+    },
+    "functionsAppPlanName": {
+      "type": "string",
+      "defaultValue": "plan-funcs-app",
+      "metadata": {
+        "description": "Base name for Functions app service plan (suffix will be added)"
+      }
+    },
+    "functionsAppName": {
+      "type": "string",
+      "defaultValue": "func-app",
+      "metadata": {
+        "description": "Base name for Functions app (suffix will be added)"
+      }
+    },
+    "functionsSkuName": {
+      "type": "string",
+      "defaultValue": "Y1",
+      "allowedValues": [
+        "Y1",
+        "EP1"
+      ],
+      "metadata": {
+        "description": "SKU name for Functions app service plan. Use Y1 for Consumption (current), EP1 for Flex Consumption (migration required before Sep 2028)"
+      }
+    },
+    "enableFunctionApp": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Azure Function App deployment"
+      }
+    },
+    "jwtSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "JWT secret for authentication (reserved for future use)"
+      }
+    },
+    "corsAllowedOrigins": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "List of allowed CORS origins"
+      }
+    },
+    "githubRepoUrl": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GitHub repository URL for source control deployment (reserved for future use)"
+      }
+    },
+    "githubBranch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "GitHub branch for source control deployment (reserved for future use)"
+      }
+    },
+    "githubRepoPath": {
+      "type": "string",
+      "defaultValue": "azure-functions/ProcessCsvBlobTrigger",
+      "metadata": {
+        "description": "Path to the Function App code in the repository (reserved for future use)"
+      }
+    }
+  },
+  "variables": {
+    "uniqueSuffix": "[uniqueString(resourceGroup().id)]",
+    "commonTags": {
+      "Environment": "[parameters('environment')]",
+      "Project": "Infrastructure"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}{1}', parameters('storageAccountName'), variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix'))]",
+      "location": "[if(not(equals(parameters('sqlLocation'), '')), parameters('sqlLocation'), parameters('location'))]",
+      "properties": {
+        "version": "12.0",
+        "administratorLogin": "[parameters('sqlAdminLogin')]",
+        "administratorLoginPassword": "[parameters('sqlAdminPassword')]",
+        "minimalTlsVersion": "1.2"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')), 'AllowAzureServices')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')), 'AllowAllIPs')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "255.255.255.255"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "condition": "[and(parameters('allowCurrentIp'), not(equals(parameters('currentIpAddress'), '')))]",
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')), 'AllowCurrentIP')]",
+      "properties": {
+        "startIpAddress": "[parameters('currentIpAddress')]",
+        "endIpAddress": "[parameters('currentIpAddress')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2023-05-01-preview",
+      "name": "[format('{0}/{1}', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')), parameters('sqlDatabaseName'))]",
+      "location": "[if(not(equals(parameters('sqlLocation'), '')), parameters('sqlLocation'), parameters('location'))]",
+      "sku": {
+        "name": "[parameters('sqlSkuName')]"
+      },
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "licenseType": "[parameters('sqlLicenseType')]",
+        "maxSizeBytes": "[mul(mul(mul(parameters('sqlMaxSizeGb'), 1024), 1024), 1024)]",
+        "zoneRedundant": "[parameters('sqlZoneRedundant')]"
+      },
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}{1}', parameters('functionsAppPlanName'), variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "kind": "linux",
+      "sku": {
+        "name": "[parameters('functionsSkuName')]"
+      },
+      "properties": {
+        "reserved": true
+      },
+      "tags": "[variables('commonTags')]"
+    },
+    {
+      "condition": "[parameters('enableFunctionApp')]",
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}{1}', parameters('functionsAppName'), variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,linux",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}{1}', parameters('functionsAppPlanName'), variables('uniqueSuffix')))]",
+        "siteConfig": {
+          "linuxFxVersion": "NODE|20",
+          "appSettings": [
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "node"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "~20"
+            },
+            {
+              "name": "AZURE_FUNCTIONS_ENVIRONMENT",
+              "value": "[parameters('environment')]"
+            },
+            {
+              "name": "AZURE_SQL_SERVER",
+              "value": "[reference(resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix'))), '2023-05-01-preview').fullyQualifiedDomainName]"
+            },
+            {
+              "name": "AZURE_SQL_DATABASE",
+              "value": "[parameters('sqlDatabaseName')]"
+            },
+            {
+              "name": "AZURE_SQL_USER",
+              "value": "[parameters('sqlAdminLogin')]"
+            },
+            {
+              "name": "AZURE_SQL_PASSWORD",
+              "value": "[parameters('sqlAdminPassword')]"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix'))), '2023-05-01').keys[0].value, environment().suffixes.storage)]"
+            },
+            {
+              "name": "WEBSITE_USE_PLACEHOLDER",
+              "value": "0"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix'))), '2023-05-01').keys[0].value, environment().suffixes.storage)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[format('{0}{1}', toLower(parameters('functionsAppName')), variables('uniqueSuffix'))]"
+            }
+          ],
+          "cors": "[if(not(equals(parameters('corsAllowedOrigins'), createArray())), createObject('allowedOrigins', parameters('corsAllowedOrigins')), null())]"
+        },
+        "httpsOnly": true
+      },
+      "tags": "[variables('commonTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', format('{0}{1}', parameters('functionsAppPlanName'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[parameters('resourceGroupName')]"
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "value": "[parameters('location')]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[format('{0}{1}', parameters('storageAccountName'), variables('uniqueSuffix'))]"
+    },
+    "storageAccountConnectionString": {
+      "type": "string",
+      "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', format('{0}{1}', parameters('storageAccountName'), variables('uniqueSuffix')), listKeys(resourceId('Microsoft.Storage/storageAccounts', format('{0}{1}', parameters('storageAccountName'), variables('uniqueSuffix'))), '2023-05-01').keys[0].value, environment().suffixes.storage)]"
+    },
+    "sqlServerName": {
+      "type": "string",
+      "value": "[format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix'))]"
+    },
+    "sqlServerFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix'))), '2023-05-01-preview').fullyQualifiedDomainName]"
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "value": "[parameters('sqlDatabaseName')]"
+    },
+    "sqlConnectionString": {
+      "type": "string",
+      "value": "[format('Server=tcp:{0},1433;Initial Catalog={1};Persist Security Info=False;User ID={2};Password={3};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;', reference(resourceId('Microsoft.Sql/servers', format('{0}{1}', parameters('sqlServerName'), variables('uniqueSuffix'))), '2023-05-01-preview').fullyQualifiedDomainName, parameters('sqlDatabaseName'), parameters('sqlAdminLogin'), parameters('sqlAdminPassword'))]"
+    },
+    "functionAppName": {
+      "type": "string",
+      "value": "[if(and(parameters('enableFunctionApp'), not(equals(reference(resourceId('Microsoft.Web/sites', format('{0}{1}', parameters('functionsAppName'), variables('uniqueSuffix'))), '2023-01-01', 'full'), null()))), format('{0}{1}', parameters('functionsAppName'), variables('uniqueSuffix')), '')]"
+    },
+    "functionAppUrl": {
+      "type": "string",
+      "value": "[if(and(parameters('enableFunctionApp'), not(equals(reference(resourceId('Microsoft.Web/sites', format('{0}{1}', parameters('functionsAppName'), variables('uniqueSuffix'))), '2023-01-01', 'full'), null()))), format('https://{0}', reference(resourceId('Microsoft.Web/sites', format('{0}{1}', parameters('functionsAppName'), variables('uniqueSuffix'))), '2023-01-01').defaultHostName), '')]"
+    },
+    "functionsStorageAccountName": {
+      "type": "string",
+      "value": "[format('{0}{1}', parameters('functionsStorageName'), variables('uniqueSuffix'))]"
+    }
+  }
+}

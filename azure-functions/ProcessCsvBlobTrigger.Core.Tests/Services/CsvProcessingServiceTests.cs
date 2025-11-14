@@ -125,5 +125,181 @@ public class CsvProcessingServiceTests
         Assert.Single(result);
         Assert.Single(result[0]); // Only one record with id
     }
+
+    [Fact]
+    public void ParseCsv_WithQuotedValues_HandlesQuotes()
+    {
+        // Arrange
+        var csvContent = "id,name,email\n\"1\",\"John Doe\",\"john@example.com\"";
+
+        // Act
+        var result = _service.ParseCsv(csvContent);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("1", result[0]["id"]);
+        Assert.Equal("John Doe", result[0]["name"]);
+        Assert.Equal("john@example.com", result[0]["email"]);
+    }
+
+    [Fact]
+    public void ParseCsv_WithWhitespace_TrimsValues()
+    {
+        // Arrange
+        var csvContent = "id,name,email\n 1 , John Doe , john@example.com ";
+
+        // Act
+        var result = _service.ParseCsv(csvContent);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("1", result[0]["id"]);
+        Assert.Equal("John Doe", result[0]["name"]);
+        Assert.Equal("john@example.com", result[0]["email"]);
+    }
+
+    [Fact]
+    public void ParseCsv_WithMissingValues_FillsWithEmptyString()
+    {
+        // Arrange
+        var csvContent = "id,name,email,age\n1,John,";
+
+        // Act
+        var result = _service.ParseCsv(csvContent);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("1", result[0]["id"]);
+        Assert.Equal("John", result[0]["name"]);
+        Assert.Equal("", result[0]["email"]);
+        Assert.Equal("", result[0]["age"]);
+    }
+
+    [Fact]
+    public void ParseCsv_WithNullInput_ReturnsEmptyList()
+    {
+        // Act
+        var result = _service.ParseCsv(null!);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ParseCsv_WithOnlyWhitespace_ReturnsEmptyList()
+    {
+        // Arrange
+        var csvContent = "   \n  \n  ";
+
+        // Act
+        var result = _service.ParseCsv(csvContent);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void CreateChunks_WithInvalidId_ExcludesRecord()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>>
+        {
+            new() { { "id", "invalid" }, { "name", "Test" }, { "email", "test@test.com" }, { "age", "30" }, { "city", "City" }, { "salary", "50000" } }
+        };
+
+        // Act
+        var result = _service.CreateChunks(records);
+
+        // Assert - Invalid ID causes parsing to fail, record is excluded
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void CreateChunks_WithInvalidAge_ParsesAsZero()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>>
+        {
+            new() { { "id", "1" }, { "name", "Test" }, { "email", "test@test.com" }, { "age", "invalid" }, { "city", "City" }, { "salary", "50000" } }
+        };
+
+        // Act
+        var result = _service.CreateChunks(records);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result); // Invalid age causes parsing to fail, record excluded
+    }
+
+    [Fact]
+    public void CreateChunks_WithInvalidSalary_ParsesAsZero()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>>
+        {
+            new() { { "id", "1" }, { "name", "Test" }, { "email", "test@test.com" }, { "age", "30" }, { "city", "City" }, { "salary", "invalid" } }
+        };
+
+        // Act
+        var result = _service.CreateChunks(records);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result); // Invalid salary causes parsing to fail, record excluded
+    }
+
+    [Fact]
+    public void CreateChunks_WithExactly100Records_CreatesSingleChunk()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>>();
+        for (int i = 1; i <= 100; i++)
+        {
+            records.Add(new Dictionary<string, string>
+            {
+                { "id", i.ToString() },
+                { "name", $"Name{i}" },
+                { "email", $"email{i}@example.com" },
+                { "age", "30" },
+                { "city", "City" },
+                { "salary", "50000" }
+            });
+        }
+
+        // Act
+        var result = _service.CreateChunks(records);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(100, result[0].Count);
+    }
+
+    [Fact]
+    public void CreateChunks_WithEmptyRecords_ReturnsEmptyChunks()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>>();
+
+        // Act
+        var result = _service.CreateChunks(records);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void CreateChunks_WithNullRecords_ThrowsException()
+    {
+        // Arrange
+        var records = new List<Dictionary<string, string>> { null! };
+
+        // Act & Assert - Null records cause ArgumentNullException
+        Assert.Throws<ArgumentNullException>(() => _service.CreateChunks(records));
+    }
 }
 

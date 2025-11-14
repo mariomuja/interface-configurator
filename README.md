@@ -107,6 +107,29 @@ The frontend is deployed to Vercel. Configuration is in `vercel/vercel.json`.
 
 ### Deployment
 
+#### Azure Functions
+
+Azure Functions are automatically deployed via GitHub Actions using the **"Run from Package"** method (Microsoft's recommended approach).
+
+**Quick Setup:**
+```powershell
+# Windows
+.\setup-github-secrets.ps1
+```
+
+```bash
+# Linux/Mac
+./setup-github-secrets.sh
+```
+
+**Documentation:**
+- [GitHub Actions Deployment](./GITHUB_ACTIONS_DEPLOYMENT.md) - Complete guide
+- [Setup GitHub Secrets](./SETUP_GITHUB_SECRETS.md) - Automated setup
+- [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) - Step-by-step checklist
+- [Documentation Index](./DOCUMENTATION_INDEX.md) - Complete documentation overview
+
+#### Vercel
+
 Vercel deployments are automatically triggered on git push to the main branch.
 
 ## Environment Variables
@@ -161,6 +184,8 @@ Configured via Terraform in Function App settings:
 - **Build Errors**: Check Node.js version compatibility
 - **Environment Variables**: Verify all required variables are set
 - **CORS**: Check CORS configuration matches frontend URL
+- **Function App Deployment**: See [GITHUB_ACTIONS_DEPLOYMENT.md](./GITHUB_ACTIONS_DEPLOYMENT.md)
+- **GitHub Secrets**: See [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
 
 ## Maintenance
 

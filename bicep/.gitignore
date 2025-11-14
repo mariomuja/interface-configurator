@@ -1,0 +1,11 @@
+# Bicep build outputs
+*.bicepparam
+!*.bicepparam.example
+
+# Azure deployment outputs
+*.json.bak
+*.json.backup
+
+# Local parameter overrides (if any)
+parameters.local.json
+

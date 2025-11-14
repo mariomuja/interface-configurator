@@ -1,40 +1,39 @@
-# GitHub Secret jetzt setzen - Schnellanleitung
+# ⚠️ VERALTET - GitHub Secret Setup
 
-## Schritt 1: GitHub Secret setzen
+**Diese Anleitung ist veraltet!**
 
-1. **Öffne diesen Link direkt:**
-   https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions
+Wir verwenden jetzt **Service Principal Credentials** statt Publish Profile.
 
-2. **Klicke auf "New repository secret"** (rechts oben)
+## Aktuelle Methode
 
-3. **Fülle aus:**
-   - **Name**: `AZURE_FUNCTIONAPP_PUBLISH_PROFILE`
-   - **Secret**: Kopiere den **gesamten Inhalt** aus `publish-profile.xml` (siehe unten)
+Siehe: [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
 
-4. **Klicke auf "Add secret"**
+## Schnellstart
 
-## Schritt 2: Publish Profile Inhalt
+```powershell
+# Windows
+.\setup-github-secrets.ps1
+```
 
-Öffne die Datei `publish-profile.xml` im Root-Verzeichnis und kopiere **alles** von `<publishData>` bis `</publishData>` inklusive.
+```bash
+# Linux/Mac
+./setup-github-secrets.sh
+```
 
-**WICHTIG**: Kopiere den kompletten XML-Inhalt!
+## Was hat sich geändert?
 
-## Schritt 3: Deployment auslösen
+**Alt**: Publish Profile (XML)  
+**Neu**: Service Principal Credentials (JSON)
 
-Nach dem Setzen des Secrets kannst du das Deployment auslösen:
+**Vorteile**:
+- ✅ Automatisiertes Setup via Scripts
+- ✅ Sicherer (Service Principal mit minimalen Berechtigungen)
+- ✅ Einfacher zu verwalten
 
-### Option A: Automatisch (bei nächstem Push)
-- Mache eine Änderung in `azure-functions/ProcessCsvBlobTrigger/`
-- Committe und pushe zu `main`
-- GitHub Actions startet automatisch
+## Benötigte Secrets
 
-### Option B: Manuell
-1. Gehe zu: https://github.com/mariomuja/infrastructure-as-code/actions
-2. Klicke auf "Deploy Azure Functions"
-3. Klicke auf "Run workflow" → "Run workflow"
+1. `AZURE_CREDENTIALS` - Service Principal JSON
+2. `AZURE_RESOURCE_GROUP` - Resource Group Name
+3. `AZURE_FUNCTIONAPP_NAME` - Function App Name
 
-## Fertig!
-
-Nach dem Deployment sollte die Function App den Code enthalten.
-
-
+Siehe: [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md) für Details.

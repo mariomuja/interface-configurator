@@ -96,3 +96,4 @@ az functionapp config appsettings set \
 2. Oder manuell nach jedem Deployment setzen
 3. Function App neu starten nach dem Setzen
 
+

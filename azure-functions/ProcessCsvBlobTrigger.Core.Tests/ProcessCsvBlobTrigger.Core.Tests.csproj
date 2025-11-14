@@ -21,10 +21,12 @@
     </PackageReference>
     <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProcessCsvBlobTrigger.Core\ProcessCsvBlobTrigger.Core.csproj" />
+    <ProjectReference Include="..\ProcessCsvBlobTrigger\ProcessCsvBlobTrigger.csproj" />
   </ItemGroup>
 
 </Project>
