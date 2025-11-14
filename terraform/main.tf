@@ -168,7 +168,7 @@ resource "azurerm_linux_function_app" "main" {
 
   site_config {
     application_stack {
-      dotnet_version = "8.0"
+      node_version = "20"
     }
     
     dynamic "cors" {
@@ -180,7 +180,8 @@ resource "azurerm_linux_function_app" "main" {
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "dotnet-isolated"
+    "FUNCTIONS_WORKER_RUNTIME" = "node"
+    "WEBSITE_NODE_DEFAULT_VERSION" = "~20"
     "AZURE_FUNCTIONS_ENVIRONMENT" = var.environment
     "AZURE_SQL_SERVER" = azurerm_mssql_server.main.fully_qualified_domain_name
     "AZURE_SQL_DATABASE" = var.sql_database_name

@@ -10,8 +10,8 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_NAME: '' # Set this in repository secrets or update manually
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions/ProcessCsvBlobTrigger'
-  DOTNET_VERSION: '8.0.x'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions'
+  NODE_VERSION: '20.x'
 
 jobs:
   build-and-deploy:
@@ -20,46 +20,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj
-        continue-on-error: false
-
-      - name: Build
-        run: dotnet build ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj --configuration Release --no-restore
-        continue-on-error: false
-
-      - name: Publish
-        run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/ProcessCsvBlobTrigger.csproj --configuration Release --output ./publish --no-build
-        continue-on-error: false
-
-      - name: Verify publish output
+      - name: Install dependencies
         run: |
-          echo "Checking publish output structure..."
-          ls -la ./publish/
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          npm ci --production
+        continue-on-error: false
+
+      - name: Verify function structure
+        run: |
+          echo "Checking function structure..."
+          ls -la ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/
           echo ""
           echo "Checking for required files..."
-          test -f ./publish/ProcessCsvBlobTrigger.dll && echo "✓ ProcessCsvBlobTrigger.dll found" || echo "✗ ProcessCsvBlobTrigger.dll missing"
-          test -f ./publish/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
-          test -f ./publish/worker.config.json && echo "✓ worker.config.json found" || echo "✗ worker.config.json missing"
-          test -f ./publish/functions.metadata && echo "✓ functions.metadata found" || echo "✗ functions.metadata missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
+          test -d ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction && echo "✓ SimpleTestFunction directory found" || echo "✗ SimpleTestFunction directory missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction/function.json && echo "✓ function.json found" || echo "✗ function.json missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction/index.js && echo "✓ index.js found" || echo "✗ index.js missing"
           echo ""
-          echo "Verifying host.json configuration..."
-          if grep -q "extensionBundle" ./publish/host.json 2>/dev/null; then
-            echo "⚠ WARNING: host.json contains extensionBundle - this should be removed for dotnet-isolated"
-            echo "host.json content:"
-            cat ./publish/host.json
-          else
-            echo "✓ host.json does not contain extensionBundle (correct for dotnet-isolated)"
-          fi
+          echo "host.json content:"
+          cat ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/host.json
         continue-on-error: false
 
       - name: Create deployment package
-        run: cd publish && zip -r ../function-app.zip . && cd ..
+        run: |
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          # Exclude node_modules and other unnecessary files
+          zip -r ../function-app.zip . \
+            -x "node_modules/*" \
+            -x "*.git*" \
+            -x "*.vscode/*" \
+            -x "*.vs/*" \
+            -x "*.idea/*" \
+            -x "*test*" \
+            -x "*Test*" \
+            -x "*.md" \
+            -x "*.log"
+          cd ..
         continue-on-error: false
       
       - name: Verify ZIP package
