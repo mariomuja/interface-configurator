@@ -86,45 +86,12 @@ jobs:
             --output table || (echo "ERROR: Function App not found!" && exit 1)
         continue-on-error: false
 
-      - name: Deploy to Azure Functions (Run from Package)
+      - name: Deploy to Azure Functions (Direct Blob Upload)
         run: |
-          echo "Deploying ZIP package..."
+          echo "Deploying ZIP package using direct blob upload method..."
           echo "ZIP file path: $(pwd)/function-app.zip"
           echo "ZIP file size: $(ls -lh function-app.zip | awk '{print $5}')"
-          echo "ZIP file exists: $(test -f function-app.zip && echo 'YES' || echo 'NO')"
           echo ""
-          
-          # Use absolute path for ZIP file
-          ZIP_PATH=$(realpath function-app.zip)
-          echo "Absolute ZIP path: $ZIP_PATH"
-          
-          # Deploy with verbose output
-          az functionapp deployment source config-zip \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --src "$ZIP_PATH" \
-            --timeout 600 \
-            --verbose || {
-              echo "ERROR: Deployment failed!"
-              echo "Checking Function App status..."
-              az functionapp show \
-                --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-                --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-                --query "{name: name, state: state}" \
-                --output table
-              exit 1
-            }
-          
-          echo ""
-          echo "✅ Deployment completed successfully!"
-          echo "Azure automatically uploads the ZIP to Blob Storage"
-          echo "and should set WEBSITE_RUN_FROM_PACKAGE to the blob URL."
-        continue-on-error: false
-      
-      - name: Alternative Deployment (if config-zip failed)
-        if: failure()
-        run: |
-          echo "⚠ Primary deployment method failed, trying alternative method..."
           
           # Get storage account info
           STORAGE_CONNECTION=$(az functionapp config appsettings list \
@@ -132,12 +99,20 @@ jobs:
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
             --query "[?name=='AzureWebJobsStorage'].value" \
             -o tsv)
+          
+          if [ -z "$STORAGE_CONNECTION" ]; then
+            echo "ERROR: AzureWebJobsStorage not found!"
+            exit 1
+          fi
+          
           STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
           
           if [ -z "$STORAGE_ACCOUNT" ]; then
-            echo "ERROR: Could not get storage account name"
+            echo "ERROR: Could not extract storage account name from connection string"
             exit 1
           fi
+          
+          echo "Storage Account: $STORAGE_ACCOUNT"
           
           # Get storage account key
           STORAGE_KEY=$(az storage account keys list \
@@ -147,6 +122,7 @@ jobs:
             -o tsv)
           
           # Create container if it doesn't exist
+          echo "Creating/verifying function-releases container..."
           az storage container create \
             --name function-releases \
             --account-name $STORAGE_ACCOUNT \
@@ -165,7 +141,8 @@ jobs:
             --container-name function-releases \
             --name "$BLOB_NAME" \
             --file function-app.zip \
-            --overwrite
+            --overwrite \
+            --timeout 600
           
           # Generate SAS token (valid for 10 years)
           EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
@@ -187,13 +164,15 @@ jobs:
             --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
             --output none
           
-          echo "✅ Alternative deployment completed!"
+          echo ""
+          echo "✅ Deployment completed successfully!"
           echo "Package URL: ${PACKAGE_URL:0:100}..."
-        continue-on-error: true
+        continue-on-error: false
+      
 
-      - name: Ensure WEBSITE_RUN_FROM_PACKAGE is set
+      - name: Verify WEBSITE_RUN_FROM_PACKAGE is set
         run: |
-          echo "Checking if WEBSITE_RUN_FROM_PACKAGE is set..."
+          echo "Verifying WEBSITE_RUN_FROM_PACKAGE is set..."
           PACKAGE_URL=$(az functionapp config appsettings list \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
@@ -201,71 +180,10 @@ jobs:
             -o tsv)
           
           if [ -z "$PACKAGE_URL" ] || [ "$PACKAGE_URL" == "None" ] || [ "$PACKAGE_URL" == "" ]; then
-            echo "⚠ WEBSITE_RUN_FROM_PACKAGE not set. Using alternative deployment method..."
-            
-            # Get storage account name from connection string
-            STORAGE_CONNECTION=$(az functionapp config appsettings list \
-              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-              --query "[?name=='AzureWebJobsStorage'].value" \
-              -o tsv)
-            STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
-            
-            if [ -z "$STORAGE_ACCOUNT" ]; then
-              echo "ERROR: Could not get storage account name"
-              exit 1
-            fi
-            
-            # Get storage account key
-            STORAGE_KEY=$(az storage account keys list \
-              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-              --account-name $STORAGE_ACCOUNT \
-              --query "[0].value" \
-              -o tsv)
-            
-            # Create container if it doesn't exist
-            az storage container create \
-              --name function-releases \
-              --account-name $STORAGE_ACCOUNT \
-              --account-key $STORAGE_KEY \
-              --public-access off \
-              --fail-on-exist false || true
-            
-            # Upload ZIP to blob storage
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            BLOB_NAME="function-app-${TIMESTAMP}.zip"
-            
-            echo "Uploading ZIP to blob storage: $BLOB_NAME"
-            az storage blob upload \
-              --account-name $STORAGE_ACCOUNT \
-              --account-key $STORAGE_KEY \
-              --container-name function-releases \
-              --name "$BLOB_NAME" \
-              --file function-app.zip \
-              --overwrite
-            
-            # Generate SAS token (valid for 10 years)
-            EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
-            SAS_TOKEN=$(az storage container generate-sas \
-              --name function-releases \
-              --account-name $STORAGE_ACCOUNT \
-              --account-key $STORAGE_KEY \
-              --permissions r \
-              --expiry $EXPIRY \
-              -o tsv)
-            
-            PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${BLOB_NAME}?${SAS_TOKEN}"
-            
-            echo "Setting WEBSITE_RUN_FROM_PACKAGE to: ${PACKAGE_URL:0:100}..."
-            az functionapp config appsettings set \
-              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-              --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-              --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
-              --output none
-            
-            echo "✅ WEBSITE_RUN_FROM_PACKAGE set successfully"
+            echo "ERROR: WEBSITE_RUN_FROM_PACKAGE is not set!"
+            exit 1
           else
-            echo "✅ WEBSITE_RUN_FROM_PACKAGE is already set: ${PACKAGE_URL:0:80}..."
+            echo "✅ WEBSITE_RUN_FROM_PACKAGE is set: ${PACKAGE_URL:0:80}..."
           fi
         continue-on-error: false
       
