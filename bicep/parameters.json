@@ -59,9 +59,9 @@
     "functionsSkuName": {
       "value": "Y1"
     },
-    "enableFunctionApp": {
-      "value": true
-    },
+        "enableFunctionApp": {
+          "value": false
+        },
     "jwtSecret": {
       "value": ""
     },
