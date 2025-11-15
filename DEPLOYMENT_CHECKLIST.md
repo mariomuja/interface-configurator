@@ -104,3 +104,5 @@ Nach erfolgreichem Deployment:
 - [ ] Event Grid Subscriptions einrichten (falls benötigt)
 
 
+
+

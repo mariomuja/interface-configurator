@@ -185,3 +185,5 @@ Use the provided scripts:
 - `ensure-function-app-ready.ps1` - Ensures all services are ready
 - `verify-function-app.ps1` - Verifies function app configuration
 
+
+

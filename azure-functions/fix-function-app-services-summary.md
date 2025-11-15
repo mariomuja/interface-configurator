@@ -63,3 +63,5 @@ Die Function App wurde neu gestartet und sollte jetzt verfügbar sein.
 - Nach Neustart benoetigt die Function App Zeit zum Initialisieren
 - Das Package muss die korrekte Struktur haben
 
+
+

@@ -122,3 +122,5 @@ echo "  2. Oder pushe eine Änderung zu azure-functions/**"
 echo ""
 
 
+
+

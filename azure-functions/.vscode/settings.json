@@ -3,5 +3,32 @@
   "azureFunctions.projectLanguage": "JavaScript",
   "azureFunctions.projectRuntime": "~4",
   "debug.internalConsoleOptions": "neverOpen",
-  "azureFunctions.preDeployTask": "npm prune"
+  "azureFunctions.preDeployTask": "npm prune",
+  
+  // .NET Test Explorer Configuration
+  "dotnet.defaultSolution": "ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj",
+  "dotnet.testWindow.codeLens": true,
+  "dotnet.unitTests.runSettingsPath": "",
+  "dotnet.testWindow.showCodeLens": true,
+  
+  // Test Explorer Settings
+  "testExplorer.useNativeTesting": true,
+  "testExplorer.codeLens": true,
+  "testExplorer.showCollapseButton": true,
+  "testExplorer.showExpandButton": true,
+  "testExplorer.showFailCount": true,
+  "testExplorer.showDuration": true,
+  
+  // C# Test Settings
+  "omnisharp.enableRoslynAnalyzers": true,
+  "omnisharp.enableEditorConfigSupport": true,
+  "omnisharp.enableMsBuildLoadProjectsOnDemand": false,
+  
+  // Test Output Settings
+  "testExplorer.testFramework": "xunit",
+  "dotnet.testWindow.logging": {
+    "engineLogging": false,
+    "testRunnerLogging": false
+  },
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true
 }

@@ -15,7 +15,7 @@
       "value": "prod"
     },
         "storageAccountName": {
-          "value": "stapp-general"
+          "value": "stappgeneral"
         },
         "sqlServerName": {
           "value": "sql-main-database"

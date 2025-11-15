@@ -169,3 +169,5 @@ Write-Host "   - App Settings pruefen: az functionapp config appsettings list --
 
 Write-Host ""
 
+
+
