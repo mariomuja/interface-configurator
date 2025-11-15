@@ -10,8 +10,8 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_NAME: 'func-csv-to-sql-processor' # CSV to SQL Server processor Function App
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions'
-  NODE_VERSION: '20.x'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions/ProcessCsvBlobTrigger'
+  DOTNET_VERSION: '8.0.x'
 
 jobs:
   build-and-deploy:
@@ -20,47 +20,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Install dependencies
+      - name: Restore dependencies
         run: |
           cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          npm ci --production
+          dotnet restore
+        continue-on-error: false
+
+      - name: Build
+        run: |
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          dotnet build --configuration Release --no-restore
+        continue-on-error: false
+
+      - name: Publish
+        run: |
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          dotnet publish --configuration Release --output ./publish --no-build
         continue-on-error: false
 
       - name: Verify function structure
         run: |
-          echo "Checking function structure..."
-          ls -la ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/
+          echo "Checking published function structure..."
+          ls -la ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/ | head -20
           echo ""
           echo "Checking for required files..."
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
-          test -d ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction && echo "✓ SimpleTestFunction directory found" || echo "✗ SimpleTestFunction directory missing"
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction/function.json && echo "✓ function.json found" || echo "✗ function.json missing"
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/SimpleTestFunction/index.js && echo "✓ index.js found" || echo "✗ index.js missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/worker.config.json && echo "✓ worker.config.json found" || echo "✗ worker.config.json missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/functions.metadata && echo "✓ functions.metadata found" || echo "✗ functions.metadata missing"
+          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/ProcessCsvBlobTrigger.dll && echo "✓ ProcessCsvBlobTrigger.dll found" || echo "✗ ProcessCsvBlobTrigger.dll missing"
           echo ""
-          echo "host.json content:"
-          cat ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/host.json
+          echo "Functions in metadata:"
+          cat ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/functions.metadata | jq -r '.[].name'
         continue-on-error: false
 
       - name: Create deployment package
         run: |
-          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          # Exclude node_modules and other unnecessary files
-          zip -r ../function-app.zip . \
-            -x "node_modules/*" \
-            -x "*.git*" \
-            -x "*.vscode/*" \
-            -x "*.vs/*" \
-            -x "*.idea/*" \
-            -x "*test*" \
-            -x "*Test*" \
-            -x "*.md" \
-            -x "*.log"
-          cd ..
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish
+          zip -r ../../function-app.zip . -q
+          cd ../..
+          echo "Package created:"
+          ls -lh function-app.zip
         continue-on-error: false
       
       - name: Verify ZIP package
