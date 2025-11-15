@@ -8,16 +8,17 @@ output "resource_group_location" {
   value       = azurerm_resource_group.main.location
 }
 
-output "storage_account_name" {
-  description = "Name of the storage account"
-  value       = azurerm_storage_account.main.name
-}
-
-output "storage_account_connection_string" {
-  description = "Connection string for the storage account"
-  value       = azurerm_storage_account.main.primary_connection_string
-  sensitive   = true
-}
+# Storage account outputs commented out - general storage account not currently used
+# output "storage_account_name" {
+#   description = "Name of the storage account"
+#   value       = azurerm_storage_account.main.name
+# }
+#
+# output "storage_account_connection_string" {
+#   description = "Connection string for the storage account"
+#   value       = azurerm_storage_account.main.primary_connection_string
+#   sensitive   = true
+# }
 
 output "sql_server_name" {
   description = "Name of the SQL Server"
