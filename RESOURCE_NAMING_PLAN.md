@@ -22,8 +22,8 @@
 
 ### Storage Account Resources
 - **Current**: `stfuncsapprigklebtsay2o`
-- **New**: `stfunc-csv-processor`
-- **Reason**: Storage for CSV processor function app
+- **New**: `stfunccsvprocessor`
+- **Reason**: Storage for CSV processor function app (no hyphens - Azure Storage Account requirement)
 
 ### Resource Group
 - **Current**: `rg-infrastructure-as-code`

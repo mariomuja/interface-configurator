@@ -136,9 +136,9 @@ variable "current_ip_address" {
 # }
 
 variable "functions_storage_name" {
-  description = "Name for Functions storage account (descriptive, no suffix)"
+  description = "Name for Functions storage account (descriptive, no suffix, no hyphens - Azure requirement)"
   type        = string
-  default     = "stfunc-csv-processor"
+  default     = "stfunccsvprocessor"
 }
 
 variable "functions_app_plan_name" {

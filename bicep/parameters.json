@@ -48,7 +48,7 @@
       "value": ""
     },
         "functionsStorageName": {
-          "value": "stfunc-csv-processor"
+          "value": "stfunccsvprocessor"
         },
         "functionsAppPlanName": {
           "value": "plan-func-csv-processor"
