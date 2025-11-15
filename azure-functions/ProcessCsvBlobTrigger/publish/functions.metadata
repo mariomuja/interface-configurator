@@ -13,6 +13,7 @@
         "direction": "In",
         "type": "blobTrigger",
         "path": "csv-uploads/{name}",
+        "connection": "AzureWebJobsStorage",
         "properties": {
           "supportsDeferredBinding": "True"
         }

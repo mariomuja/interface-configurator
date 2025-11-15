@@ -11,3 +11,6 @@ C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core\obj\Release\net8.0\refint\ProcessCsvBlobTrigger.Core.dll
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core\obj\Release\net8.0\ProcessCsvBlobTrigger.Core.pdb
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core\obj\Release\net8.0\ref\ProcessCsvBlobTrigger.Core.dll
+C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger\bin\publish\ProcessCsvBlobTrigger.Core.deps.json
+C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger\bin\publish\ProcessCsvBlobTrigger.Core.dll
+C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger\bin\publish\ProcessCsvBlobTrigger.Core.pdb

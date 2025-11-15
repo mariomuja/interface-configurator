@@ -60,7 +60,7 @@
       "value": "Y1"
     },
         "enableFunctionApp": {
-          "value": false
+          "value": true
         },
     "jwtSecret": {
       "value": ""

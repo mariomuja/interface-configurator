@@ -221,15 +221,11 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
   properties: {
     serverFarmId: functionsAppServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'NODE|20'
+      linuxFxVersion: 'DOTNET-ISOLATED|8.0'
       appSettings: [
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'node'
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~20'
+          value: 'dotnet-isolated'
         }
         {
           name: 'AZURE_FUNCTIONS_ENVIRONMENT'
