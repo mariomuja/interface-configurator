@@ -95,8 +95,8 @@ param githubBranch string = 'main'
 @description('Path to the Function App code in the repository (reserved for future use)')
 param githubRepoPath string = 'azure-functions/ProcessCsvBlobTrigger'
 
-// Generate unique suffix
-var uniqueSuffix = uniqueString(resourceGroup().id)
+// Note: No random suffix - using descriptive names directly
+// Azure resource names must be globally unique, so descriptive names are used
 
 // Tags (used in resource tags below)
 var commonTags = {
@@ -107,7 +107,7 @@ var commonTags = {
 // Note: Resource Group is assumed to exist or will be created by the deployment command
 // Storage Account for general use
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: '${storageAccountName}${uniqueSuffix}'
+  name: storageAccountName
   location: location
   kind: 'StorageV2'
   sku: {
@@ -122,7 +122,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 
 // Azure SQL Server
 resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
-  name: '${sqlServerName}${uniqueSuffix}'
+  name: sqlServerName
   location: sqlLocation != '' ? sqlLocation : location
   properties: {
     version: '12.0'
@@ -185,7 +185,7 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
 
 // Storage Account for Functions
 resource functionsStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: '${functionsStorageName}${uniqueSuffix}'
+  name: functionsStorageName
   location: location
   kind: 'StorageV2'
   sku: {
@@ -200,7 +200,7 @@ resource functionsStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' 
 
 // App Service Plan for Azure Functions
 resource functionsAppServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
-  name: '${functionsAppPlanName}${uniqueSuffix}'
+  name: functionsAppPlanName
   location: location
   kind: 'linux'
   sku: {
@@ -213,8 +213,9 @@ resource functionsAppServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
 }
 
 // Linux Function App
+// CSV to SQL Server processor - processes CSV blobs and stores data in SQL Database
 resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
-  name: '${functionsAppName}${uniqueSuffix}'
+  name: functionsAppName
   location: location
   kind: 'functionapp,linux'
   properties: {
@@ -262,10 +263,10 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: 'DefaultEndpointsProtocol=https;AccountName=${functionsStorageAccount.name};AccountKey=${functionsStorageAccount.listKeys().keys[0].value};EndpointSuffix=${az.environment().suffixes.storage}'
         }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: '${toLower(functionsAppName)}${uniqueSuffix}'
-        }
+            {
+              name: 'WEBSITE_CONTENTSHARE'
+              value: toLower(replace(functionsAppName, '-', ''))
+            }
       ]
       cors: corsAllowedOrigins != [] ? {
         allowedOrigins: corsAllowedOrigins

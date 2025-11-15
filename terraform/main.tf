@@ -32,12 +32,8 @@ provider "azurerm" {
   tenant_id       = var.tenant_id != null ? var.tenant_id : null
 }
 
-# Random suffix for unique resource names
-resource "random_string" "suffix" {
-  length  = 6
-  special = false
-  upper   = false
-}
+# Note: No random suffix - using descriptive names directly
+# Azure resource names must be globally unique, so descriptive names are used
 
 # Resource Group
 resource "azurerm_resource_group" "main" {
@@ -53,7 +49,7 @@ resource "azurerm_resource_group" "main" {
 # Storage Account for general use
 # NOTE: Currently not used - kept for future use if needed
 # resource "azurerm_storage_account" "main" {
-#   name                     = "${var.storage_account_name}${random_string.suffix.result}"
+#   name                     = var.storage_account_name
 #   resource_group_name      = azurerm_resource_group.main.name
 #   location                 = azurerm_resource_group.main.location
 #   account_tier             = "Standard"
@@ -67,7 +63,7 @@ resource "azurerm_resource_group" "main" {
 
 # Azure SQL Server
 resource "azurerm_mssql_server" "main" {
-  name                         = "${var.sql_server_name}${random_string.suffix.result}"
+  name                         = var.sql_server_name
   resource_group_name          = azurerm_resource_group.main.name
   location                     = var.sql_location != "" ? var.sql_location : azurerm_resource_group.main.location
   version                      = "12.0"
@@ -131,7 +127,7 @@ resource "azurerm_mssql_database" "main" {
 
 # Storage Account for Functions (if needed)
 resource "azurerm_storage_account" "functions" {
-  name                     = "${var.functions_storage_name}${random_string.suffix.result}"
+  name                     = var.functions_storage_name
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
@@ -146,7 +142,7 @@ resource "azurerm_storage_account" "functions" {
 # App Service Plan for Azure Functions
 # Currently using Consumption Plan (Y1) - will migrate to Flex Consumption (EP1) before Sep 2028
 resource "azurerm_service_plan" "functions" {
-  name                = "${var.functions_app_plan_name}${random_string.suffix.result}"
+  name                = var.functions_app_plan_name
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
@@ -158,9 +154,10 @@ resource "azurerm_service_plan" "functions" {
 }
 
 # Linux Function App (optional - for serverless functions)
+# CSV to SQL Server processor - processes CSV blobs and stores data in SQL Database
 resource "azurerm_linux_function_app" "main" {
   count               = var.enable_function_app ? 1 : 0
-  name                = "${var.functions_app_name}${random_string.suffix.result}"
+  name                = var.functions_app_name
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_service_plan.functions.location
   service_plan_id     = azurerm_service_plan.functions.id

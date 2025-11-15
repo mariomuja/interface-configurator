@@ -14,15 +14,15 @@
     "environment": {
       "value": "prod"
     },
-    "storageAccountName": {
-      "value": "stapp"
-    },
-    "sqlServerName": {
-      "value": "sql-infrastructure"
-    },
-    "sqlDatabaseName": {
-      "value": "app_database"
-    },
+        "storageAccountName": {
+          "value": "stapp-general"
+        },
+        "sqlServerName": {
+          "value": "sql-main-database"
+        },
+        "sqlDatabaseName": {
+          "value": "app-database"
+        },
     "sqlAdminLogin": {
       "value": "sqladmin"
     },
@@ -47,15 +47,15 @@
     "currentIpAddress": {
       "value": ""
     },
-    "functionsStorageName": {
-      "value": "stfuncsapp"
-    },
-    "functionsAppPlanName": {
-      "value": "plan-funcs-app"
-    },
-    "functionsAppName": {
-      "value": "func-app"
-    },
+        "functionsStorageName": {
+          "value": "stfunc-csv-processor"
+        },
+        "functionsAppPlanName": {
+          "value": "plan-func-csv-processor"
+        },
+        "functionsAppName": {
+          "value": "func-csv-to-sql-processor"
+        },
     "functionsSkuName": {
       "value": "Y1"
     },

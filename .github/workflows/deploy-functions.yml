@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_NAME: '' # Set this in repository secrets or update manually
+  AZURE_FUNCTIONAPP_NAME: 'func-csv-to-sql-processor' # CSV to SQL Server processor Function App
   AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions'
   NODE_VERSION: '20.x'
 

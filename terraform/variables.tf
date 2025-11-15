@@ -50,21 +50,21 @@ variable "environment" {
 }
 
 variable "storage_account_name" {
-  description = "Base name for storage account (suffix will be added)"
+  description = "Name for storage account (descriptive, no suffix)"
   type        = string
-  default     = "stapp"
+  default     = "stapp-general"
 }
 
 variable "sql_server_name" {
-  description = "Base name for SQL Server (suffix will be added)"
+  description = "Name for SQL Server (descriptive, no suffix)"
   type        = string
-  default     = "sql-infrastructure"
+  default     = "sql-main-database"
 }
 
 variable "sql_database_name" {
   description = "Name of the SQL database"
   type        = string
-  default     = "app_database"
+  default     = "app-database"
 }
 
 variable "sql_admin_login" {
@@ -136,21 +136,21 @@ variable "current_ip_address" {
 # }
 
 variable "functions_storage_name" {
-  description = "Base name for Functions storage account (suffix will be added)"
+  description = "Name for Functions storage account (descriptive, no suffix)"
   type        = string
-  default     = "stfuncsapp"
+  default     = "stfunc-csv-processor"
 }
 
 variable "functions_app_plan_name" {
-  description = "Base name for Functions app service plan (suffix will be added)"
+  description = "Name for Functions app service plan (descriptive, no suffix)"
   type        = string
-  default     = "plan-funcs-app"
+  default     = "plan-func-csv-processor"
 }
 
 variable "functions_app_name" {
-  description = "Base name for Functions app (suffix will be added)"
+  description = "Name for Functions app (descriptive, no suffix) - CSV to SQL Server processor"
   type        = string
-  default     = "func-app"
+  default     = "func-csv-to-sql-processor"
 }
 
 variable "functions_sku_name" {
