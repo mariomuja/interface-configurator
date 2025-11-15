@@ -61,8 +61,8 @@ jobs:
       - name: Create deployment package
         run: |
           cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish
-          zip -r ../../function-app.zip . -q
-          cd ../..
+          zip -r ../../../function-app.zip . -q
+          cd ../../..
           echo "Package created:"
           ls -lh function-app.zip
         continue-on-error: false
