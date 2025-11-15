@@ -139,3 +139,5 @@ Dieses Script:
 - **Kudu Console**: `https://func-apprigklebtsay2o.scm.azurewebsites.net`
 - **Application Insights**: Falls konfiguriert, prüfen Sie die Telemetrie
 
+
+

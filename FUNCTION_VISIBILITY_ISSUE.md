@@ -92,3 +92,5 @@ Falls Azure es nicht automatisch setzt:
 Die Azure Testversion sollte **nicht** das Problem sein. Azure Functions im Consumption Plan funktionieren auch mit Free Tier / Testversionen. Das Problem ist wahrscheinlich technisch (Package-Loading oder Konfiguration).
 
 
+
+

@@ -109,3 +109,5 @@ Write-Host "  3. terraform apply # Erstelle neue Ressourcen" -ForegroundColor Gr
 Write-Host "  4. Aktualisiere GitHub Secret AZURE_FUNCTIONAPP_NAME auf: func-csv-to-sql-processor" -ForegroundColor Gray
 Write-Host ""
 
+
+

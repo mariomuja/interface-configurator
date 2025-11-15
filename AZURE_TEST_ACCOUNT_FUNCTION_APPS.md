@@ -97,3 +97,5 @@ az functionapp config appsettings set \
 3. Function App neu starten nach dem Setzen
 
 
+
+

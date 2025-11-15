@@ -2,7 +2,8 @@
   "recommendations": [
     "ms-azuretools.vscode-azurefunctions",
     "ms-dotnettools.csharp",
-    "ms-dotnettools.csdevkit"
+    "ms-dotnettools.csdevkit",
+    "formulahendry.dotnet-test-explorer"
   ],
   "unwantedRecommendations": []
 }

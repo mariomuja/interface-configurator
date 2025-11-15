@@ -166,3 +166,5 @@ Write-Host "Versuchen Sie jetzt, die Functions aufzulisten:" -ForegroundColor Ye
 Write-Host "  az functionapp function list --resource-group $ResourceGroup --name $FunctionAppName" -ForegroundColor Cyan
 Write-Host ""
 
+
+
