@@ -73,37 +73,45 @@ module.exports = async (req, res) => {
         // New approach: Use individual columns
         selectColumns = (hasPrimaryKey ? 'PrimaryKey' : 'Id') + ', ' + filteredCsvColumns.join(', ');
       }
-    
-    // Every SQL table has datetime_created column with DEFAULT GETUTCDATE()
-    const query = `
-      SELECT ${selectColumns}, 
-             FORMAT(datetime_created, 'yyyy-MM-dd HH:mm:ss') as datetime_created
-      FROM TransportData
-      ORDER BY datetime_created DESC
-    `;
-    
-    const result = await pool.request().query(query);
-    await pool.close();
-    
-    // Parse results - use individual columns (PrimaryKey is the primary key)
-    const records = result.recordset.map(row => {
-      const record = {
-        id: row.PrimaryKey || row.Id, // Use PrimaryKey, fallback to Id for backward compatibility
-        datetime_created: row.datetime_created,
-        createdAt: row.datetime_created // Backward compatibility
-      };
       
-      // Add all CSV columns (filteredCsvColumns contains only actual CSV columns)
-      filteredCsvColumns.forEach(col => {
-        if (row[col] !== undefined && row[col] !== null) {
-          record[col] = row[col];
-        }
+      // Every SQL table has datetime_created column with DEFAULT GETUTCDATE()
+      const query = `
+        SELECT ${selectColumns}, 
+               FORMAT(datetime_created, 'yyyy-MM-dd HH:mm:ss') as datetime_created
+        FROM TransportData
+        ORDER BY datetime_created DESC
+      `;
+      
+      const result = await pool.request().query(query);
+      await pool.close();
+      
+      // Parse results - use individual columns (PrimaryKey is the primary key)
+      const records = result.recordset.map(row => {
+        // Determine primary key value (support both PrimaryKey and Id for backward compatibility)
+        const primaryKeyValue = row.PrimaryKey || row.Id || null;
+        
+        const record = {
+          id: primaryKeyValue,
+          datetime_created: row.datetime_created,
+          createdAt: row.datetime_created // Backward compatibility
+        };
+        
+        // Add all CSV columns (filteredCsvColumns contains only actual CSV columns)
+        filteredCsvColumns.forEach(col => {
+          if (row[col] !== undefined && row[col] !== null) {
+            record[col] = row[col];
+          }
+        });
+        
+        return record;
       });
       
-      return record;
-    });
-    
-    res.status(200).json(records);
+      res.status(200).json(records);
+    } catch (queryError) {
+      await pool.close();
+      // Re-throw to be handled by outer catch block
+      throw queryError;
+    }
   } catch (error) {
     console.error('Error fetching SQL data:', error);
     console.error('Error details:', {
