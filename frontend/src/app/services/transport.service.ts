@@ -44,6 +44,28 @@ export class TransportService {
   diagnose(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/diagnose`);
   }
+
+  getInterfaceConfigurations(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/interface-configurations`);
+  }
+
+  createInterfaceConfiguration(config: {
+    interfaceName: string;
+    sourceAdapterName?: string;
+    sourceConfiguration?: string;
+    destinationAdapterName?: string;
+    destinationConfiguration?: string;
+    description?: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/create-interface-config`, config);
+  }
+
+  toggleInterfaceConfiguration(interfaceName: string, enabled: boolean): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/toggle-interface-config`, {
+      interfaceName,
+      enabled
+    });
+  }
 }
 
 

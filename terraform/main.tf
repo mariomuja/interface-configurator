@@ -135,6 +135,22 @@ resource "azurerm_mssql_database" "main" {
   }
 }
 
+# MessageBox Database - Staging area for all data
+resource "azurerm_mssql_database" "messagebox" {
+  name           = "MessageBox"
+  server_id      = azurerm_mssql_server.main.id
+  collation      = "SQL_Latin1_General_CP1_CI_AS"
+  license_type   = var.sql_license_type
+  max_size_gb    = var.sql_max_size_gb
+  sku_name       = var.sql_sku_name
+  zone_redundant = var.sql_zone_redundant
+
+  tags = {
+    Environment = var.environment
+    Purpose     = "MessageBox"
+  }
+}
+
 # Note: Backend API runs on Vercel Serverless Functions, not Azure App Service
 # The backend is deployed alongside the frontend on Vercel
 

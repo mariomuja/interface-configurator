@@ -1,0 +1,51 @@
+using System.Text.Json;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+using ProcessCsvBlobTrigger.Core.Interfaces;
+
+namespace ProcessCsvBlobTrigger;
+
+public class GetInterfaceConfigurations
+{
+    private readonly IInterfaceConfigurationService _configService;
+    private readonly ILogger<GetInterfaceConfigurations> _logger;
+
+    public GetInterfaceConfigurations(
+        IInterfaceConfigurationService configService,
+        ILogger<GetInterfaceConfigurations> logger)
+    {
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    [Function("GetInterfaceConfigurations")]
+    public async Task<HttpResponseData> Run(
+        [HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req,
+        FunctionContext executionContext)
+    {
+        _logger.LogInformation("GetInterfaceConfigurations function triggered");
+
+        try
+        {
+            var configurations = await _configService.GetAllConfigurationsAsync(executionContext.CancellationToken);
+
+            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+            var jsonResponse = JsonSerializer.Serialize(configurations);
+            await response.WriteStringAsync(jsonResponse);
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting interface configurations");
+            var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
+            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
+            return errorResponse;
+        }
+    }
+}
+

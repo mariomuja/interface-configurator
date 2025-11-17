@@ -53,12 +53,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   isTransporting = false;
   isDiagnosing = false;
   diagnosticsResult: any = null;
+  interfaceConfigurations: any[] = [];
   private refreshSubscription?: Subscription;
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
+  
+  readonly DEFAULT_INTERFACE_NAME = 'FromCsvToSqlServerExample';
 
   csvDisplayedColumns: string[] = []; // Will be populated dynamically from CSV data
   sqlDisplayedColumns: string[] = []; // Will be populated dynamically from SQL data
@@ -74,11 +77,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadSampleCsvData();
     this.loadSqlData();
     this.loadProcessLogs();
+    this.loadInterfaceConfigurations();
     this.startAutoRefresh();
     
     // Subscribe to language changes to update UI
     this.translationService.getCurrentLanguage().subscribe(() => {
       // Trigger change detection - translations will be updated via getTranslation calls
+    });
+  }
+  
+  loadInterfaceConfigurations(): void {
+    this.transportService.getInterfaceConfigurations().subscribe({
+      next: (configs) => {
+        this.interfaceConfigurations = configs || [];
+      },
+      error: (error) => {
+        console.warn('Could not load interface configurations:', error);
+        // Don't show error - this is not critical for basic functionality
+      }
     });
   }
   
@@ -373,19 +389,65 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   startTransport(): void {
     this.isTransporting = true;
+    
+    // Ensure interface configuration exists before starting transport
+    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    
+    if (!defaultConfig) {
+      // Create default interface configuration
+      this.transportService.createInterfaceConfiguration({
+        interfaceName: this.DEFAULT_INTERFACE_NAME,
+        sourceAdapterName: 'CSV',
+        sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming', enabled: true }),
+        destinationAdapterName: 'SqlServer',
+        destinationConfiguration: JSON.stringify({ destination: 'TransportData', enabled: true }),
+        description: 'Default CSV to SQL Server interface'
+      }).subscribe({
+        next: () => {
+          this.loadInterfaceConfigurations();
+          this.uploadAndStartTransport();
+        },
+        error: (error) => {
+          console.warn('Could not create interface configuration, continuing anyway:', error);
+          this.uploadAndStartTransport();
+        }
+      });
+    } else {
+      // Ensure it's enabled
+      if (!defaultConfig.isEnabled) {
+        this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, true).subscribe({
+          next: () => {
+            this.loadInterfaceConfigurations();
+            this.uploadAndStartTransport();
+          },
+          error: (error) => {
+            console.warn('Could not enable interface configuration, continuing anyway:', error);
+            this.uploadAndStartTransport();
+          }
+        });
+      } else {
+        this.uploadAndStartTransport();
+      }
+    }
+  }
+  
+  private uploadAndStartTransport(): void {
     // Use edited CSV text if available, otherwise use formatted CSV from csvData
     const csvContent = this.editableCsvText || this.formatCsvAsText();
     this.transportService.startTransport(csvContent).subscribe({
       next: (response) => {
         this.snackBar.open('Transport gestartet: ' + response.message, 'Schließen', { duration: 5000 });
         this.isTransporting = false;
-        setTimeout(() => {
-          this.loadSqlData();
-          this.loadProcessLogs();
-        }, 2000);
+        // Refresh immediately - auto-refresh (every 5 seconds) will pick up changes as they happen
+        // The timer functions run every minute, so data will appear within 1-2 minutes
+        // But we refresh immediately to show any existing data and start monitoring
+        this.loadSqlData();
+        this.loadProcessLogs();
+        this.loadInterfaceConfigurations();
       },
       error: (error) => {
         console.error('Error starting transport:', error);
+        this.isTransporting = false;
         
         // Extract detailed error message
         let errorMessage = 'Fehler beim Starten des Transports';
@@ -479,10 +541,21 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private startAutoRefresh(): void {
-    this.refreshSubscription = interval(5000).subscribe(() => {
+    // Refresh every 3 seconds to catch changes immediately after they're written
+    // This ensures the UI updates as soon as data appears in TransportData or ProcessLogs
+    this.refreshSubscription = interval(3000).subscribe(() => {
       this.loadSqlData();
       this.loadProcessLogs();
+      this.loadInterfaceConfigurations();
     });
+  }
+  
+  getDefaultInterfaceStatus(): { exists: boolean; enabled: boolean } {
+    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    return {
+      exists: !!defaultConfig,
+      enabled: defaultConfig?.isEnabled ?? false
+    };
   }
 
   getLevelColor(level: string): string {

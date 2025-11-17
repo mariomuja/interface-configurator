@@ -45,6 +45,36 @@ function convertToCsv(data) {
 
 module.exports = async (req, res) => {
   try {
+    // Ensure interface configuration exists before uploading CSV
+    const functionAppUrl = process.env.AZURE_FUNCTION_APP_URL || process.env.FUNCTION_APP_URL;
+    const interfaceName = process.env.INTERFACE_NAME || 'FromCsvToSqlServerExample';
+    
+    if (functionAppUrl) {
+      try {
+        const configUrl = `${functionAppUrl.replace(/\/$/, '')}/api/CreateInterfaceConfiguration`;
+        const fetch = require('node-fetch');
+        
+        await fetch(configUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            interfaceName: interfaceName,
+            sourceAdapterName: 'CSV',
+            sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming', enabled: true }),
+            destinationAdapterName: 'SqlServer',
+            destinationConfiguration: JSON.stringify({ destination: 'TransportData', enabled: true }),
+            description: 'Default CSV to SQL Server interface'
+          }),
+          timeout: 5000
+        });
+        console.log(`Interface configuration '${interfaceName}' ensured`);
+      } catch (configError) {
+        console.warn('Could not ensure interface configuration (will continue anyway):', configError.message);
+        // Continue with upload even if config creation fails
+      }
+    }
     // Support both connection string and account name/key authentication
     let blobServiceClient;
     if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
