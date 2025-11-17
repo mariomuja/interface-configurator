@@ -46,20 +46,33 @@ resource "azurerm_resource_group" "main" {
   }
 }
 
-# Storage Account for general use
-# NOTE: Currently not used - kept for future use if needed
-# resource "azurerm_storage_account" "main" {
-#   name                     = var.storage_account_name
-#   resource_group_name      = azurerm_resource_group.main.name
-#   location                 = azurerm_resource_group.main.location
-#   account_tier             = "Standard"
-#   account_replication_type = "LRS"
-#   min_tls_version          = "TLS1_2"
-#
-#   tags = {
-#     Environment = var.environment
-#   }
-# }
+# Storage Account for general use (Blob Storage for CSV files)
+resource "azurerm_storage_account" "main" {
+  name                     = var.storage_account_name
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
+  
+  # Disable public blob access for security
+  allow_nested_items_to_be_public = false
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# Blob Container: csv-files
+# Single container with three virtual folders:
+# - csv-incoming/ : New CSV files land here and trigger the Azure Function Blob Trigger
+# - csv-processed/ : Successfully processed CSV files are moved here
+# - csv-error/ : CSV files that failed processing are moved here
+resource "azurerm_storage_container" "csv_files" {
+  name                  = "csv-files"
+  storage_account_name  = azurerm_storage_account.main.name
+  container_access_type = "private" # Private access - uses connection string authentication
+}
 
 # Azure SQL Server
 resource "azurerm_mssql_server" "main" {
@@ -125,6 +138,19 @@ resource "azurerm_mssql_database" "main" {
 # Note: Backend API runs on Vercel Serverless Functions, not Azure App Service
 # The backend is deployed alongside the frontend on Vercel
 
+# Application Insights for Function App monitoring
+resource "azurerm_application_insights" "functions" {
+  count               = var.enable_function_app ? 1 : 0
+  name                = "${var.functions_app_name}-insights"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  application_type    = "web"
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
 # Storage Account for Functions (if needed)
 resource "azurerm_storage_account" "functions" {
   name                     = var.functions_storage_name
@@ -178,8 +204,7 @@ resource "azurerm_linux_function_app" "main" {
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "node"
-    "WEBSITE_NODE_DEFAULT_VERSION" = "~20"
+    "FUNCTIONS_WORKER_RUNTIME" = "dotnet-isolated"
     "AZURE_FUNCTIONS_ENVIRONMENT" = var.environment
     "AZURE_SQL_SERVER" = azurerm_mssql_server.main.fully_qualified_domain_name
     "AZURE_SQL_DATABASE" = var.sql_database_name
@@ -188,6 +213,9 @@ resource "azurerm_linux_function_app" "main" {
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
     # Disable placeholder mode to ensure functions are loaded
     "WEBSITE_USE_PLACEHOLDER" = "0"
+    # Application Insights integration
+    "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.functions[0].instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.functions[0].connection_string
     # Note: WEBSITE_RUN_FROM_PACKAGE is set by deployment workflow and should NOT be removed
     # Terraform will ignore this setting if it's managed by the deployment workflow
   }

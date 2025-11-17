@@ -1,10 +1,63 @@
-node_modules
-.terraform
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Azure Functions (already excluded, but adding patterns for safety)
+azure-functions/
+**/bin/
+**/obj/
+**/publish/
+**/TestResults/
+
+# Terraform
+.terraform/
+terraform/
 *.tfstate
+*.tfstate.backup
 *.tfvars
 terraform.tfvars
-azure-functions
-terraform
+
+# Build artifacts
+**/dist/
+**/.angular/
+**/bin/
+**/obj/
+**/publish/
+
+# ZIP files (deployment packages)
+*.zip
+deploy.zip
+**/deploy.zip
+**/*.zip
+
+# Test results
+**/TestResults/
+**/test-results/
+**/coverage/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+**/*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+azure-credentials.json
+
+# Git
+.git/
+.gitignore
+
+# Vercel
+.vercel/
 
 
 

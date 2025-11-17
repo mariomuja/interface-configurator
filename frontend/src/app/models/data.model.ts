@@ -1,20 +1,13 @@
+// Dynamic CSV/SQL records - structure matches CSV columns exactly
 export interface CsvRecord {
-  id: number;
-  name: string;
-  email: string;
-  age: number;
-  city: string;
-  salary: number;
+  [key: string]: any; // Dynamic structure based on CSV columns
 }
 
 export interface SqlRecord {
-  id: number;
-  name: string;
-  email: string;
-  age: number;
-  city: string;
-  salary: number;
-  createdAt: string;
+  id: string | number; // GUID or number
+  [key: string]: any; // Dynamic structure - all CSV columns plus datetime_created
+  datetime_created?: string;
+  createdAt?: string; // Backward compatibility
 }
 
 export interface ProcessLog {

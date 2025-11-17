@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Processors;
 using ProcessCsvBlobTrigger.Core.Services;
@@ -35,15 +36,45 @@ var host = new HostBuilder()
                     options.UseSqlServer(connectionString));
             }
             
+            // Register Adapter Configuration Service (must be registered before CsvProcessingService)
+            // Uses JSON file storage in Blob Storage with in-memory cache
+            services.AddSingleton<IAdapterConfigurationService>(sp =>
+            {
+                var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
+                var logger = sp.GetService<ILogger<ProcessCsvBlobTrigger.Services.AdapterConfigurationService>>();
+                var service = new ProcessCsvBlobTrigger.Services.AdapterConfigurationService(blobServiceClient, logger);
+                // Initialize on startup (fire and forget)
+                _ = Task.Run(async () => await service.InitializeAsync(), CancellationToken.None);
+                return service;
+            });
+            
             // Register Core Services
             services.AddScoped<ICsvProcessingService, CsvProcessingService>();
             
-            // Register Adapter Services (these handle null DbContext gracefully)
-            services.AddScoped<ILoggingService, LoggingServiceAdapter>();
-            services.AddScoped<IDataService, DataServiceAdapter>();
+            // Register In-Memory Logging Service (no SQL dependency)
+            services.AddSingleton<IInMemoryLoggingService, InMemoryLoggingService>();
+            services.AddSingleton<ILoggingService>(sp => sp.GetRequiredService<IInMemoryLoggingService>());
             
-            // Register Processor
-            services.AddScoped<ICsvProcessor, CsvProcessor>();
+            // Register Adapter Services (these handle null DbContext gracefully)
+            services.AddScoped<IDataService, DataServiceAdapter>();
+            services.AddScoped<IDynamicTableService, DynamicTableService>();
+            
+            // Register Error Row Service (requires BlobServiceClient)
+            var storageConnectionString = Environment.GetEnvironmentVariable("MainStorageConnection") 
+                ?? Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            if (!string.IsNullOrEmpty(storageConnectionString))
+            {
+                var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(storageConnectionString);
+                services.AddSingleton(blobServiceClient);
+                services.AddScoped<IErrorRowService, ErrorRowService>();
+            }
+            else
+            {
+                Console.WriteLine("WARNING: Storage connection string not set. Error row service may not work.");
+            }
+            
+            // Register Processor - using new row-by-row processor
+            services.AddScoped<ICsvProcessor, ProcessCsvBlobTrigger.Core.Processors.CsvProcessor>();
         }
         catch (Exception ex)
         {

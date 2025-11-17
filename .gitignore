@@ -21,3 +21,4 @@ publish-profile.xml
 
 # Azure Service Principal Credentials (sensitive)
 azure-credentials.json
+.vercel

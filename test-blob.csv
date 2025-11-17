@@ -1,3 +1,2 @@
-﻿Name,Age,City
-John,30,New York
-Jane,25,Los Angeles
+﻿id,name,email,age,city,salary
+1,Test User,test@example.com,30,Berlin,50000

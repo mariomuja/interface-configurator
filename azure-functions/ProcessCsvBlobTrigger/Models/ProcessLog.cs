@@ -10,8 +10,18 @@ public class ProcessLog
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
     
+    // Every SQL table MUST have a datetime_created column with DEFAULT GETUTCDATE()
     [Required]
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    [Column("datetime_created", TypeName = "datetime2")]
+    public DateTime datetime_created { get; set; } = DateTime.UtcNow;
+    
+    // Keep Timestamp for backward compatibility (maps to same column)
+    [NotMapped]
+    public DateTime Timestamp 
+    { 
+        get => datetime_created; 
+        set => datetime_created = value; 
+    }
     
     [Required]
     [MaxLength(50)]
@@ -23,6 +33,10 @@ public class ProcessLog
     
     [MaxLength]
     public string? Details { get; set; }
+    
+    [MaxLength(200)]
+    [Column("Component")]
+    public string? Component { get; set; }
 }
 
 

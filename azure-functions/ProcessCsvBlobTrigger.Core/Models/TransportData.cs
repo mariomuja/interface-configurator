@@ -7,26 +7,11 @@ namespace ProcessCsvBlobTrigger.Core.Models;
 public class TransportData
 {
     [Key]
-    public int Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
     
-    [Required]
-    [MaxLength(255)]
-    public string Name { get; set; } = string.Empty;
-    
-    [Required]
-    [MaxLength(255)]
-    public string Email { get; set; } = string.Empty;
-    
-    [Required]
-    public int Age { get; set; }
-    
-    [Required]
-    [MaxLength(100)]
-    public string City { get; set; } = string.Empty;
-    
-    [Required]
-    [Column(TypeName = "decimal(18,2)")]
-    public decimal Salary { get; set; }
+    // Store all CSV columns as a dictionary
+    // This allows dynamic mapping of any CSV structure
+    public Dictionary<string, string> CsvColumns { get; set; } = new();
     
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -1,39 +1,32 @@
-const sql = require('mssql');
-
-async function getSqlConfig() {
-  return {
-    server: process.env.AZURE_SQL_SERVER,
-    database: process.env.AZURE_SQL_DATABASE,
-    user: process.env.AZURE_SQL_USER,
-    password: process.env.AZURE_SQL_PASSWORD,
-    options: {
-      encrypt: true,
-      trustServerCertificate: false
-    }
-  };
-}
+const { getSqlConfig, validateSqlConfig, getSqlErrorMessage, sql } = require('./sql-config');
 
 module.exports = async (req, res) => {
   try {
     const config = await getSqlConfig();
     
     // Validate configuration
-    if (!config.server || !config.database || !config.user || !config.password) {
-      const missing = [];
-      if (!config.server) missing.push('AZURE_SQL_SERVER');
-      if (!config.database) missing.push('AZURE_SQL_DATABASE');
-      if (!config.user) missing.push('AZURE_SQL_USER');
-      if (!config.password) missing.push('AZURE_SQL_PASSWORD');
-      
-      console.error('Missing SQL configuration:', missing);
-      return res.status(500).json({ 
-        error: 'Database configuration incomplete', 
-        details: `Missing environment variables: ${missing.join(', ')}`,
-        message: 'Please configure Azure SQL environment variables in Vercel'
-      });
+    const validation = validateSqlConfig(config);
+    if (!validation.isValid) {
+      console.error('Missing SQL configuration:', validation.missing);
+      return res.status(500).json(validation.error);
     }
     
     const pool = await sql.connect(config);
+    
+    // Check if table exists before trying to clear it
+    const tableExistsQuery = `
+      SELECT COUNT(*) AS TableCount
+      FROM sys.tables
+      WHERE name = 'TransportData'
+    `;
+    
+    const tableExistsResult = await pool.request().query(tableExistsQuery);
+    const tableExists = tableExistsResult.recordset[0].TableCount > 0;
+    
+    if (!tableExists) {
+      await pool.close();
+      return res.status(200).json({ message: 'Table does not exist yet. Nothing to clear.' });
+    }
     
     // Clear the table
     await pool.request().query('DELETE FROM TransportData');
@@ -44,7 +37,7 @@ module.exports = async (req, res) => {
       .input('message', sql.VarChar, 'Table cleared by user')
       .input('details', sql.VarChar, 'All data removed from TransportData table')
       .query(`
-        INSERT INTO ProcessLogs (timestamp, level, message, details)
+        INSERT INTO ProcessLogs (datetime_created, level, message, details)
         VALUES (GETUTCDATE(), @level, @message, @details)
       `);
     
@@ -54,13 +47,14 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error('Error clearing table:', error);
     
+    // Check if error is due to missing table
+    if (error.code === 'EREQUEST' && error.message && error.message.includes('Invalid object name')) {
+      return res.status(200).json({ message: 'Table does not exist yet. Nothing to clear.' });
+    }
+    
     // Provide more detailed error information
-    let errorMessage = error.message;
-    if (error.code === 'ETIMEOUT' || error.code === 'ESOCKET') {
-      errorMessage = 'Cannot connect to Azure SQL Server. Check firewall rules and connection string.';
-    } else if (error.code === 'ELOGIN') {
-      errorMessage = 'Authentication failed. Check SQL credentials.';
-    } else if (error.code === 'EREQUEST') {
+    let errorMessage = getSqlErrorMessage(error);
+    if (error.code === 'EREQUEST') {
       errorMessage = 'SQL query failed. Check if TransportData table exists.';
     }
     

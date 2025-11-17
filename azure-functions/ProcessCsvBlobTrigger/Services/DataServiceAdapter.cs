@@ -1,7 +1,10 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProcessCsvBlobTrigger.Core.Helpers;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Models;
+using ProcessCsvBlobTrigger.Core.Services;
 using ProcessCsvBlobTrigger.Data;
 
 namespace ProcessCsvBlobTrigger.Services;
@@ -90,7 +93,7 @@ public class DataServiceAdapter : IDataService
             await _context.Database.EnsureCreatedAsync(cancellationToken);
 
             await SafeLogAsync("info", "Database schema verified", 
-                "TransportData and ProcessLogs tables are ready", cancellationToken);
+                "TransportData table is ready", cancellationToken);
         }
         catch (Exception ex)
         {
@@ -156,10 +159,19 @@ public class DataServiceAdapter : IDataService
             }
             catch (Exception chunkError)
             {
-                var errorMessage = chunkError?.Message ?? "Unknown error";
+                // Log to Application Insights with full exception details including inner exceptions
+                if (_logger != null)
+                {
+                    _logger.LogError(chunkError, "Chunk {ChunkNumber}/{TotalChunks} processing failed", chunkNumber, chunks.Count);
+                    var exceptionDetails = ExceptionHelper.FormatException(chunkError, includeStackTrace: true);
+                    _logger.LogError("Chunk processing error - Full exception details:\n{ExceptionDetails}", exceptionDetails);
+                }
+                
+                var exceptionSummary = ExceptionHelper.GetExceptionSummary(chunkError);
+                var exceptionDetailsForDb = ExceptionHelper.FormatException(chunkError, includeStackTrace: true);
                 await SafeLogAsync("error", 
                     $"Chunk {chunkNumber}/{chunks.Count} processing failed", 
-                    $"Error: {errorMessage}, Chunk size: {chunk.Count}, Records: {recordIdsStr}", cancellationToken);
+                    $"Error: {exceptionSummary}, Chunk size: {chunk.Count}, Records: {recordIdsStr}\n\nFull Details:\n{exceptionDetailsForDb}", cancellationToken);
                 throw;
             }
         }
@@ -168,7 +180,14 @@ public class DataServiceAdapter : IDataService
             $"Total chunks: {chunks.Count}, Total records: {totalRecords}, Total processed: {totalProcessed}", cancellationToken);
     }
 
-    private async Task InsertChunkAsync(List<TransportData> chunk, int chunkNumber, int totalChunks, CancellationToken cancellationToken)
+    // InsertChunkAsync is deprecated - use InsertRowsAsync instead
+    // This method is kept for backward compatibility but should not be called
+    private async Task InsertChunkAsync(List<Core.Models.TransportData> chunk, int chunkNumber, int totalChunks, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException("InsertChunkAsync is deprecated. The new implementation uses InsertRowsAsync with dynamic columns.");
+    }
+
+    public async Task InsertRowsAsync(List<Dictionary<string, string>> rows, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
     {
         if (_context == null)
         {
@@ -176,104 +195,106 @@ public class DataServiceAdapter : IDataService
             throw new InvalidOperationException("Database context is not available");
         }
 
-        if (chunk == null || chunk.Count == 0)
+        if (rows == null || rows.Count == 0)
         {
-            await SafeLogAsync("warning", 
-                $"Chunk {chunkNumber}/{totalChunks} is null or empty", 
-                "Skipping empty chunk", cancellationToken);
+            await SafeLogAsync("warning", "No rows to insert", null, cancellationToken);
             return;
         }
 
-        try
+        var typeValidator = new TypeValidator();
+        
+        // Filter out reserved columns before sanitizing
+        var reservedColumns = new[] { "id", "Id", "CsvDataJson", "PrimaryKey", "datetime_created" };
+        var filteredColumnTypes = columnTypes
+            .Where(kvp => !reservedColumns.Any(rc => string.Equals(kvp.Key, rc, StringComparison.OrdinalIgnoreCase)))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        
+        var sanitizedColumns = filteredColumnTypes.Keys.Select(SanitizeColumnName).ToList();
+
+        // Build dynamic INSERT statement - PrimaryKey is auto-generated, don't include it
+        var columnList = string.Join(", ", sanitizedColumns);
+        var parameterList = string.Join(", ", sanitizedColumns.Select(c => "@" + c));
+        var insertSql = $@"
+            INSERT INTO TransportData ({columnList}, datetime_created)
+            VALUES ({parameterList}, GETUTCDATE())";
+
+        await SafeLogAsync("info", "Starting row insertion",
+            $"Total rows: {rows.Count}, Columns: {columnList}", cancellationToken);
+
+        // Process in batches of 100
+        var batchSize = 100;
+        var totalInserted = 0;
+
+        for (int batchStart = 0; batchStart < rows.Count; batchStart += batchSize)
         {
-            await SafeLogAsync("info", 
-                $"Chunk {chunkNumber}/{totalChunks} - Starting database transaction", 
-                $"Records: {chunk.Count}", cancellationToken);
-
-            if (_context.Database == null)
-            {
-                throw new InvalidOperationException("Database is not available");
-            }
-
-            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var batch = rows.Skip(batchStart).Take(batchSize).ToList();
+            var batchNumber = (batchStart / batchSize) + 1;
+            var totalBatches = (int)Math.Ceiling((double)rows.Count / batchSize);
 
             try
             {
-                // Convert Core models to Function App models with null-safety
-                var transportDataEntities = chunk
-                    .Where(td => td != null)
-                    .Select(td => new Models.TransportData
-                    {
-                        Id = td.Id,
-                        Name = td.Name ?? string.Empty,
-                        Email = td.Email ?? string.Empty,
-                        Age = td.Age,
-                        City = td.City ?? string.Empty,
-                        Salary = td.Salary,
-                        CreatedAt = td.CreatedAt
-                    })
-                    .ToList();
-
-                if (transportDataEntities.Count == 0)
-                {
-                    await SafeLogAsync("warning", 
-                        $"Chunk {chunkNumber}/{totalChunks} - No valid records to insert", 
-                        "All records were null", cancellationToken);
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
-
-                _context.TransportData.AddRange(transportDataEntities);
-                await _context.SaveChangesAsync(cancellationToken);
-
-                await transaction.CommitAsync(cancellationToken);
-
-                await SafeLogAsync("info", 
-                    $"Chunk {chunkNumber}/{totalChunks} - Transaction committed", 
-                    $"Records inserted: {transportDataEntities.Count}, Transaction status: Committed", cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                var errorMessage = ex?.Message ?? "Unknown error";
-                await SafeLogAsync("error", 
-                    $"Chunk {chunkNumber}/{totalChunks} - Transaction error occurred", 
-                    $"Error: {errorMessage}, Attempting rollback", cancellationToken);
-
+                using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    await transaction.RollbackAsync(cancellationToken);
-                    await SafeLogAsync("error", 
-                        $"Chunk {chunkNumber}/{totalChunks} - Transaction rolled back", 
-                        $"Error: {errorMessage}, Records in chunk: {chunk.Count}", cancellationToken);
-                }
-                catch (Exception rollbackEx)
-                {
-                    await SafeLogAsync("error", 
-                        $"Chunk {chunkNumber}/{totalChunks} - Rollback failed", 
-                        $"Rollback error: {rollbackEx?.Message ?? "Unknown"}", cancellationToken);
-                }
+                    foreach (var row in batch)
+                    {
+                        var parameters = new List<SqlParameter>();
+                        foreach (var column in filteredColumnTypes)
+                        {
+                            var sanitizedColumnName = SanitizeColumnName(column.Key);
+                            var value = row.GetValueOrDefault(column.Key, null) ?? null;
+                            var sqlValue = value != null && !string.IsNullOrWhiteSpace(value)
+                                ? typeValidator.ConvertValue(value, column.Value.DataType)
+                                : DBNull.Value;
 
+                            parameters.Add(new SqlParameter("@" + sanitizedColumnName, sqlValue ?? DBNull.Value));
+                        }
+
+                        await _context.Database.ExecuteSqlRawAsync(insertSql, parameters.ToArray(), cancellationToken);
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+                    totalInserted += batch.Count;
+
+                    await SafeLogAsync("info", $"Batch {batchNumber}/{totalBatches} inserted",
+                        $"Rows: {batch.Count}, Total inserted: {totalInserted}/{rows.Count}", cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    await SafeLogAsync("error", $"Batch {batchNumber}/{totalBatches} failed",
+                        $"Error: {ex.Message}, Rows in batch: {batch.Count}", cancellationToken);
+                    throw;
+                }
+            }
+            catch (Exception batchEx)
+            {
+                _logger?.LogError(batchEx, "Error inserting batch {BatchNumber}", batchNumber);
                 throw;
             }
         }
-        catch (Exception ex)
-        {
-            var errorMessage = ex?.Message ?? "Unknown error";
-            var stackTrace = ex?.StackTrace;
-            var stackTraceStr = "N/A";
-            
-            if (!string.IsNullOrWhiteSpace(stackTrace))
-            {
-                stackTraceStr = stackTrace.Length > 500 
-                    ? stackTrace.Substring(0, 500) + "... [truncated]" 
-                    : stackTrace;
-            }
 
-            await SafeLogAsync("error", 
-                $"Error processing chunk {chunkNumber}/{totalChunks}", 
-                $"Error: {errorMessage}, Stack: {stackTraceStr}", cancellationToken);
-            throw;
+        await SafeLogAsync("info", "Row insertion completed",
+            $"Total rows inserted: {totalInserted}/{rows.Count}", cancellationToken);
+    }
+
+    private string SanitizeColumnName(string columnName)
+    {
+        // Remove special characters and ensure valid SQL identifier
+        var sanitized = columnName
+            .Replace(" ", "_")
+            .Replace("-", "_")
+            .Replace(".", "_")
+            .Replace("/", "_")
+            .Replace("\\", "_");
+
+        // Ensure it starts with a letter
+        if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
+        {
+            sanitized = "_" + sanitized;
         }
+
+        return sanitized;
     }
 }
 

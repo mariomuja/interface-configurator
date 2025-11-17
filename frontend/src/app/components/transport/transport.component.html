@@ -1,125 +1,98 @@
 <div class="transport-container">
-  <mat-card class="control-card">
-    <mat-card-content>
-      <div class="button-group">
-        <button mat-raised-button color="primary" (click)="startTransport()" [disabled]="isTransporting">
-          <mat-icon>play_arrow</mat-icon>
-          Transport starten
-        </button>
-        <button mat-raised-button color="warn" (click)="clearTable()">
-          <mat-icon>delete</mat-icon>
-          Tabelle leeren
-        </button>
-      </div>
-      <div *ngIf="isTransporting" class="spinner-container">
-        <mat-spinner diameter="30"></mat-spinner>
-        <span>Transport läuft...</span>
-      </div>
-    </mat-card-content>
-  </mat-card>
-
   <div class="data-container">
-    <mat-card class="data-card">
-      <mat-card-header>
-        <mat-card-title>Quelle - CSV-Daten ({{ csvData.length }} Datensätze)</mat-card-title>
+    <mat-card class="data-card csv-card">
+      <mat-card-header class="data-card-header">
+        <mat-card-title class="data-card-title">{{ getTranslation('source.csv') }} ({{ csvData.length }} {{ getTranslation('records') }})</mat-card-title>
+        <div class="data-card-actions">
+          <button mat-raised-button color="primary" (click)="startTransport()" [disabled]="isTransporting" class="action-button">
+            <mat-icon>play_arrow</mat-icon>
+            {{ getTranslation('transport.start') }}
+          </button>
+        </div>
       </mat-card-header>
       <mat-card-content>
         <div *ngIf="isLoading" class="spinner-container">
           <mat-spinner></mat-spinner>
         </div>
-        <div class="table-container" *ngIf="!isLoading">
-          <table mat-table [dataSource]="csvData" class="data-table">
-            <ng-container matColumnDef="id">
-              <th mat-header-cell *matHeaderCellDef>ID</th>
-              <td mat-cell *matCellDef="let row">{{ row.id }}</td>
-            </ng-container>
-            <ng-container matColumnDef="name">
-              <th mat-header-cell *matHeaderCellDef>Name</th>
-              <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-            </ng-container>
-            <ng-container matColumnDef="email">
-              <th mat-header-cell *matHeaderCellDef>E-Mail</th>
-              <td mat-cell *matCellDef="let row">{{ row.email }}</td>
-            </ng-container>
-            <ng-container matColumnDef="age">
-              <th mat-header-cell *matHeaderCellDef>Alter</th>
-              <td mat-cell *matCellDef="let row">{{ row.age }}</td>
-            </ng-container>
-            <ng-container matColumnDef="city">
-              <th mat-header-cell *matHeaderCellDef>Stadt</th>
-              <td mat-cell *matCellDef="let row">{{ row.city }}</td>
-            </ng-container>
-            <ng-container matColumnDef="salary">
-              <th mat-header-cell *matHeaderCellDef>Gehalt</th>
-              <td mat-cell *matCellDef="let row">{{ row.salary | number:'1.2-2' }} €</td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="csvDisplayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: csvDisplayedColumns"></tr>
-          </table>
+        <div class="csv-text-container" *ngIf="!isLoading">
+          <textarea 
+            class="csv-text csv-editable" 
+            [(ngModel)]="editableCsvText"
+            (input)="onCsvTextChange()"
+            spellcheck="false"
+            placeholder="CSV-Daten hier bearbeiten..."></textarea>
         </div>
       </mat-card-content>
     </mat-card>
 
-    <mat-card class="data-card">
-      <mat-card-header>
-        <mat-card-title>Ziel - SQL Server Tabelle ({{ sqlData.length }} Datensätze)</mat-card-title>
+    <mat-card class="data-card sql-card">
+      <mat-card-header class="data-card-header">
+        <mat-card-title class="data-card-title">{{ getTranslation('destination.sql') }} ({{ sqlData.length }} {{ getTranslation('records') }})</mat-card-title>
+        <div class="data-card-actions">
+          <button mat-raised-button color="accent" (click)="dropTable()" class="action-button">
+            <mat-icon>delete_forever</mat-icon>
+            {{ getTranslation('table.drop') }}
+          </button>
+        </div>
       </mat-card-header>
       <mat-card-content>
-        <div class="table-container">
+        <div class="table-container" *ngIf="sqlDisplayedColumns.length > 0">
           <table mat-table [dataSource]="sqlData" class="data-table">
-            <ng-container matColumnDef="id">
-              <th mat-header-cell *matHeaderCellDef>ID</th>
-              <td mat-cell *matCellDef="let row">{{ row.id }}</td>
-            </ng-container>
-            <ng-container matColumnDef="name">
-              <th mat-header-cell *matHeaderCellDef>Name</th>
-              <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-            </ng-container>
-            <ng-container matColumnDef="email">
-              <th mat-header-cell *matHeaderCellDef>E-Mail</th>
-              <td mat-cell *matCellDef="let row">{{ row.email }}</td>
-            </ng-container>
-            <ng-container matColumnDef="age">
-              <th mat-header-cell *matHeaderCellDef>Alter</th>
-              <td mat-cell *matCellDef="let row">{{ row.age }}</td>
-            </ng-container>
-            <ng-container matColumnDef="city">
-              <th mat-header-cell *matHeaderCellDef>Stadt</th>
-              <td mat-cell *matCellDef="let row">{{ row.city }}</td>
-            </ng-container>
-            <ng-container matColumnDef="salary">
-              <th mat-header-cell *matHeaderCellDef>Gehalt</th>
-              <td mat-cell *matCellDef="let row">{{ row.salary | number:'1.2-2' }} €</td>
-            </ng-container>
-            <ng-container matColumnDef="createdAt">
-              <th mat-header-cell *matHeaderCellDef>Erstellt am</th>
-              <td mat-cell *matCellDef="let row">{{ row.createdAt | date:'short' }}</td>
+            <!-- Dynamic columns - rendered based on SQL data structure (matches CSV columns exactly) -->
+            <ng-container *ngFor="let column of sqlDisplayedColumns" [matColumnDef]="column">
+              <th mat-header-cell *matHeaderCellDef>{{ getColumnDisplayName(column) }}</th>
+              <td mat-cell *matCellDef="let row">
+                <!-- Special handling for date columns -->
+                <span *ngIf="isDateColumn(column)">
+                  {{ getCellValue(row, column) | date:'short' }}
+                </span>
+                <!-- Numeric columns (excluding date and id columns) -->
+                <span *ngIf="!isDateColumn(column) && column.toLowerCase() !== 'id' && isNumericColumn(column, sqlData)">
+                  {{ getCellValue(row, column) | number:'1.2-2' }}
+                </span>
+                <!-- Text/other columns -->
+                <span *ngIf="!isDateColumn(column) && (!isNumericColumn(column, sqlData) || column.toLowerCase() === 'id')">
+                  {{ getCellValue(row, column) }}
+                </span>
+              </td>
             </ng-container>
             <tr mat-header-row *matHeaderRowDef="sqlDisplayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: sqlDisplayedColumns"></tr>
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" [attr.colspan]="sqlDisplayedColumns.length">
+                {{ getTranslation('no.data.sql') }}
+              </td>
+            </tr>
           </table>
+        </div>
+        <div class="table-empty-message" *ngIf="sqlDisplayedColumns.length === 0">
+          <p>{{ getTranslation('table.empty') }}</p>
         </div>
       </mat-card-content>
     </mat-card>
   </div>
 
   <mat-card class="log-card">
-    <mat-card-header>
-      <mat-card-title>Prozess-Logs ({{ logDataSource.data.length }} Einträge)</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="log-filter-container">
+    <mat-card-header class="log-header">
+      <mat-card-title class="log-title">{{ getTranslation('process.log') }} ({{ logDataSource.data.length }} {{ getTranslation('entries') }})</mat-card-title>
+      <div class="log-header-actions">
         <mat-form-field appearance="outline" class="component-filter">
-          <mat-label>Azure-Komponente filtern</mat-label>
+          <mat-label>{{ getTranslation('log.filter') }}</mat-label>
           <mat-select [(ngModel)]="selectedComponent" (selectionChange)="onComponentFilterChange()">
-            <mat-option value="all">Alle Komponenten</mat-option>
+            <mat-option value="all">{{ getTranslation('log.filter.all') }}</mat-option>
             <mat-option value="Azure Function">Azure Function</mat-option>
             <mat-option value="Blob Storage">Blob Storage</mat-option>
             <mat-option value="SQL Server">SQL Server</mat-option>
             <mat-option value="Vercel API">Vercel API</mat-option>
           </mat-select>
         </mat-form-field>
+        <button mat-raised-button color="warn" (click)="clearLogs()" class="clear-logs-button">
+          <mat-icon>delete</mat-icon>
+          {{ getTranslation('log.clear') }}
+        </button>
       </div>
+    </mat-card-header>
+    <mat-card-content>
       <div class="table-container log-table-container">
         <table mat-table [dataSource]="logDataSource" matSort class="log-table resizable-table">
           <ng-container matColumnDef="timestamp">
@@ -169,7 +142,23 @@
                 <div class="resize-handle"></div>
               </div>
             </th>
-            <td mat-cell *matCellDef="let row" class="resizable-cell">{{ row.details || '-' }}</td>
+            <td mat-cell *matCellDef="let row" class="resizable-cell">
+              <div class="log-details-container">
+                <div class="log-details-main" *ngIf="row.details && !hasExceptionDetails(row.details)">
+                  {{ row.details }}
+                </div>
+                <div class="log-details-exception" *ngIf="row.details && hasExceptionDetails(row.details)">
+                  <div class="exception-summary">{{ getExceptionSummary(row.details) }}</div>
+                  <div class="exception-full" [class.expanded]="isExceptionExpanded(row)">
+                    <pre>{{ row.details }}</pre>
+                  </div>
+                  <button mat-button color="primary" class="exception-toggle" (click)="toggleExceptionDetails(row)">
+                    {{ isExceptionExpanded(row) ? 'Weniger anzeigen' : 'Vollständige Details anzeigen' }}
+                  </button>
+                </div>
+                <span *ngIf="!row.details">-</span>
+              </div>
+            </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="logDisplayedColumns"></tr>
           <tr mat-row *matRowDef="let row; columns: logDisplayedColumns"></tr>

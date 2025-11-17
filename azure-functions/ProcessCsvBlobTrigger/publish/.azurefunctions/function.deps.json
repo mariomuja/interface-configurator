@@ -8,7 +8,7 @@
     ".NETCoreApp,Version=v6.0": {
       "Microsoft.Azure.Functions.Worker.Extensions/1.0.0": {
         "dependencies": {
-          "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs": "5.1.3",
+          "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs": "5.2.0",
           "Microsoft.NET.Sdk.Functions": "4.3.0",
           "Microsoft.NETCore.Targets": "3.0.0"
         },
@@ -415,7 +415,7 @@
           }
         }
       },
-      "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs/5.1.3": {
+      "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs/5.2.0": {
         "dependencies": {
           "Azure.Storage.Blobs": "12.16.0",
           "Azure.Storage.Queues": "12.14.0",
@@ -424,8 +424,8 @@
         },
         "runtime": {
           "lib/netstandard2.0/Microsoft.Azure.WebJobs.Extensions.Storage.Blobs.dll": {
-            "assemblyVersion": "5.1.3.0",
-            "fileVersion": "5.100.323.32603"
+            "assemblyVersion": "5.2.0.0",
+            "fileVersion": "5.200.23.42905"
           }
         }
       },
@@ -1771,12 +1771,12 @@
       "path": "microsoft.azure.webjobs.extensions.http/3.2.0",
       "hashPath": "microsoft.azure.webjobs.extensions.http.3.2.0.nupkg.sha512"
     },
-    "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs/5.1.3": {
+    "Microsoft.Azure.WebJobs.Extensions.Storage.Blobs/5.2.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-fhXmXJ7ZONc/OGC1vPkfaYnr0X/Ho0Ijxe/WnjHZ72nfeUil948DusjbkUhFxjGswazrWMz6CspwhXJ8zI3g0w==",
-      "path": "microsoft.azure.webjobs.extensions.storage.blobs/5.1.3",
-      "hashPath": "microsoft.azure.webjobs.extensions.storage.blobs.5.1.3.nupkg.sha512"
+      "sha512": "sha512-1KvrWkEnve2D/9HlRAJsaymAmwVE4RWCclM/DFfuKQNNo8D6YMAUoFkt75S1EQSMNxQjrygU6CULGoOxHuEbXw==",
+      "path": "microsoft.azure.webjobs.extensions.storage.blobs/5.2.0",
+      "hashPath": "microsoft.azure.webjobs.extensions.storage.blobs.5.2.0.nupkg.sha512"
     },
     "Microsoft.Azure.WebJobs.Host.Storage/3.0.14": {
       "type": "package",

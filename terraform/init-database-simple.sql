@@ -1,13 +1,11 @@
 ﻿-- Create TransportData table
+-- Primary Key is GUID with DEFAULT NEWID() to auto-generate GUIDs
+-- CsvDataJson stores ALL CSV columns as JSON to mirror exact CSV structure
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[TransportData]') AND type in (N'U'))
 BEGIN
     CREATE TABLE [dbo].[TransportData] (
-        [Id] INT IDENTITY(1,1) PRIMARY KEY,
-        [Name] NVARCHAR(255) NOT NULL,
-        [Email] NVARCHAR(255) NOT NULL,
-        [Age] INT NOT NULL,
-        [City] NVARCHAR(100) NOT NULL,
-        [Salary] DECIMAL(18,2) NOT NULL,
+        [Id] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        [CsvDataJson] NVARCHAR(MAX) NOT NULL,
         [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
     );
     CREATE INDEX [IX_TransportData_CreatedAt] ON [dbo].[TransportData]([CreatedAt]);

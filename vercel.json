@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "infrastructure-as-code",
   "framework": "angular",
   "buildCommand": "cd frontend && npm install && npm run build:prod",
   "outputDirectory": "frontend/dist/infrastructure-as-code/browser",

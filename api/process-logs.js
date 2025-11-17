@@ -1,72 +1,63 @@
-const sql = require('mssql');
-
-async function getSqlConfig() {
-  return {
-    server: process.env.AZURE_SQL_SERVER,
-    database: process.env.AZURE_SQL_DATABASE,
-    user: process.env.AZURE_SQL_USER,
-    password: process.env.AZURE_SQL_PASSWORD,
-    options: {
-      encrypt: true,
-      trustServerCertificate: false
-    }
-  };
-}
-
 module.exports = async (req, res) => {
   try {
-    const config = await getSqlConfig();
+    // Get Function App URL from environment variable
+    const functionAppUrl = process.env.AZURE_FUNCTION_APP_URL || process.env.FUNCTION_APP_URL;
     
-    // Validate configuration
-    if (!config.server || !config.database || !config.user || !config.password) {
-      const missing = [];
-      if (!config.server) missing.push('AZURE_SQL_SERVER');
-      if (!config.database) missing.push('AZURE_SQL_DATABASE');
-      if (!config.user) missing.push('AZURE_SQL_USER');
-      if (!config.password) missing.push('AZURE_SQL_PASSWORD');
-      
-      console.error('Missing SQL configuration:', missing);
+    if (!functionAppUrl) {
       return res.status(500).json({ 
-        error: 'Database configuration incomplete', 
-        details: `Missing environment variables: ${missing.join(', ')}`,
-        message: 'Please configure Azure SQL environment variables in Vercel'
+        error: 'Function App URL not configured',
+        message: 'Please set AZURE_FUNCTION_APP_URL environment variable'
       });
     }
+
+    // Call Function App endpoint to get logs from in-memory store
+    // Remove trailing slash if present
+    const baseUrl = functionAppUrl.replace(/\/$/, '');
+    const logsUrl = `${baseUrl}/api/GetProcessLogs`;
     
-    const pool = await sql.connect(config);
+    // Use built-in fetch (Node.js 18+) or node-fetch
+    let fetch;
+    try {
+      // Try built-in fetch first (Node.js 18+)
+      fetch = globalThis.fetch || require('node-fetch');
+    } catch {
+      // Fallback to node-fetch if not available
+      const nodeFetch = await import('node-fetch');
+      fetch = nodeFetch.default;
+    }
     
-    const result = await pool.request().query(`
-      SELECT id, 
-             FORMAT(timestamp, 'yyyy-MM-ddTHH:mm:ssZ') as timestamp,
-             level, message, details
-      FROM ProcessLogs
-      ORDER BY timestamp DESC
-    `);
+    const response = await fetch(logsUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Function App returned status ${response.status}: ${errorText}`);
+    }
+
+    const logs = await response.json();
     
-    await pool.close();
-    
-    res.status(200).json(result.recordset);
+    // Transform to match expected format
+    const transformedLogs = logs.map(log => ({
+      id: log.id,
+      timestamp: log.datetime_created ? new Date(log.datetime_created).toISOString() : new Date().toISOString(),
+      level: log.level || 'info',
+      message: log.message || '',
+      details: log.details || null,
+      component: log.component || null
+    }));
+
+    res.status(200).json(transformedLogs);
   } catch (error) {
     console.error('Error fetching process logs:', error);
     
-    // Provide more detailed error information
-    let errorMessage = error.message;
-    if (error.code === 'ETIMEOUT' || error.code === 'ESOCKET') {
-      errorMessage = 'Cannot connect to Azure SQL Server. Check firewall rules and connection string.';
-    } else if (error.code === 'ELOGIN') {
-      errorMessage = 'Authentication failed. Check SQL credentials.';
-    } else if (error.code === 'EREQUEST') {
-      errorMessage = 'SQL query failed. Check if ProcessLogs table exists.';
-    }
-    
     res.status(500).json({ 
       error: 'Failed to fetch process logs', 
-      details: errorMessage,
-      code: error.code,
-      message: 'Please check Azure SQL configuration and ensure tables are initialized'
+      details: error.message,
+      message: 'Please check Function App configuration and ensure AZURE_FUNCTION_APP_URL is set'
     });
   }
 };
-
-
-

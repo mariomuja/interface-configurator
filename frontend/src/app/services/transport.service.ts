@@ -23,12 +23,22 @@ export class TransportService {
     return this.http.get<ProcessLog[]>(`${this.apiUrl}/process-logs`);
   }
 
-  startTransport(): Observable<{ message: string; fileId: string }> {
-    return this.http.post<{ message: string; fileId: string }>(`${this.apiUrl}/start-transport`, {});
+  startTransport(csvContent?: string): Observable<{ message: string; fileId: string }> {
+    return this.http.post<{ message: string; fileId: string }>(`${this.apiUrl}/start-transport`, {
+      csvContent: csvContent
+    });
   }
 
   clearTable(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/clear-table`, {});
+  }
+
+  dropTable(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/drop-table`, {});
+  }
+
+  clearLogs(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/clear-logs`, {});
   }
 }
 

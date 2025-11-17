@@ -244,6 +244,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Azure.Storage.Blobs": {
+              "target": "Package",
+              "version": "[12.22.0, )"
+            },
             "Microsoft.Azure.Functions.Worker": {
               "target": "Package",
               "version": "[1.23.0, )"
@@ -254,11 +258,15 @@
             },
             "Microsoft.Azure.Functions.Worker.Extensions.Storage.Blobs": {
               "target": "Package",
-              "version": "[6.0.0, )"
+              "version": "[6.2.0, )"
             },
             "Microsoft.Azure.Functions.Worker.Sdk": {
               "target": "Package",
               "version": "[1.18.1, )"
+            },
+            "Microsoft.Data.SqlClient": {
+              "target": "Package",
+              "version": "[5.1.6, )"
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",

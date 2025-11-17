@@ -22,17 +22,25 @@ function generateSampleCsvData() {
   return data;
 }
 
+// Get CSV field separator from environment variable or use default
+// This can be configured via Azure Function App Settings: CsvFieldSeparator
+// Default: ║ (Box Drawing Double Vertical Line, U+2551)
+const FIELD_SEPARATOR = process.env.CsvFieldSeparator || '║';
+
 function convertToCsv(data) {
   const headers = ['id', 'name', 'email', 'age', 'city', 'salary'];
   const rows = data.map(row => 
     headers.map(header => {
       const value = row[header];
-      return typeof value === 'string' && value.includes(',') 
-        ? `"${value}"` 
-        : value;
-    }).join(',')
+      // Escape separator and quotes if present
+      const valueStr = String(value || '');
+      if (valueStr.includes(FIELD_SEPARATOR) || valueStr.includes('"')) {
+        return `"${valueStr.replace(/"/g, '""')}"`;
+      }
+      return valueStr;
+    }).join(FIELD_SEPARATOR)
   );
-  return [headers.join(','), ...rows].join('\n');
+  return [headers.join(FIELD_SEPARATOR), ...rows].join('\n');
 }
 
 module.exports = async (req, res) => {
@@ -52,21 +60,48 @@ module.exports = async (req, res) => {
       throw new Error('Azure Storage credentials not configured');
     }
     
-    const containerName = process.env.AZURE_STORAGE_CONTAINER || 'csv-uploads';
+    // Use csv-files container with csv-incoming folder
+    const containerName = process.env.AZURE_STORAGE_CONTAINER || 'csv-files';
     const containerClient = blobServiceClient.getContainerClient(containerName);
     
-    // Ensure container exists with public blob access
-    await containerClient.createIfNotExists({
-      access: 'blob' // Allows anonymous read access to blobs
-    });
+    // Ensure container exists (container is already created via Bicep/Terraform with private access)
+    // We don't need to specify access level here since the container is managed by Infrastructure as Code
+    // If container doesn't exist, create it without specifying access (will use storage account default)
+    try {
+      const createResponse = await containerClient.createIfNotExists();
+      console.log('Container createIfNotExists response:', {
+        succeeded: createResponse.succeeded,
+        errorCode: createResponse.errorCode
+      });
+    } catch (createError) {
+      console.error('Error creating container:', {
+        message: createError.message,
+        code: createError.code,
+        statusCode: createError.statusCode,
+        details: createError.details
+      });
+      // If container already exists, that's fine - continue
+      if (createError.statusCode !== 409) { // 409 = Conflict (already exists)
+        throw createError;
+      }
+    }
     
-    // Generate CSV data
-    const csvData = generateSampleCsvData();
-    const csvContent = convertToCsv(csvData);
+    // Use CSV content from request body if provided, otherwise generate sample data
+    let csvContent;
+    if (req.body && req.body.csvContent && typeof req.body.csvContent === 'string' && req.body.csvContent.trim() !== '') {
+      csvContent = req.body.csvContent;
+      console.log('Using CSV content from request body');
+    } else {
+      // Generate CSV data
+      const csvData = generateSampleCsvData();
+      csvContent = convertToCsv(csvData);
+      console.log('Using generated sample CSV data');
+    }
     
-    // Upload to blob storage
+    // Upload to blob storage in csv-incoming folder
     const fileName = `transport-${uuidv4()}.csv`;
-    const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+    const blobPath = `csv-incoming/${fileName}`; // Upload to csv-incoming folder
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
     
     await blockBlobClient.upload(csvContent, csvContent.length, {
       blobHTTPHeaders: { blobContentType: 'text/csv' }
@@ -79,6 +114,14 @@ module.exports = async (req, res) => {
     });
   } catch (error) {
     console.error('Error starting transport:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      requestId: error.requestId,
+      details: error.details,
+      stack: error.stack?.substring(0, 500)
+    });
     
     // Provide more detailed error information
     let errorMessage = error.message || 'Unknown error';
@@ -87,15 +130,27 @@ module.exports = async (req, res) => {
     if (error.message && error.message.includes('Azure Storage credentials')) {
       errorMessage = 'Azure Storage configuration incomplete';
       errorDetails = 'Missing AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_NAME/AZURE_STORAGE_ACCOUNT_KEY in Vercel environment variables';
-    } else if (error.message && error.message.includes('container')) {
-      errorDetails = 'Error accessing or creating storage container';
+    } else if (error.statusCode === 403) {
+      errorMessage = 'Access denied to storage account';
+      errorDetails = 'Check if AZURE_STORAGE_CONNECTION_STRING is correct and has proper permissions';
+    } else if (error.statusCode === 404) {
+      errorMessage = 'Storage account or container not found';
+      errorDetails = 'Check storage account name and container name';
+    } else if (error.code === 'ContainerNotFound' || error.message?.includes('container')) {
+      errorMessage = 'Error accessing or creating storage container';
+      errorDetails = `${error.message} (Status: ${error.statusCode || 'N/A'})`;
+    } else if (error.message?.includes('Public access')) {
+      errorMessage = 'Public access not permitted';
+      errorDetails = 'Storage account has public access disabled. Container will be created with private access.';
     }
     
     res.status(500).json({ 
       error: 'Failed to start transport', 
       details: errorDetails || errorMessage,
       message: errorMessage,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      code: error.code,
+      statusCode: error.statusCode,
+      requestId: error.requestId
     });
   }
 };

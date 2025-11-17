@@ -31,7 +31,6 @@ describe('TransportComponent', () => {
       'getSqlData',
       'getProcessLogs',
       'startTransport',
-      'clearTable'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -93,12 +92,7 @@ describe('TransportComponent', () => {
     expect(snackBar.open).toHaveBeenCalled();
   }));
 
-  it('should clear table', () => {
-    transportService.clearTable.and.returnValue(of({ message: 'Table cleared' }));
-    spyOn(window, 'confirm').and.returnValue(true);
-    component.clearTable();
-    expect(transportService.clearTable).toHaveBeenCalled();
-  });
+  // clearTable test removed - method was removed, table clearing is now handled by dropTable
 
   it('should get level color correctly', () => {
     expect(component.getLevelColor('error')).toBe('warn');

@@ -11,9 +11,9 @@ using System;
 using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("ProcessCsvBlobTrigger.Core")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("release")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+357566ec39fabd2a7975f3c355586439822fffd2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2021c2efdb0fb14c2a2d3ddaca3a30f954d53d15")]
 [assembly: System.Reflection.AssemblyProductAttribute("ProcessCsvBlobTrigger.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ProcessCsvBlobTrigger.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

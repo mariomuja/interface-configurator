@@ -116,8 +116,35 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false // Disable public blob access for security
+    // Enable Event Grid for blob events
+    isHnsEnabled: false
   }
   tags: commonTags
+}
+
+
+// Blob Services (implicit child resource of storage account)
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+// Blob Container: csv-files
+// Single container with three virtual folders:
+// - csv-incoming/ : New CSV files land here and trigger the Azure Function Blob Trigger
+// - csv-processed/ : Successfully processed CSV files are moved here
+// - csv-error/ : CSV files that failed processing are moved here
+resource csvFilesContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobServices
+  name: 'csv-files'
+  properties: {
+    publicAccess: 'None' // Private access - uses connection string authentication
+    metadata: {
+      description: 'Container for CSV files with virtual folders: csv-incoming, csv-processed, csv-error'
+      purpose: 'csv-storage'
+    }
+  }
 }
 
 // Azure SQL Server
@@ -179,6 +206,19 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
     licenseType: sqlLicenseType
     maxSizeBytes: sqlMaxSizeGb * 1024 * 1024 * 1024 // Convert GB to bytes
     zoneRedundant: sqlZoneRedundant
+  }
+  tags: commonTags
+}
+
+// Application Insights for Function App monitoring
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = if (enableFunctionApp) {
+  name: '${functionsAppName}-insights'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    Request_Source: 'rest'
+    WorkspaceResourceId: null
   }
   tags: commonTags
 }
@@ -259,10 +299,22 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
           value: 'DefaultEndpointsProtocol=https;AccountName=${functionsStorageAccount.name};AccountKey=${functionsStorageAccount.listKeys().keys[0].value};EndpointSuffix=${az.environment().suffixes.storage}'
         }
-            {
-              name: 'WEBSITE_CONTENTSHARE'
-              value: toLower(replace(functionsAppName, '-', ''))
-            }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: toLower(replace(functionsAppName, '-', ''))
+        }
+        {
+          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+          value: enableFunctionApp && applicationInsights != null ? applicationInsights.properties.InstrumentationKey : ''
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: enableFunctionApp && applicationInsights != null ? applicationInsights.properties.ConnectionString : ''
+        }
+        {
+          name: 'MainStorageConnection'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${az.environment().suffixes.storage}'
+        }
       ]
       cors: corsAllowedOrigins != [] ? {
         allowedOrigins: corsAllowedOrigins
@@ -272,6 +324,13 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
   }
   tags: commonTags
 }
+
+// Event Grid System Topic for Storage Account
+// Azure automatically creates a system topic when we create an event subscription
+// Note: Event Grid Subscription removed - Azure Function uses native Blob Trigger
+// The Function App's ProcessCsvBlobTrigger function uses a Blob Trigger binding,
+// which automatically triggers when blobs are created in the configured container.
+// Event Grid subscriptions only support Event Grid triggers, not Blob triggers.
 
 // Outputs
 output resourceGroupName string = resourceGroupName
@@ -285,4 +344,6 @@ output sqlConnectionString string = 'Server=tcp:${sqlServer.properties.fullyQual
 output functionAppName string = enableFunctionApp && functionApp != null ? functionApp.name : ''
 output functionAppUrl string = enableFunctionApp && functionApp != null ? 'https://${functionApp.properties.defaultHostName}' : ''
 output functionsStorageAccountName string = functionsStorageAccount.name
+output applicationInsightsName string = enableFunctionApp && applicationInsights != null ? applicationInsights.name : ''
+output applicationInsightsInstrumentationKey string = enableFunctionApp && applicationInsights != null ? applicationInsights.properties.InstrumentationKey : ''
 

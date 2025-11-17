@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ProcessCsvBlobTrigger.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a6d4da4127c862eaa34958adad9b22d7bf340250")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2021c2efdb0fb14c2a2d3ddaca3a30f954d53d15")]
 [assembly: System.Reflection.AssemblyProductAttribute("ProcessCsvBlobTrigger.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ProcessCsvBlobTrigger.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

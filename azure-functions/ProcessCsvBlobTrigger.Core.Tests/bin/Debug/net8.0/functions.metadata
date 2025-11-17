@@ -1,28 +1,22 @@
 [
   {
-    "name": "SimpleTestFunction",
+    "name": "ProcessCsvBlobTrigger",
     "scriptFile": "ProcessCsvBlobTrigger.dll",
-    "entryPoint": "ProcessCsvBlobTrigger.SimpleTestFunction.Run",
+    "entryPoint": "ProcessCsvBlobTrigger.ProcessCsvBlobTriggerFunction.Run",
     "language": "dotnet-isolated",
     "properties": {
       "IsCodeless": false
     },
     "bindings": [
       {
-        "name": "req",
+        "name": "blobStream",
         "direction": "In",
-        "type": "httpTrigger",
-        "authLevel": "Anonymous",
-        "methods": [
-          "get",
-          "post"
-        ],
-        "properties": {}
-      },
-      {
-        "name": "$return",
-        "type": "http",
-        "direction": "Out"
+        "type": "blobTrigger",
+        "path": "csv-files/csv-incoming/{name}",
+        "connection": "MainStorageConnection",
+        "properties": {
+          "supportsDeferredBinding": "True"
+        }
       }
     ]
   }

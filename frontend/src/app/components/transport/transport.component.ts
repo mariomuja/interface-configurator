@@ -14,6 +14,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { TransportService } from '../../services/transport.service';
+import { TranslationService } from '../../services/translation.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -44,22 +45,26 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild(MatSort) sort!: MatSort;
   
   csvData: CsvRecord[] = [];
+  editableCsvText: string = '';
   sqlData: SqlRecord[] = [];
   processLogs: ProcessLog[] = [];
   logDataSource = new MatTableDataSource<ProcessLog & { component?: string }>([]);
   isLoading = false;
   isTransporting = false;
   private refreshSubscription?: Subscription;
+  private lastErrorShown: string = '';
+  private errorShownCount: number = 0;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
 
-  csvDisplayedColumns: string[] = ['id', 'name', 'email', 'age', 'city', 'salary'];
-  sqlDisplayedColumns: string[] = ['id', 'name', 'email', 'age', 'city', 'salary', 'createdAt'];
+  csvDisplayedColumns: string[] = []; // Will be populated dynamically from CSV data
+  sqlDisplayedColumns: string[] = []; // Will be populated dynamically from SQL data
   logDisplayedColumns: string[] = ['timestamp', 'level', 'component', 'message', 'details'];
 
   constructor(
     private transportService: TransportService,
+    private translationService: TranslationService,
     private snackBar: MatSnackBar
   ) {}
 
@@ -68,6 +73,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadSqlData();
     this.loadProcessLogs();
     this.startAutoRefresh();
+    
+    // Subscribe to language changes to update UI
+    this.translationService.getCurrentLanguage().subscribe(() => {
+      // Trigger change detection - translations will be updated via getTranslation calls
+    });
+  }
+  
+  getTranslation(key: string): string {
+    return this.translationService.translate(key);
   }
   
   ngAfterViewInit(): void {
@@ -141,6 +155,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transportService.getSampleCsvData().subscribe({
       next: (data) => {
         this.csvData = data;
+        this.editableCsvText = this.formatCsvAsText();
+        // Extract columns dynamically from CSV data
+        if (data && data.length > 0) {
+          this.csvDisplayedColumns = this.extractColumns(data);
+        }
         this.isLoading = false;
       },
       error: (error) => {
@@ -155,6 +174,34 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transportService.getSqlData().subscribe({
       next: (data) => {
         this.sqlData = data;
+        // Extract columns dynamically from SQL data
+        if (data && data.length > 0) {
+          // Always include id and datetime_created/createdAt, then add all CSV columns
+          const columns = this.extractColumns(data);
+          // Ensure id is first, then CSV columns, then datetime_created/createdAt last
+          const idColumn = columns.find(c => c.toLowerCase() === 'id');
+          const dateColumns = columns.filter(c => 
+            c.toLowerCase() === 'datetime_created' || 
+            c.toLowerCase() === 'createdat' || 
+            c.toLowerCase() === 'created_at'
+          );
+          const csvColumns = columns.filter(c => 
+            c.toLowerCase() !== 'id' && 
+            c.toLowerCase() !== 'datetime_created' && 
+            c.toLowerCase() !== 'createdat' &&
+            c.toLowerCase() !== 'created_at' &&
+            c.toLowerCase() !== 'error'
+          );
+          
+          this.sqlDisplayedColumns = [
+            ...(idColumn ? [idColumn] : []),
+            ...csvColumns,
+            ...(dateColumns.length > 0 ? [dateColumns[0]] : [])
+          ];
+        }
+        // Reset error tracking on success
+        this.lastErrorShown = '';
+        this.errorShownCount = 0;
       },
       error: (error) => {
         console.error('Error loading SQL data:', error);
@@ -162,6 +209,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Extract detailed error message
         let errorMessage = 'Fehler beim Laden der SQL-Daten';
         let errorDetails = '';
+        let errorCode = '';
         
         if (error.error) {
           if (error.error.details) {
@@ -177,19 +225,38 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           } else if (error.error.error) {
             errorMessage = error.error.error;
           }
+          
+          if (error.error.code) {
+            errorCode = error.error.code;
+          }
         } else if (error.message) {
           errorDetails = error.message;
         }
         
-        // Show detailed error message
-        const fullMessage = errorDetails 
-          ? `${errorMessage}: ${errorDetails}`
-          : errorMessage;
+        // Create unique error identifier
+        const errorKey = `${errorCode}:${errorDetails}`;
         
-        this.snackBar.open(fullMessage, 'Schließen', { 
-          duration: 8000,
-          panelClass: ['error-snackbar']
-        });
+        // Only show error popup if:
+        // 1. It's a different error than last time, OR
+        // 2. It's the first time showing this error, OR
+        // 3. It's been shown less than 3 times (to avoid spam)
+        if (errorKey !== this.lastErrorShown || this.errorShownCount < 3) {
+          const fullMessage = errorDetails 
+            ? `${errorMessage}: ${errorDetails}`
+            : errorMessage;
+          
+          this.snackBar.open(fullMessage, 'Schließen', { 
+            duration: 8000,
+            panelClass: ['error-snackbar']
+          });
+          
+          if (errorKey === this.lastErrorShown) {
+            this.errorShownCount++;
+          } else {
+            this.lastErrorShown = errorKey;
+            this.errorShownCount = 1;
+          }
+        }
       }
     });
   }
@@ -208,6 +275,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         );
         
         this.updateLogDataSource();
+        // Reset error tracking on success
+        this.lastErrorShown = '';
+        this.errorShownCount = 0;
       },
       error: (error) => {
         console.error('Error loading process logs:', error);
@@ -215,21 +285,50 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Extract detailed error message
         let errorMessage = 'Fehler beim Laden der Prozess-Logs';
         let errorDetails = '';
+        let errorCode = '';
         
         if (error.error) {
           if (error.error.details) {
             errorDetails = error.error.details;
           } else if (error.error.message) {
             errorDetails = error.error.message;
+          } else if (error.error.error) {
+            errorDetails = error.error.error;
+          }
+          
+          if (error.error.message) {
+            errorMessage = error.error.message;
+          } else if (error.error.error) {
+            errorMessage = error.error.error;
+          }
+          
+          if (error.error.code) {
+            errorCode = error.error.code;
           }
         } else if (error.message) {
           errorDetails = error.message;
         }
         
-        if (errorDetails) {
-          this.snackBar.open(`${errorMessage}: ${errorDetails}`, 'Schließen', { 
-            duration: 5000 
+        // Create unique error identifier
+        const errorKey = `process-logs:${errorCode}:${errorDetails}`;
+        
+        // Only show error popup if it's a different error or hasn't been shown too many times
+        if (errorKey !== this.lastErrorShown || this.errorShownCount < 3) {
+          const fullMessage = errorDetails 
+            ? `${errorMessage}: ${errorDetails}`
+            : errorMessage;
+          
+          this.snackBar.open(fullMessage, 'Schließen', { 
+            duration: 8000,
+            panelClass: ['error-snackbar']
           });
+          
+          if (errorKey === this.lastErrorShown) {
+            this.errorShownCount++;
+          } else {
+            this.lastErrorShown = errorKey;
+            this.errorShownCount = 1;
+          }
         }
       }
     });
@@ -272,7 +371,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   startTransport(): void {
     this.isTransporting = true;
-    this.transportService.startTransport().subscribe({
+    // Use edited CSV text if available, otherwise use formatted CSV from csvData
+    const csvContent = this.editableCsvText || this.formatCsvAsText();
+    this.transportService.startTransport(csvContent).subscribe({
       next: (response) => {
         this.snackBar.open('Transport gestartet: ' + response.message, 'Schließen', { duration: 5000 });
         this.isTransporting = false;
@@ -313,17 +414,38 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  clearTable(): void {
-    if (confirm('Möchten Sie wirklich alle Daten aus der Tabelle löschen?')) {
-      this.transportService.clearTable().subscribe({
+  dropTable(): void {
+    const confirmMessage = this.translationService.translate('table.drop.confirm');
+    if (confirm(confirmMessage)) {
+      this.transportService.dropTable().subscribe({
         next: (response) => {
-          this.snackBar.open(response.message, 'Schließen', { duration: 3000 });
-          this.loadSqlData();
+          this.snackBar.open(response.message, 'Schließen', { duration: 5000 });
+          // Clear SQL data and columns - table structure will be recreated from next CSV
+          this.sqlData = [];
+          this.sqlDisplayedColumns = [];
           this.loadProcessLogs();
         },
         error: (error) => {
-          console.error('Error clearing table:', error);
-          this.snackBar.open('Fehler beim Löschen der Tabelle', 'Schließen', { duration: 3000 });
+          console.error('Error dropping table:', error);
+          const errorMessage = error.error?.message || error.error?.error || 'Fehler beim Löschen der Tabelle';
+          this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
+        }
+      });
+    }
+  }
+
+  clearLogs(): void {
+    const confirmMessage = this.translationService.translate('log.clear.confirm');
+    if (confirm(confirmMessage)) {
+      this.transportService.clearLogs().subscribe({
+        next: (response) => {
+          this.snackBar.open(response.message, 'Schließen', { duration: 3000 });
+          this.loadProcessLogs();
+        },
+        error: (error) => {
+          console.error('Error clearing logs:', error);
+          const errorMessage = error.error?.message || error.error?.error || 'Fehler beim Leeren der Protokolltabelle';
+          this.snackBar.open(errorMessage, 'Schließen', { duration: 3000 });
         }
       });
     }
@@ -341,6 +463,248 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       case 'error': return 'warn';
       case 'warning': return 'accent';
       default: return 'primary';
+    }
+  }
+
+  // Use a seldom-used UTF-8 character as field separator: ║ (Box Drawing Double Vertical Line, U+2551)
+  private readonly FIELD_SEPARATOR = '║';
+
+  /**
+   * Format CSV data as text (for display in Courier New)
+   */
+  formatCsvAsText(): string {
+    if (!this.csvData || this.csvData.length === 0) {
+      return this.translationService.translate('no.data.csv');
+    }
+
+    // Get all columns
+    const columns = this.extractColumns(this.csvData);
+    
+    // Build header row
+    const headerRow = columns.join(this.FIELD_SEPARATOR);
+    
+    // Build data rows
+    const dataRows = this.csvData.map(row => {
+      return columns.map(col => {
+        const value = this.getCellValue(row, col);
+        const valueStr = String(value || '');
+        // Escape separator and quotes in values
+        if (valueStr.includes(this.FIELD_SEPARATOR) || valueStr.includes('"')) {
+          return `"${valueStr.replace(/"/g, '""')}"`;
+        }
+        return valueStr;
+      }).join(this.FIELD_SEPARATOR);
+    });
+    
+    // Combine header and data rows
+    return [headerRow, ...dataRows].join('\n');
+  }
+
+  /**
+   * Handle CSV text changes from editable textarea
+   */
+  onCsvTextChange(): void {
+    // Parse the edited CSV text back into csvData
+    if (!this.editableCsvText || this.editableCsvText.trim() === '') {
+      this.csvData = [];
+      return;
+    }
+
+    try {
+      const lines = this.editableCsvText.split('\n').filter(line => line.trim() !== '');
+      if (lines.length === 0) {
+        this.csvData = [];
+        return;
+      }
+
+      // Parse header row using the field separator
+      const headers = this.parseCsvLine(lines[0]).map(h => h.trim().replace(/^"|"$/g, ''));
+      
+      // Parse data rows
+      const records: CsvRecord[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = this.parseCsvLine(lines[i]);
+        const record: any = {};
+        headers.forEach((header, index) => {
+          record[header] = values[index] || '';
+        });
+        records.push(record);
+      }
+      
+      this.csvData = records;
+    } catch (error) {
+      console.error('Error parsing CSV text:', error);
+      // Keep the text but show a warning
+      this.snackBar.open('CSV-Format könnte ungültig sein. Bitte überprüfen Sie die Syntax.', 'OK', {
+        duration: 3000
+      });
+    }
+  }
+
+  /**
+   * Parse a CSV line handling quoted values and custom field separator
+   */
+  private parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+        }
+      } else if (char === this.FIELD_SEPARATOR && !inQuotes) {
+        // End of value (using custom separator)
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    // Add last value
+    values.push(current.trim());
+    
+    return values;
+  }
+
+  /**
+   * Extract column names dynamically from data records
+   */
+  extractColumns(data: any[]): string[] {
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Collect all unique keys from all records
+    const allKeys = new Set<string>();
+    data.forEach(record => {
+      if (record && typeof record === 'object') {
+        Object.keys(record).forEach(key => {
+          // Exclude error and internal fields
+          if (key !== 'error' && !key.startsWith('_')) {
+            allKeys.add(key);
+          }
+        });
+      }
+    });
+
+    return Array.from(allKeys);
+  }
+
+  /**
+   * Get display value for a cell (handles different data types)
+   */
+  getCellValue(row: any, column: string): any {
+    const value = row[column];
+    if (value === null || value === undefined) {
+      return '';
+    }
+    return value;
+  }
+
+  /**
+   * Check if a column should be formatted as a number
+   */
+  isNumericColumn(column: string, data: any[]): boolean {
+    if (!data || data.length === 0) return false;
+    
+    // Check first few non-null values
+    for (const row of data.slice(0, 10)) {
+      const value = row[column];
+      if (value !== null && value !== undefined && value !== '') {
+        return typeof value === 'number' || !isNaN(Number(value));
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get column display name (capitalize first letter, replace underscores)
+   */
+  getColumnDisplayName(column: string): string {
+    return column
+      .replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1')
+      .trim()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  /**
+   * Check if a column is a date column
+   */
+  isDateColumn(column: string): boolean {
+    const lower = column.toLowerCase();
+    return lower === 'datetime_created' || lower === 'createdat' || lower === 'created_at' || lower === 'timestamp';
+  }
+
+  /**
+   * Check if details contain exception information
+   */
+  hasExceptionDetails(details: string): boolean {
+    if (!details) return false;
+    return details.includes('Type:') || 
+           details.includes('Message:') || 
+           details.includes('StackTrace:') ||
+           details.includes('Source:') ||
+           details.includes('TargetSite:') ||
+           details.includes('Full Details:');
+  }
+
+  /**
+   * Extract exception summary (first line or error message)
+   */
+  getExceptionSummary(details: string): string {
+    if (!details) return '';
+    
+    // Try to extract the error message
+    const messageMatch = details.match(/Message:\s*(.+?)(?:\n|Source:|$)/i);
+    if (messageMatch && messageMatch[1]) {
+      return messageMatch[1].trim();
+    }
+    
+    // Try to extract "Full Details:" line
+    const fullDetailsMatch = details.match(/Full Details:\s*(.+?)(?:\n|$)/i);
+    if (fullDetailsMatch && fullDetailsMatch[1]) {
+      return fullDetailsMatch[1].trim();
+    }
+    
+    // Return first line
+    const firstLine = details.split('\n')[0];
+    return firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+  }
+
+  /**
+   * Track expanded exception details
+   */
+  private expandedExceptions = new Set<number>();
+
+  /**
+   * Check if exception details are expanded
+   */
+  isExceptionExpanded(row: ProcessLog): boolean {
+    return this.expandedExceptions.has(row.id);
+  }
+
+  /**
+   * Toggle exception details expansion
+   */
+  toggleExceptionDetails(row: ProcessLog): void {
+    if (this.expandedExceptions.has(row.id)) {
+      this.expandedExceptions.delete(row.id);
+    } else {
+      this.expandedExceptions.add(row.id);
     }
   }
 }

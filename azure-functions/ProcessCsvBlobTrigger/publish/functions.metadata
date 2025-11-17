@@ -9,11 +9,11 @@
     },
     "bindings": [
       {
-        "name": "blobContent",
+        "name": "blobStream",
         "direction": "In",
         "type": "blobTrigger",
-        "path": "csv-uploads/{name}",
-        "connection": "AzureWebJobsStorage",
+        "path": "csv-files/csv-incoming/{name}",
+        "connection": "MainStorageConnection",
         "properties": {
           "supportsDeferredBinding": "True"
         }

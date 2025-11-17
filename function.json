@@ -1,0 +1,11 @@
+﻿{
+    "bindings":  [
+                     {
+                         "direction":  "In",
+                         "path":  "incoming-csv/{name}",
+                         "name":  "blobContent",
+                         "type":  "blobTrigger",
+                         "connection":  "AzureWebJobsStorage"
+                     }
+                 ]
+}

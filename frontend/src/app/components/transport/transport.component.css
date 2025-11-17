@@ -3,51 +3,289 @@
   flex-direction: column;
   gap: 20px;
   padding: 20px;
-}
-
-.control-card {
   width: 100%;
-}
-
-.button-group {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  max-width: 100%;
+  overflow-x: hidden; /* No horizontal scrollbar for entire screen */
+  box-sizing: border-box;
 }
 
 .spinner-container {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px;
+  padding: 12px 16px;
   justify-content: center;
+  margin-top: 8px;
+}
+
+/* Data card header styles */
+.data-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  margin: 0;
+}
+
+.data-card-title {
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.data-card-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.action-button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+  line-height: 36px;
+}
+
+.action-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
 }
 
 .data-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: row;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden; /* No horizontal scrollbar */
+  box-sizing: border-box;
 }
 
 .data-card {
+  flex: 1 1 50%; /* Each card takes 50% of the width */
+  min-width: 0; /* Allow flex items to shrink below their content size */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent card from overflowing */
+}
+
+.csv-card,
+.sql-card {
+  height: 100%;
+}
+
+.csv-text-container {
   width: 100%;
+  height: 100%;
+  overflow: auto; /* Horizontal and vertical scrollbar for CSV text */
+  max-height: 400px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.csv-text {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 16px;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-wrap: normal;
+  color: #333;
+  min-width: max-content; /* Allow horizontal scrolling */
+}
+
+.csv-editable {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border: none;
+  outline: none;
+  resize: none;
+  background-color: #fafafa;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.csv-editable:focus {
+  background-color: #fff;
+  box-shadow: inset 0 0 0 2px #3f51b5;
+}
+
+.table-empty-message {
+  padding: 40px 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.table-empty-message p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .log-card {
   width: 100%;
 }
 
-.log-filter-container {
-  margin-bottom: 16px;
+/* Override Material Card Header default styles */
+.log-card ::ng-deep .mat-mdc-card-header {
+  padding: 8px 16px !important;
+  margin: 0 !important;
+  min-height: 48px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.log-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  min-height: 48px;
+  gap: 12px;
+}
+
+.log-title {
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  height: 40px;
+  line-height: 40px;
+}
+
+.log-header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 40px;
 }
 
 .component-filter {
-  width: 250px;
+  width: 220px;
+  margin: 0;
+  height: 40px;
+}
+
+.component-filter ::ng-deep .mat-mdc-form-field-wrapper {
+  padding-bottom: 0 !important;
+}
+
+.component-filter ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+.component-filter ::ng-deep .mat-mdc-text-field-wrapper {
+  padding-bottom: 0 !important;
+}
+
+.component-filter ::ng-deep .mat-mdc-form-field-infix {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  min-height: 24px !important;
+  border-top: none !important;
+}
+
+.component-filter ::ng-deep .mat-mdc-form-field {
+  height: 40px;
+}
+
+.component-filter ::ng-deep .mat-mdc-select {
+  height: 24px;
+  line-height: 24px;
+}
+
+.component-filter ::ng-deep .mat-mdc-select-trigger {
+  height: 24px;
+  line-height: 24px;
+}
+
+.clear-logs-button {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 40px !important;
+  margin: 0;
+}
+
+.clear-logs-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
+}
+
+@media (max-width: 768px) {
+  .log-header {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: auto;
+  }
+  
+  .log-title {
+    font-size: 14px;
+    height: auto;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  
+  .log-header-actions {
+    width: 100%;
+    margin-left: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    height: auto;
+  }
+  
+  .component-filter {
+    width: 100%;
+  }
+  
+  .clear-logs-button {
+    width: 100%;
+  }
 }
 
 .table-container {
   max-height: 400px;
-  overflow: auto;
+  overflow: auto; /* Horizontal and vertical scrollbar for table */
+  width: 100%;
+  min-width: 0; /* Allow flex items to shrink */
 }
 
 .log-table-container {
@@ -57,17 +295,56 @@
 
 .data-table, .log-table {
   width: 100%;
+  min-width: max-content; /* Allow horizontal scrolling */
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.data-table th, .data-table td,
-.log-table th, .log-table td {
+/* Destination table (SQL) specific styles - compact Courier New */
+.sql-card .data-table {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.sql-card .data-table th,
+.sql-card .data-table td {
+  padding: 4px 8px;
+  text-align: left;
+  line-height: 1.3;
+  vertical-align: top;
+}
+
+.sql-card .data-table th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+  font-size: 11px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 2px solid #ddd;
+  padding: 6px 8px;
+}
+
+.sql-card .data-table td {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.sql-card .data-table tr {
+  height: auto;
+  min-height: 0;
+}
+
+/* Source CSV and Log tables keep original styles */
+.csv-card .data-table th,
+.csv-card .data-table td,
+.log-table th,
+.log-table td {
   padding: 8px 16px;
   text-align: left;
 }
 
-.data-table th, .log-table th {
+.log-table th {
   background-color: #f5f5f5;
   font-weight: 500;
   position: sticky;
@@ -141,10 +418,57 @@
   color: white !important;
 }
 
-@media (max-width: 1200px) {
-  .data-container {
-    grid-template-columns: 1fr;
-  }
+/* Exception details styling */
+.log-details-container {
+  width: 100%;
 }
 
+.log-details-main {
+  white-space: normal;
+  word-wrap: break-word;
+}
 
+.log-details-exception {
+  font-family: 'Courier New', monospace;
+}
+
+.exception-summary {
+  font-weight: 600;
+  color: #d32f2f;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+}
+
+.exception-full {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  margin: 8px 0;
+}
+
+.exception-full.expanded {
+  max-height: 2000px;
+  overflow-y: auto;
+}
+
+.exception-full pre {
+  font-size: 0.75em;
+  line-height: 1.4;
+  margin: 0;
+  padding: 8px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.exception-toggle {
+  font-size: 0.8em;
+  padding: 4px 8px;
+  margin-top: 4px;
+  min-height: 28px;
+  line-height: 1.2;
+}

@@ -55,18 +55,21 @@ describe('AppComponent', () => {
   it('should have phone and email links', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const phoneLink = fixture.nativeElement.querySelector('a[href^="tel:"]');
+    const phoneLinks = fixture.nativeElement.querySelectorAll('a[href^="tel:"]');
     const emailLink = fixture.nativeElement.querySelector('a[href^="mailto:"]');
-    expect(phoneLink).toBeTruthy();
+    expect(phoneLinks.length).toBeGreaterThan(0);
     expect(emailLink).toBeTruthy();
   });
 
-  it('should have GitHub link', () => {
+  it('should have GitHub and LinkedIn links that open in new tabs', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const githubLink = fixture.nativeElement.querySelector('a[href*="github.com"]');
+    const linkedInLink = fixture.nativeElement.querySelector('a[href*="linkedin.com"]');
     expect(githubLink).toBeTruthy();
     expect(githubLink.getAttribute('target')).toBe('_blank');
+    expect(linkedInLink).toBeTruthy();
+    expect(linkedInLink.getAttribute('target')).toBe('_blank');
   });
 });
 
