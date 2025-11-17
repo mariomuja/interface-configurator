@@ -40,6 +40,9 @@ var host = new HostBuilder()
                 // Register MessageBoxDbContext for MessageBox database
                 services.AddDbContext<MessageBoxDbContext>(options =>
                     options.UseSqlServer(messageBoxConnectionString));
+                
+                // Ensure MessageBox database and tables are created automatically on startup
+                services.AddHostedService<MessageBoxDatabaseInitializer>();
             }
             
             // Register Adapter Configuration Service (must be registered before CsvProcessingService)
