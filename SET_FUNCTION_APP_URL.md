@@ -9,7 +9,18 @@ https://func-csv-to-sql-processor.azurewebsites.net
 
 ## Quick Setup
 
-### Option 1: Vercel Dashboard (Recommended)
+### Option 1: Automated Script (Easiest)
+
+```powershell
+.\set-vercel-function-app-url.ps1
+```
+
+This script will:
+- Automatically find your Function App URL
+- Set it in Vercel via CLI
+- Verify the Function App is accessible
+
+### Option 2: Vercel Dashboard (Recommended)
 
 1. Go to: https://vercel.com/dashboard
 2. Select your project: `infrastructure-as-code`
