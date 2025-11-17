@@ -57,22 +57,22 @@ module.exports = async (req, res) => {
       
       const columnResult = await pool.request().query(columnQuery);
       const csvColumns = columnResult.recordset.map(r => r.ColumnName);
-    
-    // Build dynamic SELECT query - use individual columns (PrimaryKey is the primary key column)
-    let selectColumns = 'PrimaryKey';
-    let hasCsvDataJson = false;
-    
-    // Filter out reserved columns from csvColumns
-    const reservedColumns = ['PrimaryKey', 'Id', 'datetime_created', 'CsvDataJson'];
-    const filteredCsvColumns = csvColumns.filter(c => !reservedColumns.includes(c));
-    
-    if (filteredCsvColumns.length > 0) {
-      // New approach: Use individual columns
-      selectColumns = 'PrimaryKey, ' + filteredCsvColumns.join(', ');
-    } else {
-      // No CSV columns found - just select PrimaryKey and datetime_created
-      selectColumns = 'PrimaryKey';
-    }
+      
+      // Check if table has PrimaryKey column (new structure) or Id column (old structure)
+      const hasPrimaryKey = await checkColumnExists(pool, 'TransportData', 'PrimaryKey');
+      const hasId = await checkColumnExists(pool, 'TransportData', 'Id');
+      
+      // Build dynamic SELECT query
+      let selectColumns = hasPrimaryKey ? 'PrimaryKey' : (hasId ? 'Id' : 'PrimaryKey');
+      
+      // Filter out reserved columns from csvColumns
+      const reservedColumns = ['PrimaryKey', 'Id', 'datetime_created', 'CsvDataJson'];
+      const filteredCsvColumns = csvColumns.filter(c => !reservedColumns.includes(c));
+      
+      if (filteredCsvColumns.length > 0) {
+        // New approach: Use individual columns
+        selectColumns = (hasPrimaryKey ? 'PrimaryKey' : 'Id') + ', ' + filteredCsvColumns.join(', ');
+      }
     
     // Every SQL table has datetime_created column with DEFAULT GETUTCDATE()
     const query = `
