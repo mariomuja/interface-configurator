@@ -1,5 +1,20 @@
 const { getSqlConfig, validateSqlConfig, getSqlErrorMessage, sql } = require('./sql-config');
 
+// Helper function to check if a column exists
+async function checkColumnExists(pool, tableName, columnName) {
+  try {
+    const result = await pool.request().query(`
+      SELECT COUNT(*) AS ColumnCount
+      FROM sys.columns c
+      INNER JOIN sys.tables t ON c.object_id = t.object_id
+      WHERE t.name = '${tableName}' AND c.name = '${columnName}'
+    `);
+    return result.recordset[0].ColumnCount > 0;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = async (req, res) => {
   try {
     const config = await getSqlConfig();
@@ -13,34 +28,35 @@ module.exports = async (req, res) => {
     
     const pool = await sql.connect(config);
     
-    // First, check if TransportData table exists
-    const tableExistsQuery = `
-      SELECT COUNT(*) AS TableCount
-      FROM sys.tables
-      WHERE name = 'TransportData'
-    `;
-    
-    const tableExistsResult = await pool.request().query(tableExistsQuery);
-    const tableExists = tableExistsResult.recordset[0].TableCount > 0;
-    
-    // If table doesn't exist, return empty array (table will be created when first CSV is processed)
-    if (!tableExists) {
-      await pool.close();
-      return res.status(200).json([]);
-    }
-    
-    // Get all column names from TransportData table (excluding PrimaryKey, datetime_created, and reserved columns)
-    const columnQuery = `
-      SELECT c.name AS ColumnName
-      FROM sys.columns c
-      INNER JOIN sys.tables t ON c.object_id = t.object_id
-      WHERE t.name = 'TransportData'
-      AND c.name NOT IN ('PrimaryKey', 'Id', 'datetime_created', 'CsvDataJson')
-      ORDER BY c.column_id
-    `;
-    
-    const columnResult = await pool.request().query(columnQuery);
-    const csvColumns = columnResult.recordset.map(r => r.ColumnName);
+    try {
+      // First, check if TransportData table exists
+      const tableExistsQuery = `
+        SELECT COUNT(*) AS TableCount
+        FROM sys.tables
+        WHERE name = 'TransportData'
+      `;
+      
+      const tableExistsResult = await pool.request().query(tableExistsQuery);
+      const tableExists = tableExistsResult.recordset[0].TableCount > 0;
+      
+      // If table doesn't exist, return empty array (table will be created when first CSV is processed)
+      if (!tableExists) {
+        await pool.close();
+        return res.status(200).json([]);
+      }
+      
+      // Get all column names from TransportData table (excluding PrimaryKey, datetime_created, and reserved columns)
+      const columnQuery = `
+        SELECT c.name AS ColumnName
+        FROM sys.columns c
+        INNER JOIN sys.tables t ON c.object_id = t.object_id
+        WHERE t.name = 'TransportData'
+        AND c.name NOT IN ('PrimaryKey', 'Id', 'datetime_created', 'CsvDataJson')
+        ORDER BY c.column_id
+      `;
+      
+      const columnResult = await pool.request().query(columnQuery);
+      const csvColumns = columnResult.recordset.map(r => r.ColumnName);
     
     // Build dynamic SELECT query - use individual columns (PrimaryKey is the primary key column)
     let selectColumns = 'PrimaryKey';
@@ -109,15 +125,35 @@ module.exports = async (req, res) => {
     
     // Check if error is due to missing table or connection issues
     const errorMessage = error.message || '';
+    const errorNumber = error.number || 0;
+    
+    // SQL Server error numbers:
+    // 208 = Invalid object name (table doesn't exist)
+    // 207 = Invalid column name
     const isTableMissing = error.code === 'EREQUEST' && (
+      errorNumber === 208 ||
       errorMessage.includes('Invalid object name') ||
       errorMessage.includes("doesn't exist") ||
-      errorMessage.includes('does not exist')
+      errorMessage.includes('does not exist') ||
+      errorMessage.includes('Invalid object name \'TransportData\'')
     );
     
     if (isTableMissing) {
       // Table doesn't exist yet - return empty array with informative message
       // The table will be created automatically when the first CSV is processed
+      console.log('TransportData table does not exist yet. Returning empty array.');
+      return res.status(200).json([]);
+    }
+    
+    // Check for column-related errors (old table structure)
+    const isColumnError = error.code === 'EREQUEST' && (
+      errorNumber === 207 ||
+      errorMessage.includes('Invalid column name') ||
+      errorMessage.includes('PrimaryKey')
+    );
+    
+    if (isColumnError) {
+      console.log('Table exists but has old structure. Returning empty array.');
       return res.status(200).json([]);
     }
     
