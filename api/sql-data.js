@@ -107,22 +107,43 @@ module.exports = async (req, res) => {
       });
     }
     
-    // Check if error is due to missing table
-    if (error.code === 'EREQUEST' && error.message && error.message.includes('Invalid object name')) {
-      // Table doesn't exist yet - return empty array (table will be created when first CSV is processed)
+    // Check if error is due to missing table or connection issues
+    const errorMessage = error.message || '';
+    const isTableMissing = error.code === 'EREQUEST' && (
+      errorMessage.includes('Invalid object name') ||
+      errorMessage.includes("doesn't exist") ||
+      errorMessage.includes('does not exist')
+    );
+    
+    if (isTableMissing) {
+      // Table doesn't exist yet - return empty array with informative message
+      // The table will be created automatically when the first CSV is processed
       return res.status(200).json([]);
     }
     
-    // Provide more detailed error information
-    const errorMessage = getSqlErrorMessage(error);
+    // Check for connection errors
+    const isConnectionError = error.code === 'ETIMEOUT' || 
+                              error.code === 'ESOCKET' || 
+                              error.code === 'ECONNREFUSED' ||
+                              error.code === 'ELOGIN';
+    
+    if (isConnectionError) {
+      return res.status(500).json({ 
+        error: 'Database connection failed', 
+        details: getSqlErrorMessage(error),
+        code: error.code,
+        message: 'Cannot connect to Azure SQL Server. Please check firewall rules, credentials, and connection string.'
+      });
+    }
+    
+    // Provide more detailed error information for other errors
+    const detailedErrorMessage = getSqlErrorMessage(error);
     
     res.status(500).json({ 
       error: 'Failed to fetch SQL data', 
-      details: errorMessage,
+      details: detailedErrorMessage,
       code: error.code,
-      message: error.code === 'EREQUEST' && error.message && error.message.includes('Invalid object name')
-        ? 'TransportData table does not exist yet. It will be created automatically when you upload your first CSV file.'
-        : 'Please check Azure SQL configuration and ensure tables are initialized'
+      message: 'An error occurred while querying the database. Please check Azure SQL configuration.'
     });
   }
 };

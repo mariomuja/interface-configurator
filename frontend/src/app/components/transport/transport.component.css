@@ -249,6 +249,108 @@
   margin-right: 4px;
 }
 
+.diagnose-button {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 40px !important;
+  margin: 0;
+}
+
+.diagnose-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
+}
+
+.diagnostics-result {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.diagnostics-result h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.diagnostics-summary {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: white;
+  border-radius: 4px;
+}
+
+.diagnostics-summary p {
+  margin: 4px 0;
+}
+
+.diagnostics-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diagnostic-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background-color: white;
+  border-radius: 4px;
+  border-left: 4px solid #ccc;
+}
+
+.diagnostic-check.ok {
+  border-left-color: #4caf50;
+}
+
+.diagnostic-check.failed {
+  border-left-color: #f44336;
+}
+
+.diagnostic-check.error {
+  border-left-color: #ff9800;
+}
+
+.diagnostic-check mat-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.diagnostic-check.ok mat-icon {
+  color: #4caf50;
+}
+
+.diagnostic-check.failed mat-icon,
+.diagnostic-check.error mat-icon {
+  color: #f44336;
+}
+
+.check-details {
+  flex: 1;
+}
+
+.check-details strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.check-details-text {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  word-break: break-word;
+}
+
 @media (max-width: 768px) {
   .log-header {
     flex-direction: column;

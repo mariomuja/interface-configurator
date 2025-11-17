@@ -40,6 +40,10 @@ export class TransportService {
   clearLogs(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/clear-logs`, {});
   }
+
+  diagnose(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/diagnose`);
+  }
 }
 
 

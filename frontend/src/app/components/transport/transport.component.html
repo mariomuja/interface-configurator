@@ -86,6 +86,10 @@
             <mat-option value="Vercel API">Vercel API</mat-option>
           </mat-select>
         </mat-form-field>
+        <button mat-raised-button color="accent" (click)="runDiagnostics()" [disabled]="isDiagnosing" class="diagnose-button">
+          <mat-icon>bug_report</mat-icon>
+          {{ isDiagnosing ? 'Diagnose...' : 'Diagnose' }}
+        </button>
         <button mat-raised-button color="warn" (click)="clearLogs()" class="clear-logs-button">
           <mat-icon>delete</mat-icon>
           {{ getTranslation('log.clear') }}
@@ -93,6 +97,24 @@
       </div>
     </mat-card-header>
     <mat-card-content>
+      <!-- Diagnostics Result -->
+      <div *ngIf="diagnosticsResult" class="diagnostics-result">
+        <h3>Diagnose-Ergebnisse</h3>
+        <div class="diagnostics-summary">
+          <p><strong>Status:</strong> {{ diagnosticsResult.summary.overall }}</p>
+          <p><strong>Erfolgreich:</strong> {{ diagnosticsResult.summary.passed }}/{{ diagnosticsResult.summary.totalChecks }}</p>
+        </div>
+        <div class="diagnostics-checks">
+          <div *ngFor="let check of diagnosticsResult.checks" class="diagnostic-check" [class.ok]="check.status === 'OK'" [class.failed]="check.status === 'FAILED'" [class.error]="check.status === 'ERROR'">
+            <mat-icon>{{ check.status === 'OK' ? 'check_circle' : check.status === 'FAILED' ? 'error' : 'warning' }}</mat-icon>
+            <div class="check-details">
+              <strong>{{ check.name }}</strong>: {{ check.status }}
+              <div class="check-details-text">{{ check.details }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div class="table-container log-table-container">
         <table mat-table [dataSource]="logDataSource" matSort class="log-table resizable-table">
           <ng-container matColumnDef="timestamp">

@@ -18,7 +18,7 @@
 
 ## 🎯 What This Application Demonstrates
 
-This application demonstrates a complete **data integration workflow** from CSV files to SQL Server database, showcasing modern cloud-native integration patterns and Infrastructure as Code (IaC) principles. It serves as a reference implementation for building scalable, maintainable data integration solutions on Microsoft Azure.
+This application demonstrates a complete **data integration workflow** from CSV files to SQL Server database, showcasing modern cloud-native integration patterns and Infrastructure as Code (IaC) principles. It features a **pluggable adapter architecture** that allows easy swapping of data sources and destinations (CSV, SQL Server, and future adapters like JSON, SAP, REST APIs). It serves as a reference implementation for building scalable, maintainable data integration solutions on Microsoft Azure.
 
 ## 🚀 Integration Concepts Implemented
 
@@ -63,21 +63,80 @@ This application demonstrates a complete **data integration workflow** from CSV 
 - **Audit Trail**: `datetime_created` column with automatic timestamp on all tables
 - **Error Recovery**: Failed rows preserved for manual review and reprocessing
 
-### 8. **Modern Development Practices**
-- **Clean Architecture**: Separation of concerns (Services, Models, Data Access)
+### 8. **Adapter Pattern Architecture**
+- **Pluggable Adapters**: CSV and SQL Server adapters implementing a common `IAdapter` interface
+- **Source/Destination Flexibility**: Each adapter can be used as both source and destination
+- **Interchangeable Components**: Easy to swap adapters (e.g., CSV → JSON, SQL Server → SAP)
+- **Separation of Concerns**: CSV-specific logic isolated in `CsvAdapter`, SQL Server logic in `SqlServerAdapter`
+- **Unified Interface**: All adapters implement `ReadAsync()`, `WriteAsync()`, `GetSchemaAsync()`, and `EnsureDestinationStructureAsync()`
+- **Future Extensibility**: New adapters (JSON, SAP, REST APIs) can be added without changing core processing logic
+
+### 9. **Modern Development Practices**
+- **Clean Architecture**: Separation of concerns (Services, Models, Data Access, Adapters)
 - **Dependency Injection**: Loose coupling and testability
 - **Error Handling**: Comprehensive exception handling with detailed logging
 - **Code Standards**: Consistent coding patterns and documentation
+- **Design Patterns**: Adapter Pattern for data source/destination abstraction
 
 ## 🏗️ Architecture Overview
 
-The application uses a multi-platform infrastructure:
+The application uses a multi-platform infrastructure with a pluggable adapter architecture:
 
 - **Frontend**: Deployed on Vercel (Angular application with serverless functions)
 - **Backend**: Deployed on Vercel serverless functions
 - **Database**: Azure SQL Database
 - **Storage**: Azure Storage Accounts
 - **Processing**: Azure Function App for serverless functions
+
+### Adapter Architecture
+
+The data processing layer uses an **Adapter Pattern** to abstract data sources and destinations:
+
+```
+┌─────────────────┐
+│  CsvProcessor   │
+│  (Orchestrator) │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼───┐ ┌──▼──────┐
+│ Source │ │Destination│
+│Adapter │ │  Adapter   │
+└───┬───┘ └──┬───────┘
+    │        │
+┌───▼───┐ ┌──▼──────┐
+│  CSV  │ │SQL Server│
+│Adapter│ │ Adapter  │
+└───────┘ └──────────┘
+```
+
+**Key Components:**
+
+- **`IAdapter` Interface**: Common contract for all adapters
+  - `ReadAsync()`: Read data from source
+  - `WriteAsync()`: Write data to destination
+  - `GetSchemaAsync()`: Retrieve schema information
+  - `EnsureDestinationStructureAsync()`: Ensure destination structure matches schema
+
+- **`CsvAdapter`**: Handles CSV file operations
+  - Reads CSV files from Azure Blob Storage
+  - Writes CSV files to Azure Blob Storage
+  - Configurable field separator (UTF-8 character support)
+  - Column count validation
+
+- **`SqlServerAdapter`**: Handles SQL Server operations
+  - Reads data from SQL Server tables
+  - Writes data to SQL Server tables
+  - Dynamic table structure management
+  - Type conversion and validation
+
+**Benefits:**
+
+- **Flexibility**: Easy to add new adapters (JSON, SAP, REST APIs, etc.)
+- **Testability**: Each adapter can be tested independently
+- **Maintainability**: Source/destination logic is isolated and reusable
+- **Extensibility**: New data sources/destinations don't require changes to core processing logic
 
 ## 🔧 Terraform (Azure Infrastructure)
 

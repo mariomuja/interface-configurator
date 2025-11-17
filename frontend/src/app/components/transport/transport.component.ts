@@ -51,6 +51,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   logDataSource = new MatTableDataSource<ProcessLog & { component?: string }>([]);
   isLoading = false;
   isTransporting = false;
+  isDiagnosing = false;
+  diagnosticsResult: any = null;
   private refreshSubscription?: Subscription;
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
@@ -449,6 +451,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
       });
     }
+  }
+
+  runDiagnostics(): void {
+    this.isDiagnosing = true;
+    this.diagnosticsResult = null;
+    
+    this.transportService.diagnose().subscribe({
+      next: (result) => {
+        this.diagnosticsResult = result;
+        this.isDiagnosing = false;
+        
+        // Show summary in snackbar
+        const summary = result.summary;
+        const message = `Diagnose abgeschlossen: ${summary.passed}/${summary.totalChecks} Checks erfolgreich`;
+        this.snackBar.open(message, 'OK', { duration: 5000 });
+        
+        // Log details to console
+        console.log('Diagnostics Result:', result);
+      },
+      error: (error) => {
+        console.error('Error running diagnostics:', error);
+        this.isDiagnosing = false;
+        this.snackBar.open('Fehler bei der Diagnose', 'Schließen', { duration: 3000 });
+      }
+    });
   }
 
   private startAutoRefresh(): void {
