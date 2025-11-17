@@ -1,10 +1,75 @@
-# Infrastructure as Code
+# 📊 CSV to SQL Server Transport - Integration Demo
 
-**Live Demo**: [https://infrastructure-as-code.vercel.app](https://infrastructure-as-code.vercel.app)
+<div align="center">
 
-This directory contains infrastructure-as-code definitions for the International Bookkeeping application.
+[![Live Preview](https://img.shields.io/badge/🌐_Live_Preview-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://infrastructure-as-code.vercel.app)
+[![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com)
+[![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://www.terraform.io)
+[![Angular](https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.io)
+[![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 
-## Architecture Overview
+**A complete data integration workflow demonstrating modern cloud-native integration patterns**
+
+[Features](#-integration-concepts-implemented) • [Architecture](#-architecture-overview) • [Deployment](#-terraform-azure-infrastructure) • [Contact](#-contact)
+
+</div>
+
+---
+
+## 🎯 What This Application Demonstrates
+
+This application demonstrates a complete **data integration workflow** from CSV files to SQL Server database, showcasing modern cloud-native integration patterns and Infrastructure as Code (IaC) principles. It serves as a reference implementation for building scalable, maintainable data integration solutions on Microsoft Azure.
+
+## 🚀 Integration Concepts Implemented
+
+### 1. **Event-Driven Architecture**
+- **Blob Storage Trigger**: Azure Function automatically triggered when CSV files are uploaded to Blob Storage
+- **Asynchronous Processing**: Non-blocking data processing pipeline
+- **Event Logging**: Comprehensive process logging for monitoring and debugging
+
+### 2. **Dynamic Schema Management**
+- **Schema-on-Write**: SQL table structure automatically adapts to CSV column structure
+- **Dynamic Column Creation**: New CSV columns automatically create corresponding SQL columns
+- **Type Inference**: Automatic data type detection and conversion (string, integer, decimal, date)
+- **Schema Evolution**: Handles CSV schema changes without manual database migrations
+
+### 3. **Row-Level Error Handling**
+- **Type Validation**: Validates data types before insertion
+- **Failed Row Isolation**: Individual failed rows saved as separate CSV files in error folder
+- **Success/Failure Tracking**: Only successfully processed rows are inserted; failed rows are preserved for reprocessing
+- **Error Details Logging**: Comprehensive error logging with exception details for troubleshooting
+
+### 4. **Infrastructure as Code (IaC)**
+- **Terraform**: Complete Azure infrastructure defined as code
+- **Reproducible Deployments**: Infrastructure can be recreated identically across environments
+- **Version Control**: All infrastructure changes tracked in Git
+- **Automated Provisioning**: Single command deploys entire infrastructure stack
+
+### 5. **Multi-Platform Architecture**
+- **Frontend**: Angular application deployed on Vercel
+- **Backend API**: Serverless functions on Vercel
+- **Data Processing**: Azure Functions (C# .NET isolated runtime)
+- **Storage**: Azure Blob Storage for CSV files
+- **Database**: Azure SQL Database with dynamic schema
+
+### 6. **Internationalization (i18n)**
+- **5 Languages**: German, English, French, Spanish, Italian
+- **Runtime Language Switching**: Users can change language without page reload
+- **Persistent Language Preference**: Language selection saved in browser localStorage
+
+### 7. **Data Quality & Validation**
+- **Type Safety**: Automatic type detection and conversion
+- **Data Integrity**: GUID primary keys (no IDENTITY columns)
+- **Audit Trail**: `datetime_created` column with automatic timestamp on all tables
+- **Error Recovery**: Failed rows preserved for manual review and reprocessing
+
+### 8. **Modern Development Practices**
+- **Clean Architecture**: Separation of concerns (Services, Models, Data Access)
+- **Dependency Injection**: Loose coupling and testability
+- **Error Handling**: Comprehensive exception handling with detailed logging
+- **Code Standards**: Consistent coding patterns and documentation
+
+## 🏗️ Architecture Overview
 
 The application uses a multi-platform infrastructure:
 
@@ -12,9 +77,9 @@ The application uses a multi-platform infrastructure:
 - **Backend**: Deployed on Vercel serverless functions
 - **Database**: Azure SQL Database
 - **Storage**: Azure Storage Accounts
-- **Optional**: Azure Function App for serverless functions
+- **Processing**: Azure Function App for serverless functions
 
-## Terraform (Azure Infrastructure)
+## 🔧 Terraform (Azure Infrastructure)
 
 ### Prerequisites
 
@@ -101,7 +166,7 @@ After applying, Terraform outputs:
 - Storage account information
 - Resource group name
 
-## Vercel Configuration
+## 📦 Vercel Configuration
 
 The frontend is deployed to Vercel. Configuration is in `vercel/vercel.json`.
 
@@ -132,7 +197,7 @@ Azure Functions are automatically deployed via GitHub Actions using the **"Run f
 
 Vercel deployments are automatically triggered on git push to the main branch.
 
-## Environment Variables
+## 🔐 Environment Variables
 
 ### Frontend (Vercel)
 
@@ -150,7 +215,7 @@ Configured via Terraform in Function App settings:
 - `NODE_ENV`: Environment
 - `FUNCTIONS_WORKER_RUNTIME`: Node.js runtime
 
-## Security Considerations
+## 🔒 Security Considerations
 
 - **Secrets**: Never commit `terraform.tfvars` with real values
 - **Firewall Rules**: Configure SQL Server firewall to allow only necessary IPs
@@ -158,13 +223,13 @@ Configured via Terraform in Function App settings:
 - **CORS**: Configure CORS origins appropriately
 - **JWT Secrets**: Use strong, randomly generated secrets
 
-## Cost Optimization
+## 💰 Cost Optimization
 
 - Use appropriate SKU sizes for your workload
 - Consider using Azure SQL Database Basic tier for development
 - Use consumption plan for Function Apps when possible
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Terraform Issues
 
@@ -187,7 +252,7 @@ Configured via Terraform in Function App settings:
 - **Function App Deployment**: See [GITHUB_ACTIONS_DEPLOYMENT.md](./GITHUB_ACTIONS_DEPLOYMENT.md)
 - **GitHub Secrets**: See [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
 
-## Maintenance
+## 🔧 Maintenance
 
 ### Updates
 
@@ -201,9 +266,33 @@ Configured via Terraform in Function App settings:
 - SQL Database backups are configured automatically
 - Consider additional backup strategies for production
 
-## Support
+## 📚 Support
 
 For issues or questions:
 - Check Terraform documentation: https://registry.terraform.io/providers/hashicorp/azurerm
 - Azure documentation: https://docs.microsoft.com/azure
 - Vercel documentation: https://vercel.com/docs
+
+---
+
+## 👤 Contact
+
+<div align="center">
+
+**Mario Muja**
+
+[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mario.muja@example.com)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/mario-muja)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mario-muja)
+
+</div>
+
+---
+
+<div align="center">
+
+*This project demonstrates modern cloud-native integration patterns and Infrastructure as Code practices for data integration workflows.*
+
+Made with ❤️ using Azure, Terraform, Angular, and Vercel
+
+</div>
