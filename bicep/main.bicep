@@ -328,7 +328,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
 // Event Grid System Topic for Storage Account
 // Azure automatically creates a system topic when we create an event subscription
 // Note: Event Grid Subscription removed - Azure Function uses native Blob Trigger
-// The Function App's ProcessCsvBlobTrigger function uses a Blob Trigger binding,
+// The Function App's main function uses a Blob Trigger binding,
 // which automatically triggers when blobs are created in the configured container.
 // Event Grid subscriptions only support Event Grid triggers, not Blob triggers.
 

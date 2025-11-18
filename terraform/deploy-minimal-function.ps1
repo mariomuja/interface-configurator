@@ -21,9 +21,9 @@ $essentialFiles = @(
     "functions.metadata",
     "extensions.json",
     "worker.config.json",
-    "ProcessCsvBlobTrigger.dll",
-    "ProcessCsvBlobTrigger.deps.json",
-    "ProcessCsvBlobTrigger.runtimeconfig.json"
+    "main.dll",
+    "main.deps.json",
+    "main.runtimeconfig.json"
 )
 
 Write-Host "Kopiere essentielle Dateien..." -ForegroundColor White
