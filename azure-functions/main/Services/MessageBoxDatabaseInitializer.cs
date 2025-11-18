@@ -45,11 +45,24 @@ public class MessageBoxDatabaseInitializer : IHostedService
 
             if (created)
             {
-                _logger.LogInformation("MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs");
+                _logger.LogInformation("MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics");
             }
             else
             {
-                _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs");
+                _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics");
+                
+                // Ensure ProcessingStatistics table exists (in case it was added after initial creation)
+                try
+                {
+                    var tableExists = await messageBoxContext.Database.ExecuteSqlRawAsync(
+                        "IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProcessingStatistics') CREATE TABLE ProcessingStatistics (Id INT IDENTITY(1,1) PRIMARY KEY, InterfaceName NVARCHAR(200) NOT NULL, RowsProcessed INT NOT NULL, RowsSucceeded INT NOT NULL, RowsFailed INT NOT NULL, ProcessingDurationMs BIGINT NOT NULL, ProcessingStartTime DATETIME2 NOT NULL, ProcessingEndTime DATETIME2 NOT NULL, SourceFile NVARCHAR(500) NULL);",
+                        cancellationToken);
+                    _logger.LogInformation("Verified ProcessingStatistics table exists");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not verify/create ProcessingStatistics table. It may need to be created manually.");
+                }
             }
         }
         catch (Microsoft.Data.SqlClient.SqlException sqlEx)
