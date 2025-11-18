@@ -47,6 +47,7 @@ public class SqlServerAdapter : IAdapter
     private readonly int _commandTimeout;
     private readonly bool _failOnBadStatement;
     private readonly IInterfaceConfigurationService? _configService;
+    private readonly ProcessingStatisticsService? _statisticsService;
 
     public SqlServerAdapter(
         ApplicationDbContext? context,
