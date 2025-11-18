@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Hosted service that ensures MessageBox database and tables are created automatically on startup

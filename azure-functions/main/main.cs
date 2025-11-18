@@ -2,21 +2,21 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Adapters;
-using ProcessCsvBlobTrigger.Core.Helpers;
-using ProcessCsvBlobTrigger.Core.Interfaces;
+using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Main.Core.Helpers;
+using InterfaceConfigurator.Main.Core.Interfaces;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
-public class ProcessCsvBlobTriggerFunction
+public class MainFunction
 {
     private readonly CsvAdapter _csvAdapter;
-    private readonly ILogger<ProcessCsvBlobTriggerFunction> _logger;
+    private readonly ILogger<MainFunction> _logger;
     private readonly BlobServiceClient _blobServiceClient;
 
-    public ProcessCsvBlobTriggerFunction(
+    public MainFunction(
         CsvAdapter csvAdapter,
-        ILogger<ProcessCsvBlobTriggerFunction> logger)
+        ILogger<MainFunction> logger)
     {
         _csvAdapter = csvAdapter ?? throw new ArgumentNullException(nameof(csvAdapter));
         _logger = logger;
@@ -37,7 +37,7 @@ public class ProcessCsvBlobTriggerFunction
         }
     }
 
-    [Function("ProcessCsvBlobTrigger")]
+    [Function("Main")]
     public async Task Run(
         [BlobTrigger("csv-files/csv-incoming/{name}", Connection = "MainStorageConnection")] Stream blobStream,
         string name,

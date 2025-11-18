@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace ProcessCsvBlobTrigger.Core.Models;
+namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Tracks which destination adapters have processed which messages

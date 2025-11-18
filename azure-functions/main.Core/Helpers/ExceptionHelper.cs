@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace ProcessCsvBlobTrigger.Core.Helpers;
+namespace InterfaceConfigurator.Main.Core.Helpers;
 
 /// <summary>
 /// Helper class for formatting exceptions including inner exceptions for logging

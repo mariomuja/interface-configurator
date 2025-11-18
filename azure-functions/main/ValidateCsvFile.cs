@@ -4,9 +4,9 @@ using Azure.Storage.Blobs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Services;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// HTTP endpoint to validate CSV file before processing
@@ -60,7 +60,7 @@ public class ValidateCsvFileFunction
             var csvContent = downloadResult.Value.Content.ToString();
 
             // Validate CSV
-            var validationService = new ProcessCsvBlobTrigger.Services.CsvValidationService(_logger);
+            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
             var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter);
 
             var response = req.CreateResponse(HttpStatusCode.OK);

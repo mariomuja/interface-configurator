@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Helpers;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Core.Services;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Core.Helpers;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Core.Services;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger.Adapters;
+namespace InterfaceConfigurator.Main.Adapters;
 
 /// <summary>
 /// SQL Server Adapter for reading from and writing to SQL Server tables
@@ -248,14 +248,14 @@ public class SqlServerAdapter : IAdapter
             _logger?.LogInformation("Writing {RecordCount} records to SQL Server table: {Destination}", records?.Count ?? 0, destination);
 
             // If MessageBoxService is available, subscribe and process messages from event queue (as Destination adapter)
-            List<ProcessCsvBlobTrigger.Core.Models.MessageBoxMessage>? processedMessages = null;
+            List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
             if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
             {
                 _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
                 
                 // Read pending messages (event-driven: messages are queued when added)
                 var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-                processedMessages = new List<ProcessCsvBlobTrigger.Core.Models.MessageBoxMessage>();
+                processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
                 
                 if (messages.Count > 0)
                 {

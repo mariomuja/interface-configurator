@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for tracking processing statistics (processing time, rows/hour, success rates)

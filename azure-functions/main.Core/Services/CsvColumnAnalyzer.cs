@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace ProcessCsvBlobTrigger.Core.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Analyzes CSV columns to determine appropriate SQL data types

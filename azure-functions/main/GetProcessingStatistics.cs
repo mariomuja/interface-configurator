@@ -3,10 +3,10 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Services;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// HTTP endpoint to get processing statistics
@@ -50,7 +50,7 @@ public class GetProcessingStatisticsFunction
                 endDate = ed;
             }
 
-            var statisticsService = new ProcessCsvBlobTrigger.Services.ProcessingStatisticsService(_context, _logger);
+            var statisticsService = new InterfaceConfigurator.Main.Services.ProcessingStatisticsService(_context, _logger);
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {

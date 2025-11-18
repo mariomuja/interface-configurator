@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Interfaces;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// In-memory event queue implementation for message processing events

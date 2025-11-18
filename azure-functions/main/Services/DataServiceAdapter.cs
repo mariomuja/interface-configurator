@@ -1,13 +1,13 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Helpers;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Core.Services;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Core.Helpers;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Core.Services;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 public class DataServiceAdapter : IDataService
 {

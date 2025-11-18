@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Helpers;
+namespace InterfaceConfigurator.Main.Core.Helpers;
 
 /// <summary>
 /// Helper class to build SQL Server connection strings from individual properties
@@ -94,7 +94,7 @@ public static class SqlConnectionStringBuilder
     /// <summary>
     /// Builds a SQL Server connection string from InterfaceConfiguration properties
     /// </summary>
-    public static string BuildConnectionStringFromConfig(ProcessCsvBlobTrigger.Core.Models.InterfaceConfiguration config)
+    public static string BuildConnectionStringFromConfig(InterfaceConfigurator.Main.Core.Models.InterfaceConfiguration config)
     {
         return BuildConnectionString(
             config.SqlServerName,

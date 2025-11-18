@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for monitoring dead letter queue and providing statistics

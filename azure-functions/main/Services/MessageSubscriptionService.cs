@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for managing message subscriptions and tracking adapter processing status

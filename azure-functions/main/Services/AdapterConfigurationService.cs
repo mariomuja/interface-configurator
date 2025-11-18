@@ -4,10 +4,10 @@ using System.Text.Json;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Adapter Configuration Service using JSON file storage in Blob Storage

@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Models;
+namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Result of processing a single CSV row

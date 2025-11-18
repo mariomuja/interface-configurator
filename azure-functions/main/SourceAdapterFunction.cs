@@ -1,10 +1,10 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using System.Text.Json;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// Timer-triggered function that processes enabled Source adapters

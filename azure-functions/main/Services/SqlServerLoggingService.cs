@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Models;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// SQL Server-based logging service - logs are stored in MessageBox database
@@ -128,7 +128,7 @@ public class SqlServerLoggingService : ILoggingService
                 ?? Environment.GetEnvironmentVariable("FunctionAppName");
             var functionName = Environment.GetEnvironmentVariable("FUNCTION_NAME") 
                 ?? Environment.GetEnvironmentVariable("FunctionName")
-                ?? "ProcessCsvBlobTrigger";
+                ?? "InterfaceConfigurator.Main";
 
             var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(resourceGroup))

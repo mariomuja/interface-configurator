@@ -1,13 +1,13 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Adapters;
-using ProcessCsvBlobTrigger.Core.Helpers;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Main.Core.Helpers;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger.Services;
+namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Factory for creating adapter instances based on interface configuration

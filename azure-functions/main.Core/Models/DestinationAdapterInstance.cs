@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ProcessCsvBlobTrigger.Core.Models;
+namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Represents a destination adapter instance configuration

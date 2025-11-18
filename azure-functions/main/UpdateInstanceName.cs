@@ -2,9 +2,9 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Interfaces;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 public class UpdateInstanceName
 {

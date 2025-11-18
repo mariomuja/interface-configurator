@@ -1,10 +1,10 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using System.IO;
 
-namespace ProcessCsvBlobTrigger.Core.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 public class CsvProcessingService : ICsvProcessingService
 {

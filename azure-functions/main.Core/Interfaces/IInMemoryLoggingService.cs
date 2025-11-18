@@ -1,6 +1,6 @@
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Models;
 
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Extended logging service interface for in-memory logging

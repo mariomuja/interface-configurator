@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Models;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Services;
 
-namespace ProcessCsvBlobTrigger.Data;
+namespace InterfaceConfigurator.Main.Data;
 
 /// <summary>
 /// DbContext for MessageBox database
@@ -17,8 +18,8 @@ public class MessageBoxDbContext : DbContext
     public DbSet<MessageBoxMessage> Messages { get; set; }
     public DbSet<MessageSubscription> MessageSubscriptions { get; set; }
     public DbSet<AdapterInstance> AdapterInstances { get; set; }
-    public DbSet<ProcessCsvBlobTrigger.Models.ProcessLog> ProcessLogs { get; set; }
-    public DbSet<ProcessCsvBlobTrigger.Services.ProcessingStatistics> ProcessingStatistics { get; set; }
+    public DbSet<Models.ProcessLog> ProcessLogs { get; set; }
+    public DbSet<ProcessingStatistics> ProcessingStatistics { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,7 +81,7 @@ public class MessageBoxDbContext : DbContext
         });
 
         // Configure ProcessLog
-        modelBuilder.Entity<ProcessCsvBlobTrigger.Models.ProcessLog>(entity =>
+        modelBuilder.Entity<Models.ProcessLog>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id)
@@ -96,7 +97,7 @@ public class MessageBoxDbContext : DbContext
         });
 
         // Configure ProcessingStatistics
-        modelBuilder.Entity<ProcessCsvBlobTrigger.Services.ProcessingStatistics>(entity =>
+        modelBuilder.Entity<ProcessingStatistics>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id)

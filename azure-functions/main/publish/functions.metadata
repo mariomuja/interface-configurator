@@ -1,8 +1,8 @@
 [
   {
-    "name": "ProcessCsvBlobTrigger",
-    "scriptFile": "ProcessCsvBlobTrigger.dll",
-    "entryPoint": "ProcessCsvBlobTrigger.ProcessCsvBlobTriggerFunction.Run",
+    "name": "Main",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.MainFunction.Run",
     "language": "dotnet-isolated",
     "properties": {
       "IsCodeless": false

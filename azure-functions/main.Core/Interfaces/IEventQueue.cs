@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Event queue for triggering message processing when new messages are added to MessageBox

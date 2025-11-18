@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Service for managing adapter configurations

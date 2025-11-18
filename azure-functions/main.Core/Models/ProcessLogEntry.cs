@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Models;
+namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// In-memory process log entry (no SQL dependency)

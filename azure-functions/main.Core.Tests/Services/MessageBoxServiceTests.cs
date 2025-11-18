@@ -1,14 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Models;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Services;
 using Xunit;
 
-namespace ProcessCsvBlobTrigger.Core.Tests.Services;
+namespace InterfaceConfigurator.Main.Core.Tests.Services;
 
 /// <summary>
 /// Unit tests for MessageBoxService

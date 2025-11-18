@@ -1,7 +1,7 @@
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Core.Services;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Core.Services;
 
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 public interface IDataService
 {

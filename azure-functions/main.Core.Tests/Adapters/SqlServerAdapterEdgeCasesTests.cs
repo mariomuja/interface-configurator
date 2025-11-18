@@ -1,15 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using ProcessCsvBlobTrigger.Adapters;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
-using ProcessCsvBlobTrigger.Core.Services;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Core.Services;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Services;
 using Xunit;
 
-namespace ProcessCsvBlobTrigger.Core.Tests.Adapters;
+namespace InterfaceConfigurator.Main.Core.Tests.Adapters;
 
 /// <summary>
 /// Unit tests for SqlServerAdapter edge cases and error scenarios

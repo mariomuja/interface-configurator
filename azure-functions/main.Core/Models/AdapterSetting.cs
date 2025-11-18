@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Models;
+namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Represents a single adapter setting (for JSON serialization)

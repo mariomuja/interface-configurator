@@ -1,12 +1,12 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Moq;
-using ProcessCsvBlobTrigger;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using Xunit;
 
-namespace ProcessCsvBlobTrigger.Core.Tests.Functions;
+namespace InterfaceConfigurator.Main.Core.Tests.Functions;
 
 /// <summary>
 /// Unit tests for DestinationAdapterFunction

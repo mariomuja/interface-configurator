@@ -4,10 +4,10 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Services;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// Health check endpoint for monitoring Function App and dependencies

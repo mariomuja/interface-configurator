@@ -1,6 +1,6 @@
-using ProcessCsvBlobTrigger.Core.Services;
+using InterfaceConfigurator.Main.Core.Services;
 
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Service for dynamically creating and managing SQL tables based on CSV structure

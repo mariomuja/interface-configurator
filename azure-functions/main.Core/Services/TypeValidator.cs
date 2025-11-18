@@ -1,7 +1,7 @@
 using System.Globalization;
-using ProcessCsvBlobTrigger.Core.Services;
+using InterfaceConfigurator.Main.Core.Services;
 
-namespace ProcessCsvBlobTrigger.Core.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Validates CSV values against expected SQL data types

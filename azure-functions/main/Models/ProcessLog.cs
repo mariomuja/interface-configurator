@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace ProcessCsvBlobTrigger.Models;
+namespace InterfaceConfigurator.Main.Models;
 
 [Table("ProcessLogs")]
 public class ProcessLog

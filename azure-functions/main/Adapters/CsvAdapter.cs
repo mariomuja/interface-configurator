@@ -2,12 +2,12 @@ using System.Text;
 using System.Linq;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Services;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Services;
 using Renci.SshNet;
 using Renci.SshNet.Sftp;
 
-namespace ProcessCsvBlobTrigger.Adapters;
+namespace InterfaceConfigurator.Main.Adapters;
 
 /// <summary>
 /// CSV Adapter for reading from and writing to CSV files in Azure Blob Storage
@@ -543,14 +543,14 @@ public class CsvAdapter : IAdapter
             _logger?.LogInformation("Writing CSV to destination: {Destination}, {RecordCount} records", destination, records?.Count ?? 0);
 
             // If MessageBoxService is available, subscribe and process messages from event queue (as Destination adapter)
-            List<ProcessCsvBlobTrigger.Core.Models.MessageBoxMessage>? processedMessages = null;
+            List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
             if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
             {
                 _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
                 
                 // Read pending messages (event-driven: messages are queued when added)
                 var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-                processedMessages = new List<ProcessCsvBlobTrigger.Core.Models.MessageBoxMessage>();
+                processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
                 
                 if (messages.Count > 0)
                 {

@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Adapters;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Services;
-using ProcessCsvBlobTrigger.Data;
-using ProcessCsvBlobTrigger.Services;
+using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Services;
+using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults()
@@ -77,8 +77,8 @@ var host = new HostBuilder()
             services.AddSingleton<IAdapterConfigurationService>(sp =>
             {
                 var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
-                var logger = sp.GetService<ILogger<ProcessCsvBlobTrigger.Services.AdapterConfigurationService>>();
-                var service = new ProcessCsvBlobTrigger.Services.AdapterConfigurationService(blobServiceClient, logger);
+                var logger = sp.GetService<ILogger<AdapterConfigurationService>>();
+                var service = new AdapterConfigurationService(blobServiceClient, logger);
                 // Initialize on startup (fire and forget)
                 _ = Task.Run(async () => await service.InitializeAsync(), CancellationToken.None);
                 return service;
@@ -88,15 +88,15 @@ var host = new HostBuilder()
             services.AddSingleton<IInterfaceConfigurationService>(sp =>
             {
                 var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
-                var logger = sp.GetService<ILogger<ProcessCsvBlobTrigger.Services.InterfaceConfigurationService>>();
-                var service = new ProcessCsvBlobTrigger.Services.InterfaceConfigurationService(blobServiceClient, logger);
+                var logger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationService>>();
+                var service = new InterfaceConfigurator.Main.Services.InterfaceConfigurationService(blobServiceClient, logger);
                 // Initialize on startup (fire and forget)
                 _ = Task.Run(async () => await service.InitializeAsync(), CancellationToken.None);
                 return service;
             });
             
             // Register Adapter Factory
-            services.AddScoped<IAdapterFactory, ProcessCsvBlobTrigger.Services.AdapterFactory>();
+            services.AddScoped<IAdapterFactory, InterfaceConfigurator.Main.Services.AdapterFactory>();
             
             // Register Core Services
             services.AddScoped<ICsvProcessingService, CsvProcessingService>();

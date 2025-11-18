@@ -4,9 +4,9 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Data;
+using InterfaceConfigurator.Main.Data;
 
-namespace ProcessCsvBlobTrigger;
+namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// HTTP endpoint to retrieve process logs from MessageBox database

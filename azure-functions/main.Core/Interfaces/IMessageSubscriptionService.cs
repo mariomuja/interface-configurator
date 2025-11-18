@@ -1,4 +1,4 @@
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Service for managing message subscriptions and tracking which adapters have processed messages

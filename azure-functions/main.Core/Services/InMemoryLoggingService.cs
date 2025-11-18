@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Models;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 
-namespace ProcessCsvBlobTrigger.Core.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// In-memory logging service - logs are stored in memory and lost when Function App restarts
@@ -154,7 +154,7 @@ public class InMemoryLoggingService : IInMemoryLoggingService
                 ?? Environment.GetEnvironmentVariable("FunctionAppName");
             var functionName = Environment.GetEnvironmentVariable("FUNCTION_NAME") 
                 ?? Environment.GetEnvironmentVariable("FunctionName")
-                ?? "ProcessCsvBlobTrigger";
+                ?? "InterfaceConfigurator.Main";
 
             var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(resourceGroup))

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using ProcessCsvBlobTrigger.Models;
+using InterfaceConfigurator.Main.Models;
 
-namespace ProcessCsvBlobTrigger.Data;
+namespace InterfaceConfigurator.Main.Data;
 
 /// <summary>
 /// DbContext for the main application database (app-database)
@@ -19,13 +19,13 @@ public class ApplicationDbContext : DbContext
     /// TransportData table - stores CSV data in the main application database
     /// This table is created in app-database (not MessageBox database)
     /// </summary>
-    public DbSet<ProcessCsvBlobTrigger.Models.TransportData> TransportData { get; set; }
+    public DbSet<InterfaceConfigurator.Main.Models.TransportData> TransportData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<ProcessCsvBlobTrigger.Models.TransportData>(entity =>
+        modelBuilder.Entity<InterfaceConfigurator.Main.Models.TransportData>(entity =>
         {
             entity.HasKey(e => e.PrimaryKey);
             // GUID primary key with DEFAULT NEWID() - NEVER use IDENTITY for primary keys

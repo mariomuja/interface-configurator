@@ -1,6 +1,6 @@
-using ProcessCsvBlobTrigger.Core.Services;
+using InterfaceConfigurator.Main.Core.Services;
 
-namespace ProcessCsvBlobTrigger.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Core.Interfaces;
 
 /// <summary>
 /// Interface for data adapters that can be used as source or destination
