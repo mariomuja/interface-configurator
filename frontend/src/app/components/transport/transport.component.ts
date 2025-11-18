@@ -1974,6 +1974,107 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  private formatJsonWithComments(obj: any, indent: string = '', parentKey: string = ''): string {
+    // Helper function to format JSON with comments
+    const comments: { [key: string]: string } = {
+      // Top-level properties
+      'interfaceName': 'The name of the interface configuration',
+      'sourceAdapterName': 'Type of source adapter (CSV or SqlServer)',
+      'destinationAdapterName': 'Type of destination adapter (CSV or SqlServer)',
+      'description': 'Description of the interface configuration',
+      'sourceAdapterInstance': 'Source adapter instance configuration. Contains all properties for the source adapter.',
+      'destinationAdapterInstances': 'Array of destination adapter instances. Each instance contains all properties for a destination adapter.',
+      
+      // Adapter instance properties (used in both source and destination)
+      'adapterInstanceGuid': 'A unique identifier (GUID) assigned to this adapter instance. Used internally to track which adapter instance created each message in the MessageBox.',
+      'instanceName': 'A user-friendly name to identify this adapter instance. Displayed in the UI and helps distinguish between multiple instances.',
+      'adapterName': 'Type of adapter (CSV or SqlServer)',
+      'isEnabled': 'Controls whether this adapter instance is active. When enabled, the adapter process runs automatically. When disabled, the process stops immediately.',
+      'receiveFolder': 'The blob storage folder path where CSV files are monitored. Format: \'container-name/folder-path\' (e.g., \'csv-files/csv-incoming\'). Leave empty to disable folder monitoring.',
+      'fileMask': 'Wildcard pattern to filter files in the Receive Folder. Examples: \'*.txt\', \'*.csv\', \'data_*.txt\'. Supports * (any sequence) and ? (single character). Default: \'*.txt\'.',
+      'batchSize': 'Number of rows read from the CSV file in one chunk before debatching into single rows. Larger batches improve performance but use more memory. Default: 100 rows per batch.',
+      'fieldSeparator': 'Character used to separate fields in CSV files. Default: \'║\' (Box Drawing Double Vertical Line, U+2551) - a seldomly used UTF-8 character that avoids conflicts with common data.',
+      'destinationReceiveFolder': 'The blob storage folder path where CSV files will be written (for CSV destination adapters). Format: \'container-name/folder-path\' (e.g., \'csv-files/csv-outgoing\').',
+      'destinationFileMask': 'File mask pattern for constructing output filenames (for CSV destination adapters). Supports variables: $datetime (replaced with current date/time: yyyyMMddHHmmss.fff).',
+      
+      // SQL Server properties
+      'sqlServerName': 'SQL Server name or IP address. For Azure SQL: use the full FQDN (e.g., \'sql-server.database.windows.net\'). For on-premises: use server name or IP address.',
+      'sqlDatabaseName': 'The name of the SQL Server database to connect to.',
+      'sqlUserName': 'SQL login username (required when Integrated Security is disabled).',
+      'sqlPassword': 'SQL login password (required when Integrated Security is disabled). Password is masked for security.',
+      'sqlIntegratedSecurity': 'Use Windows Authentication (Integrated Security). When enabled, User Name and Password are not required. When disabled, SQL Authentication is used.',
+      'sqlResourceGroup': 'Azure Resource Group name (for Azure SQL managed database access). Used for Azure-specific security and access management.',
+      'sqlPollingStatement': 'SQL SELECT or EXEC statement to poll for new data (Source adapters only). Executed periodically according to Polling Interval. Example: \'SELECT * FROM Orders WHERE Processed = 0\'.',
+      'sqlPollingInterval': 'How often the polling statement is executed (in seconds). The adapter will run the polling statement at this interval to check for new data. Default: 60 seconds.',
+      'sqlUseTransaction': 'Wrap execution in an explicit SQL transaction. When enabled, all database operations are wrapped in a transaction that can be committed or rolled back. Ensures atomicity.',
+      'sqlBatchSize': 'Number of rows fetched at once when reading data from SQL Server. Larger batch sizes improve performance but use more memory. Default: 1000 rows per batch.',
+      'destination': 'Destination table name for SqlServer destination adapters. The table is automatically created with dynamic columns based on the CSV data structure.',
+      'tableName': 'Table name for SqlServer adapters. Same as destination property.',
+      'configuration': 'Raw configuration object containing adapter-specific settings.'
+    };
+    
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) return '[]';
+      
+      // Add section comment for destinationAdapterInstances array
+      let sectionComment = '';
+      if (parentKey === 'destinationAdapterInstances') {
+        sectionComment = `${indent}  // Destination adapter instances array\n`;
+      }
+      
+      const items = obj.map((item, index) => {
+        const itemStr = this.formatJsonWithComments(item, indent + '  ', '');
+        // Add comment for each destination instance
+        const instanceComment = parentKey === 'destinationAdapterInstances' 
+          ? ` // Destination adapter instance ${index + 1}`
+          : '';
+        return `${indent}  ${itemStr}${instanceComment}`;
+      }).join(',\n');
+      
+      return `${sectionComment}[\n${items}\n${indent}]`;
+    } else if (obj !== null && typeof obj === 'object') {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return '{}';
+      
+      // Add section comment for sourceAdapterInstance
+      let sectionComment = '';
+      if (parentKey === '' && keys.includes('sourceAdapterInstance')) {
+        sectionComment = `${indent}// Source adapter instance configuration\n`;
+      }
+      
+      const items = keys.map((key, index) => {
+        const value = obj[key];
+        const comment = comments[key] || '';
+        const commentStr = comment ? ` // ${comment}` : '';
+        
+        // Add section comment before specific keys
+        let keyComment = '';
+        if (key === 'sourceAdapterInstance' && parentKey === '') {
+          keyComment = `${indent}  // Source adapter instance configuration\n`;
+        } else if (key === 'destinationAdapterInstances' && parentKey === '') {
+          keyComment = `${indent}  // Destination adapter instances array\n`;
+        }
+        
+        let valueStr: string;
+        if (value === null) {
+          valueStr = 'null';
+        } else if (typeof value === 'string') {
+          valueStr = JSON.stringify(value);
+        } else if (typeof value === 'number' || typeof value === 'boolean') {
+          valueStr = String(value);
+        } else {
+          valueStr = this.formatJsonWithComments(value, indent + '  ', key);
+        }
+        
+        return `${keyComment}${indent}  "${key}": ${valueStr}${commentStr}`;
+      }).join(',\n');
+      
+      return `${sectionComment}{\n${items}\n${indent}}`;
+    } else {
+      return JSON.stringify(obj);
+    }
+  }
+
   private openJsonViewDialog(config: any): void {
     try {
       // Build structured JSON with source and destination adapter instances
@@ -2065,7 +2166,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           : (config.destinationAdapterInstances || [])
       };
       
-      const jsonString = JSON.stringify(structuredConfig, null, 2);
+      // Format JSON with comments
+      const jsonString = this.formatJsonWithComments(structuredConfig);
       const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
         width: '800px',
         maxWidth: '90vw',
