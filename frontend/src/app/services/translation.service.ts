@@ -21,11 +21,11 @@ export class TranslationService {
   
   private translations: Translations = {
     'app.title': {
-      de: 'Integration Configuration',
-      en: 'Integration Configuration',
-      fr: 'Configuration d\'intégration',
-      es: 'Configuración de integración',
-      it: 'Configurazione integrazione'
+      de: 'System Interface Configuration',
+      en: 'System Interface Configuration',
+      fr: 'Configuration d\'interface système',
+      es: 'Configuración de interfaz del sistema',
+      it: 'Configurazione interfaccia sistema'
     },
     'source.csv': {
       de: 'Quelle - CSV-Daten',

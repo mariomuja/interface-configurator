@@ -4,7 +4,7 @@
 param(
     [string]$ResourceGroup = "",
     [string]$FunctionAppName = "",
-    [string]$VercelProject = "integration-configurator"
+    [string]$VercelProject = "interface-configurator"
 )
 
 Write-Host "=== Setting AZURE_FUNCTION_APP_URL in Vercel ===" -ForegroundColor Cyan

@@ -33,7 +33,7 @@ Siehe auch: [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
      --sdk-auth
    ```
 
-2. **GitHub Secrets setzen** (https://github.com/mariomuja/interface-configuration/settings/secrets/actions):
+2. **GitHub Secrets setzen** (https://github.com/mariomuja/interface-configurator/settings/secrets/actions):
    - `AZURE_CREDENTIALS`: JSON-Output aus Schritt 1
    - `AZURE_RESOURCE_GROUP`: `rg-interface-configuration`
    - `AZURE_FUNCTIONAPP_NAME`: `terraform output function_app_name`

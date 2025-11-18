@@ -6,7 +6,7 @@ Write-Host ""
 
 # Clean and rebuild
 Write-Host "1. Cleaning project..." -ForegroundColor Yellow
-Set-Location "C:\Users\mario\integration-configurator\azure-functions\main"
+Set-Location "C:\Users\mario\interface-configurator\azure-functions\main"
 dotnet clean | Out-Null
 
 Write-Host "2. Restoring packages..." -ForegroundColor Yellow

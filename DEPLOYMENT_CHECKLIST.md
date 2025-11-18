@@ -49,7 +49,7 @@ terraform apply
      --sdk-auth
    ```
 
-2. GitHub Secrets setzen: https://github.com/mariomuja/interface-configuration/settings/secrets/actions
+2. GitHub Secrets setzen: https://github.com/mariomuja/interface-configurator/settings/secrets/actions
    - [ ] `AZURE_CREDENTIALS` (JSON aus Schritt 1)
    - [ ] `AZURE_RESOURCE_GROUP` (`rg-interface-configuration`)
    - [ ] `AZURE_FUNCTIONAPP_NAME` (aus `terraform output function_app_name`)
@@ -64,7 +64,7 @@ terraform apply
 
 ### Option B: Manuell
 
-- [ ] Gehe zu: https://github.com/mariomuja/interface-configuration/actions
+- [ ] Gehe zu: https://github.com/mariomuja/interface-configurator/actions
 - [ ] Klicke auf "Deploy Azure Functions"
 - [ ] Klicke auf "Run workflow"
 
@@ -92,8 +92,8 @@ terraform apply
 
 ## Wichtige Links
 
-- GitHub Secrets: https://github.com/mariomuja/interface-configuration/settings/secrets/actions
-- GitHub Actions: https://github.com/mariomuja/interface-configuration/actions
+- GitHub Secrets: https://github.com/mariomuja/interface-configurator/settings/secrets/actions
+- GitHub Actions: https://github.com/mariomuja/interface-configurator/actions
 - Azure Portal: https://portal.azure.com
 
 ## Nächste Schritte

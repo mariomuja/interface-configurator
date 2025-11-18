@@ -55,9 +55,11 @@ import { switchMap } from 'rxjs/operators';
 })
 export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild('csvEditor', { static: false }) csvEditor?: any;
   
   csvData: CsvRecord[] = [];
   editableCsvText: string = '';
+  formattedCsvHtml: string = '';
   sqlData: SqlRecord[] = [];
   processLogs: ProcessLog[] = [];
   logDataSource = new MatTableDataSource<ProcessLog & { component?: string }>([]);
@@ -93,6 +95,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   sqlBatchSize: number = 1000;
   sourceCardExpanded: boolean = true;
   destinationCardExpanded: boolean = true;
+  private destinationCardExpandedStates: Map<string, boolean> = new Map();
   isRestartingSource: boolean = false;
   isRestartingDestination: boolean = false;
   sourceAdapterName: 'CSV' | 'SqlServer' = 'CSV';
@@ -151,6 +154,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.destinationFileMask = defaultConfig.destinationFileMask || '*.txt';
           this.sourceAdapterInstanceGuid = defaultConfig.sourceAdapterInstanceGuid || '';
           this.destinationAdapterInstanceGuid = defaultConfig.destinationAdapterInstanceGuid || '';
+          
+          // Load CsvData from configuration if available
+          if (defaultConfig.csvData) {
+            this.editableCsvText = defaultConfig.csvData;
+            this.formattedCsvHtml = this.formatCsvAsHtml();
+            // Update the contenteditable div with formatted HTML
+            setTimeout(() => {
+              if (this.csvEditor?.nativeElement) {
+                this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
+              }
+            }, 0);
+            this.onCsvTextChange(); // Parse CSV text into csvData array
+          }
+          
           // SQL Server properties
           this.sqlServerName = defaultConfig.sqlServerName || '';
           this.sqlDatabaseName = defaultConfig.sqlDatabaseName || '';
@@ -162,6 +179,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.sqlPollingInterval = defaultConfig.sqlPollingInterval ?? 60;
           this.sqlUseTransaction = defaultConfig.sqlUseTransaction ?? false;
           this.sqlBatchSize = defaultConfig.sqlBatchSize ?? 1000;
+          
+          // Ensure field separator is set to ║
+          if (defaultConfig.sourceFieldSeparator !== '║') {
+            this.updateFieldSeparator('║');
+          }
         } else if (!this.currentInterfaceName) {
           // Set default name if no configuration exists yet
           this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
@@ -281,30 +303,168 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isLoading = true;
     this.transportService.getSampleCsvData().subscribe({
       next: (data) => {
+        // Use data if available, otherwise generate sample data locally
+        if (!data || data.length === 0) {
+          data = this.generateSampleCsvData();
+        }
+        
         this.csvData = data;
-        this.editableCsvText = this.formatCsvAsText();
+        const csvText = this.formatCsvAsText();
+        this.editableCsvText = csvText;
+        this.formattedCsvHtml = this.formatCsvAsHtml();
+        
+        // Update the contenteditable div with formatted HTML
+        setTimeout(() => {
+          if (this.csvEditor?.nativeElement) {
+            this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
+          }
+        }, 0);
+        
         // Extract columns dynamically from CSV data
         if (data && data.length > 0) {
           this.csvDisplayedColumns = this.extractColumns(data);
         }
+        
+        // Set CsvData property on adapter if interface is configured
+        if (this.currentInterfaceName && csvText && csvText !== this.translationService.translate('no.data.csv')) {
+          this.updateCsvDataProperty(csvText);
+        }
+        
+        // Ensure field separator is set to ║
+        if (this.sourceFieldSeparator !== '║') {
+          this.updateFieldSeparator('║');
+        }
+        
         this.isLoading = false;
       },
       error: (error) => {
         console.error('Error loading CSV data:', error);
-        console.error('Full error object:', JSON.stringify(error, null, 2));
+        // Generate sample data locally as fallback
+        const fallbackData = this.generateSampleCsvData();
+        this.csvData = fallbackData;
+        const csvText = this.formatCsvAsText();
+        this.editableCsvText = csvText;
+        this.formattedCsvHtml = this.formatCsvAsHtml();
         
-        // Extract detailed error message with all available information
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der CSV-Daten');
+        // Update the contenteditable div with formatted HTML
+        setTimeout(() => {
+          if (this.csvEditor?.nativeElement) {
+            this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
+          }
+        }, 0);
         
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 15000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        // Extract columns dynamically from CSV data
+        if (fallbackData && fallbackData.length > 0) {
+          this.csvDisplayedColumns = this.extractColumns(fallbackData);
+        }
+        
         this.isLoading = false;
       }
     });
+  }
+
+  generateSampleCsvData(): CsvRecord[] {
+    const data: CsvRecord[] = [];
+    const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer'];
+    const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt'];
+    
+    for (let i = 1; i <= 50; i++) {
+      const name = names[Math.floor(Math.random() * names.length)];
+      const city = cities[Math.floor(Math.random() * cities.length)];
+      data.push({
+        id: i,
+        name: `${name} ${i}`,
+        email: `user${i}@example.com`,
+        age: Math.floor(Math.random() * 40) + 20,
+        city: city,
+        salary: Math.floor(Math.random() * 50000) + 30000
+      } as CsvRecord);
+    }
+    
+    return data;
+  }
+  
+  /**
+   * Update CsvData property on the adapter
+   */
+  updateCsvDataProperty(csvText: string): void {
+    if (!this.currentInterfaceName) {
+      return;
+    }
+    
+    this.transportService.updateCsvData(this.currentInterfaceName, csvText).subscribe({
+      next: () => {
+        // Successfully updated CsvData property
+        console.log('CsvData property updated successfully');
+      },
+      error: (error) => {
+        console.error('Error updating CsvData property:', error);
+        // Don't show error to user - this is a background operation
+      }
+    });
+  }
+
+  /**
+   * Handle file selection for CSV data
+   */
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    
+    if (!file) {
+      return;
+    }
+
+    // Check file extension
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      this.snackBar.open('Bitte wählen Sie eine .txt Datei aus.', 'OK', {
+        duration: 3000,
+        panelClass: ['error-snackbar']
+      });
+      // Reset file input
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        if (content) {
+          this.editableCsvText = content;
+          this.formattedCsvHtml = this.formatCsvAsHtml();
+          // Update the contenteditable div with formatted HTML
+          setTimeout(() => {
+            if (this.csvEditor?.nativeElement) {
+              this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
+            }
+          }, 0);
+          // Trigger CSV text change handler to parse and update CsvData property
+          this.onCsvTextChange();
+          this.snackBar.open(`Datei "${file.name}" erfolgreich geladen.`, 'OK', {
+            duration: 2000
+          });
+        }
+      } catch (error) {
+        console.error('Error reading file:', error);
+        this.snackBar.open('Fehler beim Lesen der Datei.', 'OK', {
+          duration: 3000,
+          panelClass: ['error-snackbar']
+        });
+      }
+      // Reset file input to allow selecting the same file again
+      input.value = '';
+    };
+
+    reader.onerror = () => {
+      this.snackBar.open('Fehler beim Lesen der Datei.', 'OK', {
+        duration: 3000,
+        panelClass: ['error-snackbar']
+      });
+      input.value = '';
+    };
+
+    reader.readAsText(file, 'UTF-8');
   }
 
   loadSqlData(): void {
@@ -699,12 +859,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   clearLogs(): void {
-    const confirmMessage = this.translationService.translate('log.clear.confirm');
+    const confirmMessage = this.translationService.translate('log.clear.confirm') || 'Are you sure you want to clear all logs?';
     if (confirm(confirmMessage)) {
+      this.isLoading = true;
       this.transportService.clearLogs().subscribe({
         next: (response) => {
-          this.snackBar.open(response.message, 'Schließen', { duration: 3000 });
+          this.snackBar.open(response?.message || 'Logs cleared successfully', 'Schließen', { duration: 3000 });
           this.loadProcessLogs();
+          this.isLoading = false;
         },
         error: (error) => {
           console.error('Error clearing logs:', error);
@@ -719,6 +881,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             verticalPosition: 'top',
             horizontalPosition: 'center'
           });
+          this.isLoading = false;
         }
       });
     }
@@ -1462,22 +1625,78 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  getDestinationCardExpanded(instanceGuid: string): boolean {
+    if (!this.destinationCardExpandedStates.has(instanceGuid)) {
+      // Default to expanded state
+      this.destinationCardExpandedStates.set(instanceGuid, true);
+    }
+    return this.destinationCardExpandedStates.get(instanceGuid) ?? true;
+  }
+
+  setDestinationCardExpanded(instanceGuid: string, expanded: boolean): void {
+    this.destinationCardExpandedStates.set(instanceGuid, expanded);
+  }
+
   loadDestinationAdapterInstances(): void {
     this.transportService.getDestinationAdapterInstances(this.DEFAULT_INTERFACE_NAME).subscribe({
       next: (instances) => {
         this.destinationAdapterInstances = instances || [];
-        // If no instances exist, create a default one from legacy properties for backward compatibility
+        // Initialize expansion states for new instances
+        this.destinationAdapterInstances.forEach(instance => {
+          if (!this.destinationCardExpandedStates.has(instance.adapterInstanceGuid)) {
+            this.destinationCardExpandedStates.set(instance.adapterInstanceGuid, true);
+          }
+        });
+        // If no instances exist, create a default SqlServerAdapter instance pointing to TransferData table
         if (this.destinationAdapterInstances.length === 0) {
           const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
-          if (defaultConfig && defaultConfig.destinationAdapterName) {
-            this.destinationAdapterInstances = [{
-              adapterInstanceGuid: defaultConfig.destinationAdapterInstanceGuid || this.generateGuid(),
-              instanceName: defaultConfig.destinationInstanceName || 'Destination',
-              adapterName: defaultConfig.destinationAdapterName,
-              isEnabled: defaultConfig.destinationIsEnabled ?? true,
-              configuration: defaultConfig.destinationConfiguration || '{}'
-            }];
-          }
+          
+          // Create default SqlServerAdapter destination instance pointing to TransportData table in app database
+          const defaultSqlServerInstance = {
+            adapterInstanceGuid: this.generateGuid(),
+            instanceName: 'SQL Server Destination',
+            adapterName: 'SqlServer',
+            isEnabled: true,
+            configuration: JSON.stringify({
+              destination: 'TransportData',
+              tableName: 'TransportData'
+            })
+          };
+          
+          // Add the default instance via API
+          this.transportService.addDestinationAdapterInstance(
+            this.DEFAULT_INTERFACE_NAME,
+            defaultSqlServerInstance.adapterName,
+            defaultSqlServerInstance.instanceName,
+            defaultSqlServerInstance.configuration
+          ).subscribe({
+            next: (createdInstance) => {
+              this.destinationAdapterInstances = [createdInstance];
+              // Update interface configuration with SQL Server connection properties if available
+              if (defaultConfig) {
+                if (defaultConfig.sqlServerName && defaultConfig.sqlDatabaseName) {
+                  // SQL connection properties are already set in the interface configuration
+                  // The SqlServerAdapter will use these from the interface configuration
+                }
+              }
+            },
+            error: (error) => {
+              console.error('Error creating default SqlServerAdapter instance:', error);
+              // Fallback: use legacy properties if API call fails
+              if (defaultConfig && defaultConfig.destinationAdapterName) {
+                this.destinationAdapterInstances = [{
+                  adapterInstanceGuid: defaultConfig.destinationAdapterInstanceGuid || this.generateGuid(),
+                  instanceName: defaultConfig.destinationInstanceName || 'Destination',
+                  adapterName: defaultConfig.destinationAdapterName,
+                  isEnabled: defaultConfig.destinationIsEnabled ?? true,
+                  configuration: defaultConfig.destinationConfiguration || '{}'
+                }];
+              } else {
+                // Use the default SqlServerAdapter instance locally even if API call fails
+                this.destinationAdapterInstances = [defaultSqlServerInstance];
+              }
+            }
+          });
         }
       },
       error: (error) => {
@@ -1616,7 +1835,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       adapterType: 'Destination',
       adapterName: instance.adapterName,
       instanceName: instance.instanceName,
-      isEnabled: instance.isEnabled,
+      isEnabled: instance.isEnabled ?? true,
       adapterInstanceGuid: instance.adapterInstanceGuid,
       receiveFolder: instance.adapterName === 'CSV' ? (defaultConfig?.destinationReceiveFolder || '') : undefined,
       fileMask: instance.adapterName === 'CSV' ? (defaultConfig?.destinationFileMask || '*.txt') : undefined,
@@ -1657,7 +1876,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       configuration = { ...configuration, destination: properties.destinationReceiveFolder };
     }
     
-    // Update instance properties
+    // Update enabled property immediately in local array for UI responsiveness
+    if (properties.isEnabled !== undefined) {
+      instance.isEnabled = properties.isEnabled;
+    }
+    
+    // Update instance name immediately in local array for UI responsiveness
+    if (properties.instanceName !== undefined) {
+      instance.instanceName = properties.instanceName;
+    }
+    
+    // Update instance properties via API
     this.transportService.updateDestinationAdapterInstance(
       this.DEFAULT_INTERFACE_NAME,
       instanceGuid,
@@ -1666,11 +1895,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       JSON.stringify(configuration)
     ).subscribe({
       next: () => {
+        // Reload from API to ensure consistency
         this.loadDestinationAdapterInstances();
         this.snackBar.open('Destination adapter instance updated', 'OK', { duration: 3000 });
       },
       error: (error) => {
         console.error('Error updating destination adapter instance:', error);
+        // Revert local changes on error
+        this.loadDestinationAdapterInstances();
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der Destination Adapter Instance');
         this.snackBar.open(detailedMessage, 'Schließen', {
           duration: 10000,
@@ -1678,7 +1910,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           verticalPosition: 'top',
           horizontalPosition: 'center'
         });
-        this.loadDestinationAdapterInstances(); // Reload to restore previous state
       }
     });
   }
@@ -1737,13 +1968,108 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     return [headerRow, ...dataRows].join('\n');
   }
 
+  // Color palette for CSV columns - dark, readable colors
+  private readonly COLUMN_COLORS = [
+    '#1a237e', // Dark blue
+    '#b71c1c', // Dark red
+    '#004d40', // Dark teal
+    '#e65100', // Dark orange
+    '#4a148c', // Dark purple
+    '#006064', // Dark cyan
+    '#3e2723', // Dark brown
+    '#1b5e20', // Dark green
+    '#880e4f', // Dark pink
+    '#212121', // Dark gray
+    '#0d47a1', // Blue
+    '#c62828', // Red
+    '#00695c', // Teal
+    '#e64a19', // Orange
+    '#6a1b9a', // Purple
+  ];
+
   /**
-   * Handle CSV text changes from editable textarea
+   * Format CSV data as HTML with colored columns
+   */
+  formatCsvAsHtml(): string {
+    if (!this.editableCsvText || this.editableCsvText.trim() === '') {
+      return '';
+    }
+
+    try {
+      const lines = this.editableCsvText.split('\n').filter(line => line.trim() !== '');
+      if (lines.length === 0) {
+        return '';
+      }
+
+      // Build HTML with colored columns
+      const htmlLines = lines.map((line) => {
+        const values = this.parseCsvLine(line);
+        const cells = values.map((value, colIndex) => {
+          const color = this.COLUMN_COLORS[colIndex % this.COLUMN_COLORS.length];
+          const escapedValue = this.escapeHtml(value.trim().replace(/^"|"$/g, ''));
+          return `<span style="color: ${color};">${escapedValue}</span>`;
+        });
+        
+        // Add separator between cells
+        const separator = `<span style="color: #999;">${this.FIELD_SEPARATOR}</span>`;
+        return cells.join(separator);
+      });
+
+      return htmlLines.join('<br>');
+    } catch (error) {
+      console.error('Error formatting CSV as HTML:', error);
+      return this.escapeHtml(this.editableCsvText);
+    }
+  }
+
+  /**
+   * Escape HTML special characters
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Handle blur event on contenteditable div
+   */
+  onCsvTextBlur(): void {
+    // Extract plain text from HTML content
+    if (this.csvEditor?.nativeElement) {
+      const plainText = this.csvEditor.nativeElement.textContent || this.csvEditor.nativeElement.innerText || '';
+      if (plainText !== this.editableCsvText) {
+        this.editableCsvText = plainText;
+      }
+      // Reformat with colors after editing
+      this.formattedCsvHtml = this.formatCsvAsHtml();
+      if (this.csvEditor?.nativeElement) {
+        this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
+      }
+      this.onCsvTextChange();
+    }
+  }
+
+  /**
+   * Handle CSV text changes from editable contenteditable div
    */
   onCsvTextChange(): void {
+    // Extract plain text from contenteditable div
+    if (this.csvEditor?.nativeElement) {
+      const plainText = this.csvEditor.nativeElement.textContent || this.csvEditor.nativeElement.innerText || '';
+      if (plainText !== this.editableCsvText) {
+        this.editableCsvText = plainText;
+      }
+    }
+
     // Parse the edited CSV text back into csvData
     if (!this.editableCsvText || this.editableCsvText.trim() === '') {
       this.csvData = [];
+      this.formattedCsvHtml = '';
+      // Update CsvData property when cleared
+      if (this.currentInterfaceName) {
+        this.updateCsvDataProperty('');
+      }
       return;
     }
 
@@ -1751,6 +2077,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       const lines = this.editableCsvText.split('\n').filter(line => line.trim() !== '');
       if (lines.length === 0) {
         this.csvData = [];
+        this.formattedCsvHtml = '';
+        // Update CsvData property when cleared
+        if (this.currentInterfaceName) {
+          this.updateCsvDataProperty('');
+        }
         return;
       }
 
@@ -1769,6 +2100,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       
       this.csvData = records;
+      
+      // Update formatted HTML with colored columns
+      this.formattedCsvHtml = this.formatCsvAsHtml();
+      
+      // Update CsvData property when CSV text changes
+      if (this.currentInterfaceName && this.editableCsvText) {
+        this.updateCsvDataProperty(this.editableCsvText);
+      }
     } catch (error) {
       console.error('Error parsing CSV text:', error);
       // Keep the text but show a warning

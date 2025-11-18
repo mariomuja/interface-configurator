@@ -18,7 +18,7 @@ Write-Host "[2/5] Pruefe GitHub CLI..." -ForegroundColor Yellow
 $ghCheck = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $ghCheck) {
     Write-Host "✗ GitHub CLI nicht gefunden. Bitte installieren: https://cli.github.com/" -ForegroundColor Red
-    Write-Host "  Oder setze die Secrets manuell ueber: https://github.com/mariomuja/interface-configuration/settings/secrets/actions" -ForegroundColor Yellow
+    Write-Host "  Oder setze die Secrets manuell ueber: https://github.com/mariomuja/interface-configurator/settings/secrets/actions" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "✓ GitHub CLI gefunden" -ForegroundColor Green
@@ -121,6 +121,6 @@ Write-Host "  • AZURE_RESOURCE_GROUP = $resourceGroup" -ForegroundColor White
 Write-Host "  • AZURE_FUNCTIONAPP_NAME = $functionAppName" -ForegroundColor White
 Write-Host ""
 Write-Host "Naechste Schritte:" -ForegroundColor Cyan
-Write-Host "  1. Teste den Workflow: https://github.com/mariomuja/interface-configuration/actions" -ForegroundColor White
+Write-Host "  1. Teste den Workflow: https://github.com/mariomuja/interface-configurator/actions" -ForegroundColor White
 Write-Host "  2. Oder pushe eine Aenderung zu azure-functions/**" -ForegroundColor White
 Write-Host ""

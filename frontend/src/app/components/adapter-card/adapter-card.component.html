@@ -1,19 +1,25 @@
 <mat-expansion-panel [(expanded)]="expanded" (opened)="onExpandedChange(true)" (closed)="onExpandedChange(false)" 
-                     [class]="'data-card ' + (adapterName === 'CSV' ? 'csv-card' : 'sql-card')">
+                     [class]="'data-card ' + (adapterName === 'CSV' ? 'csv-card' : 'sql-card')"
+                     [class.disabled-card]="isDisabled"
+                     [disabled]="isDisabled">
   <mat-expansion-panel-header>
     <mat-panel-title>
       <div class="card-header-left">
-        <mat-icon class="adapter-type-icon" [class.csv-icon]="adapterName === 'CSV'" [class.sql-icon]="adapterName === 'SqlServer'">
-          {{ adapterName === 'CSV' ? 'description' : 'storage' }}
+        <mat-icon class="expand-icon">
+          {{ expanded ? 'expand_less' : 'expand_more' }}
         </mat-icon>
         
         <button mat-icon-button (click)="onSettings(); $event.stopPropagation()" 
-                class="settings-button" matTooltip="Adapter-Eigenschaften öffnen">
+                class="settings-button" 
+                [disabled]="isDisabled"
+                matTooltip="Adapter-Eigenschaften öffnen">
           <mat-icon>settings</mat-icon>
         </button>
         
-        <button mat-icon-button (click)="onRestart(); $event.stopPropagation()" [disabled]="isRestarting" 
-                class="restart-button" matTooltip="Adapter-Prozess neu starten">
+        <button mat-icon-button (click)="onRestart(); $event.stopPropagation()" 
+                [disabled]="isRestarting || isDisabled" 
+                class="restart-button" 
+                matTooltip="Adapter-Prozess neu starten">
           <mat-icon>{{ isRestarting ? 'hourglass_empty' : 'refresh' }}</mat-icon>
         </button>
         
@@ -22,6 +28,10 @@
           <mat-icon class="status-icon" [class.enabled]="isEnabled" [class.disabled]="!isEnabled" 
                     [matTooltip]="isEnabled ? 'Adapter ist aktiviert' : 'Adapter ist deaktiviert'">
             {{ isEnabled ? 'check_circle' : 'cancel' }}
+          </mat-icon>
+          <mat-icon *ngIf="isDisabled" class="warning-icon" 
+                    matTooltip="Multiple destinations are not yet supported. Only the first destination will be active.">
+            info
           </mat-icon>
         </div>
         
@@ -32,7 +42,9 @@
       </div>
     </mat-panel-title>
     <mat-panel-description>
-      <button mat-raised-button [color]="getPrimaryActionColor()" (click)="onPrimaryAction(); $event.stopPropagation()" 
+      <button mat-raised-button [color]="getPrimaryActionColor()" 
+              (click)="onPrimaryAction(); $event.stopPropagation()" 
+              [disabled]="isDisabled"
               class="action-button">
         <mat-icon>{{ getPrimaryActionIcon() }}</mat-icon>
         {{ getPrimaryActionLabel() }}

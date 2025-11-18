@@ -105,16 +105,18 @@ export class DestinationInstancesDialogComponent implements OnInit {
   }
 
   private getDefaultInstanceName(adapterName: 'CSV' | 'SqlServer'): string {
-    const existingNames = this.instances
-      .filter(i => i.adapterName === adapterName)
-      .map(i => i.instanceName);
+    // Count all existing instances to determine the next number
+    const totalCount = this.instances.length;
+    let counter = totalCount + 1;
+    let name = `Destination ${counter}`;
     
-    let counter = 1;
-    let name = `${adapterName} Destination`;
+    // Ensure uniqueness by checking if name already exists
+    const existingNames = this.instances.map(i => i.instanceName);
     while (existingNames.includes(name)) {
-      name = `${adapterName} Destination ${counter}`;
       counter++;
+      name = `Destination ${counter}`;
     }
+    
     return name;
   }
 }

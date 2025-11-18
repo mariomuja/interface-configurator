@@ -65,7 +65,7 @@ cd ..
 
 After setting the variable and redeploying:
 
-1. Open your app: https://integration-configurator.vercel.app
+1. Open your app: https://interface-configurator.vercel.app
 2. Click the **"Diagnose"** button
 3. Check that "Function App URL" shows **OK**
 4. Check that "Function App Connectivity" shows **OK**
@@ -93,7 +93,7 @@ If the Function App URL is set but connectivity check fails:
 
 4. **Check CORS settings** (if needed):
    - Azure Portal → Function App → CORS
-   - Add `https://integration-configurator.vercel.app` if needed
+   - Add `https://interface-configurator.vercel.app` if needed
 
 ### Get Function App URL from Azure
 

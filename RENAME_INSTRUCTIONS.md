@@ -38,9 +38,9 @@ Or manually:
 
 ### 2. Rename GitHub Repository
 
-1. Go to: https://github.com/mariomuja/infrastructure-as-code/settings
+1. Go to: https://github.com/mariomuja/interface-configurator/settings
 2. Scroll down to the "Repository name" section
-3. Change the name from `infrastructure-as-code` to `interface-configurator`
+3. The repository name should be `interface-configurator`
 4. Click "Rename"
 
 **Note**: GitHub will automatically redirect the old URL to the new one, but it's best to update all references.

@@ -25,7 +25,7 @@
 ### Step 1: Access Vercel Dashboard
 1. Go to [https://vercel.com/dashboard](https://vercel.com/dashboard)
 2. Sign in with your account
-3. Select your project (likely named `integration-configurator` or similar)
+3. Select your project (likely named `interface-configurator` or similar)
 
 ### Step 2: Check Deployment Status
 1. Look for the latest deployment in the deployments list

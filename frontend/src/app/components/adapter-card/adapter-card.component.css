@@ -21,20 +21,20 @@
   flex: 1;
 }
 
-.adapter-type-icon {
+.expand-icon {
   font-size: 24px;
   width: 24px;
   height: 24px;
   line-height: 24px;
   color: rgba(0, 0, 0, 0.54);
+  flex: 0 0 auto;
+  transition: transform 0.2s ease;
 }
 
-.adapter-type-icon.csv-icon {
-  color: #2196f3;
-}
-
-.adapter-type-icon.sql-icon {
-  color: #4caf50;
+/* Hide the default Material expansion panel indicator on the right */
+.data-card ::ng-deep .mat-expansion-panel-header .mat-expansion-indicator,
+.data-card ::ng-deep .mat-expansion-panel-header .mat-expansion-panel-header-indicator {
+  display: none !important;
 }
 
 .settings-button {
@@ -42,12 +42,12 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.6); /* Dark grey instead of white */
   transition: color 0.2s ease;
 }
 
 .settings-button:hover {
-  color: rgba(255, 255, 255, 1);
+  color: rgba(0, 0, 0, 0.87); /* Darker grey on hover */
 }
 
 .settings-button mat-icon {
@@ -165,5 +165,35 @@
 .data-card ::ng-deep .mat-expansion-panel-header-description {
   flex: 0 0 auto;
   justify-content: flex-end;
+}
+
+/* Disabled card styling for unsupported multiple destinations */
+.data-card.disabled-card {
+  opacity: 0.6;
+}
+
+.data-card.disabled-card ::ng-deep .mat-expansion-panel-header {
+  cursor: not-allowed;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.data-card.disabled-card ::ng-deep .mat-expansion-panel-body {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+/* Tooltips and info icons should still work on disabled cards */
+.data-card.disabled-card .warning-icon {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.warning-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  flex: 0 0 auto;
+  color: #ff9800;
+  margin-left: 4px;
 }
 

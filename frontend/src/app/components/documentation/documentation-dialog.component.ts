@@ -70,11 +70,17 @@ import { DOCUMENTATION_CHAPTERS, DocumentationChapter } from '../../models/docum
       color: #1976d2;
       border-bottom: 2px solid #1976d2;
       padding-bottom: 8px;
+      font-weight: 500; /* Reduced from default bold (700) */
     }
     
     .documentation-content h3 {
       color: #424242;
       margin-top: 24px;
+      font-weight: 500; /* Reduced from default bold (700) */
+    }
+    
+    .documentation-content h4 {
+      font-weight: 500; /* Reduced from default bold (700) */
     }
     
     .documentation-content ul, .documentation-content ol {
@@ -96,6 +102,11 @@ import { DOCUMENTATION_CHAPTERS, DocumentationChapter } from '../../models/docum
     
     .documentation-content strong {
       color: #1976d2;
+      font-weight: 500; /* Reduced from default bold (700) for better readability */
+    }
+    
+    .documentation-content b {
+      font-weight: 500; /* Reduced from default bold (700) for better readability */
     }
   `]
 })

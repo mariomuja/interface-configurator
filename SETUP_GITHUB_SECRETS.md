@@ -58,7 +58,7 @@ Kopiere den JSON-Output.
 
 ### 2. GitHub Secrets setzen
 
-Gehe zu: https://github.com/mariomuja/interface-configuration/settings/secrets/actions
+Gehe zu: https://github.com/mariomuja/interface-configurator/settings/secrets/actions
 
 Setze folgende Secrets:
 
@@ -70,7 +70,7 @@ Setze folgende Secrets:
 
 Der GitHub Actions Workflow wird automatisch ausgelöst wenn:
 - Code in `azure-functions/**` geändert wird
-- Du manuell den Workflow startest: https://github.com/mariomuja/interface-configuration/actions
+- Du manuell den Workflow startest: https://github.com/mariomuja/interface-configurator/actions
 
 ## Troubleshooting
 

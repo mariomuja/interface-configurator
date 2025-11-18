@@ -1,7 +1,7 @@
 {
   "name": "interface-configurator-api",
   "version": "1.0.0",
-  "description": "API for Integration Configuration API",
+  "description": "API for System Interface Configuration API",
   "dependencies": {
     "@azure/storage-blob": "^12.22.0",
     "@vercel/node": "^3.2.29",

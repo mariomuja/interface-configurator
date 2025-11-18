@@ -105,6 +105,11 @@ public interface IInterfaceConfigurationService
     Task UpdateFieldSeparatorAsync(string interfaceName, string fieldSeparator, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update the CSV data property for the CSV adapter. When set, the adapter will debatch and send this data to the MessageBox.
+    /// </summary>
+    Task UpdateCsvDataAsync(string interfaceName, string? csvData, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Update the destination receive folder for the CSV adapter when used as destination.
     /// </summary>
     Task UpdateDestinationReceiveFolderAsync(string interfaceName, string destinationReceiveFolder, CancellationToken cancellationToken = default);

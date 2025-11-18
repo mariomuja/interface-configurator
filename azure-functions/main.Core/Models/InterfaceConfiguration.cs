@@ -103,6 +103,14 @@ public class InterfaceConfiguration
     public string SourceFieldSeparator { get; set; } = "║";
 
     /// <summary>
+    /// CSV data that can be directly assigned to the adapter instance
+    /// When set, the adapter will debatch this data and send it to the MessageBox
+    /// This allows CSV data to be provided directly without needing a file
+    /// </summary>
+    [MaxLength(10000000)] // 10MB max
+    public string? CsvData { get; set; }
+
+    /// <summary>
     /// Destination folder/path for CSV adapter when used as destination
     /// Files will be written to this location with filenames constructed from FileMask pattern
     /// </summary>

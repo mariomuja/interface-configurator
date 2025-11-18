@@ -488,6 +488,32 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
            await SaveConfigurationsAsync(cancellationToken);
        }
 
+       public async Task UpdateCsvDataAsync(string interfaceName, string? csvData, CancellationToken cancellationToken = default)
+       {
+           await EnsureInitializedAsync(cancellationToken);
+           await _lock.WaitAsync(cancellationToken);
+           try
+           {
+               if (_configurations.TryGetValue(interfaceName, out var config))
+               {
+                   config.CsvData = csvData;
+                   config.UpdatedAt = DateTime.UtcNow;
+                   _logger?.LogInformation("CsvData for interface '{InterfaceName}' updated. DataLength={DataLength}", 
+                       interfaceName, csvData?.Length ?? 0);
+               }
+               else
+               {
+                   _logger?.LogWarning("Interface configuration '{InterfaceName}' not found for updating CsvData", interfaceName);
+                   throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+               }
+           }
+           finally
+           {
+               _lock.Release();
+           }
+           await SaveConfigurationsAsync(cancellationToken);
+       }
+
        public async Task UpdateDestinationReceiveFolderAsync(string interfaceName, string destinationReceiveFolder, CancellationToken cancellationToken = default)
        {
            await EnsureInitializedAsync(cancellationToken);

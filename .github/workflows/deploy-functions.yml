@@ -31,16 +31,11 @@ jobs:
           dotnet restore
         continue-on-error: false
 
-      - name: Build
+      - name: Build and Publish
         run: |
           cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          dotnet build --configuration Release --no-restore
-        continue-on-error: false
-
-      - name: Publish
-        run: |
-          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          dotnet publish --no-self-contained --configuration Release --output ./publish --no-build
+          # Build and publish in one step with --no-self-contained to ensure smaller package size
+          dotnet publish --no-self-contained --configuration Release --output ./publish
         continue-on-error: false
 
       - name: Install Azure Functions Core Tools
@@ -273,8 +268,20 @@ jobs:
           echo "Deploying using func azure functionapp publish --dotnet-isolated..."
           cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           
-          # Use func publish command (this was the only way that worked)
-          # func publish will use the published output from ./publish directory
+          # Check publish folder size before deployment
+          echo "Checking publish folder size..."
+          du -sh ./publish || echo "Could not check size"
+          echo ""
+          echo "Publish folder contents (first 10 items):"
+          ls -lh ./publish | head -10 || echo "Could not list contents"
+          echo ""
+          
+          # Use func publish command with explicit path to pre-built publish folder
+          # The --dotnet-isolated flag ensures it uses the correct runtime
+          # IMPORTANT: func publish will use the existing ./publish folder if it exists,
+          # but we need to ensure it doesn't rebuild. The --dotnet-isolated flag should
+          # use the pre-built folder, but if it rebuilds, it might not use --no-self-contained.
+          # By pre-building with --no-self-contained above, we ensure the package is small.
           func azure functionapp publish ${{ secrets.AZURE_FUNCTIONAPP_NAME }} --dotnet-isolated --force
           
           echo ""
@@ -504,6 +511,15 @@ jobs:
       #
       # This workflow uses func azure functionapp publish --dotnet-isolated to deploy,
       # which handles the deployment process automatically including setting WEBSITE_RUN_FROM_PACKAGE.
-      # The dotnet publish command uses --no-self-contained to create a framework-dependent deployment.
+      #
+      # IMPORTANT: The dotnet publish command MUST use --no-self-contained to create a framework-dependent deployment.
+      # This ensures smaller package sizes (typically < 50MB vs > 200MB for self-contained) and faster deployments.
+      # 
       # MEMORY: ALWAYS build with --no-self-contained flag for Azure Functions to ensure smaller packages and faster deployments.
+      #
+      # Key difference from local deployment:
+      # - Local: `func azure functionapp publish` automatically builds with --no-self-contained
+      # - GitHub Actions: We pre-build with --no-self-contained (line 38) to ensure the package is small,
+      #   then func publish uses the pre-built ./publish folder. If func publish rebuilds, it might not
+      #   use --no-self-contained, causing large packages and deployment failures.
 

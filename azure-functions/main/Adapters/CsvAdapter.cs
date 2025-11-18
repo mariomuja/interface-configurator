@@ -36,6 +36,9 @@ public class CsvAdapter : IAdapter
     private readonly string _destinationFileMask;
     private readonly ILogger<CsvAdapter>? _logger;
     
+    // CSV Data property - can be set directly to trigger debatching
+    private string? _csvData;
+    
     // SFTP properties
     private readonly string _adapterType;
     private readonly string? _sftpHost;
@@ -108,6 +111,99 @@ public class CsvAdapter : IAdapter
         {
             _sftpConnectionSemaphore = new SemaphoreSlim(_sftpMaxConnectionPoolSize, _sftpMaxConnectionPoolSize);
             _sftpConnectionPool = new Queue<SftpClient>();
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the CSV data directly. When set, processes and debatches the data to MessageBox.
+    /// </summary>
+    public string? CsvData
+    {
+        get => _csvData;
+        set
+        {
+            _csvData = value;
+            if (!string.IsNullOrWhiteSpace(_csvData))
+            {
+                // Process CSV data asynchronously when set
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ProcessCsvDataAsync(CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error processing CsvData property");
+                    }
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Processes the CsvData property by parsing it and debatching to MessageBox
+    /// </summary>
+    public async Task ProcessCsvDataAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_csvData))
+        {
+            _logger?.LogWarning("CsvData is empty, nothing to process");
+            return;
+        }
+
+        if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            _logger?.LogWarning("Cannot process CsvData: MessageBoxService, InterfaceName, or AdapterInstanceGuid is missing");
+            return;
+        }
+
+        try
+        {
+            _logger?.LogInformation("Processing CsvData property: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, DataLength={DataLength}",
+                _interfaceName, _adapterInstanceGuid.Value, _csvData.Length);
+
+            // Parse CSV using CsvProcessingService with configured field separator
+            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(_csvData, _fieldSeparator, cancellationToken);
+
+            _logger?.LogInformation("Successfully parsed CsvData: {HeaderCount} headers, {RecordCount} records",
+                headers.Count, records.Count);
+
+            // Process records in batches of _batchSize, then debatch each batch into single rows
+            _logger?.LogInformation("Processing CsvData in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
+                _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
+
+            // Process records in batches
+            for (int i = 0; i < records.Count; i += _batchSize)
+            {
+                var batch = records.Skip(i).Take(_batchSize).ToList();
+                var batchNumber = (i / _batchSize) + 1;
+                var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+
+                _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
+                    batchNumber, totalBatches, batch.Count);
+
+                // Debatch batch into single rows and write to MessageBox
+                var messageIds = await _messageBoxService.WriteMessagesAsync(
+                    _interfaceName,
+                    AdapterName,
+                    "Source",
+                    _adapterInstanceGuid.Value,
+                    headers,
+                    batch,
+                    cancellationToken);
+
+                _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
+                    messageIds.Count, batchNumber, totalBatches);
+            }
+
+            _logger?.LogInformation("Completed processing CsvData: {TotalRecords} records debatched into {TotalMessages} messages",
+                records.Count, records.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error processing CsvData property");
+            throw;
         }
     }
 

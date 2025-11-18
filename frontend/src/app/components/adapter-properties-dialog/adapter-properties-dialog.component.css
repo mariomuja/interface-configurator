@@ -23,7 +23,7 @@ mat-dialog-content {
 .dialog-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
   padding: 10px 0;
 }
 
@@ -34,7 +34,8 @@ mat-dialog-content {
 .full-width mat-label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .full-width mat-label span {
@@ -44,6 +45,8 @@ mat-dialog-content {
 .full-width mat-label .help-icon {
   flex: 0 0 auto;
   margin-left: 4px;
+  position: relative;
+  z-index: 1;
 }
 
 .help-icon {
@@ -169,5 +172,18 @@ mat-dialog-actions button mat-icon {
 
 ::ng-deep .mat-mdc-form-field-hint-wrapper {
   padding-top: 4px;
+}
+
+/* Fix for Receive Folder label - ensure help icon doesn't overlap input */
+.full-width ::ng-deep .mat-mdc-form-field-label-wrapper {
+  overflow: visible;
+}
+
+.full-width ::ng-deep .mat-mdc-text-field-wrapper {
+  padding-top: 0;
+}
+
+.full-width ::ng-deep .mat-mdc-form-field-label {
+  white-space: nowrap;
 }
 

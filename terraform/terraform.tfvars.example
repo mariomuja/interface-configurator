@@ -43,7 +43,7 @@ functions_sku_name      = "Y1"  # Consumption plan (will be migrated to EP1 Flex
 # GitHub Source Control (optional - enables continuous deployment from GitHub)
 # If provided, Function App will automatically deploy from GitHub repository
 # Leave empty to use GitHub Actions deployment instead
-github_repo_url  = ""  # e.g., "https://github.com/mariomuja/interface-configuration"
+github_repo_url  = ""  # e.g., "https://github.com/mariomuja/interface-configurator"
 github_branch    = "main"
 github_repo_path = "azure-functions/main"  # Path to Function App code in repo
 

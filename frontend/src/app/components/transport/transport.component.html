@@ -1,7 +1,25 @@
 <div class="transport-container">
+  <!-- Interface Name Editor - Moved before source card, wider -->
+  <div class="interface-name-container-top">
+    <mat-form-field appearance="outline" class="interface-name-field-wide">
+      <mat-label>{{ getTranslation('interface.name') }}</mat-label>
+      <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
+      <mat-icon matSuffix>edit</mat-icon>
+    </mat-form-field>
+  </div>
+  
   <div class="data-container">
-    <!-- Source Card -->
+    <!-- Source Card Header with Toggle Button (shown when collapsed) -->
+    <div class="source-card-header" *ngIf="!sourceCardExpanded">
+      <button mat-icon-button (click)="sourceCardExpanded = !sourceCardExpanded" class="toggle-card-button">
+        <mat-icon>expand_more</mat-icon>
+      </button>
+      <span class="card-header-label">Source</span>
+    </div>
+    
+    <!-- Source Card (shown when expanded) -->
     <app-adapter-card
+      *ngIf="sourceCardExpanded"
       [adapterType]="'Source'"
       [adapterName]="sourceAdapterName"
       [instanceName]="sourceInstanceName"
@@ -17,12 +35,21 @@
       (primaryAction)="startTransport()"
       (settingsClick)="openSourceAdapterSettings()">
       <div class="csv-text-container" *ngIf="!isLoading && sourceAdapterName === 'CSV'">
-        <textarea 
+        <div class="csv-file-actions">
+          <input type="file" #fileInput accept=".txt" (change)="onFileSelected($event)" style="display: none;" />
+          <button mat-stroked-button type="button" (click)="fileInput.click()" class="open-file-button">
+            <mat-icon>folder_open</mat-icon>
+            Open File...
+          </button>
+        </div>
+        <div 
+          #csvEditor
           class="csv-text csv-editable" 
-          [(ngModel)]="editableCsvText"
+          contenteditable="true"
           (input)="onCsvTextChange()"
+          (blur)="onCsvTextBlur()"
           spellcheck="false"
-          placeholder="CSV-Daten hier bearbeiten..."></textarea>
+          [attr.data-placeholder]="'CSV-Daten hier bearbeiten...'"></div>
       </div>
       <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
         <p>SQL Server Source Adapter</p>
@@ -36,40 +63,38 @@
     </app-adapter-card>
 
     <!-- Destination Adapter Instances -->
-    <div class="destinations-container">
-      <div class="destinations-header">
-        <h3>Destinations</h3>
+    <mat-card class="destinations-container-card">
+      <mat-card-header class="destinations-header">
+        <button mat-icon-button (click)="destinationCardExpanded = !destinationCardExpanded" class="toggle-card-button">
+          <mat-icon>{{ destinationCardExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        <mat-card-title>
+          <h3>Destinations</h3>
+        </mat-card-title>
         <button mat-raised-button color="primary" (click)="openDestinationInstancesDialog()" class="manage-destinations-button">
           <mat-icon>list</mat-icon>
           Manage Destinations
         </button>
-      </div>
+      </mat-card-header>
       
-      <!-- Interface Name Editor - Compact, left-aligned -->
-      <div class="interface-name-container">
-        <mat-form-field appearance="outline" class="interface-name-field">
-          <mat-label>{{ getTranslation('interface.name') }}</mat-label>
-          <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
-          <mat-icon matSuffix>edit</mat-icon>
-        </mat-form-field>
-      </div>
-      
-      <div class="destination-cards" *ngIf="destinationAdapterInstances.length > 0">
-        <app-adapter-card
-          *ngFor="let instance of destinationAdapterInstances"
-          [adapterType]="'Destination'"
-          [adapterName]="instance.adapterName"
-          [instanceName]="instance.instanceName"
-          [isEnabled]="instance.isEnabled"
-          [adapterInstanceGuid]="instance.adapterInstanceGuid"
-          [isRestarting]="false"
-          [isLoading]="isLoading"
-          [expanded]="true"
-          [showReceiveFolder]="false"
-          (restart)="restartDestinationAdapter()"
-          (expandedChange)="destinationCardExpanded = $event"
-          (primaryAction)="dropTable()"
-          (settingsClick)="openDestinationInstanceSettings(instance)">
+      <mat-card-content>
+        <div class="destination-cards" *ngIf="destinationAdapterInstances.length > 0 && destinationCardExpanded">
+          <app-adapter-card
+            *ngFor="let instance of destinationAdapterInstances; let i = index"
+            [adapterType]="'Destination'"
+            [adapterName]="instance.adapterName"
+            [instanceName]="instance.instanceName"
+            [isEnabled]="instance.isEnabled"
+            [adapterInstanceGuid]="instance.adapterInstanceGuid"
+            [isRestarting]="false"
+            [isLoading]="isLoading"
+            [expanded]="getDestinationCardExpanded(instance.adapterInstanceGuid)"
+            [showReceiveFolder]="false"
+            [isDisabled]="i > 0"
+            (restart)="restartDestinationAdapter()"
+            (expandedChange)="setDestinationCardExpanded(instance.adapterInstanceGuid, $event)"
+            (primaryAction)="dropTable()"
+            (settingsClick)="openDestinationInstanceSettings(instance)">
       <div class="table-container" *ngIf="sqlDisplayedColumns.length > 0">
         <table mat-table [dataSource]="sqlData" class="data-table">
           <!-- Dynamic columns - rendered based on SQL data structure (matches CSV columns exactly) -->
@@ -103,7 +128,9 @@
         <p>{{ getTranslation('table.empty') }}</p>
       </div>
     </app-adapter-card>
-  </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
 
   <mat-card class="log-card">
     <mat-card-header class="log-header">

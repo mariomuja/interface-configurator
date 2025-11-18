@@ -9,7 +9,7 @@ export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
     id: 'readme',
     title: 'README - Architecture Overview',
     content: `
-      <h2>📊 Integration Configuration - Interface Configuration Demo</h2>
+      <h2>📊 System Interface Configuration - Interface Configuration Demo</h2>
       <p>This application demonstrates a revolutionary approach to <strong>data integration</strong>: <strong>Configuration over Implementation</strong>. Instead of writing custom code for each new interface between systems, you simply <strong>configure</strong> what you want to connect—and it just works. No new implementation artifacts required.</p>
       
       <h3>The Vision: Configure, Don't Implement</h3>
@@ -81,7 +81,7 @@ export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
     id: 'overview',
     title: 'Übersicht',
     content: `
-      <h2>Integration Configuration</h2>
+      <h2>System Interface Configuration</h2>
       <p>Diese Anwendung demonstriert einen vollständigen Daten-Transport-Workflow von CSV-Dateien in eine SQL Server Datenbank unter Verwendung von Infrastructure as Code (IaC) Prinzipien.</p>
       <h3>Funktionsweise:</h3>
       <ol>

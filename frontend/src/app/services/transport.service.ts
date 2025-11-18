@@ -212,6 +212,13 @@ export class TransportService {
     });
   }
 
+  updateCsvData(interfaceName: string, csvData: string): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/UpdateCsvData`, {
+      interfaceName,
+      csvData
+    });
+  }
+
   updateDestinationReceiveFolder(interfaceName: string, destinationReceiveFolder: string): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/UpdateDestinationReceiveFolder`, {
       interfaceName,

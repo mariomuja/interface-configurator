@@ -137,9 +137,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "get"
+          "get",
+          "options"
         ],
         "route": "GetDestinationAdapterInstances",
         "properties": {}
@@ -164,10 +165,12 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "get"
+          "get",
+          "options"
         ],
+        "route": "GetInterfaceConfigurations",
         "properties": {}
       },
       {
@@ -219,7 +222,8 @@
         "type": "httpTrigger",
         "authLevel": "Anonymous",
         "methods": [
-          "get"
+          "get",
+          "options"
         ],
         "route": "GetProcessLogs",
         "properties": {}
@@ -448,6 +452,34 @@
           "put"
         ],
         "route": "UpdateBatchSize",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateCsvData",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateCsvData.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateCsvData",
         "properties": {}
       },
       {
