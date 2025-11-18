@@ -1976,7 +1976,96 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private openJsonViewDialog(config: any): void {
     try {
-      const jsonString = JSON.stringify(config, null, 2);
+      // Build structured JSON with source and destination adapter instances
+      const structuredConfig: any = {
+        interfaceName: this.currentInterfaceName || config.interfaceName || 'Unknown Interface',
+        sourceAdapterName: config.sourceAdapterName || this.sourceAdapterName || 'CSV',
+        destinationAdapterName: config.destinationAdapterName || 'SqlServer',
+        description: config.description || '',
+        sourceAdapterInstance: {
+          adapterInstanceGuid: this.sourceAdapterInstanceGuid || config.sourceAdapterInstanceGuid || '',
+          instanceName: this.sourceInstanceName || config.sourceInstanceName || 'Source',
+          adapterName: this.sourceAdapterName || config.sourceAdapterName || 'CSV',
+          isEnabled: this.sourceIsEnabled !== undefined ? this.sourceIsEnabled : (config.sourceIsEnabled ?? true),
+          receiveFolder: this.sourceReceiveFolder || config.sourceReceiveFolder || '',
+          fileMask: this.sourceFileMask || config.sourceFileMask || '*.txt',
+          batchSize: this.sourceBatchSize !== undefined ? this.sourceBatchSize : (config.sourceBatchSize ?? 100),
+          fieldSeparator: this.sourceFieldSeparator || config.sourceFieldSeparator || '║',
+          // Include SQL Server properties if source is SqlServer
+          ...(this.sourceAdapterName === 'SqlServer' ? {
+            sqlServerName: this.sqlServerName || config.sqlServerName || '',
+            sqlDatabaseName: this.sqlDatabaseName || config.sqlDatabaseName || '',
+            sqlUserName: this.sqlUserName || config.sqlUserName || '',
+            sqlPassword: this.sqlPassword ? '***' : '', // Don't expose password
+            sqlIntegratedSecurity: this.sqlIntegratedSecurity !== undefined ? this.sqlIntegratedSecurity : (config.sqlIntegratedSecurity ?? false),
+            sqlResourceGroup: this.sqlResourceGroup || config.sqlResourceGroup || '',
+            sqlPollingStatement: this.sqlPollingStatement || config.sqlPollingStatement || '',
+            sqlPollingInterval: this.sqlPollingInterval !== undefined ? this.sqlPollingInterval : (config.sqlPollingInterval ?? 60),
+            sqlUseTransaction: this.sqlUseTransaction !== undefined ? this.sqlUseTransaction : (config.sqlUseTransaction ?? false),
+            sqlBatchSize: this.sqlBatchSize !== undefined ? this.sqlBatchSize : (config.sqlBatchSize ?? 1000)
+          } : {})
+        },
+        destinationAdapterInstances: (this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0) 
+          ? this.destinationAdapterInstances.map(instance => {
+              // Parse configuration if it's a string
+              let instanceConfig = instance.configuration || {};
+              if (typeof instanceConfig === 'string') {
+                try {
+                  instanceConfig = JSON.parse(instanceConfig);
+                } catch (e) {
+                  instanceConfig = {};
+                }
+              }
+              
+              // Build full destination instance object with all properties
+              const fullInstance: any = {
+                adapterInstanceGuid: instance.adapterInstanceGuid || '',
+                instanceName: instance.instanceName || '',
+                adapterName: instance.adapterName || 'SqlServer',
+                isEnabled: instance.isEnabled !== undefined ? instance.isEnabled : true,
+                configuration: instanceConfig
+              };
+              
+              // If it's a CSV adapter, include CSV-specific properties
+              if (instance.adapterName === 'CSV') {
+                fullInstance.receiveFolder = instance.receiveFolder || instanceConfig.receiveFolder || instanceConfig.destination || '';
+                fullInstance.fileMask = instance.fileMask || instanceConfig.fileMask || '*.txt';
+                fullInstance.batchSize = instance.batchSize !== undefined ? instance.batchSize : (instanceConfig.batchSize ?? 100);
+                fullInstance.fieldSeparator = instance.fieldSeparator || instanceConfig.fieldSeparator || '║';
+                fullInstance.destinationReceiveFolder = instanceConfig.destinationReceiveFolder || instance.receiveFolder || instanceConfig.receiveFolder || '';
+                fullInstance.destinationFileMask = instanceConfig.destinationFileMask || instance.fileMask || instanceConfig.fileMask || '*.txt';
+              }
+              
+              // If it's a SqlServer adapter, include SQL-specific properties
+              if (instance.adapterName === 'SqlServer') {
+                fullInstance.destination = instanceConfig.destination || instanceConfig.tableName || '';
+                fullInstance.tableName = instanceConfig.tableName || instanceConfig.destination || '';
+                fullInstance.sqlServerName = instanceConfig.sqlServerName || this.sqlServerName || '';
+                fullInstance.sqlDatabaseName = instanceConfig.sqlDatabaseName || this.sqlDatabaseName || '';
+                fullInstance.sqlUserName = instanceConfig.sqlUserName || this.sqlUserName || '';
+                fullInstance.sqlPassword = instanceConfig.sqlPassword ? '***' : ''; // Don't expose password
+                fullInstance.sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined 
+                  ? instanceConfig.sqlIntegratedSecurity 
+                  : (this.sqlIntegratedSecurity ?? false);
+                fullInstance.sqlResourceGroup = instanceConfig.sqlResourceGroup || this.sqlResourceGroup || '';
+                fullInstance.sqlPollingStatement = instanceConfig.sqlPollingStatement || this.sqlPollingStatement || '';
+                fullInstance.sqlPollingInterval = instanceConfig.sqlPollingInterval !== undefined 
+                  ? instanceConfig.sqlPollingInterval 
+                  : (this.sqlPollingInterval ?? 60);
+                fullInstance.sqlUseTransaction = instanceConfig.sqlUseTransaction !== undefined 
+                  ? instanceConfig.sqlUseTransaction 
+                  : (this.sqlUseTransaction ?? false);
+                fullInstance.sqlBatchSize = instanceConfig.sqlBatchSize !== undefined 
+                  ? instanceConfig.sqlBatchSize 
+                  : (this.sqlBatchSize ?? 1000);
+              }
+              
+              return fullInstance;
+            })
+          : (config.destinationAdapterInstances || [])
+      };
+      
+      const jsonString = JSON.stringify(structuredConfig, null, 2);
       const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
         width: '800px',
         maxWidth: '90vw',
