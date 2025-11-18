@@ -81,7 +81,7 @@ if ($appSettingsJson) {
 }
 
 Write-Host "`n3. Teste Function App Endpoint..." -ForegroundColor Yellow
-$functionUrl = "https://$($functionApp.defaultHostName)/api/SimpleTestFunction"
+$functionUrl = "https://$($functionApp.defaultHostName)/api/health"
 try {
     $response = Invoke-WebRequest -Uri $functionUrl -Method GET -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
     Write-Host "   Function antwortet!" -ForegroundColor Green
