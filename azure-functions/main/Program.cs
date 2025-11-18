@@ -31,22 +31,41 @@ var host = new HostBuilder()
             {
                 // Main application database connection (app-database)
                 // This database contains TransportData table and other application tables
-                var connectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog={sqlDatabase};Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+                // Enhanced with retry policy and connection pooling for resilience
+                var connectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog={sqlDatabase};Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
                 
                 // MessageBox database connection (separate database for staging/messaging)
                 // This database contains Messages, MessageSubscriptions, and ProcessLogs tables ONLY
                 // TransportData table is NOT created here - it belongs to the main application database
-                var messageBoxConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=MessageBox;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+                var messageBoxConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=MessageBox;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
                 
                 // Register DbContext for main application database (app-database)
                 // SqlServerAdapter uses this context to create/write to TransportData table
+                // Enhanced with retry-on-failure for transient errors
                 services.AddDbContext<ApplicationDbContext>(options =>
-                    options.UseSqlServer(connectionString));
+                    options.UseSqlServer(connectionString, sqlOptions =>
+                    {
+                        // Enable retry on transient failures (network issues, timeouts, etc.)
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 3,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null); // Use default transient error numbers
+                        sqlOptions.CommandTimeout(60); // Increase timeout to accommodate retries
+                    }));
                 
                 // Register MessageBoxDbContext for MessageBox database (separate database)
                 // Contains Messages, MessageSubscriptions, ProcessLogs - NOT TransportData
+                // Enhanced with retry-on-failure for transient errors
                 services.AddDbContext<MessageBoxDbContext>(options =>
-                    options.UseSqlServer(messageBoxConnectionString));
+                    options.UseSqlServer(messageBoxConnectionString, sqlOptions =>
+                    {
+                        // Enable retry on transient failures
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 3,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null);
+                        sqlOptions.CommandTimeout(60);
+                    }));
                 
                 // Ensure MessageBox database and tables are created automatically on startup
                 services.AddHostedService<MessageBoxDatabaseInitializer>();

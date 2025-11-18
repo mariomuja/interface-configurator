@@ -284,6 +284,36 @@ jobs:
           fi
         continue-on-error: false
       
+      - name: Health Check After Deployment
+        run: |
+          echo "Waiting for Function App to be ready..."
+          sleep 30
+          
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          HEALTH_CHECK_URL="https://${{ secrets.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health"
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL" || echo "000")
+            
+            if [ "$HEALTH_STATUS" = "200" ]; then
+              echo "✅ Health check passed!"
+              echo "Health check response:"
+              curl -s "$HEALTH_CHECK_URL" | jq '.' || curl -s "$HEALTH_CHECK_URL"
+              exit 0
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Health check attempt $RETRY_COUNT/$MAX_RETRIES failed (HTTP $HEALTH_STATUS), retrying..."
+            sleep 10
+          done
+          
+          echo "❌ Health check failed after $MAX_RETRIES attempts"
+          echo "Last health check response:"
+          curl -s "$HEALTH_CHECK_URL" || echo "Could not reach health endpoint"
+          exit 1
+        continue-on-error: false
+
       - name: Verify deployment
         run: |
           echo "✅ Deployment completed successfully!"
