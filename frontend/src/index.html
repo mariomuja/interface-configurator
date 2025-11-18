@@ -9,6 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script>
+    // Inject Azure Function App URL for production
+    // This allows the frontend to call Azure Functions directly when deployed on Vercel
+    window.__AZURE_FUNCTION_APP_URL__ = 'https://func-integration-main.azurewebsites.net/api';
+  </script>
 </head>
 <body class="mat-typography">
   <app-root></app-root>
