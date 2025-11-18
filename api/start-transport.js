@@ -152,7 +152,7 @@ module.exports = async (req, res) => {
     });
     
     res.status(200).json({
-      message: 'CSV file uploaded to Azure Blob Storage',
+      message: 'CSV file uploaded. The source adapter will process it and write data to MessageBox. Destination adapters will then read from MessageBox and write to their configured destinations. After processing, the file will be moved to csv-processed or csv-error folder.',
       fileId: fileName,
       blobUrl: blockBlobClient.url
     });

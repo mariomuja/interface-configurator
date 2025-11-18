@@ -832,7 +832,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const csvContent = this.editableCsvText || this.formatCsvAsText();
     this.transportService.startTransport(csvContent).subscribe({
       next: (response) => {
-        this.snackBar.open('Transport gestartet: ' + response.message, 'Schließen', { duration: 5000 });
+        // Show a more user-friendly message about the MessageBox architecture
+        const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
+        this.snackBar.open(userMessage, 'Schließen', { duration: 7000 });
         this.isTransporting = false;
         // Refresh immediately - auto-refresh (every 5 seconds) will pick up changes as they happen
         // The timer functions run every minute, so data will appear within 1-2 minutes
