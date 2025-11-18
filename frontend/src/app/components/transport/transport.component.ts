@@ -1891,14 +1891,21 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // If not found locally, try to load from API
-    // But first check if we have any interface data (even if incomplete) in interfaceConfigurations
+    // If not found locally, check for placeholder or try API
+    // First check if we have any interface data (including placeholders) in interfaceConfigurations
     const anyMatchingConfig = this.interfaceConfigurations.find(c => 
-      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
+      c.interfaceName === this.currentInterfaceName
     );
     
     if (anyMatchingConfig) {
-      // We have some data locally, use it even if incomplete
+      // We have some data locally (real or placeholder), use it
+      if (anyMatchingConfig._isPlaceholder) {
+        // For placeholders, show the placeholder data as JSON
+        this.openJsonViewDialog(anyMatchingConfig);
+        return;
+      }
+      
+      // For real interfaces, try to load destination adapter instances
       this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
         next: (instances) => {
           const fullConfig = {
@@ -1945,18 +1952,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         );
         
         if (hasPlaceholder) {
-          // Only show "create interface" message if we have a placeholder
-          this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
-        } else {
-          // Otherwise show the actual error
-          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 10000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
+          // Show placeholder data as JSON instead of error message
+          const placeholderConfig = this.interfaceConfigurations.find(c => 
+            c.interfaceName === this.currentInterfaceName && c._isPlaceholder
+          );
+          if (placeholderConfig) {
+            this.openJsonViewDialog(placeholderConfig);
+            return;
+          }
         }
+        
+        // Otherwise show the actual error
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
       }
     });
   }
