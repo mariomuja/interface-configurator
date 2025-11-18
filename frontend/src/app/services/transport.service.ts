@@ -8,15 +8,32 @@ import { CsvRecord, SqlRecord, ProcessLog } from '../models/data.model';
   providedIn: 'root'
 })
 export class TransportService {
-  // Use Azure Function App URL if available, otherwise fall back to relative /api
-  // This allows the app to work both locally (with proxy) and on Vercel (with Azure Functions)
+  // Use Azure Function App URL from environment or fall back to relative /api
+  // In production (Vercel), this will use the Azure Function App URL directly
+  // In development, it will use /api which can be proxied via Angular proxy config
   private apiUrl = this.getApiUrl();
 
   constructor(private http: HttpClient) {}
 
   private getApiUrl(): string {
-    // Vercel will proxy /api/* requests to Azure Functions via vercel.json
-    // This allows the frontend to use relative paths while Vercel handles the proxying
+    // Check if we're in browser environment
+    if (typeof window !== 'undefined') {
+      // Check for environment variable injected at build time
+      // Vercel will replace this during build if NEXT_PUBLIC_ or VERCEL_ env vars are set
+      // For Angular, we need to use a different approach
+      const functionAppUrl = (window as any).__AZURE_FUNCTION_APP_URL__;
+      if (functionAppUrl) {
+        return functionAppUrl;
+      }
+      
+      // Check if we're on Vercel (production) - use Azure Functions directly
+      // In production, call Azure Functions directly instead of proxying
+      if (window.location.hostname.includes('vercel.app')) {
+        return 'https://func-integration-main.azurewebsites.net/api';
+      }
+    }
+    
+    // Default: use relative path for local development
     return '/api';
   }
 
