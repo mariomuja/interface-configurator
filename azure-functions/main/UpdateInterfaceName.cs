@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -21,10 +22,18 @@ public class UpdateInterfaceName
 
     [Function("UpdateInterfaceName")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "UpdateInterfaceName")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("UpdateInterfaceName function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
@@ -35,6 +44,7 @@ public class UpdateInterfaceName
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "OldInterfaceName and NewInterfaceName are required" }));
                 return badRequestResponse;
             }
@@ -45,6 +55,7 @@ public class UpdateInterfaceName
             {
                 var notFoundResponse = req.CreateResponse(System.Net.HttpStatusCode.NotFound);
                 notFoundResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(notFoundResponse);
                 await notFoundResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Interface configuration '{request.OldInterfaceName}' not found" }));
                 return notFoundResponse;
             }
@@ -55,6 +66,7 @@ public class UpdateInterfaceName
             {
                 var conflictResponse = req.CreateResponse(System.Net.HttpStatusCode.Conflict);
                 conflictResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(conflictResponse);
                 await conflictResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Interface configuration '{request.NewInterfaceName}' already exists" }));
                 return conflictResponse;
             }
@@ -74,6 +86,7 @@ public class UpdateInterfaceName
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(config));
             return response;
         }
@@ -82,6 +95,7 @@ public class UpdateInterfaceName
             _logger.LogError(ex, "Error updating interface name");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }

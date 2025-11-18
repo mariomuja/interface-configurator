@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -21,10 +22,18 @@ public class UpdateReceiveFolder
 
     [Function("UpdateReceiveFolder")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "UpdateReceiveFolder")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("UpdateReceiveFolder function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
@@ -35,6 +44,7 @@ public class UpdateReceiveFolder
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "InterfaceName is required" }));
                 return badRequestResponse;
             }
@@ -45,6 +55,7 @@ public class UpdateReceiveFolder
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
                 message = $"Receive folder for interface '{request.InterfaceName}' updated to '{request.ReceiveFolder}'",
                 interfaceName = request.InterfaceName,
@@ -57,6 +68,7 @@ public class UpdateReceiveFolder
             _logger.LogError(ex, "Error updating receive folder");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }

@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -25,10 +26,18 @@ public class RestartAdapter
 
     [Function("RestartAdapter")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "RestartAdapter")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("RestartAdapter function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
@@ -39,6 +48,7 @@ public class RestartAdapter
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "InterfaceName is required" }));
                 return badRequestResponse;
             }
@@ -47,6 +57,7 @@ public class RestartAdapter
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "AdapterType must be 'Source' or 'Destination'" }));
                 return badRequestResponse;
             }
@@ -57,6 +68,7 @@ public class RestartAdapter
             {
                 var notFoundResponse = req.CreateResponse(System.Net.HttpStatusCode.NotFound);
                 notFoundResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(notFoundResponse);
                 await notFoundResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Interface configuration '{request.InterfaceName}' not found" }));
                 return notFoundResponse;
             }
@@ -79,6 +91,7 @@ public class RestartAdapter
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
                 message = $"{request.AdapterType} adapter process for interface '{request.InterfaceName}' will restart on the next timer trigger (within 1 minute). Restart timestamp: {restartTimestamp}",
                 interfaceName = request.InterfaceName,
@@ -92,6 +105,7 @@ public class RestartAdapter
             _logger.LogError(ex, "Error restarting adapter");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }

@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -21,10 +22,18 @@ public class UpdateSqlTransactionProperties
 
     [Function("UpdateSqlTransactionProperties")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "UpdateSqlTransactionProperties")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", "options", Route = "UpdateSqlTransactionProperties")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("UpdateSqlTransactionProperties function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
@@ -35,6 +44,7 @@ public class UpdateSqlTransactionProperties
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "InterfaceName is required" }));
                 return badRequestResponse;
             }
@@ -50,6 +60,7 @@ public class UpdateSqlTransactionProperties
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
                 message = $"SQL transaction properties for interface '{request.InterfaceName}' updated",
                 interfaceName = request.InterfaceName,
@@ -63,6 +74,7 @@ public class UpdateSqlTransactionProperties
             _logger.LogError(ex, "Error updating SQL transaction properties");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
