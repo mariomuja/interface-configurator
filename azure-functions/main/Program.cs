@@ -67,8 +67,9 @@ var host = new HostBuilder()
                         sqlOptions.CommandTimeout(60);
                     }));
                 
-                // Ensure MessageBox database and tables are created automatically on startup
+                // Ensure both databases and tables are created automatically on startup
                 services.AddHostedService<MessageBoxDatabaseInitializer>();
+                services.AddHostedService<ApplicationDatabaseInitializer>();
             }
             
             // Register Adapter Configuration Service (must be registered before CsvProcessingService)

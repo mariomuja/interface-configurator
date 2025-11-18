@@ -36,8 +36,8 @@ public class InitializeMessageBoxFunction
             var created = await _context.Database.EnsureCreatedAsync(context.CancellationToken);
 
             var message = created
-                ? "MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, ProcessLogs"
-                : "MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, ProcessLogs";
+                ? "MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs"
+                : "MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs";
 
             _logger.LogInformation(message);
 

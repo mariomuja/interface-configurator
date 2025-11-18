@@ -8,16 +8,17 @@ using ProcessCsvBlobTrigger.Data;
 namespace ProcessCsvBlobTrigger.Services;
 
 /// <summary>
-/// Hosted service that ensures MessageBox database and tables are created automatically on startup
+/// Hosted service that ensures Application database and tables are created automatically on startup
+/// This initializes the TransportData table in the main application database (app-database)
 /// </summary>
-public class MessageBoxDatabaseInitializer : IHostedService
+public class ApplicationDatabaseInitializer : IHostedService
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<MessageBoxDatabaseInitializer> _logger;
+    private readonly ILogger<ApplicationDatabaseInitializer> _logger;
 
-    public MessageBoxDatabaseInitializer(
+    public ApplicationDatabaseInitializer(
         IServiceProvider serviceProvider,
-        ILogger<MessageBoxDatabaseInitializer> logger)
+        ILogger<ApplicationDatabaseInitializer> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -27,29 +28,29 @@ public class MessageBoxDatabaseInitializer : IHostedService
     {
         try
         {
-            _logger.LogInformation("Initializing MessageBox database and tables...");
+            _logger.LogInformation("Initializing Application database and tables...");
 
             using var scope = _serviceProvider.CreateScope();
-            var messageBoxContext = scope.ServiceProvider.GetService<MessageBoxDbContext>();
+            var applicationContext = scope.ServiceProvider.GetService<ApplicationDbContext>();
 
-            if (messageBoxContext == null)
+            if (applicationContext == null)
             {
-                _logger.LogWarning("MessageBoxDbContext is not available. Skipping database initialization.");
+                _logger.LogWarning("ApplicationDbContext is not available. Skipping database initialization.");
                 return;
             }
 
             // Ensure database exists and tables are created
             // EnsureCreatedAsync will create the database if it doesn't exist (if permissions allow)
             // and will create all tables defined in the DbContext if they don't exist
-            var created = await messageBoxContext.Database.EnsureCreatedAsync(cancellationToken);
+            var created = await applicationContext.Database.EnsureCreatedAsync(cancellationToken);
 
             if (created)
             {
-                _logger.LogInformation("MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs");
+                _logger.LogInformation("Application database and tables created successfully. Tables: TransportData");
             }
             else
             {
-                _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs");
+                _logger.LogInformation("Application database and tables already exist. Tables: TransportData");
             }
         }
         catch (Microsoft.Data.SqlClient.SqlException sqlEx)
@@ -57,21 +58,21 @@ public class MessageBoxDatabaseInitializer : IHostedService
             // Handle SQL-specific errors (e.g., database doesn't exist, permission issues)
             if (sqlEx.Number == 4060) // Cannot open database
             {
-                _logger.LogError(sqlEx, "MessageBox database does not exist. Please ensure the database is created via Terraform before deploying the Function App.");
+                _logger.LogError(sqlEx, "Application database does not exist. Please ensure the database is created via Terraform before deploying the Function App.");
             }
             else if (sqlEx.Number == 18456) // Login failed
             {
-                _logger.LogError(sqlEx, "Failed to connect to MessageBox database. Please check SQL credentials.");
+                _logger.LogError(sqlEx, "Failed to connect to Application database. Please check SQL credentials.");
             }
             else
             {
-                _logger.LogError(sqlEx, "SQL error initializing MessageBox database: {ErrorNumber} - {Message}", sqlEx.Number, sqlEx.Message);
+                _logger.LogError(sqlEx, "SQL error initializing Application database: {ErrorNumber} - {Message}", sqlEx.Number, sqlEx.Message);
             }
             // Don't throw - allow function app to start even if database initialization fails
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing MessageBox database. Tables may need to be created manually. Error: {Message}", ex.Message);
+            _logger.LogError(ex, "Error initializing Application database. Tables may need to be created manually. Error: {Message}", ex.Message);
             // Don't throw - allow function app to start even if database initialization fails
         }
     }
