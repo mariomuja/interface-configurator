@@ -1,20 +1,21 @@
 h2[mat-dialog-title] {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  padding: 20px 24px 16px;
+  padding: 12px 16px 10px;
+  font-size: 14px;
 }
 
 h2[mat-dialog-title] mat-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
 }
 
 mat-dialog-content {
-  padding: 0 24px;
+  padding: 0 16px;
   min-width: 500px;
   max-width: 600px;
 }
@@ -22,8 +23,8 @@ mat-dialog-content {
 .dialog-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 16px 0;
+  gap: 10px;
+  padding: 10px 0;
 }
 
 .full-width {
@@ -88,22 +89,22 @@ mat-dialog-content {
 }
 
 .sql-section {
-  margin-top: 24px;
-  padding-top: 24px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .sql-section h3,
 .csv-destination-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
+  margin: 0 0 10px 0;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(0, 0, 0, 0.87);
 }
 
 .csv-destination-section {
-  margin-top: 24px;
-  padding-top: 24px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
 }
 
@@ -150,7 +151,7 @@ mat-dialog-content {
 }
 
 mat-dialog-actions {
-  padding: 16px 24px;
+  padding: 10px 16px;
   margin: 0;
 }
 

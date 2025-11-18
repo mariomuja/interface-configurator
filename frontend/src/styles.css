@@ -11,6 +11,100 @@ html, body {
 
 body {
   font-family: Roboto, "Helvetica Neue", sans-serif;
+  font-size: 13px; /* Reduced from default 14px */
+}
+
+/* Compact Material Form Fields */
+.mat-mdc-form-field {
+  font-size: 13px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-text-field-wrapper {
+  padding-bottom: 0 !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-infix {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  min-height: 32px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-subscript-wrapper {
+  margin-top: 2px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-hint-wrapper {
+  padding-top: 2px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-floating-label {
+  font-size: 13px !important;
+}
+
+.mat-mdc-form-field input,
+.mat-mdc-form-field textarea,
+.mat-mdc-select-value {
+  font-size: 13px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-hint {
+  font-size: 11px !important;
+}
+
+/* Compact Buttons */
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button {
+  font-size: 12px !important;
+  padding: 4px 12px !important;
+  min-height: 32px !important;
+  line-height: 24px !important;
+}
+
+.mat-mdc-button .mat-icon,
+.mat-mdc-raised-button .mat-icon,
+.mat-mdc-outlined-button .mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  line-height: 16px !important;
+}
+
+/* Compact Cards */
+.mat-mdc-card {
+  padding: 12px !important;
+}
+
+.mat-mdc-card-header {
+  padding: 8px 12px !important;
+  margin: -12px -12px 8px -12px !important;
+}
+
+.mat-mdc-card-content {
+  padding: 8px 12px !important;
+}
+
+/* Compact Tables */
+.mat-mdc-table {
+  font-size: 12px !important;
+}
+
+.mat-mdc-table th,
+.mat-mdc-table td {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+}
+
+/* Compact Chips */
+.mat-mdc-chip {
+  font-size: 11px !important;
+  height: 24px !important;
+  padding: 0 8px !important;
+}
+
+/* Compact Tooltips */
+.mat-mdc-tooltip {
+  font-size: 11px !important;
 }
 
 

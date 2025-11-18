@@ -76,9 +76,9 @@ import { TranslationService, Language } from './services/translation.service';
     }
     
     .app-toolbar {
-      padding: 0 16px;
+      padding: 0 12px;
       height: auto;
-      min-height: 64px;
+      min-height: 48px;
     }
     
     .toolbar-content {
@@ -86,8 +86,8 @@ import { TranslationService, Language } from './services/translation.service';
       align-items: flex-start;
       justify-content: space-between;
       width: 100%;
-      padding: 8px 0;
-      gap: 16px;
+      padding: 6px 0;
+      gap: 12px;
     }
     
     .app-title-section {
@@ -96,20 +96,20 @@ import { TranslationService, Language } from './services/translation.service';
       flex-direction: column;
       align-items: flex-start;
       min-width: 0;
-      margin-right: 16px;
+      margin-right: 12px;
     }
     
     .app-title {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: 500;
       white-space: nowrap;
-      margin: 0 0 4px 0;
+      margin: 0 0 2px 0;
       text-align: left;
     }
     
     .app-description {
-      font-size: 11px;
-      line-height: 1.4;
+      font-size: 10px;
+      line-height: 1.3;
       color: rgba(255, 255, 255, 0.9);
       margin: 0;
       text-align: left;
@@ -283,9 +283,9 @@ import { TranslationService, Language } from './services/translation.service';
     }
     
     .language-field ::ng-deep .mat-mdc-form-field-infix {
-      padding-top: 8px;
-      padding-bottom: 8px;
-      min-height: 40px;
+      padding-top: 4px;
+      padding-bottom: 4px;
+      min-height: 32px;
     }
     
     main {
