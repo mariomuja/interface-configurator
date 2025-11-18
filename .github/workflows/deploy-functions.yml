@@ -40,40 +40,18 @@ jobs:
       - name: Publish
         run: |
           cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          dotnet publish --configuration Release --output ./publish --no-build
+          dotnet publish --self-contained false --configuration Release --output ./publish --no-build
         continue-on-error: false
 
-      - name: Verify function structure
+      - name: Install Azure Functions Core Tools
         run: |
-          echo "Checking published function structure..."
-          ls -la ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/ | head -20
-          echo ""
-          echo "Checking for required files..."
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/host.json && echo "✓ host.json found" || echo "✗ host.json missing"
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/worker.config.json && echo "✓ worker.config.json found" || echo "✗ worker.config.json missing"
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/functions.metadata && echo "✓ functions.metadata found" || echo "✗ functions.metadata missing"
-          test -f ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/ProcessCsvBlobTrigger.dll && echo "✓ ProcessCsvBlobTrigger.dll found" || echo "✗ ProcessCsvBlobTrigger.dll missing"
-          echo ""
-          echo "Functions in metadata:"
-          cat ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish/functions.metadata | jq -r '.[].name'
-        continue-on-error: false
-
-      - name: Create deployment package
-        run: |
-          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/publish
-          zip -r ../../../function-app.zip . -q
-          cd ../../..
-          echo "Package created:"
-          ls -lh function-app.zip
-        continue-on-error: false
-      
-      - name: Verify ZIP package
-        run: |
-          echo "ZIP package size:"
-          ls -lh function-app.zip
-          echo ""
-          echo "ZIP package contents:"
-          unzip -l function-app.zip | head -20
+          echo "Installing Azure Functions Core Tools..."
+          curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+          sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+          sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main" > /etc/apt/sources.list.d/dotnetdev.list'
+          sudo apt-get update
+          sudo apt-get install -y azure-functions-core-tools-4
+          func --version
         continue-on-error: false
 
       - name: Azure Login
@@ -91,87 +69,17 @@ jobs:
             --output table || (echo "ERROR: Function App not found!" && exit 1)
         continue-on-error: false
 
-      - name: Deploy to Azure Functions (Direct Blob Upload)
+      - name: Deploy to Azure Functions using func publish
         run: |
-          echo "Deploying ZIP package using direct blob upload method..."
-          echo "ZIP file path: $(pwd)/function-app.zip"
-          echo "ZIP file size: $(ls -lh function-app.zip | awk '{print $5}')"
-          echo ""
+          echo "Deploying using func azure functionapp publish --dotnet-isolated..."
+          cd ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           
-          # Get storage account info
-          STORAGE_CONNECTION=$(az functionapp config appsettings list \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --query "[?name=='AzureWebJobsStorage'].value" \
-            -o tsv)
-          
-          if [ -z "$STORAGE_CONNECTION" ]; then
-            echo "ERROR: AzureWebJobsStorage not found!"
-            exit 1
-          fi
-          
-          STORAGE_ACCOUNT=$(echo "$STORAGE_CONNECTION" | sed -n 's/.*AccountName=\([^;]*\).*/\1/p')
-          
-          if [ -z "$STORAGE_ACCOUNT" ]; then
-            echo "ERROR: Could not extract storage account name from connection string"
-            exit 1
-          fi
-          
-          echo "Storage Account: $STORAGE_ACCOUNT"
-          
-          # Get storage account key
-          STORAGE_KEY=$(az storage account keys list \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --account-name $STORAGE_ACCOUNT \
-            --query "[0].value" \
-            -o tsv)
-          
-          # Create container if it doesn't exist
-          echo "Creating/verifying function-releases container..."
-          az storage container create \
-            --name function-releases \
-            --account-name $STORAGE_ACCOUNT \
-            --account-key $STORAGE_KEY \
-            --public-access off \
-            --fail-on-exist false || true
-          
-          # Upload ZIP to blob storage
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          BLOB_NAME="function-app-${TIMESTAMP}.zip"
-          
-          echo "Uploading ZIP to blob storage: $BLOB_NAME"
-          az storage blob upload \
-            --account-name $STORAGE_ACCOUNT \
-            --account-key $STORAGE_KEY \
-            --container-name function-releases \
-            --name "$BLOB_NAME" \
-            --file function-app.zip \
-            --overwrite \
-            --timeout 600
-          
-          # Generate SAS token (valid for 10 years)
-          EXPIRY=$(date -u -d "+10 years" +"%Y-%m-%dT%H:%M:%SZ")
-          SAS_TOKEN=$(az storage container generate-sas \
-            --name function-releases \
-            --account-name $STORAGE_ACCOUNT \
-            --account-key $STORAGE_KEY \
-            --permissions r \
-            --expiry $EXPIRY \
-            -o tsv)
-          
-          PACKAGE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/function-releases/${BLOB_NAME}?${SAS_TOKEN}"
-          
-          # Set WEBSITE_RUN_FROM_PACKAGE
-          echo "Setting WEBSITE_RUN_FROM_PACKAGE to blob URL..."
-          az functionapp config appsettings set \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_FUNCTIONAPP_NAME }} \
-            --settings WEBSITE_RUN_FROM_PACKAGE="$PACKAGE_URL" \
-            --output none
+          # Use func publish command (this was the only way that worked)
+          # func publish will use the published output from ./publish directory
+          func azure functionapp publish ${{ secrets.AZURE_FUNCTIONAPP_NAME }} --dotnet-isolated --force
           
           echo ""
           echo "✅ Deployment completed successfully!"
-          echo "Package URL: ${PACKAGE_URL:0:100}..."
         continue-on-error: false
       
 
@@ -365,6 +273,7 @@ jobs:
       # 2. AZURE_RESOURCE_GROUP: Resource group name (e.g., "rg-interface-configuration")
       # 3. AZURE_FUNCTIONAPP_NAME: Function app name (get from terraform output function_app_name)
       #
-      # This workflow uses "Run from Package" mode (WEBSITE_RUN_FROM_PACKAGE=1),
-      # which is Microsoft's recommended deployment method for Azure Functions.
+      # This workflow uses func azure functionapp publish --dotnet-isolated to deploy,
+      # which handles the deployment process automatically including setting WEBSITE_RUN_FROM_PACKAGE.
+      # The dotnet publish command uses --self-contained false to create a framework-dependent deployment.
 

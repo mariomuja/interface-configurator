@@ -560,6 +560,16 @@ public class CsvAdapter : IAdapter
                     
                     foreach (var message in messages)
                     {
+                        // Try to acquire lock on message (prevent concurrent processing)
+                        var lockAcquired = await _messageBoxService.MarkMessageAsInProgressAsync(
+                            message.MessageId, lockTimeoutMinutes: 5, cancellationToken);
+                        
+                        if (!lockAcquired)
+                        {
+                            _logger?.LogWarning("Could not acquire lock on message {MessageId}, skipping (may be processed by another instance)", message.MessageId);
+                            continue; // Skip this message, another instance is processing it
+                        }
+
                         try
                         {
                             // Create subscription for this message (if subscription service is available)
@@ -585,7 +595,19 @@ public class CsvAdapter : IAdapter
                         }
                         catch (Exception ex)
                         {
-                            _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox", message.MessageId);
+                            _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox: {ErrorMessage}", message.MessageId, ex.Message);
+                            
+                            // Release lock and mark as error (will handle retry logic)
+                            try
+                            {
+                                await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
+                                await _messageBoxService.MarkMessageAsErrorAsync(message.MessageId, ex.Message, cancellationToken);
+                            }
+                            catch (Exception lockEx)
+                            {
+                                _logger?.LogError(lockEx, "Error releasing lock or marking error for message {MessageId}", message.MessageId);
+                            }
+                            
                             // Mark subscription as error if subscription service is available
                             if (_subscriptionService != null)
                             {
@@ -698,8 +720,15 @@ public class CsvAdapter : IAdapter
                 {
                     try
                     {
+                        // Release lock before marking as processed
+                        await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Processed", cancellationToken);
+                        
                         await _subscriptionService.MarkSubscriptionAsProcessedAsync(
                             message.MessageId, AdapterName, $"Written to CSV destination: {destination}", cancellationToken);
+                        
+                        // Mark message as processed (releases lock automatically)
+                        await _messageBoxService.MarkMessageAsProcessedAsync(
+                            message.MessageId, $"Written to CSV destination: {destination}", cancellationToken);
                         
                         // Check if all subscriptions are processed, then remove message
                         var allProcessed = await _subscriptionService.AreAllSubscriptionsProcessedAsync(message.MessageId, cancellationToken);
@@ -711,6 +740,12 @@ public class CsvAdapter : IAdapter
                     catch (Exception ex)
                     {
                         _logger?.LogError(ex, "Error marking subscription as processed for message {MessageId}", message.MessageId);
+                        // Release lock on error
+                        try
+                        {
+                            await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
+                        }
+                        catch { }
                     }
                 }
             }

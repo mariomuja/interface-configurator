@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -63,6 +65,9 @@ public class MessageBoxService : IMessageBoxService
             };
             var messageDataJson = JsonSerializer.Serialize(messageData);
 
+            // Calculate message hash for idempotency checking
+            var messageHash = CalculateMessageHash(messageDataJson);
+
             var message = new MessageBoxMessage
             {
                 MessageId = Guid.NewGuid(),
@@ -72,7 +77,10 @@ public class MessageBoxService : IMessageBoxService
                 AdapterInstanceGuid = adapterInstanceGuid,
                 MessageData = messageDataJson,
                 Status = "Pending",
-                datetime_created = DateTime.UtcNow
+                datetime_created = DateTime.UtcNow,
+                RetryCount = 0,
+                MaxRetries = 3, // Default max retries
+                MessageHash = messageHash
             };
 
             _context.Messages.Add(message);
@@ -154,15 +162,38 @@ public class MessageBoxService : IMessageBoxService
                 interfaceName, status ?? "All");
 
             var query = _context.Messages
-                .Where(m => m.InterfaceName == interfaceName);
+                .Where(m => m.InterfaceName == interfaceName)
+                .Where(m => !m.DeadLetter); // Exclude dead letter messages
 
             if (!string.IsNullOrWhiteSpace(status))
             {
-                query = query.Where(m => m.Status == status);
+                if (status == "Pending")
+                {
+                    // For Pending status, also include retryable Error messages
+                    var now = DateTime.UtcNow;
+                    query = query.Where(m => 
+                        m.Status == "Pending" || 
+                        (m.Status == "Error" && m.RetryCount < m.MaxRetries && 
+                         (m.Status != "InProgress" || !m.InProgressUntil.HasValue || m.InProgressUntil.Value <= now)));
+                }
+                else
+                {
+                    query = query.Where(m => m.Status == status);
+                }
+            }
+            else
+            {
+                // Exclude InProgress messages unless they're stale
+                var now = DateTime.UtcNow;
+                query = query.Where(m => 
+                    m.Status != "InProgress" || 
+                    !m.InProgressUntil.HasValue || 
+                    m.InProgressUntil.Value <= now);
             }
 
             var messages = await query
-                .OrderBy(m => m.datetime_created) // Process oldest first
+                .OrderBy(m => m.RetryCount) // Process messages with fewer retries first
+                .ThenBy(m => m.datetime_created) // Then oldest first
                 .ToListAsync(cancellationToken);
 
             _logger?.LogInformation(
@@ -273,19 +304,262 @@ public class MessageBoxService : IMessageBoxService
                 throw new InvalidOperationException($"Message not found: {messageId}");
             }
 
-            message.Status = "Error";
-            message.datetime_processed = DateTime.UtcNow;
+            // Increment retry count
+            message.RetryCount++;
+            message.LastRetryTime = DateTime.UtcNow;
             message.ErrorMessage = errorMessage;
+            message.InProgressUntil = null; // Release lock
 
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger?.LogInformation("Successfully marked message as error: MessageId={MessageId}", messageId);
+            // Check if max retries exceeded
+            if (message.RetryCount >= message.MaxRetries)
+            {
+                await MoveMessageToDeadLetterAsync(messageId, 
+                    $"Max retries ({message.MaxRetries}) exceeded. Last error: {errorMessage}", 
+                    cancellationToken);
+            }
+            else
+            {
+                message.Status = "Error";
+                message.datetime_processed = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger?.LogWarning(
+                    "Message marked as error (retry {RetryCount}/{MaxRetries}): MessageId={MessageId}", 
+                    message.RetryCount, message.MaxRetries, messageId);
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error marking message as error: MessageId={MessageId}", messageId);
             throw;
         }
+    }
+
+    public async Task<bool> MarkMessageAsInProgressAsync(
+        Guid messageId,
+        int lockTimeoutMinutes = 5,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var message = await _context.Messages
+                .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+
+            if (message == null)
+            {
+                throw new InvalidOperationException($"Message not found: {messageId}");
+            }
+
+            // Check if message is already locked and lock hasn't expired
+            if (message.Status == "InProgress" && message.InProgressUntil.HasValue)
+            {
+                if (message.InProgressUntil.Value > DateTime.UtcNow)
+                {
+                    _logger?.LogWarning(
+                        "Message {MessageId} is already locked until {LockUntil}", 
+                        messageId, message.InProgressUntil.Value);
+                    return false; // Lock already held
+                }
+                // Lock expired, proceed to acquire new lock
+            }
+
+            // Acquire lock
+            message.Status = "InProgress";
+            message.InProgressUntil = DateTime.UtcNow.AddMinutes(lockTimeoutMinutes);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger?.LogInformation(
+                "Message {MessageId} locked for processing until {LockUntil}", 
+                messageId, message.InProgressUntil.Value);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error marking message as InProgress: MessageId={MessageId}", messageId);
+            throw;
+        }
+    }
+
+    public async Task ReleaseMessageLockAsync(
+        Guid messageId,
+        string revertToStatus = "Pending",
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var message = await _context.Messages
+                .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+
+            if (message == null)
+            {
+                throw new InvalidOperationException($"Message not found: {messageId}");
+            }
+
+            if (message.Status == "InProgress")
+            {
+                message.Status = revertToStatus;
+                message.InProgressUntil = null;
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger?.LogInformation(
+                    "Released lock on message {MessageId}, reverted to status: {Status}", 
+                    messageId, revertToStatus);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error releasing message lock: MessageId={MessageId}", messageId);
+            throw;
+        }
+    }
+
+    public async Task MoveMessageToDeadLetterAsync(
+        Guid messageId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogWarning("Moving message to dead letter: MessageId={MessageId}, Reason={Reason}", messageId, reason);
+
+            var message = await _context.Messages
+                .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+
+            if (message == null)
+            {
+                throw new InvalidOperationException($"Message not found: {messageId}");
+            }
+
+            message.Status = "DeadLetter";
+            message.DeadLetter = true;
+            message.ErrorMessage = $"Dead Letter: {reason}";
+            message.InProgressUntil = null;
+            message.datetime_processed = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger?.LogWarning("Successfully moved message to dead letter: MessageId={MessageId}", messageId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error moving message to dead letter: MessageId={MessageId}", messageId);
+            throw;
+        }
+    }
+
+    public async Task<List<MessageBoxMessage>> ReadRetryableMessagesAsync(
+        string interfaceName,
+        int minRetryDelayMinutes = 1,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(interfaceName))
+            throw new ArgumentException("Interface name cannot be empty", nameof(interfaceName));
+
+        try
+        {
+            var now = DateTime.UtcNow;
+            var minRetryTime = now.AddMinutes(-minRetryDelayMinutes);
+
+            // Calculate exponential backoff delay: 2^retryCount minutes
+            // RetryCount 0: 1 min, RetryCount 1: 2 min, RetryCount 2: 4 min, etc.
+            var messages = await _context.Messages
+                .Where(m => m.InterfaceName == interfaceName)
+                .Where(m => m.Status == "Error" || m.Status == "Pending")
+                .Where(m => !m.DeadLetter)
+                .Where(m => m.RetryCount < m.MaxRetries)
+                .Where(m => m.Status != "InProgress" || !m.InProgressUntil.HasValue || m.InProgressUntil.Value <= now)
+                .Where(m => !m.LastRetryTime.HasValue || m.LastRetryTime.Value <= minRetryTime || 
+                    (m.LastRetryTime.Value.AddMinutes(Math.Pow(2, m.RetryCount)) <= now))
+                .OrderBy(m => m.RetryCount) // Retry messages with fewer retries first
+                .ThenBy(m => m.LastRetryTime ?? m.datetime_created) // Then by last retry time
+                .ToListAsync(cancellationToken);
+
+            _logger?.LogInformation(
+                "Found {Count} retryable messages for interface {InterfaceName}", 
+                messages.Count, interfaceName);
+
+            return messages;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error reading retryable messages: Interface={InterfaceName}", interfaceName);
+            throw;
+        }
+    }
+
+    public async Task<List<MessageBoxMessage>> ReadDeadLetterMessagesAsync(
+        string? interfaceName = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = _context.Messages
+                .Where(m => m.DeadLetter || m.Status == "DeadLetter");
+
+            if (!string.IsNullOrWhiteSpace(interfaceName))
+            {
+                query = query.Where(m => m.InterfaceName == interfaceName);
+            }
+
+            var messages = await query
+                .OrderByDescending(m => m.datetime_processed ?? m.datetime_created)
+                .ToListAsync(cancellationToken);
+
+            _logger?.LogInformation(
+                "Found {Count} dead letter messages for interface {InterfaceName}", 
+                messages.Count, interfaceName ?? "All");
+
+            return messages;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error reading dead letter messages: Interface={InterfaceName}", interfaceName ?? "All");
+            throw;
+        }
+    }
+
+    public async Task<int> ReleaseStaleLocksAsync(
+        int lockTimeoutMinutes = 5,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var timeoutThreshold = now.AddMinutes(-lockTimeoutMinutes);
+
+            var staleMessages = await _context.Messages
+                .Where(m => m.Status == "InProgress")
+                .Where(m => m.InProgressUntil.HasValue && m.InProgressUntil.Value < timeoutThreshold)
+                .ToListAsync(cancellationToken);
+
+            foreach (var message in staleMessages)
+            {
+                var lockUntil = message.InProgressUntil; // Store before clearing
+                message.Status = "Pending"; // Revert to Pending for retry
+                message.InProgressUntil = null;
+                _logger?.LogWarning(
+                    "Released stale lock on message {MessageId} (was locked until {LockUntil})", 
+                    message.MessageId, lockUntil);
+            }
+
+            if (staleMessages.Count > 0)
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger?.LogInformation("Released {Count} stale locks", staleMessages.Count);
+            }
+
+            return staleMessages.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error releasing stale locks");
+            throw;
+        }
+    }
+
+    private string CalculateMessageHash(string messageData)
+    {
+        using var sha256 = SHA256.Create();
+        var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(messageData));
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     public (List<string> headers, Dictionary<string, string> record) ExtractDataFromMessage(MessageBoxMessage message)

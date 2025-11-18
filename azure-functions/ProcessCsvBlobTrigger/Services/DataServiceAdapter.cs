@@ -242,7 +242,7 @@ public class DataServiceAdapter : IDataService
                         foreach (var column in filteredColumnTypes)
                         {
                             var sanitizedColumnName = SanitizeColumnName(column.Key);
-                            var value = row.GetValueOrDefault(column.Key, null) ?? null;
+                            var value = row.TryGetValue(column.Key, out var val) ? val : null;
                             var sqlValue = value != null && !string.IsNullOrWhiteSpace(value)
                                 ? typeValidator.ConvertValue(value, column.Value.DataType)
                                 : DBNull.Value;

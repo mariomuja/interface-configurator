@@ -38,6 +38,13 @@ public class DestinationAdapterFunction
 
         try
         {
+            // Release stale locks first (messages locked longer than timeout)
+            var staleLocksReleased = await _messageBoxService.ReleaseStaleLocksAsync(lockTimeoutMinutes: 5, context.CancellationToken);
+            if (staleLocksReleased > 0)
+            {
+                _logger.LogInformation("Released {Count} stale message locks", staleLocksReleased);
+            }
+
             // Get all enabled interface configurations
             var configurations = await _configService.GetEnabledDestinationConfigurationsAsync(context.CancellationToken);
 

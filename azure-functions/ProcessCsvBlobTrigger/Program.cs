@@ -160,7 +160,31 @@ var host = new HostBuilder()
                 {
                     throw new InvalidOperationException("BlobServiceClient is required for CsvAdapter");
                 }
-                return new CsvAdapter(csvProcessingService, adapterConfig, blobServiceClient, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, logger);
+                return new CsvAdapter(
+                    csvProcessingService: csvProcessingService, 
+                    adapterConfig: adapterConfig, 
+                    blobServiceClient: blobServiceClient, 
+                    messageBoxService: messageBoxService, 
+                    subscriptionService: subscriptionService, 
+                    interfaceName: "FromCsvToSqlServerExample", 
+                    adapterInstanceGuid: null,
+                    receiveFolder: null,
+                    fileMask: null,
+                    batchSize: null,
+                    fieldSeparator: null,
+                    destinationReceiveFolder: null,
+                    destinationFileMask: null,
+                    adapterType: null,
+                    sftpHost: null,
+                    sftpPort: null,
+                    sftpUsername: null,
+                    sftpPassword: null,
+                    sftpSshKey: null,
+                    sftpFolder: null,
+                    sftpFileMask: null,
+                    sftpMaxConnectionPoolSize: null,
+                    sftpFileBufferSize: null,
+                    logger: logger);
             });
             
             // SQL Server Adapter (for destination) - register as named service

@@ -249,15 +249,38 @@ public class DynamicTableService : IDynamicTableService
     {
         try
         {
-            // Try to query the table - if it exists, this will succeed
+            // Sanitize table name to prevent SQL injection
+            var sanitizedTableName = SanitizeTableName(tableName);
+            // Use square brackets to safely escape the table name
+            // The table name is sanitized to only contain alphanumeric characters and underscores, so it's safe
+#pragma warning disable EF1002 // SQL injection warning - table name is sanitized
             var result = await _context.Database.ExecuteSqlRawAsync(
-                $"SELECT TOP 1 1 FROM {tableName}", cancellationToken);
+                $"SELECT TOP 1 1 FROM [{sanitizedTableName}]", cancellationToken);
+#pragma warning restore EF1002
             return true;
         }
         catch
         {
             return false;
         }
+    }
+    
+    private string SanitizeTableName(string tableName)
+    {
+        if (string.IsNullOrWhiteSpace(tableName))
+            throw new ArgumentException("Table name cannot be null or empty", nameof(tableName));
+        
+        // Remove any characters that are not alphanumeric or underscore
+        var sanitized = new string(tableName.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
+        
+        if (string.IsNullOrWhiteSpace(sanitized))
+            throw new ArgumentException("Table name must contain at least one alphanumeric character", nameof(tableName));
+        
+        // Ensure it doesn't start with a number
+        if (char.IsDigit(sanitized[0]))
+            sanitized = "_" + sanitized;
+        
+        return sanitized;
     }
 
     private async Task CreateTableAsync(Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken)

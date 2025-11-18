@@ -102,7 +102,8 @@ public interface IMessageBoxService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks a message as error
+    /// Marks a message as error and increments retry count
+    /// If retry count exceeds MaxRetries, moves message to DeadLetter
     /// </summary>
     /// <param name="messageId">MessageId</param>
     /// <param name="errorMessage">Error message</param>
@@ -110,6 +111,74 @@ public interface IMessageBoxService
     Task MarkMessageAsErrorAsync(
         Guid messageId,
         string errorMessage,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a message as InProgress and sets lock timeout
+    /// Prevents concurrent processing of the same message
+    /// </summary>
+    /// <param name="messageId">MessageId</param>
+    /// <param name="lockTimeoutMinutes">Lock timeout in minutes (default: 5)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if lock was acquired, false if message is already locked</returns>
+    Task<bool> MarkMessageAsInProgressAsync(
+        Guid messageId,
+        int lockTimeoutMinutes = 5,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Releases the InProgress lock on a message (reverts to Pending or Error)
+    /// </summary>
+    /// <param name="messageId">MessageId</param>
+    /// <param name="revertToStatus">Status to revert to if not processed (default: "Pending")</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task ReleaseMessageLockAsync(
+        Guid messageId,
+        string revertToStatus = "Pending",
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a message to DeadLetter status after max retries exceeded
+    /// </summary>
+    /// <param name="messageId">MessageId</param>
+    /// <param name="reason">Reason for moving to dead letter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task MoveMessageToDeadLetterAsync(
+        Guid messageId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads messages eligible for retry (Error status with retry count < MaxRetries)
+    /// Excludes messages that are locked (InProgress) or recently retried (exponential backoff)
+    /// </summary>
+    /// <param name="interfaceName">Name of the interface</param>
+    /// <param name="minRetryDelayMinutes">Minimum delay between retries in minutes (default: 1)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of messages eligible for retry</returns>
+    Task<List<MessageBoxMessage>> ReadRetryableMessagesAsync(
+        string interfaceName,
+        int minRetryDelayMinutes = 1,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads messages from dead letter queue
+    /// </summary>
+    /// <param name="interfaceName">Name of the interface (optional, null for all interfaces)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of dead letter messages</returns>
+    Task<List<MessageBoxMessage>> ReadDeadLetterMessagesAsync(
+        string? interfaceName = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Releases stale InProgress locks (messages locked longer than timeout)
+    /// </summary>
+    /// <param name="lockTimeoutMinutes">Lock timeout in minutes</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Number of locks released</returns>
+    Task<int> ReleaseStaleLocksAsync(
+        int lockTimeoutMinutes = 5,
         CancellationToken cancellationToken = default);
 
     /// <summary>
