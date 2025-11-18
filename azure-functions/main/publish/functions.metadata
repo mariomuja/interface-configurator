@@ -12,9 +12,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
         "route": "AddDestinationAdapterInstance",
         "properties": {}

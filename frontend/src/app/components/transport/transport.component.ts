@@ -1846,7 +1846,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       configToUse = allMatching.find(c => !c._isPlaceholder) || null;
     }
 
-    // If we found a real config, use it
+    // If we found a real config locally, use it
     if (configToUse && !configToUse._isPlaceholder) {
       this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
         next: (instances) => {
@@ -1865,22 +1865,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Check if this is ONLY a placeholder (no real interface exists)
-    const hasPlaceholder = this.interfaceConfigurations.some(c => 
-      c.interfaceName === this.currentInterfaceName && c._isPlaceholder
-    );
-    const hasRealInterface = this.interfaceConfigurations.some(c => 
-      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
-    );
-    
-    if (hasPlaceholder && !hasRealInterface) {
-      this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
-      return;
-    }
-
-    // Fallback: Try to load from API if not found locally
+    // If not found locally, try to load from API
+    // Only show "create interface" error if API fails AND we have a placeholder
     this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: (config) => {
+        // Successfully loaded from API - update local cache and show JSON
         // Also get destination adapter instances
         this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
           next: (instances) => {
@@ -1899,13 +1888,25 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (error) => {
         console.error('Error loading interface configuration:', error);
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        
+        // Check if this is ONLY a placeholder (no real interface exists)
+        const hasPlaceholder = this.interfaceConfigurations.some(c => 
+          c.interfaceName === this.currentInterfaceName && c._isPlaceholder
+        );
+        
+        if (hasPlaceholder) {
+          // Only show "create interface" message if we have a placeholder
+          this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
+        } else {
+          // Otherwise show the actual error
+          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
+          this.snackBar.open(detailedMessage, 'Schließen', { 
+            duration: 10000,
+            panelClass: ['error-snackbar'],
+            verticalPosition: 'top',
+            horizontalPosition: 'center'
+          });
+        }
       }
     });
   }
