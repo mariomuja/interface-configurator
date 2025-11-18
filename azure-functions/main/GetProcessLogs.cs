@@ -27,9 +27,17 @@ public class GetProcessLogsFunction
 
     [Function("GetProcessLogs")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetProcessLogs")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "options", Route = "GetProcessLogs")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Ensure database and tables exist before querying

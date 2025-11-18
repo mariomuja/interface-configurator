@@ -22,10 +22,18 @@ public class GetInterfaceConfigurations
 
     [Function("GetInterfaceConfigurations")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetInterfaceConfigurations")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "options", Route = "GetInterfaceConfigurations")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("GetInterfaceConfigurations function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
