@@ -1831,33 +1831,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Check if this is a placeholder interface - find the real one, not placeholder
-    const localConfig = this.interfaceConfigurations.find(c => 
-      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
-    );
-    
-    // If only placeholder exists, show error
-    const placeholderConfig = this.interfaceConfigurations.find(c => 
-      c.interfaceName === this.currentInterfaceName && c._isPlaceholder
-    );
-    
-    if (!localConfig && placeholderConfig) {
-      this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
-      return;
-    }
-    
-    if (!localConfig && !placeholderConfig) {
-      this.snackBar.open('Interface not found. Please reload the page.', 'OK', { duration: 3000 });
-      return;
+    // First, try to use selectedInterfaceConfig if available and not a placeholder
+    let configToUse = this.selectedInterfaceConfig && !this.selectedInterfaceConfig._isPlaceholder 
+      ? this.selectedInterfaceConfig 
+      : null;
+
+    // If not available, try to find it in interfaceConfigurations (non-placeholder)
+    if (!configToUse) {
+      configToUse = this.interfaceConfigurations.find(c => 
+        c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
+      ) || null;
     }
 
-    // Try to use local config first (already loaded)
-    if (localConfig && !localConfig._isPlaceholder) {
-      // Load destination adapter instances and show dialog
+    // If we found a real config, use it
+    if (configToUse && !configToUse._isPlaceholder) {
       this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
         next: (instances) => {
           const fullConfig = {
-            ...localConfig,
+            ...configToUse,
             destinationAdapterInstances: instances || []
           };
           this.openJsonViewDialog(fullConfig);
@@ -1865,13 +1856,23 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         error: (error) => {
           console.error('Error loading destination adapter instances:', error);
           // Show dialog with just the interface config (without instances)
-          this.openJsonViewDialog(localConfig);
+          this.openJsonViewDialog(configToUse);
         }
       });
       return;
     }
 
-    // Fallback: Try to load from API if not in local config
+    // Check if this is a placeholder interface
+    const placeholderConfig = this.interfaceConfigurations.find(c => 
+      c.interfaceName === this.currentInterfaceName && c._isPlaceholder
+    );
+    
+    if (placeholderConfig) {
+      this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
+      return;
+    }
+
+    // Fallback: Try to load from API if not found locally
     this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: (config) => {
         // Also get destination adapter instances
@@ -1892,29 +1893,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (error) => {
         console.error('Error loading interface configuration:', error);
-        // If API fails, try to use selectedInterfaceConfig as last resort
-        if (this.selectedInterfaceConfig) {
-          this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
-            next: (instances) => {
-              const fullConfig = {
-                ...this.selectedInterfaceConfig,
-                destinationAdapterInstances: instances || []
-              };
-              this.openJsonViewDialog(fullConfig);
-            },
-            error: () => {
-              this.openJsonViewDialog(this.selectedInterfaceConfig);
-            }
-          });
-        } else {
-          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 10000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
-        }
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
       }
     });
   }
