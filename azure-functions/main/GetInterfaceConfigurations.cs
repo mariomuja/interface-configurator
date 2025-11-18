@@ -40,10 +40,24 @@ public class GetInterfaceConfigurations
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting interface configurations");
+            _logger.LogError(ex, "Error getting interface configurations: {Message}", ex.Message);
+            _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
+            
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
+            
+            var errorDetails = new
+            {
+                error = new
+                {
+                    code = "500",
+                    message = "A server error has occurred",
+                    details = ex.Message,
+                    type = ex.GetType().Name
+                }
+            };
+            
+            await errorResponse.WriteStringAsync(JsonSerializer.Serialize(errorDetails));
             return errorResponse;
         }
     }
