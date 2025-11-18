@@ -6,6 +6,7 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
+using System.Data;
 
 namespace InterfaceConfigurator.Main.Services;
 
@@ -214,133 +215,11 @@ public class DataServiceAdapter : IDataService
         // Build dynamic INSERT statement - PrimaryKey is auto-generated, don't include it
         var columnList = string.Join(", ", sanitizedColumns);
         var parameterList = string.Join(", ", sanitizedColumns.Select(c => "@" + c));
-        var insertSql = $@"
-            INSERT INTO TransportData ({columnList}, datetime_created)
-            VALUES ({parameterList}, GETUTCDATE())";
-
         await SafeLogAsync("info", "Starting row insertion",
             $"Total rows: {rows.Count}, Columns: {columnList}", cancellationToken);
 
-        // Process in batches of 100
-        var batchSize = 100;
-        var totalInserted = 0;
-
-        for (int batchStart = 0; batchStart < rows.Count; batchStart += batchSize)
-        {
-            var batch = rows.Skip(batchStart).Take(batchSize).ToList();
-            var batchNumber = (batchStart / batchSize) + 1;
-            var totalBatches = (int)Math.Ceiling((double)rows.Count / batchSize);
-
-            try
-            {
-                using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-                try
-                {
-                    var rowIndexInBatch = 0;
-                    foreach (var row in batch)
-                    {
-                        try
-                        {
-                            var parameters = new List<SqlParameter>();
-                            var columnErrors = new List<string>();
-                            
-                            foreach (var column in filteredColumnTypes)
-                            {
-                                try
-                                {
-                                    var sanitizedColumnName = SanitizeColumnName(column.Key);
-                                    var value = row.TryGetValue(column.Key, out var val) ? val : null;
-                                    var sqlValue = value != null && !string.IsNullOrWhiteSpace(value)
-                                        ? typeValidator.ConvertValue(value, column.Value.DataType)
-                                        : DBNull.Value;
-
-                                    parameters.Add(new SqlParameter("@" + sanitizedColumnName, sqlValue ?? DBNull.Value));
-                                }
-                                catch (Exception colEx)
-                                {
-                                    // Track column-level errors
-                                    columnErrors.Add($"Column '{column.Key}': {colEx.Message}");
-                                }
-                            }
-
-                            if (columnErrors.Count > 0)
-                            {
-                                var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
-                                var errorMsg = $"Row {globalRowIndex} (batch {batchNumber}): Column errors - {string.Join("; ", columnErrors)}";
-                                await SafeLogAsync("error", $"Row {globalRowIndex} column validation failed", errorMsg, cancellationToken);
-                                throw new InvalidOperationException(errorMsg);
-                            }
-
-                            await _context.Database.ExecuteSqlRawAsync(insertSql, parameters.ToArray(), cancellationToken);
-                        }
-                        catch (Microsoft.Data.SqlClient.SqlException sqlEx)
-                        {
-                            var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
-                            var errorDetails = $"Row {globalRowIndex} (batch {batchNumber}): SQL Error {sqlEx.Number} - {sqlEx.Message}";
-                            
-                            // Try to extract column name from error message if available
-                            if (sqlEx.Message.Contains("column") || sqlEx.Message.Contains("Column"))
-                            {
-                                errorDetails += $". Column information may be available in error message.";
-                            }
-                            
-                            await SafeLogAsync("error", $"Row {globalRowIndex} SQL insert failed", errorDetails, cancellationToken);
-                            throw new InvalidOperationException(errorDetails, sqlEx);
-                        }
-                        catch (Exception rowEx)
-                        {
-                            var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
-                            var errorDetails = $"Row {globalRowIndex} (batch {batchNumber}): {rowEx.Message}";
-                            await SafeLogAsync("error", $"Row {globalRowIndex} processing failed", errorDetails, cancellationToken);
-                            throw;
-                        }
-                        
-                        rowIndexInBatch++;
-                    }
-
-                    await transaction.CommitAsync(cancellationToken);
-                    totalInserted += batch.Count;
-
-                    await SafeLogAsync("info", $"Batch {batchNumber}/{totalBatches} inserted",
-                        $"Rows: {batch.Count}, Total inserted: {totalInserted}/{rows.Count}", cancellationToken);
-                }
-                catch (Microsoft.Data.SqlClient.SqlException sqlEx)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    
-                    // Handle duplicate key violations gracefully (idempotency)
-                    // SQL Server error 2627 = Violation of PRIMARY KEY constraint
-                    // SQL Server error 2601 = Cannot insert duplicate key row
-                    if (sqlEx.Number == 2627 || sqlEx.Number == 2601)
-                    {
-                        await SafeLogAsync("warning", $"Batch {batchNumber}/{totalBatches} skipped (duplicate key)",
-                            $"Duplicate key violation detected. This may indicate idempotent retry. Rows in batch: {batch.Count}", cancellationToken);
-                        // Don't throw - treat as idempotent operation (already inserted)
-                        totalInserted += batch.Count; // Count as inserted for logging
-                        continue; // Continue with next batch
-                    }
-                    
-                    await SafeLogAsync("error", $"Batch {batchNumber}/{totalBatches} failed",
-                        $"SQL Error {sqlEx.Number}: {sqlEx.Message}, Rows in batch: {batch.Count}", cancellationToken);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    await SafeLogAsync("error", $"Batch {batchNumber}/{totalBatches} failed",
-                        $"Error: {ex.Message}, Rows in batch: {batch.Count}", cancellationToken);
-                    throw;
-                }
-            }
-            catch (Exception batchEx)
-            {
-                _logger?.LogError(batchEx, "Error inserting batch {BatchNumber}", batchNumber);
-                throw;
-            }
-        }
-
-        await SafeLogAsync("info", "Row insertion completed",
-            $"Total rows inserted: {totalInserted}/{rows.Count}", cancellationToken);
+        // Use bulk insert for better performance (SqlBulkCopy)
+        await InsertRowsBulkAsync(rows, filteredColumnTypes, sanitizedColumns, typeValidator, cancellationToken);
     }
 
     private string SanitizeColumnName(string columnName)
@@ -360,6 +239,150 @@ public class DataServiceAdapter : IDataService
         }
 
         return sanitized;
+    }
+
+    /// <summary>
+    /// Bulk insert rows using SqlBulkCopy for better performance
+    /// </summary>
+    private async Task InsertRowsBulkAsync(
+        List<Dictionary<string, string>> rows,
+        Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> filteredColumnTypes,
+        List<string> sanitizedColumns,
+        TypeValidator typeValidator,
+        CancellationToken cancellationToken)
+    {
+        if (_context == null)
+            throw new InvalidOperationException("Database context is not available");
+
+        var connectionString = _context.Database.GetConnectionString();
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Connection string is not available");
+
+        // Process rows in batches of 5000 for bulk insert
+        var bulkBatchSize = 5000;
+        var totalInserted = 0;
+
+        for (int batchStart = 0; batchStart < rows.Count; batchStart += bulkBatchSize)
+        {
+            var batch = rows.Skip(batchStart).Take(bulkBatchSize).ToList();
+            var batchNumber = (batchStart / bulkBatchSize) + 1;
+            var totalBatches = (int)Math.Ceiling((double)rows.Count / bulkBatchSize);
+
+            // Create DataTable for bulk insert
+            var dataTable = new DataTable();
+            
+            // Add columns to DataTable
+            foreach (var column in sanitizedColumns)
+            {
+                // Determine column type from first non-null value
+                var columnType = typeof(string); // Default to string
+                var columnKey = filteredColumnTypes.Keys.FirstOrDefault(k => SanitizeColumnName(k) == column);
+                if (columnKey != null && filteredColumnTypes.TryGetValue(columnKey, out var typeInfo))
+                {
+                    columnType = typeInfo.DataType switch
+                    {
+                        CsvColumnAnalyzer.SqlDataType.INT => typeof(int?),
+                        CsvColumnAnalyzer.SqlDataType.DECIMAL => typeof(decimal?),
+                        CsvColumnAnalyzer.SqlDataType.DATETIME2 => typeof(DateTime?),
+                        CsvColumnAnalyzer.SqlDataType.BIT => typeof(bool?),
+                        _ => typeof(string)
+                    };
+                }
+                
+                dataTable.Columns.Add(column, columnType);
+            }
+            
+            // Add datetime_created column
+            dataTable.Columns.Add("datetime_created", typeof(DateTime));
+
+            // Add rows to DataTable
+            foreach (var row in batch)
+            {
+                var dataRow = dataTable.NewRow();
+                
+                foreach (var column in sanitizedColumns)
+                {
+                    var columnKey = filteredColumnTypes.Keys.FirstOrDefault(k => SanitizeColumnName(k) == column);
+                    if (columnKey != null)
+                    {
+                        var value = row.TryGetValue(columnKey, out var val) ? val : null;
+                        if (!string.IsNullOrWhiteSpace(value))
+                        {
+                            try
+                            {
+                                var convertedValue = typeValidator.ConvertValue(value, filteredColumnTypes[columnKey].DataType);
+                                dataRow[column] = convertedValue ?? DBNull.Value;
+                            }
+                            catch
+                            {
+                                dataRow[column] = DBNull.Value;
+                            }
+                        }
+                        else
+                        {
+                            dataRow[column] = DBNull.Value;
+                        }
+                    }
+                }
+                
+                dataRow["datetime_created"] = DateTime.UtcNow;
+                dataTable.Rows.Add(dataRow);
+            }
+
+            // Use SqlBulkCopy for bulk insert
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            
+            try
+            {
+                using var transaction = connection.BeginTransaction();
+                try
+                {
+                    using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction);
+                    bulkCopy.DestinationTableName = "TransportData";
+                    bulkCopy.BatchSize = 1000; // Rows per batch within bulk copy
+                    bulkCopy.BulkCopyTimeout = 300; // 5 minutes timeout
+                    
+                    // Map columns
+                    foreach (var column in sanitizedColumns)
+                    {
+                        bulkCopy.ColumnMappings.Add(column, column);
+                    }
+                    bulkCopy.ColumnMappings.Add("datetime_created", "datetime_created");
+                    
+                    await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    
+                    totalInserted += batch.Count;
+                    await SafeLogAsync("info", $"Bulk batch {batchNumber}/{totalBatches} inserted",
+                        $"Rows: {batch.Count}, Total inserted: {totalInserted}/{rows.Count}", cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    
+                    // Handle duplicate key violations gracefully (idempotency)
+                    if (ex is SqlException sqlEx && (sqlEx.Number == 2627 || sqlEx.Number == 2601))
+                    {
+                        await SafeLogAsync("warning", $"Bulk batch {batchNumber}/{totalBatches} skipped (duplicate key)",
+                            $"Duplicate key violation detected. This may indicate idempotent retry. Rows in batch: {batch.Count}", cancellationToken);
+                        totalInserted += batch.Count; // Count as inserted for logging
+                        continue;
+                    }
+                    
+                    await SafeLogAsync("error", $"Bulk batch {batchNumber}/{totalBatches} failed",
+                        $"Error: {ex.Message}, Rows in batch: {batch.Count}", cancellationToken);
+                    throw;
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        await SafeLogAsync("info", "Row insertion completed",
+            $"Total rows inserted: {totalInserted}/{rows.Count}", cancellationToken);
     }
 }
 

@@ -41,6 +41,109 @@ public class CsvProcessingService : ICsvProcessingService
 
         var separator = !string.IsNullOrWhiteSpace(fieldSeparator) ? fieldSeparator : await GetFieldSeparatorAsync(cancellationToken);
 
+        // Use streaming parsing for large files to reduce memory usage
+        // For small files (< 1MB), use in-memory parsing for better performance
+        if (csvContent.Length > 1024 * 1024) // 1MB threshold
+        {
+            return await ParseCsvWithHeadersStreamingAsync(csvContent, separator, cancellationToken);
+        }
+        else
+        {
+            return ParseCsvWithHeadersInMemory(csvContent, separator);
+        }
+    }
+
+    /// <summary>
+    /// Parse CSV with streaming to reduce memory usage for large files
+    /// </summary>
+    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersStreamingAsync(string csvContent, string separator, CancellationToken cancellationToken)
+    {
+        var headers = new List<string>();
+        var records = new List<Dictionary<string, string>>();
+        var invalidRows = new List<(int lineNumber, int actualColumnCount)>();
+        
+        using var reader = new StringReader(csvContent);
+        
+        // Read header line
+        var headerLine = await reader.ReadLineAsync();
+        if (string.IsNullOrWhiteSpace(headerLine))
+            return (new List<string>(), new List<Dictionary<string, string>>());
+
+        headers = ParseCsvLine(headerLine, separator)
+            .Select(h => h.Trim().Trim('"'))
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .ToList();
+
+        var expectedColumnCount = headers.Count;
+        if (expectedColumnCount == 0)
+        {
+            throw new InvalidOperationException("CSV file has no valid headers. Cannot determine expected column count.");
+        }
+
+        // Process data rows line by line (streaming)
+        int lineNumber = 2; // Start at 2 (after header)
+        string? line;
+        const int chunkSize = 1000; // Process in chunks to balance memory and performance
+        var chunk = new List<Dictionary<string, string>>();
+
+        while ((line = await reader.ReadLineAsync()) != null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            var values = ParseCsvLine(line, separator)
+                .Select(v => v.Trim().Trim('"'))
+                .ToArray();
+
+            var actualColumnCount = values.Length;
+            
+            if (actualColumnCount != expectedColumnCount)
+            {
+                invalidRows.Add((lineNumber, actualColumnCount));
+                lineNumber++;
+                continue; // Skip invalid rows but continue processing
+            }
+
+            var record = headers
+                .Select((header, index) => new { header, value = values.Length > index ? values[index] : string.Empty })
+                .ToDictionary(x => x.header, x => x.value);
+
+            chunk.Add(record);
+            lineNumber++;
+
+            // Process chunk when it reaches chunkSize
+            if (chunk.Count >= chunkSize)
+            {
+                records.AddRange(chunk);
+                chunk.Clear();
+            }
+        }
+
+        // Add remaining records from last chunk
+        if (chunk.Count > 0)
+        {
+            records.AddRange(chunk);
+        }
+
+        // Throw exception if any rows have inconsistent column counts
+        if (invalidRows.Any())
+        {
+            var errorDetails = string.Join(", ", invalidRows.Take(10).Select(r => $"Line {r.lineNumber} has {r.actualColumnCount} columns"));
+            var errorMessage = $"CSV file has inconsistent column counts. Expected {expectedColumnCount} columns (based on header row), but found rows with different counts: {errorDetails}" +
+                (invalidRows.Count > 10 ? $" (and {invalidRows.Count - 10} more)" : "");
+            throw new InvalidDataException(errorMessage);
+        }
+
+        return (headers, records);
+    }
+
+    /// <summary>
+    /// Parse CSV in memory for small files (faster for small files)
+    /// </summary>
+    private (List<string> headers, List<Dictionary<string, string>> records) ParseCsvWithHeadersInMemory(string csvContent, string separator)
+    {
         var lines = csvContent
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Where(line => !string.IsNullOrWhiteSpace(line))

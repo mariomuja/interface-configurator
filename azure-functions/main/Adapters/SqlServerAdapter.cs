@@ -106,9 +106,18 @@ public class SqlServerAdapter : IAdapter
         if (string.IsNullOrWhiteSpace(_connectionString))
             throw new InvalidOperationException("Connection string is required when default context is not available");
 
-        // Create DbContextOptions with custom connection string
+        // Create DbContextOptions with custom connection string and connection pooling
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseSqlServer(_connectionString);
+        optionsBuilder.UseSqlServer(_connectionString, options =>
+        {
+            // Enable connection pooling and optimize for performance
+            options.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+            options.CommandTimeout(300); // 5 minutes timeout for large operations
+            options.MaxBatchSize(1000); // Batch size for EF Core operations
+        });
         
         return new ApplicationDbContext(optionsBuilder.Options);
     }

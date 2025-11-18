@@ -77,9 +77,23 @@ public class DestinationAdapterFunction
                     _logger.LogInformation("Processing {InstanceCount} enabled destination adapter instances for interface '{InterfaceName}'", 
                         enabledInstances.Count, config.InterfaceName);
                     
-                    // Process each destination adapter instance in parallel (separate processes)
-                    var tasks = enabledInstances.Select(instance => 
-                        ProcessDestinationAdapterInstanceAsync(config, instance, context.CancellationToken));
+                    // Process each destination adapter instance in parallel with optimized concurrency
+                    // Limit concurrent processing to avoid overwhelming the database
+                    const int maxConcurrency = 5; // Process up to 5 destination adapters concurrently
+                    var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+                    
+                    var tasks = enabledInstances.Select(async instance =>
+                    {
+                        await semaphore.WaitAsync(context.CancellationToken);
+                        try
+                        {
+                            await ProcessDestinationAdapterInstanceAsync(config, instance, context.CancellationToken);
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
                     
                     await Task.WhenAll(tasks);
                 }

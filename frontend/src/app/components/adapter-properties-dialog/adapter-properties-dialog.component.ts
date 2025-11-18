@@ -71,7 +71,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   isEnabled: boolean = true;
   receiveFolder: string = '';
   fileMask: string = '*.txt';
-  batchSize: number = 100;
+  batchSize: number = 1000; // Increased default batch size for better performance
   fieldSeparator: string = '║';
   destinationReceiveFolder: string = '';
   destinationFileMask: string = '*.txt';

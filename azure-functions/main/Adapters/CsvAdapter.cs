@@ -89,7 +89,7 @@ public class CsvAdapter : IAdapter
         _adapterInstanceGuid = adapterInstanceGuid;
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
-        _batchSize = batchSize ?? 100;
+        _batchSize = batchSize ?? 1000; // Increased default batch size from 100 to 1000 for better performance
         _fieldSeparator = fieldSeparator ?? "║"; // Default: Box Drawing Double Vertical Line (U+2551)
         _destinationReceiveFolder = destinationReceiveFolder;
         _destinationFileMask = destinationFileMask ?? "*.txt";
