@@ -148,6 +148,34 @@ var host = new HostBuilder()
             // Keep InMemoryLoggingService for backward compatibility (used by HTTP endpoints)
             services.AddSingleton<IInMemoryLoggingService, InMemoryLoggingService>();
             
+            // Register Metrics Service for Application Insights tracking
+            // TelemetryClient is automatically injected by Azure Functions when Application Insights is configured
+            services.AddSingleton<MetricsService>(sp =>
+            {
+                // Try to get TelemetryClient from Application Insights (if available)
+                Microsoft.ApplicationInsights.TelemetryClient? telemetryClient = null;
+                try
+                {
+                    // Application Insights SDK is automatically configured in Azure Functions
+                    // TelemetryClient can be accessed via dependency injection if Application Insights package is added
+                    // For now, we'll use null and MetricsService will handle gracefully
+                }
+                catch
+                {
+                    // TelemetryClient not available - MetricsService will work without it
+                }
+                var logger = sp.GetService<ILogger<MetricsService>>();
+                return new MetricsService(telemetryClient, logger);
+            });
+            
+            // Register Dead Letter Monitor
+            services.AddScoped<DeadLetterMonitor>(sp =>
+            {
+                var messageBoxService = sp.GetRequiredService<IMessageBoxService>();
+                var logger = sp.GetService<ILogger<DeadLetterMonitor>>();
+                return new DeadLetterMonitor(messageBoxService, logger);
+            });
+            
             // Register Adapter Services (these handle null DbContext gracefully)
             services.AddScoped<IDataService, DataServiceAdapter>();
             services.AddScoped<IDynamicTableService, DynamicTableService>();

@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Data;
+using ProcessCsvBlobTrigger.Services;
 
 namespace ProcessCsvBlobTrigger;
 
@@ -17,15 +18,18 @@ public class HealthCheck
     private readonly ApplicationDbContext? _applicationContext;
     private readonly MessageBoxDbContext? _messageBoxContext;
     private readonly ILogger<HealthCheck> _logger;
+    private readonly MetricsService? _metricsService;
 
     public HealthCheck(
         ApplicationDbContext? applicationContext,
         MessageBoxDbContext? messageBoxContext,
-        ILogger<HealthCheck> logger)
+        ILogger<HealthCheck> logger,
+        MetricsService? metricsService = null)
     {
         _applicationContext = applicationContext;
         _messageBoxContext = messageBoxContext;
         _logger = logger;
+        _metricsService = metricsService;
     }
 
     [Function("HealthCheck")]
@@ -49,6 +53,7 @@ public class HealthCheck
         {
             var dbCheck = await CheckDatabaseAsync(_applicationContext, "ApplicationDatabase");
             healthStatus.Checks.Add(dbCheck);
+            _metricsService?.TrackHealthCheck("ApplicationDatabase", dbCheck.Status == "Healthy", dbCheck.Message);
             if (dbCheck.Status != "Healthy")
             {
                 overallHealthy = false;
@@ -70,6 +75,7 @@ public class HealthCheck
         {
             var messageBoxCheck = await CheckDatabaseAsync(_messageBoxContext, "MessageBoxDatabase");
             healthStatus.Checks.Add(messageBoxCheck);
+            _metricsService?.TrackHealthCheck("MessageBoxDatabase", messageBoxCheck.Status == "Healthy", messageBoxCheck.Message);
             if (messageBoxCheck.Status != "Healthy")
             {
                 overallHealthy = false;
