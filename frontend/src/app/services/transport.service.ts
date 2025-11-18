@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { CsvRecord, SqlRecord, ProcessLog } from '../models/data.model';
 
 @Injectable({
@@ -12,15 +13,23 @@ export class TransportService {
   constructor(private http: HttpClient) {}
 
   getSampleCsvData(): Observable<CsvRecord[]> {
-    return this.http.get<CsvRecord[]>(`${this.apiUrl}/sample-csv`);
+    // Note: This endpoint doesn't exist yet - returning empty array for now
+    // TODO: Create sample-csv endpoint or remove this call
+    return this.http.get<CsvRecord[]>(`${this.apiUrl}/sample-csv`).pipe(
+      catchError(() => of([] as CsvRecord[]))
+    );
   }
 
   getSqlData(): Observable<SqlRecord[]> {
-    return this.http.get<SqlRecord[]>(`${this.apiUrl}/sql-data`);
+    // Note: This endpoint doesn't exist yet - returning empty array for now
+    // TODO: Create sql-data endpoint or remove this call
+    return this.http.get<SqlRecord[]>(`${this.apiUrl}/sql-data`).pipe(
+      catchError(() => of([] as SqlRecord[]))
+    );
   }
 
   getProcessLogs(): Observable<ProcessLog[]> {
-    return this.http.get<ProcessLog[]>(`${this.apiUrl}/process-logs`);
+    return this.http.get<ProcessLog[]>(`${this.apiUrl}/GetProcessLogs`);
   }
 
   startTransport(csvContent?: string): Observable<{ message: string; fileId: string }> {
@@ -74,7 +83,7 @@ export class TransportService {
   }
 
   getInterfaceConfigurations(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/interface-configurations`);
+    return this.http.get<any[]>(`${this.apiUrl}/GetInterfaceConfigurations`);
   }
 
   createInterfaceConfiguration(config: {

@@ -21,7 +21,7 @@ public class GetInterfaceConfigurations
 
     [Function("GetInterfaceConfigurations")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetInterfaceConfigurations")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("GetInterfaceConfigurations function triggered");
