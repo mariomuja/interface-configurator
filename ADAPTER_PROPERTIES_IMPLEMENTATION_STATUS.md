@@ -33,7 +33,7 @@ All SQL Server adapter properties are **implemented and available in the UI**.
 - **Polling Section**: "Polling Configuration (Source Only)" (lines 179-202)
 
 ### Backend Storage
-- **Model**: `azure-functions/ProcessCsvBlobTrigger.Core/Models/InterfaceConfiguration.cs`
+- **Model**: `azure-functions/main.Core/Models/InterfaceConfiguration.cs`
 - **API Endpoints**: 
   - `UpdateSqlConnectionProperties` - Updates connection properties
   - `UpdateSqlPollingProperties` - Updates polling properties
@@ -58,7 +58,7 @@ All SQL Server adapter properties are **implemented and available in the UI**.
 #### Current Implementation:
 - **Variable**: `$datetime` (replaced with `yyyyMMddHHmmss.fff` format)
 - **Example**: `"text_" + $datetime + ".txt"` → `"text_20240101120000.123.txt"`
-- **Location**: `azure-functions/ProcessCsvBlobTrigger/Adapters/CsvAdapter.cs` (lines 544-576)
+- **Location**: `azure-functions/main/Adapters/CsvAdapter.cs` (lines 544-576)
 
 #### Required Changes:
 - ❌ **Missing**: Support for `%date_time%` syntax (currently only `$datetime`)
@@ -158,9 +158,9 @@ All implemented properties are:
 ## Files to Review
 
 ### Backend
-- `azure-functions/ProcessCsvBlobTrigger.Core/Models/InterfaceConfiguration.cs`
-- `azure-functions/ProcessCsvBlobTrigger/Adapters/CsvAdapter.cs`
-- `azure-functions/ProcessCsvBlobTrigger/Services/AdapterFactory.cs`
+- `azure-functions/main.Core/Models/InterfaceConfiguration.cs`
+- `azure-functions/main/Adapters/CsvAdapter.cs`
+- `azure-functions/main/Services/AdapterFactory.cs`
 
 ### Frontend
 - `frontend/src/app/components/adapter-properties-dialog/adapter-properties-dialog.component.html`
@@ -168,9 +168,9 @@ All implemented properties are:
 - `frontend/src/app/components/transport/transport.component.ts`
 
 ### API Endpoints
-- `azure-functions/ProcessCsvBlobTrigger/UpdateSqlConnectionProperties.cs`
-- `azure-functions/ProcessCsvBlobTrigger/UpdateSqlPollingProperties.cs`
-- `azure-functions/ProcessCsvBlobTrigger/UpdateFileMask.cs`
+- `azure-functions/main/UpdateSqlConnectionProperties.cs`
+- `azure-functions/main/UpdateSqlPollingProperties.cs`
+- `azure-functions/main/UpdateFileMask.cs`
 
 
 

@@ -10,9 +10,9 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/azure-functions/ProcessCsvBlobTrigger/bin/Debug/net8.0/ProcessCsvBlobTrigger.dll",
+            "program": "${workspaceFolder}/azure-functions/main/bin/Debug/net8.0/ProcessCsvBlobTrigger.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/azure-functions/ProcessCsvBlobTrigger",
+            "cwd": "${workspaceFolder}/azure-functions/main",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false

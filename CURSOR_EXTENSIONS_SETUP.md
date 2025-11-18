@@ -62,12 +62,12 @@ If extensions aren't found in Cursor's marketplace:
 
 Your Azure Function files:
 ```
-azure-functions/ProcessCsvBlobTrigger/
+azure-functions/main/
 ├── SimpleTestFunction.cs      ← Edit this HTTP trigger function
-├── ProcessCsvBlobTrigger.cs   ← Blob trigger (currently disabled)
+├── main.cs                     ← Blob trigger (currently disabled)
 ├── Program.cs                  ← Entry point & DI configuration
 ├── host.json                   ← Function app config
-└── ProcessCsvBlobTrigger.csproj ← Project file
+└── main.csproj ← Project file
 ```
 
 ## Basic Editing Without Extensions

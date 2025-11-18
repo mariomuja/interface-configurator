@@ -44,7 +44,7 @@ VS Code sollte automatisch die empfohlenen Extensions vorschlagen, wenn Sie das 
 Der Test Explorer zeigt:
 
 ```
-📁 ProcessCsvBlobTrigger.Core.Tests
+📁 main.Core.Tests
   📁 Services
     📁 CsvProcessingServiceTests
       ✓ ParseCsv_ValidCsv_ReturnsRecords
@@ -145,7 +145,7 @@ Die Test Explorer Konfiguration befindet sich in `.vscode/settings.json`:
 3. **Projekt bauen:**
    ```powershell
    cd azure-functions
-   dotnet build ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj
+   dotnet build main.Core.Tests/main.Core.Tests.csproj
    ```
 
 ### Code Lens wird nicht angezeigt
@@ -158,7 +158,7 @@ Die Test Explorer Konfiguration befindet sich in `.vscode/settings.json`:
 
 1. Prüfen Sie, ob das Test-Projekt gebaut wurde:
    ```powershell
-   dotnet build ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj
+   dotnet build main.Core.Tests/main.Core.Tests.csproj
    ```
 
 2. Prüfen Sie die Output-Panel für Fehlermeldungen:

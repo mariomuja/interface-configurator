@@ -18,7 +18,7 @@ if (-not (Test-Path $testResultsDir)) {
 }
 
 # Führe Tests aus
-$testProject = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests\ProcessCsvBlobTrigger.Core.Tests.csproj"
+$testProject = Join-Path $PSScriptRoot "main.Core.Tests\main.Core.Tests.csproj"
 
 Write-Host "Fuehre Tests aus..." -ForegroundColor Yellow
 Write-Host ""

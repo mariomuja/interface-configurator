@@ -11,7 +11,7 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Unit Test Uebersicht" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-$testProject = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests\ProcessCsvBlobTrigger.Core.Tests.csproj"
+$testProject = Join-Path $PSScriptRoot "main.Core.Tests\main.Core.Tests.csproj"
 $testResultsDir = Join-Path $PSScriptRoot "TestResults"
 
 if (-not (Test-Path $testResultsDir)) {

@@ -193,7 +193,7 @@
     },
     "githubRepoPath": {
       "type": "string",
-      "defaultValue": "azure-functions/ProcessCsvBlobTrigger",
+      "defaultValue": "azure-functions/main",
       "metadata": {
         "description": "Path to the Function App code in the repository (reserved for future use)"
       }

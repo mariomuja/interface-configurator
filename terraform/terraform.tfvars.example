@@ -45,7 +45,7 @@ functions_sku_name      = "Y1"  # Consumption plan (will be migrated to EP1 Flex
 # Leave empty to use GitHub Actions deployment instead
 github_repo_url  = ""  # e.g., "https://github.com/mariomuja/interface-configuration"
 github_branch    = "main"
-github_repo_path = "azure-functions/ProcessCsvBlobTrigger"  # Path to Function App code in repo
+github_repo_path = "azure-functions/main"  # Path to Function App code in repo
 
 # Security
 jwt_secret = "CHANGE_ME_GENERATE_STRONG_RANDOM_SECRET"

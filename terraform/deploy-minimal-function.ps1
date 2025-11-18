@@ -4,7 +4,7 @@
 param(
     [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = "func-integration",
-    [string]$PublishPath = "azure-functions/ProcessCsvBlobTrigger/publish"
+    [string]$PublishPath = "azure-functions/main/publish"
 )
 
 Write-Host "`n=== Minimales Function App Deployment ===" -ForegroundColor Cyan

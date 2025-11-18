@@ -64,7 +64,7 @@ Azure Functions will be automatically deployed via GitHub Actions when you push 
 
 ```powershell
 # Navigate to Azure Functions directory
-cd C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger
+cd C:\Users\mario\infrastructure-as-code\azure-functions\main
 
 # Build and publish
 dotnet publish --configuration Release --output ./publish

@@ -48,7 +48,7 @@ Fehlgeschlagen: 0 Tests
   Test-Details (nach Klasse)
 ========================================
 
-[ProcessCsvBlobTrigger.Core.Tests.Services.CsvProcessingServiceTests]
+[main.Core.Tests.Services.CsvProcessingServiceTests]
   [PASS] ParseCsv_ValidCsv_ReturnsRecords (6 ms)
   [PASS] ParseCsv_EmptyContent_ReturnsEmptyList (< 1 ms)
   [PASS] CreateChunks_ValidRecords_CreatesChunks (< 1 ms)
@@ -119,7 +119,7 @@ cd azure-functions
 
 ```powershell
 cd azure-functions
-dotnet test ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj --verbosity normal
+dotnet test main.Core.Tests/main.Core.Tests.csproj --verbosity normal
 ```
 
 ### Erweiterte Optionen
@@ -214,7 +214,7 @@ Tests können auch in GitHub Actions ausgeführt werden:
 
 ```powershell
 # Stelle sicher, dass das Test-Projekt gebaut wurde
-dotnet build ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj
+dotnet build main.Core.Tests/main.Core.Tests.csproj
 ```
 
 ### ReportGenerator nicht gefunden

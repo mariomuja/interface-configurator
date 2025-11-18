@@ -6,7 +6,7 @@
   "azureFunctions.preDeployTask": "npm prune",
   
   // .NET Test Explorer Configuration
-  "dotnet.defaultSolution": "ProcessCsvBlobTrigger.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj",
+  "dotnet.defaultSolution": "main.Core.Tests/ProcessCsvBlobTrigger.Core.Tests.csproj",
   "dotnet.testWindow.codeLens": true,
   "dotnet.unitTests.runSettingsPath": "",
   "dotnet.testWindow.showCodeLens": true,

@@ -191,7 +191,7 @@ variable "github_branch" {
 }
 
 variable "github_repo_path" {
-  description = "Path to the Function App code in the repository (e.g., azure-functions/ProcessCsvBlobTrigger)"
+  description = "Path to the Function App code in the repository (e.g., azure-functions/main)"
   type        = string
-  default     = "azure-functions/ProcessCsvBlobTrigger"
+  default     = "azure-functions/main"
 }

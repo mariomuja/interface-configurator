@@ -16,7 +16,7 @@ Write-Host "  Test Report Generator" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 $originalLocation = Get-Location
-$testProjectPath = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests"
+$testProjectPath = Join-Path $PSScriptRoot "main.Core.Tests"
 $outputBaseDir = Join-Path $PSScriptRoot $OutputDir
 $coverageDir = Join-Path $outputBaseDir "coverage"
 $reportDir = Join-Path $outputBaseDir "report"

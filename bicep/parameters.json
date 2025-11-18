@@ -75,7 +75,7 @@
       "value": "main"
     },
     "githubRepoPath": {
-      "value": "azure-functions/ProcessCsvBlobTrigger"
+      "value": "azure-functions/main"
     }
   }
 }

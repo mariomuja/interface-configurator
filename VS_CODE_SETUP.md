@@ -57,11 +57,11 @@ VS Code will automatically prompt you to install recommended extensions when you
 
 Your Azure Function project is located at:
 ```
-azure-functions/ProcessCsvBlobTrigger/
-├── ProcessCsvBlobTrigger.csproj    # Project file
+azure-functions/main/
+├── main.csproj    # Project file
 ├── Program.cs                       # Entry point
 ├── SimpleTestFunction.cs           # HTTP trigger function
-├── ProcessCsvBlobTrigger.cs        # Blob trigger (temporarily disabled)
+├── main.cs                          # Blob trigger (temporarily disabled)
 ├── host.json                       # Function app configuration
 └── local.settings.json             # Local development settings (not committed)
 ```
@@ -78,7 +78,7 @@ azure-functions/ProcessCsvBlobTrigger/
 1. Open terminal in VS Code (`Ctrl+`` ` or `View → Terminal`)
 2. Navigate to function directory:
    ```bash
-   cd azure-functions/ProcessCsvBlobTrigger
+   cd azure-functions/main
    ```
 3. Restore dependencies:
    ```bash
@@ -102,7 +102,7 @@ azure-functions/ProcessCsvBlobTrigger/
 ## Editing Functions
 
 - **SimpleTestFunction.cs**: HTTP trigger function (currently active)
-- **ProcessCsvBlobTrigger.cs**: Blob trigger function (temporarily disabled)
+- **main.cs**: Blob trigger function (temporarily disabled)
 - **Program.cs**: Dependency injection and configuration
 - **host.json**: Function app settings (logging, version, etc.)
 

@@ -25,7 +25,7 @@ Nach dem Setzen des Secrets wird der GitHub Actions Workflow automatisch funktio
 ## Testen
 
 Um den Workflow zu testen:
-1. Mache eine kleine Änderung in `azure-functions/ProcessCsvBlobTrigger/`
+1. Mache eine kleine Änderung in `azure-functions/main/`
 2. Committe und pushe zu `main`
 3. Gehe zu: https://github.com/mariomuja/interface-configurator/actions
 4. Der Workflow sollte automatisch starten

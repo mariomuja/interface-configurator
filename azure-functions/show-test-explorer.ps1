@@ -12,10 +12,10 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  VS Code Test Explorer View" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-$testProject = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests\ProcessCsvBlobTrigger.Core.Tests.csproj"
+$testProject = Join-Path $PSScriptRoot "main.Core.Tests\main.Core.Tests.csproj"
 
 # Lade Test-Struktur aus den Test-Dateien
-$testFiles = Get-ChildItem -Path (Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests") -Recurse -Filter "*Tests.cs"
+$testFiles = Get-ChildItem -Path (Join-Path $PSScriptRoot "main.Core.Tests") -Recurse -Filter "*Tests.cs"
 
 $testStructure = @{}
 
@@ -42,7 +42,7 @@ foreach ($file in $testFiles) {
     }
     
     if ($className -and $testMethods.Count -gt 0) {
-        $relativePath = $file.FullName.Replace((Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests"), "").TrimStart('\')
+        $relativePath = $file.FullName.Replace((Join-Path $PSScriptRoot "main.Core.Tests"), "").TrimStart('\')
         $folder = Split-Path $relativePath -Parent
         
         if (-not $testStructure.ContainsKey($folder)) {
@@ -54,7 +54,7 @@ foreach ($file in $testFiles) {
 }
 
 # Zeige Test-Struktur
-Write-Host "ProcessCsvBlobTrigger.Core.Tests" -ForegroundColor Cyan
+Write-Host "main.Core.Tests" -ForegroundColor Cyan
 
 foreach ($folder in ($testStructure.Keys | Sort-Object)) {
     if ($folder -and $folder -ne ".") {

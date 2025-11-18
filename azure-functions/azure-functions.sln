@@ -2,13 +2,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessCsvBlobTrigger", "ProcessCsvBlobTrigger\ProcessCsvBlobTrigger.csproj", "{C3D7B9B6-5110-359F-2AE5-BAB6DD2C5537}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main", "main\main.csproj", "{C3D7B9B6-5110-359F-2AE5-BAB6DD2C5537}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessCsvBlobTrigger.Core", "ProcessCsvBlobTrigger.Core\ProcessCsvBlobTrigger.Core.csproj", "{54510603-F244-E839-A630-504B21FAE5C3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core", "main.Core\main.Core.csproj", "{54510603-F244-E839-A630-504B21FAE5C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessCsvBlobTrigger.Core.Tests", "ProcessCsvBlobTrigger.Core.Tests\ProcessCsvBlobTrigger.Core.Tests.csproj", "{E55750E5-90BB-6A20-F599-2D5C51D2086B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core.Tests", "main.Core.Tests\main.Core.Tests.csproj", "{E55750E5-90BB-6A20-F599-2D5C51D2086B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ProcessCsvBlobTrigger (1)", "ProcessCsvBlobTrigger (1)", "{4ED84258-AC28-DE93-F274-79AADBA57FF4}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "main", "main", "{4ED84258-AC28-DE93-F274-79AADBA57FF4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "obj", "obj", "{50985F2A-796E-1FA3-9C03-BDF42FCBB6AC}"
 EndProject
@@ -16,11 +16,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Release", "Release", "{19DE
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "net8.0", "net8.0", "{8C6A3ABA-E31D-69A1-8AD1-785D54448E8F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkerExtensions", "ProcessCsvBlobTrigger\obj\Release\net8.0\WorkerExtensions\WorkerExtensions.csproj", "{99BDC92F-65E8-3668-3FDD-488E03B3E40C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkerExtensions", "main\obj\Release\net8.0\WorkerExtensions\WorkerExtensions.csproj", "{99BDC92F-65E8-3668-3FDD-488E03B3E40C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "win-x64", "win-x64", "{CC962A0C-5EDB-2767-7DAB-159942C084E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkerExtensions", "ProcessCsvBlobTrigger\obj\Release\net8.0\win-x64\WorkerExtensions\WorkerExtensions.csproj", "{CF40D7A1-DF4A-1577-E760-A8E24BB96BF2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkerExtensions", "main\obj\Release\net8.0\win-x64\WorkerExtensions\WorkerExtensions.csproj", "{CF40D7A1-DF4A-1577-E760-A8E24BB96BF2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

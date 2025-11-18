@@ -6,7 +6,7 @@ param(
     [string]$FunctionAppName = "func-integration",
     [string]$StorageAccountName = "stfuncsappe1mz5h",
     [string]$ContainerName = "function-releases",
-    [string]$ZipPath = "azure-functions/ProcessCsvBlobTrigger/publish/function-app.zip"
+    [string]$ZipPath = "azure-functions/main/publish/function-app.zip"
 )
 
 Write-Host "`n=== Azure Function App Deployment ===" -ForegroundColor Cyan
@@ -20,7 +20,7 @@ $fullZipPath = Resolve-Path $ZipPath -ErrorAction SilentlyContinue
 if (-not $fullZipPath) {
     Write-Host "❌ ZIP nicht gefunden: $ZipPath" -ForegroundColor Red
     Write-Host "Erstelle neues ZIP..." -ForegroundColor Yellow
-    Push-Location "azure-functions/ProcessCsvBlobTrigger"
+    Push-Location "azure-functions/main"
     dotnet publish --configuration Release --output ./publish
     Pop-Location
     $fullZipPath = Resolve-Path $ZipPath

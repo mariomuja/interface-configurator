@@ -20,7 +20,7 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Wechsle zum Functions-Verzeichnis
 $originalLocation = Get-Location
-$testProjectPath = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests"
+$testProjectPath = Join-Path $PSScriptRoot "main.Core.Tests"
 
 if (-not (Test-Path $testProjectPath)) {
     Write-Host "Test-Projekt nicht gefunden: $testProjectPath" -ForegroundColor Red

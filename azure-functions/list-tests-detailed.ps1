@@ -11,7 +11,7 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Detaillierte Test-Uebersicht" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-$testProject = Join-Path $PSScriptRoot "ProcessCsvBlobTrigger.Core.Tests\ProcessCsvBlobTrigger.Core.Tests.csproj"
+$testProject = Join-Path $PSScriptRoot "main.Core.Tests\main.Core.Tests.csproj"
 $testResultsDir = Join-Path $PSScriptRoot "TestResults"
 
 if (-not (Test-Path $testResultsDir)) {
@@ -36,7 +36,7 @@ foreach ($line in $output) {
         $duration = $matches[2].Trim()
         
         # Parse Test-Name: Full.Qualified.Namespace.TestClass.TestMethod
-        # Beispiel: ProcessCsvBlobTrigger.Core.Tests.Services.CsvProcessingServiceTests.ParseCsv_ValidCsv_ReturnsRecords
+        # Beispiel: main.Core.Tests.Services.CsvProcessingServiceTests.ParseCsv_ValidCsv_ReturnsRecords
         # Extrahiere Test-Klasse und Test-Methode
         $parts = $testName -split '\.'
         if ($parts.Count -ge 2) {

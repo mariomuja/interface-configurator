@@ -93,7 +93,7 @@ param githubRepoUrl string = ''
 param githubBranch string = 'main'
 
 @description('Path to the Function App code in the repository (reserved for future use)')
-param githubRepoPath string = 'azure-functions/ProcessCsvBlobTrigger'
+param githubRepoPath string = 'azure-functions/main'
 
 // Note: No random suffix - using descriptive names directly
 // Azure resource names must be globally unique, so descriptive names are used
