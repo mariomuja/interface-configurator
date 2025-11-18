@@ -1820,12 +1820,33 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // Check if this is a placeholder interface
-    const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
-    if (config && config._isPlaceholder) {
+    const localConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
+    if (localConfig && localConfig._isPlaceholder) {
       this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
       return;
     }
 
+    // Try to use local config first (already loaded)
+    if (localConfig && !localConfig._isPlaceholder) {
+      // Load destination adapter instances and show dialog
+      this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
+        next: (instances) => {
+          const fullConfig = {
+            ...localConfig,
+            destinationAdapterInstances: instances || []
+          };
+          this.openJsonViewDialog(fullConfig);
+        },
+        error: (error) => {
+          console.error('Error loading destination adapter instances:', error);
+          // Show dialog with just the interface config (without instances)
+          this.openJsonViewDialog(localConfig);
+        }
+      });
+      return;
+    }
+
+    // Fallback: Try to load from API if not in local config
     this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: (config) => {
         // Also get destination adapter instances
@@ -1846,13 +1867,29 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (error) => {
         console.error('Error loading interface configuration:', error);
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        // If API fails, try to use selectedInterfaceConfig as last resort
+        if (this.selectedInterfaceConfig) {
+          this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
+            next: (instances) => {
+              const fullConfig = {
+                ...this.selectedInterfaceConfig,
+                destinationAdapterInstances: instances || []
+              };
+              this.openJsonViewDialog(fullConfig);
+            },
+            error: () => {
+              this.openJsonViewDialog(this.selectedInterfaceConfig);
+            }
+          });
+        } else {
+          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
+          this.snackBar.open(detailedMessage, 'Schließen', { 
+            duration: 10000,
+            panelClass: ['error-snackbar'],
+            verticalPosition: 'top',
+            horizontalPosition: 'center'
+          });
+        }
       }
     });
   }
