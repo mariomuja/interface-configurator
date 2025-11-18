@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "name": "infrastructure-as-code",
+  "name": "interface-configurator",
   "framework": "angular",
   "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist/infrastructure-as-code/browser",
+  "outputDirectory": "frontend/dist/interface-configurator/browser",
   "installCommand": "cd frontend && npm install",
   "build": {
     "env": {

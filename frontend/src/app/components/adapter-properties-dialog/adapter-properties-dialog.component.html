@@ -1,0 +1,344 @@
+<h2 mat-dialog-title>
+  <mat-icon>settings</mat-icon>
+  {{ dialogTitle }}
+</h2>
+
+<mat-dialog-content>
+  <div class="dialog-content">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>
+        <span>Instance Name</span>
+        <mat-icon class="help-icon" matTooltip="A user-friendly name to identify this adapter instance. This name is displayed in the UI and helps distinguish between multiple instances of the same adapter type." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <input matInput [(ngModel)]="instanceName" placeholder="Enter instance name" />
+      <mat-icon matSuffix>label</mat-icon>
+    </mat-form-field>
+
+    <!-- CSV Adapter Type Selection (Source only) -->
+    <mat-form-field appearance="outline" class="full-width" *ngIf="showSftpProperties">
+      <mat-label>
+        <span>Adapter Type</span>
+        <mat-icon class="help-icon" matTooltip="Select the adapter type: FILE (Azure Blob Storage) or SFTP (SFTP server). When SFTP is selected, FILE properties are ignored." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <mat-select [(ngModel)]="csvAdapterType">
+        <mat-option value="FILE">FILE (Azure Blob Storage)</mat-option>
+        <mat-option value="SFTP">SFTP (SFTP Server)</mat-option>
+      </mat-select>
+      <mat-icon matSuffix>storage</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" *ngIf="showReceiveFolder">
+      <mat-label>
+        <span>Receive Folder</span>
+        <mat-icon class="help-icon" matTooltip="The blob storage folder path where CSV files are monitored. When a CSV file is added to this folder, it will be automatically processed. Format: 'container-name/folder-path' (e.g., 'csv-files/csv-incoming'). Leave empty to disable folder monitoring." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <input matInput [(ngModel)]="receiveFolder" placeholder="csv-files/csv-incoming" />
+      <mat-icon matSuffix>folder</mat-icon>
+      <mat-hint>Blob storage path for CSV files (e.g., "csv-files/csv-incoming")</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" *ngIf="showFileMask">
+      <mat-label>
+        <span>File Mask</span>
+        <mat-icon class="help-icon" matTooltip="Wildcard pattern to filter files in the Receive Folder. Examples: '*.txt' (all .txt files), '*.csv' (all .csv files), 'data_*.txt' (files starting with 'data_' and ending with .txt). Supports * (any sequence) and ? (single character). Default: '*.txt'." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <input matInput [(ngModel)]="fileMask" placeholder="*.txt" />
+      <mat-icon matSuffix>filter_list</mat-icon>
+      <mat-hint>File pattern filter (e.g., "*.txt", "*.csv", "data_*.txt")</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" *ngIf="showBatchSize">
+      <mat-label>
+        <span>Batch Size</span>
+        <mat-icon class="help-icon" matTooltip="Number of rows read from the CSV file in one chunk before debatching into single rows and writing to MessageBox. Larger batches improve performance for large files but use more memory. Smaller batches use less memory but may be slower. Default: 100 rows per batch." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <input matInput type="number" [(ngModel)]="batchSize" min="1" placeholder="100" />
+      <mat-icon matSuffix>view_list</mat-icon>
+      <mat-hint>Number of rows per batch (default: 100)</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" *ngIf="showFieldSeparator">
+      <mat-label>
+        <span>Field Separator</span>
+        <mat-icon class="help-icon" matTooltip="Character used to separate fields in CSV files. Used when reading/validating CSV rows and when constructing new CSV files as destination. Default: '║' (Box Drawing Double Vertical Line, U+2551) - a seldomly used UTF-8 character that avoids conflicts with common data." matTooltipPosition="right">help_outline</mat-icon>
+      </mat-label>
+      <input matInput [(ngModel)]="fieldSeparator" placeholder="║" maxlength="10" />
+      <mat-icon matSuffix>view_column</mat-icon>
+      <mat-hint>Field separator character (default: ║)</mat-hint>
+    </mat-form-field>
+
+    <!-- CSV Destination Properties (only when used as destination) -->
+    <div *ngIf="showDestinationProperties" class="csv-destination-section">
+      <h3>CSV Destination Configuration</h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Destination Receive Folder</span>
+          <mat-icon class="help-icon" matTooltip="The blob storage folder path where CSV files will be written. Files will be created in this folder with filenames constructed from the Destination File Mask pattern. Format: 'container-name/folder-path' (e.g., 'csv-files/csv-outgoing')." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="destinationReceiveFolder" placeholder="csv-files/csv-outgoing" />
+        <mat-icon matSuffix>folder</mat-icon>
+        <mat-hint>Blob storage path for output CSV files (e.g., "csv-files/csv-outgoing")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Destination File Mask</span>
+          <mat-icon class="help-icon" matTooltip="File mask pattern for constructing output filenames. Supports variables: $datetime (replaced with current date/time with milliseconds: yyyyMMddHHmmss.fff). Example: 'text_' + $datetime + '.txt' becomes 'text_20240101120000.123.txt'. Wildcards (*, ?) are also supported and will be replaced with datetime." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="destinationFileMask" placeholder="output_$datetime.txt" />
+        <mat-icon matSuffix>description</mat-icon>
+        <mat-hint>File pattern with variables (e.g., "output_$datetime.txt", "data_*.csv")</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- SQL Server Connection Properties -->
+    <div *ngIf="showSqlServerProperties" class="sql-section">
+      <h3>SQL Server Connection</h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Server Name</span>
+          <mat-icon class="help-icon" matTooltip="SQL Server name or IP address. For Azure SQL: use the full FQDN (e.g., 'sql-server.database.windows.net'). For on-premises: use server name or IP address (e.g., '192.168.1.100' or 'localhost')." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sqlServerName" (ngModelChange)="onSqlPropertyChange()" placeholder="sql-server.database.windows.net" />
+        <mat-icon matSuffix>dns</mat-icon>
+        <mat-hint>SQL Server name or IP (e.g., "sql-server.database.windows.net")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Database Name</span>
+          <mat-icon class="help-icon" matTooltip="The name of the SQL Server database to connect to." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sqlDatabaseName" (ngModelChange)="onSqlPropertyChange()" placeholder="MyDatabase" />
+        <mat-icon matSuffix>storage</mat-icon>
+        <mat-hint>Database name</mat-hint>
+      </mat-form-field>
+
+      <div class="toggle-container">
+        <div class="toggle-header">
+          <mat-slide-toggle [(ngModel)]="sqlIntegratedSecurity" (ngModelChange)="onSqlPropertyChange()" color="primary">
+            <span class="toggle-label">Integrated Security (Windows Authentication)</span>
+          </mat-slide-toggle>
+          <mat-icon class="help-icon" matTooltip="Use Windows Authentication (Integrated Security). When enabled, User Name and Password are not required. When disabled, SQL Authentication is used with User Name and Password." matTooltipPosition="right">help_outline</mat-icon>
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width" *ngIf="!sqlIntegratedSecurity">
+        <mat-label>
+          <span>User Name</span>
+          <mat-icon class="help-icon" matTooltip="SQL login username (required when Integrated Security is disabled)." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sqlUserName" (ngModelChange)="onSqlPropertyChange()" placeholder="sql_admin" />
+        <mat-icon matSuffix>person</mat-icon>
+        <mat-hint>SQL login username</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width" *ngIf="!sqlIntegratedSecurity">
+        <mat-label>
+          <span>Password</span>
+          <mat-icon class="help-icon" matTooltip="SQL login password (required when Integrated Security is disabled)." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="password" [(ngModel)]="sqlPassword" (ngModelChange)="onSqlPropertyChange()" placeholder="••••••••" />
+        <mat-icon matSuffix>lock</mat-icon>
+        <mat-hint>SQL login password</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Resource Group</span>
+          <mat-icon class="help-icon" matTooltip="Azure Resource Group name (for Azure SQL managed database access). Used for Azure-specific security and access management." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sqlResourceGroup" placeholder="rg-my-resource-group" />
+        <mat-icon matSuffix>folder</mat-icon>
+        <mat-hint>Azure Resource Group (optional, for Azure SQL)</mat-hint>
+      </mat-form-field>
+
+      <!-- Connection String Display -->
+      <mat-form-field appearance="outline" class="full-width" *ngIf="connectionString">
+        <mat-label>
+          <span>Connection String</span>
+          <mat-icon class="help-icon" matTooltip="The generated connection string based on the SQL Server properties above. Click the copy button to copy it to clipboard." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [value]="connectionString" readonly />
+        <button mat-icon-button matSuffix (click)="copyConnectionString()" matTooltip="Copy connection string to clipboard">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+        <mat-hint>Generated connection string (read-only)</mat-hint>
+      </mat-form-field>
+
+      <!-- Transaction and Batch Size Properties -->
+      <div class="toggle-container">
+        <div class="toggle-header">
+          <mat-slide-toggle [(ngModel)]="sqlUseTransaction" color="primary">
+            <span class="toggle-label">Use Transaction</span>
+          </mat-slide-toggle>
+          <mat-icon class="help-icon" matTooltip="Wrap execution in an explicit SQL transaction. When enabled, all database operations are wrapped in a transaction that can be committed or rolled back. This ensures atomicity - either all operations succeed or all are rolled back on error." matTooltipPosition="right">help_outline</mat-icon>
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Batch Size</span>
+          <mat-icon class="help-icon" matTooltip="Number of rows fetched at once when reading data from SQL Server. Larger batch sizes improve performance for large result sets but use more memory. Smaller batch sizes use less memory but may be slower. Default: 1000 rows per batch." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="number" [(ngModel)]="sqlBatchSize" min="1" placeholder="1000" />
+        <mat-icon matSuffix>view_list</mat-icon>
+        <mat-hint>Number of rows per batch (default: 1000)</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- SFTP Properties (Source only, when SFTP adapter type) -->
+    <div *ngIf="showSftpProperties && csvAdapterType === 'SFTP'" class="sftp-section">
+      <h3>SFTP Configuration</h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Host</span>
+          <mat-icon class="help-icon" matTooltip="SFTP server hostname or IP address." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sftpHost" placeholder="sftp.example.com" />
+        <mat-icon matSuffix>dns</mat-icon>
+        <mat-hint>SFTP server hostname or IP</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Port</span>
+          <mat-icon class="help-icon" matTooltip="SFTP server port (default: 22)." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="number" [(ngModel)]="sftpPort" min="1" max="65535" placeholder="22" />
+        <mat-icon matSuffix>network_check</mat-icon>
+        <mat-hint>SFTP server port (default: 22)</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Username</span>
+          <mat-icon class="help-icon" matTooltip="SFTP username for authentication." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sftpUsername" placeholder="sftp_user" />
+        <mat-icon matSuffix>person</mat-icon>
+        <mat-hint>SFTP username</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Password</span>
+          <mat-icon class="help-icon" matTooltip="SFTP password for authentication (alternative to SSH Key)." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="password" [(ngModel)]="sftpPassword" placeholder="••••••••" />
+        <mat-icon matSuffix>lock</mat-icon>
+        <mat-hint>SFTP password (or use SSH Key below)</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>SSH Key (Base64)</span>
+          <mat-icon class="help-icon" matTooltip="SFTP SSH private key in Base64 format (alternative to Password). Paste the Base64-encoded private key content here." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <textarea matInput [(ngModel)]="sftpSshKey" rows="4" placeholder="-----BEGIN RSA PRIVATE KEY-----..."></textarea>
+        <mat-icon matSuffix>vpn_key</mat-icon>
+        <mat-hint>Base64-encoded SSH private key (or use Password above)</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Folder</span>
+          <mat-icon class="help-icon" matTooltip="SFTP remote folder path where CSV files are located." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sftpFolder" placeholder="/remote/folder/path" />
+        <mat-icon matSuffix>folder</mat-icon>
+        <mat-hint>SFTP remote folder path (e.g., "/data/csv")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>File Mask</span>
+          <mat-icon class="help-icon" matTooltip="File mask pattern to filter files in the SFTP folder. Examples: '*.txt' (all .txt files), '*.csv' (all .csv files), 'data_*.txt' (files starting with 'data_' and ending with .txt). Supports * (any sequence) and ? (single character). Default: '*.txt'." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput [(ngModel)]="sftpFileMask" placeholder="*.txt" />
+        <mat-icon matSuffix>filter_list</mat-icon>
+        <mat-hint>File pattern filter (e.g., "*.txt", "*.csv", "data_*.txt")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Max Connection Pool Size</span>
+          <mat-icon class="help-icon" matTooltip="Maximum number of concurrent SFTP connections in the connection pool. Larger pool sizes improve performance for concurrent operations but use more resources. Default: 5." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="number" [(ngModel)]="sftpMaxConnectionPoolSize" min="1" placeholder="5" />
+        <mat-icon matSuffix>group</mat-icon>
+        <mat-hint>Maximum concurrent connections (default: 5)</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>File Buffer Size (bytes)</span>
+          <mat-icon class="help-icon" matTooltip="Buffer size in bytes for reading files from SFTP server. Larger buffer sizes improve performance but use more memory. Default: 8192 bytes (8 KB)." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="number" [(ngModel)]="sftpFileBufferSize" min="1024" placeholder="8192" />
+        <mat-icon matSuffix>memory</mat-icon>
+        <mat-hint>Buffer size in bytes (default: 8192)</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- SQL Server Polling Properties (Source only) -->
+    <div *ngIf="showSqlPollingProperties" class="sql-section">
+      <h3>Polling Configuration (Source Only)</h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Polling Statement</span>
+          <mat-icon class="help-icon" matTooltip="SQL SELECT or EXEC statement to poll for new data. This statement is executed periodically according to the Polling Interval. Example: 'SELECT * FROM Orders WHERE Processed = 0' or 'EXEC sp_GetNewOrders'. The results are debatched and written to MessageBox." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <textarea matInput [(ngModel)]="sqlPollingStatement" rows="3" placeholder="SELECT * FROM Orders WHERE Processed = 0"></textarea>
+        <mat-icon matSuffix>code</mat-icon>
+        <mat-hint>SQL SELECT or EXEC statement (e.g., "SELECT * FROM Orders WHERE Processed = 0")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>
+          <span>Polling Interval</span>
+          <mat-icon class="help-icon" matTooltip="How often the polling statement is executed (in seconds). The adapter will run the polling statement at this interval to check for new data. Default: 60 seconds." matTooltipPosition="right">help_outline</mat-icon>
+        </mat-label>
+        <input matInput type="number" [(ngModel)]="sqlPollingInterval" min="1" placeholder="60" />
+        <mat-icon matSuffix>schedule</mat-icon>
+        <mat-hint>Polling interval in seconds (default: 60)</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="toggle-container">
+      <div class="toggle-header">
+        <mat-slide-toggle [(ngModel)]="isEnabled" color="primary">
+          <span class="toggle-label">Enabled</span>
+        </mat-slide-toggle>
+        <mat-icon class="help-icon" matTooltip="Controls whether this adapter instance is active. When enabled, the adapter process runs automatically according to its schedule. When disabled, the process stops immediately and no data will be processed." matTooltipPosition="right">help_outline</mat-icon>
+      </div>
+      <p class="toggle-hint">
+        When enabled, the adapter process will run automatically. When disabled, the process stops immediately.
+      </p>
+    </div>
+
+    <div class="guid-info" *ngIf="adapterInstanceGuid">
+      <mat-icon>fingerprint</mat-icon>
+      <div class="guid-text-container">
+        <span class="guid-label">
+          Adapter Instance GUID:
+          <mat-icon class="help-icon" matTooltip="A unique identifier (GUID) assigned to this adapter instance. This GUID is used internally to track which adapter instance created each message in the MessageBox. It ensures proper message routing and traceability." matTooltipPosition="right">help_outline</mat-icon>
+        </span>
+        <span class="guid-value">{{ adapterInstanceGuid }}</span>
+      </div>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()" color="warn">Cancel</button>
+  <button mat-raised-button (click)="onSave()" color="primary">
+    <mat-icon>save</mat-icon>
+    Save
+  </button>
+</mat-dialog-actions>
+

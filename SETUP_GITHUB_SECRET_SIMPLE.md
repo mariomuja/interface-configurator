@@ -3,7 +3,7 @@
 ## Schritt 1: Öffne GitHub Secrets Seite
 
 Öffne diesen Link direkt:
-**https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions**
+**https://github.com/mariomuja/interface-configurator/settings/secrets/actions**
 
 ## Schritt 2: Neues Secret hinzufügen
 
@@ -27,7 +27,7 @@ Nach dem Setzen des Secrets wird der GitHub Actions Workflow automatisch funktio
 Um den Workflow zu testen:
 1. Mache eine kleine Änderung in `azure-functions/ProcessCsvBlobTrigger/`
 2. Committe und pushe zu `main`
-3. Gehe zu: https://github.com/mariomuja/infrastructure-as-code/actions
+3. Gehe zu: https://github.com/mariomuja/interface-configurator/actions
 4. Der Workflow sollte automatisch starten
 
 

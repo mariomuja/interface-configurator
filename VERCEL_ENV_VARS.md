@@ -1,6 +1,6 @@
 # Vercel Environment Variables Configuration
 
-Diese Datei dokumentiert alle Umgebungsvariablen, die in Vercel für die Infrastructure-as-Code App konfiguriert werden müssen.
+Diese Datei dokumentiert alle Umgebungsvariablen, die in Vercel für die Interface Configurator App konfiguriert werden müssen.
 
 ## Azure SQL Database Konfiguration
 

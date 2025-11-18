@@ -1,0 +1,172 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 20px 24px 16px;
+}
+
+h2[mat-dialog-title] mat-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+}
+
+mat-dialog-content {
+  padding: 0 24px;
+  min-width: 500px;
+  max-width: 600px;
+}
+
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px 0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-width mat-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.full-width mat-label span {
+  flex: 0 0 auto;
+}
+
+.full-width mat-label .help-icon {
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+.help-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.54);
+  cursor: help;
+  vertical-align: middle;
+  margin-left: 4px;
+  transition: color 0.2s ease;
+}
+
+.help-icon:hover {
+  color: #3f51b5;
+}
+
+.toggle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.toggle-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.toggle-hint {
+  margin: 0;
+  padding-left: 48px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  line-height: 1.4;
+}
+
+.sql-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.sql-section h3,
+.csv-destination-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.csv-destination-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.guid-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+  border-left: 3px solid #3f51b5;
+}
+
+.guid-info mat-icon {
+  color: #3f51b5;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  margin-top: 2px;
+}
+
+.guid-text-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.guid-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.guid-value {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.87);
+  word-break: break-all;
+}
+
+mat-dialog-actions {
+  padding: 16px 24px;
+  margin: 0;
+}
+
+mat-dialog-actions button {
+  margin-left: 8px;
+}
+
+mat-dialog-actions button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
+}
+
+::ng-deep .mat-mdc-form-field-hint-wrapper {
+  padding-top: 4px;
+}
+

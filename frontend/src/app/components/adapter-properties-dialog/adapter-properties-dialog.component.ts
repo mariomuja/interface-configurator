@@ -1,0 +1,279 @@
+import { Component, Inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+
+export interface AdapterPropertiesData {
+  adapterType: 'Source' | 'Destination';
+  adapterName: 'CSV' | 'SqlServer';
+  instanceName: string;
+  isEnabled: boolean;
+  receiveFolder?: string; // Only for CSV adapters
+  fileMask?: string; // Only for CSV adapters
+  batchSize?: number; // Only for CSV adapters
+  fieldSeparator?: string; // Only for CSV adapters
+  destinationReceiveFolder?: string; // Only for CSV adapters when used as destination
+  destinationFileMask?: string; // Only for CSV adapters when used as destination
+  // SFTP properties (only for CSV Source adapters)
+  csvAdapterType?: string; // "FILE" or "SFTP"
+  sftpHost?: string;
+  sftpPort?: number;
+  sftpUsername?: string;
+  sftpPassword?: string;
+  sftpSshKey?: string;
+  sftpFolder?: string;
+  sftpFileMask?: string;
+  sftpMaxConnectionPoolSize?: number;
+  sftpFileBufferSize?: number;
+  // SQL Server properties
+  sqlServerName?: string;
+  sqlDatabaseName?: string;
+  sqlUserName?: string;
+  sqlPassword?: string;
+  sqlIntegratedSecurity?: boolean;
+  sqlResourceGroup?: string;
+  sqlPollingStatement?: string; // Only for Source adapters
+  sqlPollingInterval?: number; // Only for Source adapters
+  sqlUseTransaction?: boolean; // SQL Server adapter property
+  sqlBatchSize?: number; // SQL Server adapter property
+  adapterInstanceGuid: string;
+}
+
+@Component({
+  selector: 'app-adapter-properties-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatSlideToggleModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule
+  ],
+  templateUrl: './adapter-properties-dialog.component.html',
+  styleUrl: './adapter-properties-dialog.component.css'
+})
+export class AdapterPropertiesDialogComponent implements OnInit {
+  instanceName: string = '';
+  isEnabled: boolean = true;
+  receiveFolder: string = '';
+  fileMask: string = '*.txt';
+  batchSize: number = 100;
+  fieldSeparator: string = '║';
+  destinationReceiveFolder: string = '';
+  destinationFileMask: string = '*.txt';
+  // SFTP properties
+  csvAdapterType: string = 'FILE';
+  sftpHost: string = '';
+  sftpPort: number = 22;
+  sftpUsername: string = '';
+  sftpPassword: string = '';
+  sftpSshKey: string = '';
+  sftpFolder: string = '';
+  sftpFileMask: string = '*.txt';
+  sftpMaxConnectionPoolSize: number = 5;
+  sftpFileBufferSize: number = 8192;
+  // SQL Server properties
+  sqlServerName: string = '';
+  sqlDatabaseName: string = '';
+  sqlUserName: string = '';
+  sqlPassword: string = '';
+  sqlIntegratedSecurity: boolean = false;
+  sqlResourceGroup: string = '';
+  sqlPollingStatement: string = '';
+  sqlPollingInterval: number = 60;
+  sqlUseTransaction: boolean = false;
+  sqlBatchSize: number = 1000;
+  connectionString: string = '';
+  adapterInstanceGuid: string = '';
+
+  constructor(
+    public dialogRef: MatDialogRef<AdapterPropertiesDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: AdapterPropertiesData
+  ) {}
+
+  ngOnInit(): void {
+    this.instanceName = this.data.instanceName || '';
+    this.isEnabled = this.data.isEnabled ?? true;
+    this.receiveFolder = this.data.receiveFolder || '';
+    this.fileMask = this.data.fileMask || '*.txt';
+    this.batchSize = this.data.batchSize ?? 100;
+    this.fieldSeparator = this.data.fieldSeparator || '║';
+    this.destinationReceiveFolder = this.data.destinationReceiveFolder || '';
+    this.destinationFileMask = this.data.destinationFileMask || '*.txt';
+    // SFTP properties
+    this.csvAdapterType = this.data.csvAdapterType || 'FILE';
+    this.sftpHost = this.data.sftpHost || '';
+    this.sftpPort = this.data.sftpPort ?? 22;
+    this.sftpUsername = this.data.sftpUsername || '';
+    this.sftpPassword = this.data.sftpPassword || '';
+    this.sftpSshKey = this.data.sftpSshKey || '';
+    this.sftpFolder = this.data.sftpFolder || '';
+    this.sftpFileMask = this.data.sftpFileMask || '*.txt';
+    this.sftpMaxConnectionPoolSize = this.data.sftpMaxConnectionPoolSize ?? 5;
+    this.sftpFileBufferSize = this.data.sftpFileBufferSize ?? 8192;
+    // SQL Server properties
+    this.sqlServerName = this.data.sqlServerName || '';
+    this.sqlDatabaseName = this.data.sqlDatabaseName || '';
+    this.sqlUserName = this.data.sqlUserName || '';
+    this.sqlPassword = this.data.sqlPassword || '';
+    this.sqlIntegratedSecurity = this.data.sqlIntegratedSecurity ?? false;
+    this.sqlResourceGroup = this.data.sqlResourceGroup || '';
+    this.sqlPollingStatement = this.data.sqlPollingStatement || '';
+    this.sqlPollingInterval = this.data.sqlPollingInterval ?? 60;
+    this.adapterInstanceGuid = this.data.adapterInstanceGuid || '';
+    this.updateConnectionString();
+  }
+
+  updateConnectionString(): void {
+    if (!this.showSqlServerProperties) {
+      this.connectionString = '';
+      return;
+    }
+
+    const parts: string[] = [];
+    
+    if (this.sqlServerName) {
+      if (this.sqlServerName.includes('.database.windows.net')) {
+        parts.push(`Server=tcp:${this.sqlServerName},1433`);
+      } else {
+        parts.push(`Server=${this.sqlServerName},1433`);
+      }
+    }
+    
+    if (this.sqlDatabaseName) {
+      parts.push(`Initial Catalog=${this.sqlDatabaseName}`);
+    }
+    
+    if (this.sqlIntegratedSecurity) {
+      parts.push('Integrated Security=True');
+    } else {
+      if (this.sqlUserName) {
+        parts.push(`User ID=${this.sqlUserName}`);
+      }
+      if (this.sqlPassword) {
+        parts.push(`Password=${this.sqlPassword}`);
+      }
+    }
+    
+    if (this.sqlServerName?.includes('.database.windows.net')) {
+      parts.push('Persist Security Info=False');
+      parts.push('MultipleActiveResultSets=False');
+      parts.push('Encrypt=True');
+      parts.push('TrustServerCertificate=False');
+      parts.push('Connection Timeout=30');
+    } else {
+      parts.push('Persist Security Info=False');
+      parts.push('MultipleActiveResultSets=True');
+      parts.push('Encrypt=False');
+      parts.push('Connection Timeout=30');
+    }
+    
+    this.connectionString = parts.length > 0 ? parts.join(';') + ';' : '';
+  }
+
+  onSqlPropertyChange(): void {
+    this.updateConnectionString();
+  }
+
+  copyConnectionString(): void {
+    if (this.connectionString) {
+      navigator.clipboard.writeText(this.connectionString).then(() => {
+        // Show success feedback (you might want to use MatSnackBar here)
+        alert('Connection string copied to clipboard!');
+      }).catch(err => {
+        console.error('Failed to copy connection string:', err);
+        alert('Failed to copy connection string');
+      });
+    }
+  }
+
+  onCancel(): void {
+    this.dialogRef.close();
+  }
+
+  onSave(): void {
+    this.dialogRef.close({
+      instanceName: this.instanceName.trim() || (this.data.adapterType === 'Source' ? 'Source' : 'Destination'),
+      isEnabled: this.isEnabled,
+      receiveFolder: this.data.adapterName === 'CSV' ? (this.receiveFolder.trim() || '') : undefined,
+      fileMask: this.data.adapterName === 'CSV' ? (this.fileMask.trim() || '*.txt') : undefined,
+      batchSize: this.data.adapterName === 'CSV' ? (this.batchSize > 0 ? this.batchSize : 100) : undefined,
+      fieldSeparator: this.data.adapterName === 'CSV' ? (this.fieldSeparator.trim() || '║') : undefined,
+      destinationReceiveFolder: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationReceiveFolder.trim() || '') : undefined,
+      destinationFileMask: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationFileMask.trim() || '*.txt') : undefined,
+      // SFTP properties (only for CSV Source adapters)
+      csvAdapterType: this.showSftpProperties ? (this.csvAdapterType || 'FILE') : undefined,
+      sftpHost: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpHost.trim() || '') : undefined,
+      sftpPort: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPort > 0 ? this.sftpPort : 22) : undefined,
+      sftpUsername: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpUsername.trim() || '') : undefined,
+      sftpPassword: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPassword.trim() || '') : undefined,
+      sftpSshKey: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpSshKey.trim() || '') : undefined,
+      sftpFolder: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFolder.trim() || '') : undefined,
+      sftpFileMask: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileMask.trim() || '*.txt') : undefined,
+      sftpMaxConnectionPoolSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpMaxConnectionPoolSize > 0 ? this.sftpMaxConnectionPoolSize : 5) : undefined,
+      sftpFileBufferSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileBufferSize > 0 ? this.sftpFileBufferSize : 8192) : undefined,
+      // SQL Server properties
+      sqlServerName: this.data.adapterName === 'SqlServer' ? (this.sqlServerName.trim() || '') : undefined,
+      sqlDatabaseName: this.data.adapterName === 'SqlServer' ? (this.sqlDatabaseName.trim() || '') : undefined,
+      sqlUserName: this.data.adapterName === 'SqlServer' ? (this.sqlUserName.trim() || '') : undefined,
+      sqlPassword: this.data.adapterName === 'SqlServer' ? (this.sqlPassword.trim() || '') : undefined,
+      sqlIntegratedSecurity: this.data.adapterName === 'SqlServer' ? this.sqlIntegratedSecurity : undefined,
+      sqlResourceGroup: this.data.adapterName === 'SqlServer' ? (this.sqlResourceGroup.trim() || '') : undefined,
+      sqlPollingStatement: this.showSqlPollingProperties ? (this.sqlPollingStatement.trim() || '') : undefined,
+      sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined
+    });
+  }
+
+  get showReceiveFolder(): boolean {
+    return this.data.adapterName === 'CSV' && this.showFileProperties;
+  }
+
+  get showFileMask(): boolean {
+    return this.data.adapterName === 'CSV' && this.showFileProperties;
+  }
+
+  get showBatchSize(): boolean {
+    return this.data.adapterName === 'CSV';
+  }
+
+  get showFieldSeparator(): boolean {
+    return this.data.adapterName === 'CSV';
+  }
+
+  get showDestinationProperties(): boolean {
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination';
+  }
+
+  get showSqlServerProperties(): boolean {
+    return this.data.adapterName === 'SqlServer';
+  }
+
+  get showSqlPollingProperties(): boolean {
+    return this.data.adapterName === 'SqlServer' && this.data.adapterType === 'Source';
+  }
+
+  get showSftpProperties(): boolean {
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source';
+  }
+
+  get showFileProperties(): boolean {
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' && this.csvAdapterType === 'FILE';
+  }
+
+  get dialogTitle(): string {
+    return `${this.data.adapterType} Adapter Properties (${this.data.adapterName})`;
+  }
+}
+

@@ -24,7 +24,7 @@ gh secret set AZURE_FUNCTIONAPP_PUBLISH_PROFILE < publish-profile.xml
 
 Oder manuell über GitHub Web UI:
 
-1. Gehe zu: https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions
+1. Gehe zu: https://github.com/mariomuja/interface-configurator/settings/secrets/actions
 2. Klicke auf "New repository secret"
 3. **Name**: `AZURE_FUNCTIONAPP_PUBLISH_PROFILE`
 4. **Value**: Kopiere den gesamten Inhalt aus `publish-profile.xml`

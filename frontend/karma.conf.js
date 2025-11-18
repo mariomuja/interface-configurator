@@ -18,7 +18,7 @@ module.exports = function (config) {
       suppressAll: true
     },
     coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/infrastructure-as-code'),
+      dir: require('path').join(__dirname, './coverage/interface-configurator'),
       subdir: '.',
       reporters: [
         { type: 'html' },

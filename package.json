@@ -1,5 +1,5 @@
 {
-  "name": "infrastructure-as-code",
+  "name": "interface-configurator",
   "version": "1.0.0",
   "description": "CSV to SQL Server data transport with Azure infrastructure",
   "scripts": {

@@ -1,8 +1,11 @@
 using System.Text;
+using System.Linq;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Services;
+using Renci.SshNet;
+using Renci.SshNet.Sftp;
 
 namespace ProcessCsvBlobTrigger.Adapters;
 
@@ -14,6 +17,9 @@ namespace ProcessCsvBlobTrigger.Adapters;
 public class CsvAdapter : IAdapter
 {
     public string AdapterName => "CSV";
+    public string AdapterAlias => "CSV";
+    public bool SupportsRead => true;
+    public bool SupportsWrite => true;
 
     private readonly ICsvProcessingService _csvProcessingService;
     private readonly IAdapterConfigurationService _adapterConfig;
@@ -21,8 +27,28 @@ public class CsvAdapter : IAdapter
     private readonly IMessageBoxService? _messageBoxService;
     private readonly IMessageSubscriptionService? _subscriptionService;
     private readonly string? _interfaceName;
+    private readonly Guid? _adapterInstanceGuid;
+    private readonly string? _receiveFolder;
+    private readonly string _fileMask;
+    private readonly int _batchSize;
+    private readonly string _fieldSeparator;
+    private readonly string? _destinationReceiveFolder;
+    private readonly string _destinationFileMask;
     private readonly ILogger<CsvAdapter>? _logger;
-    private string? _cachedSeparator;
+    
+    // SFTP properties
+    private readonly string _adapterType;
+    private readonly string? _sftpHost;
+    private readonly int _sftpPort;
+    private readonly string? _sftpUsername;
+    private readonly string? _sftpPassword;
+    private readonly string? _sftpSshKey;
+    private readonly string? _sftpFolder;
+    private readonly string _sftpFileMask;
+    private readonly int _sftpMaxConnectionPoolSize;
+    private readonly int _sftpFileBufferSize;
+    private readonly SemaphoreSlim? _sftpConnectionSemaphore;
+    private readonly Queue<SftpClient>? _sftpConnectionPool;
 
     public CsvAdapter(
         ICsvProcessingService csvProcessingService,
@@ -31,6 +57,23 @@ public class CsvAdapter : IAdapter
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
+        Guid? adapterInstanceGuid = null,
+        string? receiveFolder = null,
+        string? fileMask = null,
+        int? batchSize = null,
+        string? fieldSeparator = null,
+        string? destinationReceiveFolder = null,
+        string? destinationFileMask = null,
+        string? adapterType = null,
+        string? sftpHost = null,
+        int? sftpPort = null,
+        string? sftpUsername = null,
+        string? sftpPassword = null,
+        string? sftpSshKey = null,
+        string? sftpFolder = null,
+        string? sftpFileMask = null,
+        int? sftpMaxConnectionPoolSize = null,
+        int? sftpFileBufferSize = null,
         ILogger<CsvAdapter>? logger = null)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
@@ -39,7 +82,33 @@ public class CsvAdapter : IAdapter
         _messageBoxService = messageBoxService;
         _subscriptionService = subscriptionService;
         _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
+        _adapterInstanceGuid = adapterInstanceGuid;
+        _receiveFolder = receiveFolder;
+        _fileMask = fileMask ?? "*.txt";
+        _batchSize = batchSize ?? 100;
+        _fieldSeparator = fieldSeparator ?? "║"; // Default: Box Drawing Double Vertical Line (U+2551)
+        _destinationReceiveFolder = destinationReceiveFolder;
+        _destinationFileMask = destinationFileMask ?? "*.txt";
         _logger = logger;
+        
+        // SFTP properties
+        _adapterType = adapterType ?? "FILE";
+        _sftpHost = sftpHost;
+        _sftpPort = sftpPort ?? 22;
+        _sftpUsername = sftpUsername;
+        _sftpPassword = sftpPassword;
+        _sftpSshKey = sftpSshKey;
+        _sftpFolder = sftpFolder;
+        _sftpFileMask = sftpFileMask ?? "*.txt";
+        _sftpMaxConnectionPoolSize = sftpMaxConnectionPoolSize ?? 5;
+        _sftpFileBufferSize = sftpFileBufferSize ?? 8192;
+        
+        // Initialize SFTP connection pool if SFTP adapter type
+        if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+        {
+            _sftpConnectionSemaphore = new SemaphoreSlim(_sftpMaxConnectionPoolSize, _sftpMaxConnectionPoolSize);
+            _sftpConnectionPool = new Queue<SftpClient>();
+        }
     }
 
     public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
@@ -49,17 +118,152 @@ public class CsvAdapter : IAdapter
 
         try
         {
-            _logger?.LogInformation("Reading CSV from source: {Source}", source);
+            _logger?.LogInformation("Reading CSV from source: {Source}, AdapterType: {AdapterType}", source, _adapterType);
 
-            // Parse source path: "container-name/blob-path" or "container-name/folder/blob-name"
-            var pathParts = source.Split('/', 2);
-            if (pathParts.Length != 2)
-                throw new ArgumentException($"Invalid source path format. Expected 'container/path', got: {source}", nameof(source));
+            // Check adapter type: SFTP or FILE (Azure Blob Storage)
+            if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ReadFromSftpAsync(source, cancellationToken);
+            }
+            else
+            {
+                return await ReadFromBlobStorageAsync(source, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error reading CSV from source: {Source}", source);
+            throw;
+        }
+    }
 
-            var containerName = pathParts[0];
-            var blobPath = pathParts[1];
+    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadFromBlobStorageAsync(string source, CancellationToken cancellationToken)
+    {
+        // Parse source path: "container-name/blob-path" or "container-name/folder/blob-name" or "container-name/folder/" (folder)
+        var pathParts = source.Split('/', 2);
+        if (pathParts.Length != 2)
+            throw new ArgumentException($"Invalid source path format. Expected 'container/path', got: {source}", nameof(source));
 
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        var containerName = pathParts[0];
+        var blobPath = pathParts[1];
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        
+        // Check if source is a folder (ends with '/' or doesn't contain a file extension)
+        bool isFolder = blobPath.EndsWith("/") || (!blobPath.Contains(".") && !string.IsNullOrWhiteSpace(blobPath));
+        
+        var allHeaders = new List<string>();
+        var allRecords = new List<Dictionary<string, string>>();
+
+        if (isFolder || !string.IsNullOrWhiteSpace(_receiveFolder))
+            {
+            // Process all CSV files in the folder
+            _logger?.LogInformation("Processing folder: {BlobPath} in container {ContainerName}", blobPath, containerName);
+            
+            // Ensure folder path ends with /
+            if (!blobPath.EndsWith("/"))
+                blobPath += "/";
+
+            // List all blobs in the folder
+            var blobs = containerClient.GetBlobsAsync(prefix: blobPath, cancellationToken: cancellationToken);
+            var csvFiles = new List<string>();
+            
+            await foreach (var blobItem in blobs)
+            {
+                // Extract filename from blob path (e.g., "folder/subfolder/file.txt" -> "file.txt")
+                var fileName = blobItem.Name.Contains('/') 
+                    ? blobItem.Name.Substring(blobItem.Name.LastIndexOf('/') + 1)
+                    : blobItem.Name;
+                
+                // Filter files by file mask pattern (e.g., "*.txt", "*.csv", "data_*.txt")
+                if (MatchesFileMask(fileName, _fileMask))
+                {
+                    csvFiles.Add(blobItem.Name);
+                }
+            }
+
+            _logger?.LogInformation("Found {FileCount} files matching mask '{FileMask}' in folder {BlobPath}", csvFiles.Count, _fileMask, blobPath);
+
+            // Process each CSV file
+            foreach (var csvFile in csvFiles)
+            {
+                try
+                {
+                    var blobClient = containerClient.GetBlobClient(csvFile);
+                    
+                    if (!await blobClient.ExistsAsync(cancellationToken))
+                    {
+                        _logger?.LogWarning("CSV file not found: {CsvFile}", csvFile);
+                        continue;
+                    }
+
+                    // Download blob content
+                    var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
+                    var csvContent = downloadResult.Value.Content.ToString();
+
+                    // Parse CSV using CsvProcessingService with configured field separator
+                    var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, _fieldSeparator, cancellationToken);
+
+                    _logger?.LogInformation("Successfully read CSV from {CsvFile}: {HeaderCount} headers, {RecordCount} records", 
+                        csvFile, headers.Count, records.Count);
+
+                    // Use headers from first file, or merge if different
+                    if (allHeaders.Count == 0)
+                    {
+                        allHeaders = headers;
+                    }
+                    else if (!headers.SequenceEqual(allHeaders))
+                    {
+                        _logger?.LogWarning("Headers differ between files. Using headers from first file.");
+                    }
+
+                    allRecords.AddRange(records);
+
+                    // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
+                    // Process records in batches of _batchSize, then debatch each batch into single rows
+                    if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
+                    {
+                        _logger?.LogInformation("Processing CSV data from {CsvFile} in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}", 
+                            csvFile, _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
+                        
+                        // Process records in batches
+                        for (int i = 0; i < records.Count; i += _batchSize)
+                        {
+                            var batch = records.Skip(i).Take(_batchSize).ToList();
+                            var batchNumber = (i / _batchSize) + 1;
+                            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+                            
+                            _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches} from {CsvFile}: {BatchRecordCount} records", 
+                                batchNumber, totalBatches, csvFile, batch.Count);
+                            
+                            // Debatch batch into single rows and write to MessageBox
+                            var messageIds = await _messageBoxService.WriteMessagesAsync(
+                                _interfaceName,
+                                AdapterName,
+                                "Source",
+                                _adapterInstanceGuid.Value,
+                                headers,
+                                batch,
+                                cancellationToken);
+                            
+                            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches} of {CsvFile}", 
+                                messageIds.Count, batchNumber, totalBatches, csvFile);
+                        }
+                        
+                        _logger?.LogInformation("Completed processing all batches from {CsvFile}: {TotalRecords} records debatched into {TotalMessages} messages", 
+                            csvFile, records.Count, records.Count);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error processing CSV file {CsvFile} from folder {BlobPath}", csvFile, blobPath);
+                    // Continue with next file
+                }
+            }
+        }
+        else
+        {
+            // Process single file
             var blobClient = containerClient.GetBlobClient(blobPath);
 
             if (!await blobClient.ExistsAsync(cancellationToken))
@@ -70,34 +274,263 @@ public class CsvAdapter : IAdapter
             var csvContent = downloadResult.Value.Content.ToString();
 
             // Parse CSV using CsvProcessingService
-            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, cancellationToken);
+            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, fieldSeparator: _fieldSeparator, cancellationToken);
 
             _logger?.LogInformation("Successfully read CSV from {Source}: {HeaderCount} headers, {RecordCount} records", 
                 source, headers.Count, records.Count);
 
+            allHeaders = headers;
+            allRecords = records;
+
             // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
-            // Each record is written as a separate message, triggering events
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            // Process records in batches of _batchSize, then debatch each batch into single rows
+            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
             {
-                _logger?.LogInformation("Debatching CSV data and writing to MessageBox as Source adapter: Interface={InterfaceName}, Records={RecordCount}", 
-                    _interfaceName, records.Count);
-                var messageIds = await _messageBoxService.WriteMessagesAsync(
-                    _interfaceName,
-                    AdapterName,
-                    "Source",
-                    headers,
-                    records,
-                    cancellationToken);
-                _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox", messageIds.Count);
+                _logger?.LogInformation("Processing CSV data in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}", 
+                    _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
+                
+                // Process records in batches
+                for (int i = 0; i < records.Count; i += _batchSize)
+                {
+                    var batch = records.Skip(i).Take(_batchSize).ToList();
+                    var batchNumber = (i / _batchSize) + 1;
+                    var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+                    
+                    _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records", 
+                        batchNumber, totalBatches, batch.Count);
+                    
+                    // Debatch batch into single rows and write to MessageBox
+                    var messageIds = await _messageBoxService.WriteMessagesAsync(
+                        _interfaceName,
+                        AdapterName,
+                        "Source",
+                        _adapterInstanceGuid.Value,
+                        headers,
+                        batch,
+                        cancellationToken);
+                    
+                    _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}", 
+                        messageIds.Count, batchNumber, totalBatches);
+                }
+                
+                _logger?.LogInformation("Completed processing all batches: {TotalRecords} records debatched into {TotalMessages} messages", 
+                    records.Count, records.Count);
+            }
+        }
+
+        if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && !_adapterInstanceGuid.HasValue)
+        {
+            _logger?.LogWarning("AdapterInstanceGuid is missing. Messages will not be written to MessageBox.");
+        }
+
+        return (allHeaders, allRecords);
+    }
+
+    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadFromSftpAsync(string source, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_sftpHost) || string.IsNullOrWhiteSpace(_sftpUsername))
+        {
+            throw new InvalidOperationException("SFTP Host and Username must be configured for SFTP adapter type.");
+        }
+
+        var allHeaders = new List<string>();
+        var allRecords = new List<Dictionary<string, string>>();
+
+        // Use SFTP folder from configuration or source parameter
+        var remoteFolder = !string.IsNullOrWhiteSpace(_sftpFolder) ? _sftpFolder : source;
+        
+        // Ensure folder path ends with /
+        if (!remoteFolder.EndsWith("/"))
+            remoteFolder += "/";
+
+        _logger?.LogInformation("Reading CSV files from SFTP server {Host}:{Port}, folder: {Folder}, file mask: {FileMask}", 
+            _sftpHost, _sftpPort, remoteFolder, _sftpFileMask);
+
+        SftpClient? sftpClient = null;
+        try
+        {
+            // Get SFTP client from pool or create new one
+            sftpClient = await GetSftpClientAsync(cancellationToken);
+            
+            if (sftpClient == null || !sftpClient.IsConnected)
+            {
+                throw new InvalidOperationException("Failed to establish SFTP connection.");
             }
 
-            return (headers, records);
+            // List files in remote folder
+            var files = sftpClient.ListDirectory(remoteFolder);
+            var csvFiles = files
+                .Where(f => !f.IsDirectory && MatchesFileMask(f.Name, _sftpFileMask))
+                .ToList();
+
+            _logger?.LogInformation("Found {FileCount} files matching mask '{FileMask}' in SFTP folder {Folder}", 
+                csvFiles.Count, _sftpFileMask, remoteFolder);
+
+            // Process each CSV file
+            foreach (var file in csvFiles)
+            {
+                try
+                {
+                    var remoteFilePath = remoteFolder + file.Name;
+                    _logger?.LogInformation("Reading CSV file from SFTP: {RemoteFilePath}", remoteFilePath);
+
+                    // Download file content using buffer
+                    using var memoryStream = new MemoryStream();
+                    sftpClient.DownloadFile(remoteFilePath, memoryStream);
+                    memoryStream.Position = 0;
+                    
+                    var csvContent = Encoding.UTF8.GetString(memoryStream.ToArray());
+
+                    // Parse CSV using CsvProcessingService
+                    var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, _fieldSeparator, cancellationToken);
+
+                    _logger?.LogInformation("Successfully read CSV from SFTP {RemoteFilePath}: {HeaderCount} headers, {RecordCount} records", 
+                        remoteFilePath, headers.Count, records.Count);
+
+                    // Use headers from first file, or merge if different
+                    if (allHeaders.Count == 0)
+                    {
+                        allHeaders = headers;
+                    }
+                    else if (!headers.SequenceEqual(allHeaders))
+                    {
+                        _logger?.LogWarning("Headers differ between files. Using headers from first file.");
+                    }
+
+                    allRecords.AddRange(records);
+
+                    // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
+                    if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
+                    {
+                        _logger?.LogInformation("Processing CSV data from SFTP {RemoteFilePath} in batches of {BatchSize} rows", 
+                            remoteFilePath, _batchSize);
+                        
+                        // Process records in batches
+                        for (int i = 0; i < records.Count; i += _batchSize)
+                        {
+                            var batch = records.Skip(i).Take(_batchSize).ToList();
+                            var batchNumber = (i / _batchSize) + 1;
+                            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+                            
+                            // Debatch batch into single rows and write to MessageBox
+                            var messageIds = await _messageBoxService.WriteMessagesAsync(
+                                _interfaceName,
+                                AdapterName,
+                                "Source",
+                                _adapterInstanceGuid.Value,
+                                headers,
+                                batch,
+                                cancellationToken);
+                            
+                            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches} of SFTP {RemoteFilePath}", 
+                                messageIds.Count, batchNumber, totalBatches, remoteFilePath);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error processing CSV file {FileName} from SFTP folder {Folder}", file.Name, remoteFolder);
+                    // Continue with next file
+                }
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            _logger?.LogError(ex, "Error reading CSV from source: {Source}", source);
-            throw;
+            // Return SFTP client to pool
+            if (sftpClient != null)
+            {
+                await ReturnSftpClientAsync(sftpClient);
+            }
         }
+
+        return (allHeaders, allRecords);
+    }
+
+    private async Task<SftpClient> GetSftpClientAsync(CancellationToken cancellationToken)
+    {
+        if (_sftpConnectionSemaphore == null || _sftpConnectionPool == null)
+        {
+            return CreateSftpClient();
+        }
+
+        await _sftpConnectionSemaphore.WaitAsync(cancellationToken);
+        
+        lock (_sftpConnectionPool)
+        {
+            if (_sftpConnectionPool.Count > 0)
+            {
+                var client = _sftpConnectionPool.Dequeue();
+                if (client.IsConnected)
+                {
+                    return client;
+                }
+                else
+                {
+                    // Client disconnected, dispose and create new one
+                    try { client.Dispose(); } catch { }
+                }
+            }
+        }
+
+        // Create new client if pool is empty
+        return CreateSftpClient();
+    }
+
+    private async Task ReturnSftpClientAsync(SftpClient client)
+    {
+        if (_sftpConnectionSemaphore == null || _sftpConnectionPool == null)
+        {
+            client?.Dispose();
+            return;
+        }
+
+        lock (_sftpConnectionPool)
+        {
+            if (client.IsConnected && _sftpConnectionPool.Count < _sftpMaxConnectionPoolSize)
+            {
+                _sftpConnectionPool.Enqueue(client);
+                _sftpConnectionSemaphore.Release();
+                return;
+            }
+        }
+
+        // Pool is full or client disconnected, dispose it
+        try { client?.Dispose(); } catch { }
+        _sftpConnectionSemaphore.Release();
+    }
+
+    private SftpClient CreateSftpClient()
+    {
+        ConnectionInfo connectionInfo;
+        
+        if (!string.IsNullOrWhiteSpace(_sftpSshKey))
+        {
+            // Use SSH key authentication
+            var keyBytes = Convert.FromBase64String(_sftpSshKey);
+            using var keyStream = new MemoryStream(keyBytes);
+            var privateKeyFile = new PrivateKeyFile(keyStream);
+            connectionInfo = new ConnectionInfo(_sftpHost, _sftpPort, _sftpUsername, new PrivateKeyAuthenticationMethod(_sftpUsername, privateKeyFile));
+        }
+        else if (!string.IsNullOrWhiteSpace(_sftpPassword))
+        {
+            // Use password authentication
+            connectionInfo = new ConnectionInfo(_sftpHost, _sftpPort, _sftpUsername, new PasswordAuthenticationMethod(_sftpUsername, _sftpPassword));
+        }
+        else
+        {
+            throw new InvalidOperationException("Either SFTP Password or SSH Key must be provided.");
+        }
+
+        var client = new SftpClient(connectionInfo);
+        client.Connect();
+        
+        if (!client.IsConnected)
+        {
+            throw new InvalidOperationException($"Failed to connect to SFTP server {_sftpHost}:{_sftpPort}");
+        }
+
+        _logger?.LogInformation("Successfully connected to SFTP server {Host}:{Port}", _sftpHost, _sftpPort);
+        return client;
     }
 
     public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
@@ -196,25 +629,45 @@ public class CsvAdapter : IAdapter
             if (headers == null || headers.Count == 0)
                 throw new ArgumentException("Headers cannot be empty", nameof(headers));
 
-            // Parse destination path: "container-name/blob-path"
-            var pathParts = destination.Split('/', 2);
-            if (pathParts.Length != 2)
-                throw new ArgumentException($"Invalid destination path format. Expected 'container/path', got: {destination}", nameof(destination));
+            // Determine destination path
+            string containerName;
+            string blobPath;
+            
+            // If DestinationReceiveFolder is configured, use it and construct filename from DestinationFileMask
+            if (!string.IsNullOrWhiteSpace(_destinationReceiveFolder))
+            {
+                var pathParts = _destinationReceiveFolder.Split('/', 2);
+                if (pathParts.Length != 2)
+                    throw new ArgumentException($"Invalid destination receive folder format. Expected 'container/path', got: {_destinationReceiveFolder}", nameof(_destinationReceiveFolder));
+                
+                containerName = pathParts[0];
+                var folderPath = pathParts[1].TrimEnd('/');
+                
+                // Construct filename from DestinationFileMask with variable substitution
+                var fileName = ExpandFileNameVariables(_destinationFileMask);
+                blobPath = $"{folderPath}/{fileName}";
+                
+                _logger?.LogInformation("Using DestinationReceiveFolder '{ReceiveFolder}' with filename '{FileName}' constructed from mask '{FileMask}'", 
+                    _destinationReceiveFolder, fileName, _destinationFileMask);
+            }
+            else
+            {
+                // Parse destination path: "container-name/blob-path"
+                var pathParts = destination.Split('/', 2);
+                if (pathParts.Length != 2)
+                    throw new ArgumentException($"Invalid destination path format. Expected 'container/path', got: {destination}", nameof(destination));
 
-            var containerName = pathParts[0];
-            var blobPath = pathParts[1];
+                containerName = pathParts[0];
+                blobPath = pathParts[1];
+            }
 
             var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
             await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
             var blobClient = containerClient.GetBlobClient(blobPath);
 
-            // Get field separator from configuration
-            if (_cachedSeparator == null)
-            {
-                _cachedSeparator = await _adapterConfig.GetCsvFieldSeparatorAsync(cancellationToken);
-            }
-            var separator = _cachedSeparator;
+            // Use configured field separator
+            var separator = _fieldSeparator;
 
             // Build CSV content
             var csvContent = new StringBuilder();
@@ -301,6 +754,41 @@ public class CsvAdapter : IAdapter
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Checks if a filename matches a wildcard pattern (e.g., "*.txt", "data_*.csv")
+    /// Supports * (matches any sequence) and ? (matches single character)
+    /// </summary>
+    private static bool MatchesFileMask(string fileName, string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+            return true; // No pattern means match all
+        
+        // Normalize pattern: remove leading/trailing whitespace
+        pattern = pattern.Trim();
+        
+        // If pattern doesn't contain wildcards, do exact match (case-insensitive)
+        if (!pattern.Contains('*') && !pattern.Contains('?'))
+        {
+            return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
+        }
+        
+        // Convert wildcard pattern to regex
+        // Escape special regex characters except * and ?
+        var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        
+        try
+        {
+            return System.Text.RegularExpressions.Regex.IsMatch(fileName, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            // If regex is invalid, fall back to simple string matching
+            return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private string EscapeCsvValue(string value, string separator)
     {
         if (string.IsNullOrEmpty(value))
@@ -313,6 +801,40 @@ public class CsvAdapter : IAdapter
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// Expands filename variables in file mask pattern
+    /// Supports: $datetime (replaced with current date/time with milliseconds: yyyyMMddHHmmss.fff)
+    /// Example: "text_" + $datetime + ".txt" becomes "text_20240101120000.123.txt"
+    /// </summary>
+    private string ExpandFileNameVariables(string fileMask)
+    {
+        if (string.IsNullOrWhiteSpace(fileMask))
+            return "output.txt";
+
+        var result = fileMask;
+        
+        // Replace $datetime with current date/time (yyyyMMddHHmmss.fff)
+        if (result.Contains("$datetime"))
+        {
+            var now = DateTime.UtcNow;
+            var datetimeString = now.ToString("yyyyMMddHHmmss") + "." + now.Millisecond.ToString("D3");
+            result = result.Replace("$datetime", datetimeString);
+        }
+        
+        // If no variables were found and it's a wildcard pattern, generate a default filename
+        if (result.Contains("*") || result.Contains("?"))
+        {
+            var now = DateTime.UtcNow;
+            var datetimeString = now.ToString("yyyyMMddHHmmss") + "." + now.Millisecond.ToString("D3");
+            
+            // Replace wildcards with datetime
+            result = result.Replace("*", datetimeString);
+            result = result.Replace("?", datetimeString.Substring(0, Math.Min(1, datetimeString.Length)));
+        }
+        
+        return result;
     }
 }
 
