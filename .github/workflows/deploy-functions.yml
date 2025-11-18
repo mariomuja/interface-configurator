@@ -160,53 +160,78 @@ jobs:
           echo "=========================================="
           echo "Step 3: Checking Function App..."
           echo "=========================================="
+          echo "Running: az functionapp show --resource-group \"${{ secrets.AZURE_RESOURCE_GROUP }}\" --name \"${{ secrets.AZURE_FUNCTIONAPP_NAME }}\""
           FUNCTION_APP_OUTPUT=$(az functionapp show \
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --name "${{ secrets.AZURE_FUNCTIONAPP_NAME }}" \
             --query "{Name: name, State: state, Runtime: siteConfig.linuxFxVersion, Location: location, DefaultHostName: defaultHostName}" \
-            --output table 2>&1) || {
-            EXIT_CODE=$?
+            --output table 2>&1)
+          EXIT_CODE=$?
+          
+          if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ ERROR: Function App check failed!"
             echo ""
             echo "Exit Code: $EXIT_CODE"
-            echo "Error Output:"
+            echo ""
+            echo "Full Error Output:"
+            echo "----------------------------------------"
             echo "$FUNCTION_APP_OUTPUT"
+            echo "----------------------------------------"
             echo ""
             echo "Detailed Error Information:"
             echo "  Resource Group: '${{ secrets.AZURE_RESOURCE_GROUP }}'"
             echo "  Function App Name: '${{ secrets.AZURE_FUNCTIONAPP_NAME }}'"
             echo "  Subscription ID: $SUBSCRIPTION_ID"
             echo ""
-            echo "Available Function Apps in resource group '${{ secrets.AZURE_RESOURCE_GROUP }}':"
-            FUNCTION_APP_LIST=$(az functionapp list \
+            echo "Attempting to list Function Apps in resource group '${{ secrets.AZURE_RESOURCE_GROUP }}'..."
+            FUNCTION_APP_LIST_OUTPUT=$(az functionapp list \
               --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
               --query "[].{Name: name, State: state, Runtime: siteConfig.linuxFxVersion, Location: location}" \
-              --output table 2>&1) || {
-              echo "  Could not list Function Apps. Error:"
-              echo "  $FUNCTION_APP_LIST"
-              FUNCTION_APP_LIST=""
-            }
-            if [ -n "$FUNCTION_APP_LIST" ] && [ "$FUNCTION_APP_LIST" != "[]" ]; then
-              echo "$FUNCTION_APP_LIST"
+              --output table 2>&1)
+            FUNCTION_APP_LIST_EXIT=$?
+            
+            if [ $FUNCTION_APP_LIST_EXIT -eq 0 ] && [ -n "$FUNCTION_APP_LIST_OUTPUT" ] && [ "$FUNCTION_APP_LIST_OUTPUT" != "[]" ]; then
+              echo "Available Function Apps in resource group:"
+              echo "$FUNCTION_APP_LIST_OUTPUT"
             else
-              echo "  No Function Apps found in this resource group"
+              echo "  Could not list Function Apps in resource group."
+              if [ $FUNCTION_APP_LIST_EXIT -ne 0 ]; then
+                echo "  List command exit code: $FUNCTION_APP_LIST_EXIT"
+                echo "  List command error:"
+                echo "  $FUNCTION_APP_LIST_OUTPUT"
+              else
+                echo "  No Function Apps found in this resource group"
+              fi
             fi
             echo ""
-            echo "All Function Apps in subscription:"
-            az functionapp list \
+            echo "Attempting to list all Function Apps in subscription..."
+            ALL_FUNCTION_APPS=$(az functionapp list \
               --query "[].{Name: name, ResourceGroup: resourceGroup, State: state, Location: location}" \
-              --output table 2>&1 || echo "Could not list all Function Apps"
+              --output table 2>&1)
+            ALL_FUNCTION_APPS_EXIT=$?
+            if [ $ALL_FUNCTION_APPS_EXIT -eq 0 ]; then
+              echo "$ALL_FUNCTION_APPS"
+            else
+              echo "  Could not list all Function Apps. Exit code: $ALL_FUNCTION_APPS_EXIT"
+              echo "  Error: $ALL_FUNCTION_APPS"
+            fi
             echo ""
-            echo "Troubleshooting steps:"
+            echo "=========================================="
+            echo "Troubleshooting Information"
+            echo "=========================================="
+            echo ""
             echo "1. Verify the Function App name in GitHub secrets (AZURE_FUNCTIONAPP_NAME)"
             echo "   Current value: '${{ secrets.AZURE_FUNCTIONAPP_NAME }}'"
+            echo ""
             echo "2. Verify the resource group name in GitHub secrets (AZURE_RESOURCE_GROUP)"
             echo "   Current value: '${{ secrets.AZURE_RESOURCE_GROUP }}'"
+            echo ""
             echo "3. Check if the Function App was created via Terraform/Bicep deployment"
+            echo ""
             echo "4. If using Bicep, ensure 'enableFunctionApp' parameter is set to true"
-            echo "5. Check Function App status:"
+            echo ""
+            echo "5. Manual verification commands:"
             echo "   az functionapp show --resource-group '${{ secrets.AZURE_RESOURCE_GROUP }}' --name '${{ secrets.AZURE_FUNCTIONAPP_NAME }}'"
-            echo "6. List Function Apps:"
             echo "   az functionapp list --resource-group '${{ secrets.AZURE_RESOURCE_GROUP }}'"
             echo ""
             echo "Common Error Codes:"
@@ -216,6 +241,8 @@ jobs:
             echo ""
             echo "Azure CLI Error Reference:"
             echo "  https://docs.microsoft.com/cli/azure/functionapp#az-functionapp-show"
+            echo ""
+            echo "=========================================="
             exit 1
           }
           
