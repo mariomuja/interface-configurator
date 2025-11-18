@@ -155,20 +155,40 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           return true; // Keep all real interfaces
         });
         
-        // Ensure default interface appears in the list even if it doesn't exist yet
-        const defaultExists = this.interfaceConfigurations.some(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+        // Ensure default interface exists - create it if it doesn't
+        const defaultExists = this.interfaceConfigurations.some(c => 
+          c.interfaceName === this.DEFAULT_INTERFACE_NAME && !c._isPlaceholder
+        );
         if (!defaultExists) {
-          // Add default interface as a placeholder (will be created when needed)
-          this.interfaceConfigurations.unshift({
+          // Automatically create the default interface
+          this.transportService.createInterfaceConfiguration({
             interfaceName: this.DEFAULT_INTERFACE_NAME,
             sourceAdapterName: 'CSV',
+            sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming' }),
             destinationAdapterName: 'SqlServer',
-            sourceInstanceName: 'Source',
-            destinationInstanceName: 'Destination',
-            sourceIsEnabled: true,
-            destinationIsEnabled: true,
-            _isPlaceholder: true // Mark as placeholder so we know it needs to be created
+            destinationConfiguration: JSON.stringify({ destination: 'TransportData' }),
+            description: 'Default CSV to SQL Server interface'
+          }).subscribe({
+            next: (createdConfig) => {
+              // Reload configurations to get the real one
+              this.loadInterfaceConfigurations();
+            },
+            error: (error) => {
+              console.error('Error creating default interface:', error);
+              // If creation fails, add as placeholder so it still appears in dropdown
+              this.interfaceConfigurations.unshift({
+                interfaceName: this.DEFAULT_INTERFACE_NAME,
+                sourceAdapterName: 'CSV',
+                destinationAdapterName: 'SqlServer',
+                sourceInstanceName: 'Source',
+                destinationInstanceName: 'Destination',
+                sourceIsEnabled: true,
+                destinationIsEnabled: true,
+                _isPlaceholder: true
+              });
+            }
           });
+          return; // Exit early, will reload after creation
         }
         
         // If no current interface is set, select the first available or default
