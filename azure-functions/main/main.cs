@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Adapters;
 using InterfaceConfigurator.Main.Core.Helpers;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Services;
 
 namespace InterfaceConfigurator.Main;
 
@@ -61,6 +62,41 @@ public class MainFunction
             try
             {
                 var sourcePath = $"csv-files/csv-incoming/{blobName}";
+                
+                // Validate CSV file before processing
+                try
+                {
+                    var validationService = new CsvValidationService(_logger);
+                    var containerClient = _blobServiceClient.GetBlobContainerClient("csv-files");
+                    var blobClient = containerClient.GetBlobClient(sourcePath);
+                    
+                    if (await blobClient.ExistsAsync(context.CancellationToken))
+                    {
+                        var downloadResult = await blobClient.DownloadContentAsync(context.CancellationToken);
+                        var csvContent = downloadResult.Value.Content.ToString();
+                        var validationResult = validationService.ValidateCsv(csvContent);
+                        
+                        if (!validationResult.IsValid)
+                        {
+                            _logger.LogWarning("CSV validation failed for {BlobName}. Issues: {Issues}", 
+                                blobName, string.Join("; ", validationResult.Issues));
+                            
+                            // Move to error folder if validation fails
+                            await MoveBlobToFolderAsync("csv-files", "csv-incoming", "csv-error", blobName, 
+                                $"Validation failed: {string.Join("; ", validationResult.Issues)}");
+                            return; // Don't process invalid CSV
+                        }
+                        
+                        _logger.LogInformation("CSV validation passed for {BlobName}. Encoding: {Encoding}, Delimiter: {Delimiter}, Columns: {ColumnCount}, Lines: {LineCount}",
+                            blobName, validationResult.Encoding, validationResult.DetectedDelimiter, validationResult.ColumnCount, validationResult.LineCount);
+                    }
+                }
+                catch (Exception validationEx)
+                {
+                    _logger.LogWarning(validationEx, "CSV validation error for {BlobName}, continuing with processing", blobName);
+                    // Continue processing even if validation fails (non-blocking)
+                }
+                
                 var (headers, records) = await _csvAdapter.ReadAsync(sourcePath, context.CancellationToken);
                 
                 _logger.LogInformation("Successfully processed CSV blob {BlobName}: {HeaderCount} headers, {RecordCount} records written to MessageBox. Destination adapter will process messages within 1 minute.",

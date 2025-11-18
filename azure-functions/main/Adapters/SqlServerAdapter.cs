@@ -5,6 +5,7 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Services;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -63,7 +64,8 @@ public class SqlServerAdapter : IAdapter
         int? commandTimeout = null,
         bool? failOnBadStatement = null,
         IInterfaceConfigurationService? configService = null,
-        ILogger<SqlServerAdapter>? logger = null)
+        ILogger<SqlServerAdapter>? logger = null,
+        ProcessingStatisticsService? statisticsService = null)
     {
         if (context == null && string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Either context or connectionString must be provided", nameof(context));
@@ -84,6 +86,7 @@ public class SqlServerAdapter : IAdapter
         _failOnBadStatement = failOnBadStatement ?? false;
         _configService = configService;
         _logger = logger;
+        _statisticsService = statisticsService;
         _columnAnalyzer = new CsvColumnAnalyzer();
         _typeValidator = new TypeValidator();
     }
@@ -383,34 +386,75 @@ public class SqlServerAdapter : IAdapter
             await EnsureDestinationStructureAsync(destination, columnTypes, cancellationToken);
 
             // Insert rows using DataService with optional transaction support
+            var startTime = DateTime.UtcNow;
+            var rowsProcessed = records?.Count ?? 0;
+            var rowsSucceeded = 0;
+            var rowsFailed = 0;
+            string? sourceFile = null;
+
             if (records != null && records.Count > 0)
             {
-                if (_useTransaction)
+                try
                 {
-                    // Wrap operations in an explicit transaction
-                    using var context = GetContext();
-                    using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-                    try
+                    if (_useTransaction)
                     {
-                        _logger?.LogInformation("Starting transaction for writing {RecordCount} records to table {Destination}", records.Count, destination);
-                        
-                        await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
-                        
-                        await transaction.CommitAsync(cancellationToken);
-                        _logger?.LogInformation("Transaction committed successfully. Inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                        // Wrap operations in an explicit transaction
+                        using var context = GetContext();
+                        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                        try
+                        {
+                            _logger?.LogInformation("Starting transaction for writing {RecordCount} records to table {Destination}", records.Count, destination);
+                            
+                            await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                            
+                            await transaction.CommitAsync(cancellationToken);
+                            rowsSucceeded = records.Count;
+                            _logger?.LogInformation("Transaction committed successfully. Inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                        }
+                        catch (Exception ex)
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                            rowsFailed = records.Count;
+                            _logger?.LogError(ex, "Transaction rolled back due to error while writing to table {Destination}", destination);
+                            throw;
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        await transaction.RollbackAsync(cancellationToken);
-                        _logger?.LogError(ex, "Transaction rolled back due to error while writing to table {Destination}", destination);
-                        throw;
+                        // No transaction - use default behavior
+                        await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                        rowsSucceeded = records.Count;
+                        _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // No transaction - use default behavior
-                    await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
-                    _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                    rowsFailed = records.Count;
+                    rowsSucceeded = 0;
+                    throw;
+                }
+                finally
+                {
+                    // Record processing statistics
+                    try
+                    {
+                        var duration = DateTime.UtcNow - startTime;
+                        if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                        {
+                            await _statisticsService.RecordProcessingStatsAsync(
+                                _interfaceName,
+                                rowsProcessed,
+                                rowsSucceeded,
+                                rowsFailed,
+                                duration,
+                                sourceFile,
+                                cancellationToken);
+                        }
+                    }
+                    catch (Exception statsEx)
+                    {
+                        _logger?.LogWarning(statsEx, "Failed to record processing statistics");
+                    }
                 }
             }
 

@@ -1,0 +1,85 @@
+<div class="csv-validation-results">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>verified</mat-icon>
+        CSV File Validation
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-icon-button (click)="validate()" [disabled]="isLoading || !blobPath">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="blobPath" class="file-info">
+        <p><strong>File:</strong> {{ blobPath }}</p>
+      </div>
+
+      <div *ngIf="isLoading" class="loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Validating CSV file...</p>
+      </div>
+
+      <div *ngIf="error" class="error">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error }}</p>
+      </div>
+
+      <div *ngIf="validationResult && !isLoading && !error" class="validation-results">
+        <div class="validation-status" [class.valid]="validationResult.isValid" [class.invalid]="!validationResult.isValid">
+          <mat-icon>{{ validationResult.isValid ? 'check_circle' : 'cancel' }}</mat-icon>
+          <span class="status-text">{{ validationResult.isValid ? 'Valid' : 'Invalid' }}</span>
+        </div>
+
+        <div class="validation-details">
+          <div class="detail-item">
+            <span class="label">Encoding:</span>
+            <span class="value">{{ validationResult.encoding || 'Unknown' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Delimiter:</span>
+            <span class="value">{{ validationResult.detectedDelimiter || 'Unknown' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Line Count:</span>
+            <span class="value">{{ validationResult.lineCount | number }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Column Count:</span>
+            <span class="value">{{ validationResult.columnCount | number }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Has Header:</span>
+            <mat-chip [color]="validationResult.hasHeader ? 'primary' : 'warn'">
+              {{ validationResult.hasHeader ? 'Yes' : 'No' }}
+            </mat-chip>
+          </div>
+          <div class="detail-item" *ngIf="validationResult.hasBom">
+            <span class="label">BOM:</span>
+            <mat-chip color="accent">Present</mat-chip>
+          </div>
+        </div>
+
+        <div *ngIf="validationResult.issues && validationResult.issues.length > 0" class="issues-list">
+          <h3>Issues Found:</h3>
+          <mat-list>
+            <mat-list-item *ngFor="let issue of validationResult.issues">
+              <mat-icon matListItemIcon [color]="getSeverityColor(issue)">
+                {{ getSeverityIcon(issue) }}
+              </mat-icon>
+              <div matListItemTitle>{{ issue }}</div>
+            </mat-list-item>
+          </mat-list>
+        </div>
+
+        <div *ngIf="validationResult.issues && validationResult.issues.length === 0" class="no-issues">
+          <mat-icon color="primary">check_circle</mat-icon>
+          <p>No issues found. CSV file is valid.</p>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+

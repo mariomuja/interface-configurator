@@ -41,6 +41,34 @@ export class TransportService {
     return this.http.post<{ message: string }>(`${this.apiUrl}/clear-logs`, {});
   }
 
+  // Processing Statistics API
+  getProcessingStatistics(interfaceName?: string, startDate?: string, endDate?: string): Observable<any> {
+    let url = `${this.apiUrl}/GetProcessingStatistics`;
+    const params: string[] = [];
+    if (interfaceName) params.push(`interfaceName=${encodeURIComponent(interfaceName)}`);
+    if (startDate) params.push(`startDate=${encodeURIComponent(startDate)}`);
+    if (endDate) params.push(`endDate=${encodeURIComponent(endDate)}`);
+    if (params.length > 0) url += '?' + params.join('&');
+    return this.http.get<any>(url);
+  }
+
+  // SQL Schema API
+  getSqlTableSchema(interfaceName: string, tableName: string = 'TransportData'): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/GetSqlTableSchema?interfaceName=${encodeURIComponent(interfaceName)}&tableName=${encodeURIComponent(tableName)}`);
+  }
+
+  // CSV Validation API
+  validateCsvFile(blobPath: string, delimiter?: string): Observable<any> {
+    let url = `${this.apiUrl}/ValidateCsvFile?blobPath=${encodeURIComponent(blobPath)}`;
+    if (delimiter) url += `&delimiter=${encodeURIComponent(delimiter)}`;
+    return this.http.get<any>(url);
+  }
+
+  // Schema Comparison API
+  compareCsvSqlSchema(interfaceName: string, csvBlobPath: string, tableName: string = 'TransportData'): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/CompareCsvSqlSchema?interfaceName=${encodeURIComponent(interfaceName)}&csvBlobPath=${encodeURIComponent(csvBlobPath)}&tableName=${encodeURIComponent(tableName)}`);
+  }
+
   diagnose(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/diagnose`);
   }

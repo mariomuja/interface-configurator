@@ -231,6 +231,8 @@ public class AdapterFactory : IAdapterFactory
             });
         }
 
+        var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
+        
         return new SqlServerAdapter(
             defaultContext,
             dynamicTableService,
@@ -247,7 +249,8 @@ public class AdapterFactory : IAdapterFactory
             commandTimeout,
             failOnBadStatement,
             configService,
-            logger);
+            logger,
+            statisticsService);
     }
 }
 

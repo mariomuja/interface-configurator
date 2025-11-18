@@ -1,0 +1,82 @@
+<div class="sql-schema-preview">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>table_chart</mat-icon>
+        SQL Table Schema: {{ tableName }}
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-icon-button (click)="loadSchema()" [disabled]="isLoading || !interfaceName">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="isLoading" class="loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Loading schema...</p>
+      </div>
+
+      <div *ngIf="error" class="error">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error }}</p>
+      </div>
+
+      <div *ngIf="schema && !isLoading && !error" class="schema-info">
+        <div class="info-row">
+          <span class="label">Table Name:</span>
+          <span class="value">{{ schema.tableName }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Column Count:</span>
+          <span class="value">{{ schema.columnCount }}</span>
+        </div>
+
+        <table mat-table [dataSource]="schema.columns" class="schema-table">
+          <ng-container matColumnDef="columnName">
+            <th mat-header-cell *matHeaderCellDef>Column Name</th>
+            <td mat-cell *matCellDef="let col">
+              <strong>{{ col.columnName }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="dataType">
+            <th mat-header-cell *matHeaderCellDef>Data Type</th>
+            <td mat-cell *matCellDef="let col">
+              <mat-chip [color]="getDataTypeColor(col.dataType)">{{ col.dataType }}</mat-chip>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="sqlTypeDefinition">
+            <th mat-header-cell *matHeaderCellDef>SQL Type</th>
+            <td mat-cell *matCellDef="let col">{{ col.sqlTypeDefinition }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="precision">
+            <th mat-header-cell *matHeaderCellDef>Precision</th>
+            <td mat-cell *matCellDef="let col">{{ col.precision || '-' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="scale">
+            <th mat-header-cell *matHeaderCellDef>Scale</th>
+            <td mat-cell *matCellDef="let col">{{ col.scale || '-' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="isNullable">
+            <th mat-header-cell *matHeaderCellDef>Nullable</th>
+            <td mat-cell *matCellDef="let col">
+              <mat-chip [color]="col.isNullable ? 'accent' : 'warn'">
+                {{ col.isNullable ? 'Yes' : 'No' }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+

@@ -1,0 +1,81 @@
+.statistics-dashboard {
+  padding: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.loading, .error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px;
+  gap: 16px;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.stat-value {
+  font-size: 2em;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.stat-value.success {
+  color: #4caf50;
+}
+
+.stat-value.warning {
+  color: #ff9800;
+}
+
+.stat-value.error {
+  color: #f44336;
+}
+
+.stat-label {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.recent-stats {
+  margin-top: 24px;
+}
+
+.stats-table {
+  width: 100%;
+}
+
+.stats-table .success {
+  color: #4caf50;
+}
+
+.stats-table .error {
+  color: #f44336;
+}
+
+.date-filter {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+

@@ -1,0 +1,154 @@
+<div class="schema-comparison">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>compare_arrows</mat-icon>
+        Schema Comparison: CSV vs SQL
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-icon-button (click)="compare()" [disabled]="isLoading || !interfaceName || !csvBlobPath">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="isLoading" class="loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Comparing schemas...</p>
+      </div>
+
+      <div *ngIf="error" class="error">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error }}</p>
+      </div>
+
+      <div *ngIf="comparisonResult && !isLoading && !error" class="comparison-results">
+        <div class="comparison-status" [class.compatible]="comparisonResult.isCompatible" [class.incompatible]="!comparisonResult.isCompatible">
+          <mat-icon>{{ comparisonResult.isCompatible ? 'check_circle' : 'cancel' }}</mat-icon>
+          <span class="status-text">{{ comparisonResult.isCompatible ? 'Schemas are Compatible' : 'Schemas are Incompatible' }}</span>
+        </div>
+
+        <div class="summary-stats">
+          <div class="stat-item">
+            <span class="label">CSV Columns:</span>
+            <span class="value">{{ comparisonResult.csvColumnCount }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">SQL Columns:</span>
+            <span class="value">{{ comparisonResult.sqlColumnCount }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Common Columns:</span>
+            <span class="value">{{ comparisonResult.commonColumnCount }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Missing in SQL:</span>
+            <span class="value error">{{ comparisonResult.missingInSql?.length || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Missing in CSV:</span>
+            <span class="value error">{{ comparisonResult.missingInCsv?.length || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Type Mismatches:</span>
+            <span class="value error">{{ comparisonResult.typeMismatches?.length || 0 }}</span>
+          </div>
+        </div>
+
+        <mat-tab-group>
+          <mat-tab label="Missing in SQL">
+            <div *ngIf="comparisonResult.missingInSql && comparisonResult.missingInSql.length > 0" class="missing-columns">
+              <mat-list>
+                <mat-list-item *ngFor="let col of comparisonResult.missingInSql">
+                  <mat-icon matListItemIcon color="warn">warning</mat-icon>
+                  <div matListItemTitle>{{ col }}</div>
+                  <div matListItemLine>Column exists in CSV but not in SQL table</div>
+                </mat-list-item>
+              </mat-list>
+            </div>
+            <div *ngIf="!comparisonResult.missingInSql || comparisonResult.missingInSql.length === 0" class="no-issues">
+              <mat-icon color="primary">check_circle</mat-icon>
+              <p>All CSV columns exist in SQL table</p>
+            </div>
+          </mat-tab>
+
+          <mat-tab label="Missing in CSV">
+            <div *ngIf="comparisonResult.missingInCsv && comparisonResult.missingInCsv.length > 0" class="missing-columns">
+              <mat-list>
+                <mat-list-item *ngFor="let col of comparisonResult.missingInCsv">
+                  <mat-icon matListItemIcon color="warn">warning</mat-icon>
+                  <div matListItemTitle>{{ col }}</div>
+                  <div matListItemLine>Column exists in SQL table but not in CSV</div>
+                </mat-list-item>
+              </mat-list>
+            </div>
+            <div *ngIf="!comparisonResult.missingInCsv || comparisonResult.missingInCsv.length === 0" class="no-issues">
+              <mat-icon color="primary">check_circle</mat-icon>
+              <p>All SQL columns exist in CSV</p>
+            </div>
+          </mat-tab>
+
+          <mat-tab label="Type Mismatches">
+            <div *ngIf="comparisonResult.typeMismatches && comparisonResult.typeMismatches.length > 0" class="type-mismatches">
+              <table mat-table [dataSource]="getTypeMismatchDataSource()" class="mismatch-table">
+                <ng-container matColumnDef="columnName">
+                  <th mat-header-cell *matHeaderCellDef>Column</th>
+                  <td mat-cell *matCellDef="let row">{{ row.columnName }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="csvType">
+                  <th mat-header-cell *matHeaderCellDef>CSV Type</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-chip color="accent">{{ row.csvType }}</mat-chip>
+                    <div class="type-detail">{{ row.csvSqlTypeDefinition }}</div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="sqlType">
+                  <th mat-header-cell *matHeaderCellDef>SQL Type</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-chip color="primary">{{ row.sqlType }}</mat-chip>
+                    <div class="type-detail">{{ row.sqlSqlTypeDefinition }}</div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>Status</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-chip color="warn">Mismatch</mat-chip>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              </table>
+            </div>
+            <div *ngIf="!comparisonResult.typeMismatches || comparisonResult.typeMismatches.length === 0" class="no-issues">
+              <mat-icon color="primary">check_circle</mat-icon>
+              <p>No type mismatches found</p>
+            </div>
+          </mat-tab>
+
+          <mat-tab label="All Columns">
+            <div class="all-columns">
+              <div class="columns-section">
+                <h4>CSV Columns ({{ comparisonResult.csvColumns?.length || 0 }})</h4>
+                <div class="column-list">
+                  <mat-chip *ngFor="let col of comparisonResult.csvColumns">{{ col }}</mat-chip>
+                </div>
+              </div>
+              <div class="columns-section">
+                <h4>SQL Columns ({{ comparisonResult.sqlColumns?.length || 0 }})</h4>
+                <div class="column-list">
+                  <mat-chip *ngFor="let col of comparisonResult.sqlColumns">{{ col }}</mat-chip>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+
