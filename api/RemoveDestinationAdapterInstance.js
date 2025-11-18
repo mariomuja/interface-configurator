@@ -18,16 +18,10 @@ module.exports = async (req, res) => {
 
   try {
     const functionAppUrl = process.env.AZURE_FUNCTION_APP_URL || 'https://func-integration-main.azurewebsites.net';
+    const queryString = req.url?.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    const url = `${functionAppUrl.replace(/\/$/, '')}/api/RemoveDestinationAdapterInstance${queryString}`;
     
-    // Extract query parameters from the request URL
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const interfaceName = url.searchParams.get('interfaceName');
-    const adapterInstanceGuid = url.searchParams.get('adapterInstanceGuid');
-    
-    // Build the Azure Function URL with query parameters
-    const targetUrl = `${functionAppUrl.replace(/\/$/, '')}/api/RemoveDestinationAdapterInstance?interfaceName=${encodeURIComponent(interfaceName || '')}&adapterInstanceGuid=${encodeURIComponent(adapterInstanceGuid || '')}`;
-    
-    const response = await fetch(targetUrl, {
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json'
