@@ -1722,7 +1722,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.currentInterfaceName) return;
     
     const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
-    if (config) {
+    if (config && !config._isPlaceholder) {
       this.selectedInterfaceConfig = config;
       // Load all data for the selected interface
       this.sourceInstanceName = config.sourceInstanceName || 'Source';
@@ -1837,10 +1837,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       : null;
 
     // If not available, try to find it in interfaceConfigurations (non-placeholder)
+    // Make sure we get the REAL interface, not a placeholder
     if (!configToUse) {
-      configToUse = this.interfaceConfigurations.find(c => 
-        c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
-      ) || null;
+      // Find all interfaces with this name, prefer non-placeholder
+      const allMatching = this.interfaceConfigurations.filter(c => 
+        c.interfaceName === this.currentInterfaceName
+      );
+      configToUse = allMatching.find(c => !c._isPlaceholder) || null;
     }
 
     // If we found a real config, use it
@@ -1862,12 +1865,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Check if this is a placeholder interface
-    const placeholderConfig = this.interfaceConfigurations.find(c => 
+    // Check if this is ONLY a placeholder (no real interface exists)
+    const hasPlaceholder = this.interfaceConfigurations.some(c => 
       c.interfaceName === this.currentInterfaceName && c._isPlaceholder
     );
+    const hasRealInterface = this.interfaceConfigurations.some(c => 
+      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
+    );
     
-    if (placeholderConfig) {
+    if (hasPlaceholder && !hasRealInterface) {
       this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
       return;
     }
