@@ -93,10 +93,40 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "CreateInterfaceConfiguration",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "DeleteInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.DeleteInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "delete",
+          "options"
+        ],
+        "route": "DeleteInterfaceConfiguration",
         "properties": {}
       },
       {
@@ -125,6 +155,34 @@
     ]
   },
   {
+    "name": "Diagnose",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.Diagnose.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "diagnose",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "GetDestinationAdapterInstances",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.GetDestinationAdapterInstances.Run",
@@ -143,6 +201,34 @@
           "options"
         ],
         "route": "GetDestinationAdapterInstances",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetInterfaceConfiguration",
         "properties": {}
       },
       {
@@ -350,9 +436,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "delete"
+          "delete",
+          "options"
         ],
         "route": "RemoveDestinationAdapterInstance",
         "properties": {}
@@ -421,10 +508,12 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "ToggleInterfaceConfiguration",
         "properties": {}
       },
       {
