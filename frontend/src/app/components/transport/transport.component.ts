@@ -1814,7 +1814,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   showInterfaceJson(): void {
-    if (!this.currentInterfaceName) return;
+    if (!this.currentInterfaceName) {
+      this.snackBar.open('Please select an interface first', 'OK', { duration: 3000 });
+      return;
+    }
+
+    // Check if this is a placeholder interface
+    const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
+    if (config && config._isPlaceholder) {
+      this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
+      return;
+    }
 
     this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: (config) => {
@@ -1848,12 +1858,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private openJsonViewDialog(config: any): void {
-    const jsonString = JSON.stringify(config, null, 2);
-    const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
-      width: '800px',
-      maxWidth: '90vw',
-      data: { interfaceName: this.currentInterfaceName, jsonString: jsonString }
-    });
+    try {
+      const jsonString = JSON.stringify(config, null, 2);
+      const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
+        width: '800px',
+        maxWidth: '90vw',
+        data: { 
+          interfaceName: this.currentInterfaceName || 'Unknown Interface', 
+          jsonString: jsonString 
+        }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        console.log('JSON dialog closed');
+      });
+    } catch (error) {
+      console.error('Error opening JSON dialog:', error);
+      this.snackBar.open('Error opening JSON dialog: ' + (error as Error).message, 'OK', { 
+        duration: 5000,
+        panelClass: ['error-snackbar']
+      });
+    }
   }
 
   loadDestinationAdapterInstances(): void {

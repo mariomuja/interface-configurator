@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 export interface InterfaceJsonViewData {
   interfaceName: string;
@@ -16,7 +17,8 @@ export interface InterfaceJsonViewData {
     CommonModule,
     MatDialogModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    MatTooltipModule
   ],
   templateUrl: './interface-json-view-dialog.component.html',
   styleUrl: './interface-json-view-dialog.component.css'

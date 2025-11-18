@@ -1,17 +1,17 @@
 <h2 mat-dialog-title>
   <mat-icon>code</mat-icon>
-  Interface Configuration: {{ data.interfaceName }}
+  Interface Configuration: {{ data?.interfaceName || 'Unknown' }}
 </h2>
 
 <mat-dialog-content>
-  <pre class="json-content">{{ data.jsonString }}</pre>
+  <pre class="json-content">{{ data?.jsonString || 'No data available' }}</pre>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button (click)="copyToClipboard()">
+  <button mat-button (click)="copyToClipboard()" color="primary">
     <mat-icon>content_copy</mat-icon>
     Copy to Clipboard
   </button>
-  <button mat-button (click)="onClose()">Close</button>
+  <button mat-button (click)="onClose()" color="primary">Close</button>
 </mat-dialog-actions>
 
