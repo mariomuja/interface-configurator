@@ -1,0 +1,17 @@
+<h2 mat-dialog-title>
+  <mat-icon>code</mat-icon>
+  Interface Configuration: {{ data.interfaceName }}
+</h2>
+
+<mat-dialog-content>
+  <pre class="json-content">{{ data.jsonString }}</pre>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="copyToClipboard()">
+    <mat-icon>content_copy</mat-icon>
+    Copy to Clipboard
+  </button>
+  <button mat-button (click)="onClose()">Close</button>
+</mat-dialog-actions>
+

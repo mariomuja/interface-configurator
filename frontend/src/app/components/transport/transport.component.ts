@@ -19,6 +19,7 @@ import { FormsModule } from '@angular/forms';
 import { AdapterCardComponent } from '../adapter-card/adapter-card.component';
 import { AdapterPropertiesDialogComponent, AdapterPropertiesData } from '../adapter-properties-dialog/adapter-properties-dialog.component';
 import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from '../destination-instances-dialog/destination-instances-dialog.component';
+import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
@@ -69,6 +70,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   diagnosticsResult: any = null;
   interfaceConfigurations: any[] = [];
   currentInterfaceName: string = '';
+  selectedInterfaceConfig: any = null;
   sourceInstanceName: string = 'Source';
   destinationInstanceName: string = 'Destination';
   destinationAdapterInstances: any[] = [];
@@ -107,6 +109,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
   
   readonly DEFAULT_INTERFACE_NAME = 'FromCsvToSqlServerExample';
+  
+  // Track if table exists (based on whether we have columns loaded)
+  tableExists: boolean = false;
 
   csvDisplayedColumns: string[] = []; // Will be populated dynamically from CSV data
   sqlDisplayedColumns: string[] = []; // Will be populated dynamically from SQL data
@@ -116,7 +121,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     private transportService: TransportService,
     private translationService: TranslationService,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    public dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -495,6 +500,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             ...csvColumns,
             ...(dateColumns.length > 0 ? [dateColumns[0]] : [])
           ];
+          // Table exists if we have columns (even if empty data)
+          this.tableExists = this.sqlDisplayedColumns.length > 0;
+        } else {
+          // Check if we have columns even with empty data (table exists but is empty)
+          // If sqlDisplayedColumns is empty, table likely doesn't exist
+          this.tableExists = this.sqlDisplayedColumns.length > 0;
         }
         // Reset error tracking on success
         this.lastErrorShown = '';
@@ -838,6 +849,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           // Clear SQL data and columns - table structure will be recreated from next CSV
           this.sqlData = [];
           this.sqlDisplayedColumns = [];
+          this.tableExists = false;
           this.loadProcessLogs();
         },
         error: (error) => {
@@ -1394,7 +1406,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         // Update enabled status if changed
-        if (result.isEnabled !== this.sourceIsEnabled) {
+        if (result.isEnabled !== undefined && result.isEnabled !== this.sourceIsEnabled) {
           this.sourceIsEnabled = result.isEnabled;
           this.onSourceEnabledChange();
         }
@@ -1636,13 +1648,242 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   setDestinationCardExpanded(instanceGuid: string, expanded: boolean): void {
     this.destinationCardExpandedStates.set(instanceGuid, expanded);
   }
+  
+  /**
+   * Check if SQL Server settings are complete
+   * Settings are complete if:
+   * - sqlServerName is set
+   * - sqlDatabaseName is set
+   * - If not using integrated security: sqlUserName and sqlPassword are set
+   */
+  areSqlSettingsComplete(): boolean {
+    if (!this.sqlServerName || !this.sqlDatabaseName) {
+      return false;
+    }
+    
+    // If using integrated security, only server and database are required
+    if (this.sqlIntegratedSecurity) {
+      return true;
+    }
+    
+    // If not using integrated security, username and password are required
+    return !!(this.sqlUserName && this.sqlPassword);
+  }
+  
+  /**
+   * Check if the "Tabelle löschen" button should be disabled
+   * Disabled if:
+   * - Table does not exist, OR
+   * - SQL settings are not complete
+   */
+  isDropTableDisabled(): boolean {
+    return !this.tableExists || !this.areSqlSettingsComplete();
+  }
+
+  onInterfaceSelectionChange(event: any): void {
+    const selectedName = event.value;
+    const config = this.interfaceConfigurations.find(c => c.interfaceName === selectedName);
+    if (config) {
+      this.selectedInterfaceConfig = config;
+      this.loadInterfaceData();
+    }
+  }
+
+  loadInterfaceData(): void {
+    if (!this.currentInterfaceName) return;
+    
+    const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
+    if (config) {
+      this.selectedInterfaceConfig = config;
+      // Load all data for the selected interface
+      this.sourceInstanceName = config.sourceInstanceName || 'Source';
+      this.destinationInstanceName = config.destinationInstanceName || 'Destination';
+      this.sourceIsEnabled = config.sourceIsEnabled ?? true;
+      this.destinationIsEnabled = config.destinationIsEnabled ?? true;
+      this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
+      this.sourceReceiveFolder = config.sourceReceiveFolder || '';
+      this.sourceFileMask = config.sourceFileMask || '*.txt';
+      this.sourceBatchSize = config.sourceBatchSize ?? 100;
+      this.sourceFieldSeparator = config.sourceFieldSeparator || '║';
+      this.destinationReceiveFolder = config.destinationReceiveFolder || '';
+      this.destinationFileMask = config.destinationFileMask || '*.txt';
+      this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
+      this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
+      
+      // Load SQL Server properties
+      this.sqlServerName = config.sqlServerName || '';
+      this.sqlDatabaseName = config.sqlDatabaseName || '';
+      this.sqlUserName = config.sqlUserName || '';
+      this.sqlPassword = config.sqlPassword || '';
+      this.sqlIntegratedSecurity = config.sqlIntegratedSecurity ?? false;
+      this.sqlResourceGroup = config.sqlResourceGroup || '';
+      this.sqlPollingStatement = config.sqlPollingStatement || '';
+      
+      // Reload adapter instances and data
+      this.loadDestinationAdapterInstances();
+      this.loadSqlData();
+      this.loadSampleCsvData();
+    }
+  }
+
+  openAddInterfaceDialog(): void {
+    // Simple prompt for now - can be replaced with a proper dialog component
+    const interfaceName = prompt('Enter interface name:');
+    if (!interfaceName || interfaceName.trim() === '') return;
+
+    const trimmedName = interfaceName.trim();
+    
+    // Check if name already exists
+    if (this.interfaceConfigurations.some(c => c.interfaceName === trimmedName)) {
+      this.snackBar.open('Interface name already exists', 'OK', { duration: 3000 });
+      return;
+    }
+
+    // Create new interface configuration
+    this.transportService.createInterfaceConfiguration({
+      interfaceName: trimmedName,
+      sourceAdapterName: 'CSV',
+      destinationAdapterName: 'SqlServer'
+    }).subscribe({
+      next: () => {
+        this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
+        this.loadInterfaceConfigurations();
+        this.currentInterfaceName = trimmedName;
+        setTimeout(() => this.loadInterfaceData(), 500);
+      },
+      error: (error) => {
+        console.error('Error creating interface:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Interfaces');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+      }
+    });
+  }
+
+  removeCurrentInterface(): void {
+    if (!this.currentInterfaceName) return;
+    
+    const confirmMessage = `Are you sure you want to delete interface "${this.currentInterfaceName}"?`;
+    if (!confirm(confirmMessage)) return;
+
+    this.transportService.deleteInterfaceConfiguration(this.currentInterfaceName).subscribe({
+      next: () => {
+        this.snackBar.open('Interface deleted successfully', 'OK', { duration: 3000 });
+        this.loadInterfaceConfigurations();
+        // Select first available interface or default
+        if (this.interfaceConfigurations.length > 0) {
+          this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
+          setTimeout(() => this.loadInterfaceData(), 500);
+        } else {
+          this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
+          this.selectedInterfaceConfig = null;
+        }
+      },
+      error: (error) => {
+        console.error('Error deleting interface:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Löschen des Interfaces');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+      }
+    });
+  }
+
+  showInterfaceJson(): void {
+    if (!this.currentInterfaceName) return;
+
+    this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
+      next: (config) => {
+        // Also get destination adapter instances
+        this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
+          next: (instances) => {
+            const fullConfig = {
+              ...config,
+              destinationAdapterInstances: instances || []
+            };
+            this.openJsonViewDialog(fullConfig);
+          },
+          error: (error) => {
+            console.error('Error loading destination adapter instances:', error);
+            // Show dialog with just the interface config
+            this.openJsonViewDialog(config);
+          }
+        });
+      },
+      error: (error) => {
+        console.error('Error loading interface configuration:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+      }
+    });
+  }
+
+  private openJsonViewDialog(config: any): void {
+    const jsonString = JSON.stringify(config, null, 2);
+    const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
+      width: '800px',
+      maxWidth: '90vw',
+      data: { interfaceName: this.currentInterfaceName, jsonString: jsonString }
+    });
+  }
 
   loadDestinationAdapterInstances(): void {
-    this.transportService.getDestinationAdapterInstances(this.DEFAULT_INTERFACE_NAME).subscribe({
+    const interfaceName = this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME;
+    this.transportService.getDestinationAdapterInstances(interfaceName).subscribe({
       next: (instances) => {
         this.destinationAdapterInstances = instances || [];
-        // Initialize expansion states for new instances
+        
+        // Ensure SqlServer instances have TransportData configuration
         this.destinationAdapterInstances.forEach(instance => {
+          if (instance.adapterName === 'SqlServer') {
+            let config = instance.configuration || {};
+            if (typeof config === 'string') {
+              try {
+                config = JSON.parse(config);
+              } catch (e) {
+                config = {};
+              }
+            }
+            
+            // Update if missing TransportData configuration
+            if (!config.destination || config.destination !== 'TransportData') {
+              config = {
+                ...config,
+                destination: 'TransportData',
+                tableName: 'TransportData'
+              };
+              
+              // Save updated configuration
+              this.transportService.updateDestinationAdapterInstance(
+                this.DEFAULT_INTERFACE_NAME,
+                instance.adapterInstanceGuid,
+                instance.instanceName,
+                instance.isEnabled,
+                JSON.stringify(config)
+              ).subscribe({
+                next: () => {
+                  instance.configuration = config;
+                },
+                error: (error) => {
+                  console.warn('Failed to update SqlServer adapter configuration:', error);
+                }
+              });
+            }
+          }
+          
+          // Initialize expansion states for new instances
           if (!this.destinationCardExpandedStates.has(instance.adapterInstanceGuid)) {
             this.destinationCardExpandedStates.set(instance.adapterInstanceGuid, true);
           }
@@ -1706,29 +1947,85 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  openDestinationInstancesDialog(): void {
-    const dialogRef = this.dialog.open(DestinationInstancesDialogComponent, {
-      width: '800px',
-      maxHeight: '90vh',
-      data: {
-        instances: this.destinationAdapterInstances,
-        availableAdapters: [
-          { name: 'CSV', displayName: 'CSV', icon: 'description' },
-          { name: 'SqlServer', displayName: 'SQL Server', icon: 'storage' }
-        ]
+  addDestinationAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+    // Set default configuration based on adapter type
+    let defaultConfiguration: any = {};
+    if (adapterName === 'SqlServer') {
+      defaultConfiguration = {
+        destination: 'TransportData',
+        tableName: 'TransportData'
+      };
+    }
+    
+    // Generate default instance name
+    const totalCount = this.destinationAdapterInstances.length;
+    let counter = totalCount + 1;
+    let instanceName = `Destination ${counter}`;
+    
+    // Ensure uniqueness by checking if name already exists
+    const existingNames = this.destinationAdapterInstances.map(i => i.instanceName);
+    while (existingNames.includes(instanceName)) {
+      counter++;
+      instanceName = `Destination ${counter}`;
+    }
+    
+    // Generate GUID
+    const adapterInstanceGuid = this.generateGuid();
+    
+    // Add the instance via API
+    this.transportService.addDestinationAdapterInstance(
+      this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
+      adapterName,
+      instanceName,
+      JSON.stringify(defaultConfiguration)
+    ).subscribe({
+      next: (createdInstance) => {
+        this.snackBar.open(`Destination adapter "${instanceName}" added successfully`, 'OK', { duration: 3000 });
+        this.loadDestinationAdapterInstances();
+      },
+      error: (error) => {
+        console.error('Error adding destination adapter:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Hinzufügen des Destination Adapters');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
       }
     });
+  }
 
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        if (result.action === 'save') {
-          // Save all instances
-          this.saveDestinationAdapterInstances(result.instances);
-        } else if (result.action === 'settings') {
-          // Open settings for a specific instance
-          this.openDestinationInstanceSettings(result.instance);
-        }
+  removeDestinationAdapter(adapterInstanceGuid: string, instanceName: string): void {
+    const confirmMessage = `Are you sure you want to remove destination adapter "${instanceName}"?`;
+    if (!confirm(confirmMessage)) return;
+
+    this.transportService.removeDestinationAdapterInstance(
+      this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
+      adapterInstanceGuid
+    ).subscribe({
+      next: () => {
+        this.snackBar.open(`Destination adapter "${instanceName}" removed successfully`, 'OK', { duration: 3000 });
+        this.loadDestinationAdapterInstances();
+      },
+      error: (error) => {
+        console.error('Error removing destination adapter:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Entfernen des Destination Adapters');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
       }
+    });
+  }
+
+  private generateGuid(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
     });
   }
 
@@ -1750,9 +2047,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const toUpdate = newInstances.filter(newInst => {
       const curr = currentInstances.find(c => c.adapterInstanceGuid === newInst.adapterInstanceGuid);
       if (!curr) return false;
+      
+      // Normalize configurations for comparison
+      const currConfig = typeof curr.configuration === 'string' ? JSON.parse(curr.configuration || '{}') : (curr.configuration || {});
+      const newConfig = typeof newInst.configuration === 'string' ? JSON.parse(newInst.configuration || '{}') : (newInst.configuration || {});
+      
       return curr.instanceName !== newInst.instanceName || 
              curr.isEnabled !== newInst.isEnabled ||
-             JSON.stringify(curr.configuration) !== JSON.stringify(newInst.configuration);
+             JSON.stringify(currConfig) !== JSON.stringify(newConfig);
     });
     
     // Execute operations
@@ -1760,13 +2062,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Add new instances
     toAdd.forEach(instance => {
+      // Ensure SqlServer instances have TransportData configuration
+      let config = instance.configuration || {};
+      if (typeof config === 'string') {
+        try {
+          config = JSON.parse(config);
+        } catch (e) {
+          config = {};
+        }
+      }
+      
+      if (instance.adapterName === 'SqlServer') {
+        config = {
+          ...config,
+          destination: 'TransportData',
+          tableName: 'TransportData'
+        };
+      }
+      
       operations.push(
         firstValueFrom(
           this.transportService.addDestinationAdapterInstance(
             this.DEFAULT_INTERFACE_NAME,
             instance.adapterName,
             instance.instanceName,
-            JSON.stringify(instance.configuration || {})
+            JSON.stringify(config)
           )
         ).catch(error => {
           console.error(`Error adding destination adapter instance ${instance.instanceName}:`, error);
@@ -1792,6 +2112,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Update changed instances
     toUpdate.forEach(instance => {
+      // Ensure SqlServer instances have TransportData configuration
+      let config = instance.configuration || {};
+      if (typeof config === 'string') {
+        try {
+          config = JSON.parse(config);
+        } catch (e) {
+          config = {};
+        }
+      }
+      
+      if (instance.adapterName === 'SqlServer') {
+        config = {
+          ...config,
+          destination: 'TransportData',
+          tableName: 'TransportData'
+        };
+      }
+      
       operations.push(
         firstValueFrom(
           this.transportService.updateDestinationAdapterInstance(
@@ -1799,7 +2137,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             instance.adapterInstanceGuid,
             instance.instanceName,
             instance.isEnabled,
-            JSON.stringify(instance.configuration || {})
+            JSON.stringify(config)
           )
         ).catch(error => {
           console.error(`Error updating destination adapter instance ${instance.instanceName}:`, error);
@@ -1831,6 +2169,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   openDestinationInstanceSettings(instance: DestinationAdapterInstance): void {
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    
+    // Parse configuration for SqlServer adapter to get table name
+    let sqlTableName = 'TransportData'; // Default
+    if (instance.adapterName === 'SqlServer' && instance.configuration) {
+      try {
+        const config = typeof instance.configuration === 'string' 
+          ? JSON.parse(instance.configuration) 
+          : instance.configuration;
+        sqlTableName = config.destination || config.tableName || 'TransportData';
+      } catch (e) {
+        console.warn('Failed to parse destination adapter configuration:', e);
+      }
+    }
+    
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
       adapterName: instance.adapterName,
@@ -1870,10 +2222,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     
-    // Build configuration JSON if needed (for CSV adapters)
+    // Build configuration JSON
     let configuration = instance.configuration || {};
+    if (typeof configuration === 'string') {
+      try {
+        configuration = JSON.parse(configuration);
+      } catch (e) {
+        configuration = {};
+      }
+    }
+    
+    // Update configuration for CSV adapters
     if (properties.destinationReceiveFolder !== undefined && instance.adapterName === 'CSV') {
       configuration = { ...configuration, destination: properties.destinationReceiveFolder };
+    }
+    
+    // Ensure SqlServer adapters have TransportData table configuration
+    if (instance.adapterName === 'SqlServer') {
+      configuration = {
+        ...configuration,
+        destination: 'TransportData',
+        tableName: 'TransportData'
+      };
     }
     
     // Update enabled property immediately in local array for UI responsiveness

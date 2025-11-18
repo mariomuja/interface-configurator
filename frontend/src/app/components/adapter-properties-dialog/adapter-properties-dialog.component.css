@@ -31,23 +31,7 @@ mat-dialog-content {
   width: 100%;
 }
 
-.full-width mat-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.full-width mat-label span {
-  flex: 0 0 auto;
-}
-
-.full-width mat-label .help-icon {
-  flex: 0 0 auto;
-  margin-left: 4px;
-  position: relative;
-  z-index: 1;
-}
+/* Help icons are now in matSuffix, so no special label styling needed */
 
 .help-icon {
   font-size: 16px;
@@ -95,6 +79,39 @@ mat-dialog-content {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.sql-destination-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(33, 150, 243, 0.08);
+  border-left: 3px solid #2196f3;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.sql-destination-note mat-icon {
+  color: #2196f3;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sql-destination-note span {
+  flex: 1;
+}
+
+.sql-destination-note strong {
+  font-weight: 600;
+  color: #1976d2;
 }
 
 .sql-section h3,
@@ -174,16 +191,5 @@ mat-dialog-actions button mat-icon {
   padding-top: 4px;
 }
 
-/* Fix for Receive Folder label - ensure help icon doesn't overlap input */
-.full-width ::ng-deep .mat-mdc-form-field-label-wrapper {
-  overflow: visible;
-}
-
-.full-width ::ng-deep .mat-mdc-text-field-wrapper {
-  padding-top: 0;
-}
-
-.full-width ::ng-deep .mat-mdc-form-field-label {
-  white-space: nowrap;
-}
+/* Help icons are now in matSuffix position, so no overlap issues */
 

@@ -92,21 +92,7 @@
   min-width: 0;
 }
 
-.status-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-  flex: 0 0 auto;
-}
-
-.status-icon.enabled {
-  color: #4caf50;
-}
-
-.status-icon.disabled {
-  color: #f44336;
-}
+/* Status icon removed from card headers */
 
 .guid-display {
   display: flex;

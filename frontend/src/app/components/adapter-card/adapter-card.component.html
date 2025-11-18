@@ -25,10 +25,6 @@
         
         <div class="instance-name-display">
           <span class="instance-name-text">{{ instanceName || (adapterType === 'Source' ? 'Source' : 'Destination') }}</span>
-          <mat-icon class="status-icon" [class.enabled]="isEnabled" [class.disabled]="!isEnabled" 
-                    [matTooltip]="isEnabled ? 'Adapter ist aktiviert' : 'Adapter ist deaktiviert'">
-            {{ isEnabled ? 'check_circle' : 'cancel' }}
-          </mat-icon>
           <mat-icon *ngIf="isDisabled" class="warning-icon" 
                     matTooltip="Multiple destinations are not yet supported. Only the first destination will be active.">
             info
@@ -44,7 +40,7 @@
     <mat-panel-description>
       <button mat-raised-button [color]="getPrimaryActionColor()" 
               (click)="onPrimaryAction(); $event.stopPropagation()" 
-              [disabled]="isDisabled"
+              [disabled]="isDisabled || primaryActionDisabled"
               class="action-button">
         <mat-icon>{{ getPrimaryActionIcon() }}</mat-icon>
         {{ getPrimaryActionLabel() }}

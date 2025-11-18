@@ -44,6 +44,7 @@ export class AdapterCardComponent {
   @Input() showReceiveFolder: boolean = false; // Only show for CSV Source adapters
   @Input() cardContent: string = ''; // Content to display in the card body (e.g., CSV text or table)
   @Input() isDisabled: boolean = false; // If true, card appears greyed out (for unsupported multiple destinations)
+  @Input() primaryActionDisabled: boolean = false; // If true, the primary action button is disabled
 
   @Output() instanceNameChange = new EventEmitter<string>();
   @Output() enabledChange = new EventEmitter<boolean>();

@@ -1,11 +1,27 @@
 <div class="transport-container">
-  <!-- Interface Name Editor - Moved before source card, wider -->
+  <!-- Interface Name Selector - Dropdown with Add/Remove/View JSON -->
   <div class="interface-name-container-top">
     <mat-form-field appearance="outline" class="interface-name-field-wide">
       <mat-label>{{ getTranslation('interface.name') }}</mat-label>
-      <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
-      <mat-icon matSuffix>edit</mat-icon>
+      <mat-select [(ngModel)]="currentInterfaceName" (selectionChange)="onInterfaceSelectionChange($event)">
+        <mat-option *ngFor="let config of interfaceConfigurations" [value]="config.interfaceName">
+          {{ config.interfaceName }}
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix>list</mat-icon>
     </mat-form-field>
+    
+    <button mat-icon-button (click)="openAddInterfaceDialog()" matTooltip="Add new interface" class="interface-action-button">
+      <mat-icon>add</mat-icon>
+    </button>
+    
+    <button mat-icon-button (click)="removeCurrentInterface()" [disabled]="!currentInterfaceName" matTooltip="Remove selected interface" class="interface-action-button">
+      <mat-icon>delete</mat-icon>
+    </button>
+    
+    <button mat-icon-button (click)="showInterfaceJson()" [disabled]="!currentInterfaceName" matTooltip="View interface JSON" class="interface-action-button">
+      <mat-icon>code</mat-icon>
+    </button>
   </div>
   
   <div class="data-container">
@@ -68,13 +84,24 @@
         <button mat-icon-button (click)="destinationCardExpanded = !destinationCardExpanded" class="toggle-card-button">
           <mat-icon>{{ destinationCardExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
         </button>
-        <mat-card-title>
-          <h3>Destinations</h3>
-        </mat-card-title>
-        <button mat-raised-button color="primary" (click)="openDestinationInstancesDialog()" class="manage-destinations-button">
-          <mat-icon>list</mat-icon>
-          Manage Destinations
-        </button>
+        <div class="destinations-header-actions">
+          <button mat-raised-button 
+                  color="primary" 
+                  (click)="addDestinationAdapter('CSV')" 
+                  class="add-destination-button"
+                  matTooltip="Add CSV destination adapter">
+            <mat-icon>description</mat-icon>
+            Add CSV
+          </button>
+          <button mat-raised-button 
+                  color="primary" 
+                  (click)="addDestinationAdapter('SqlServer')" 
+                  class="add-destination-button"
+                  matTooltip="Add SQL Server destination adapter">
+            <mat-icon>storage</mat-icon>
+            Add SQL Server
+          </button>
+        </div>
       </mat-card-header>
       
       <mat-card-content>
@@ -91,10 +118,20 @@
             [expanded]="getDestinationCardExpanded(instance.adapterInstanceGuid)"
             [showReceiveFolder]="false"
             [isDisabled]="i > 0"
+            [primaryActionDisabled]="isDropTableDisabled()"
             (restart)="restartDestinationAdapter()"
             (expandedChange)="setDestinationCardExpanded(instance.adapterInstanceGuid, $event)"
             (primaryAction)="dropTable()"
             (settingsClick)="openDestinationInstanceSettings(instance)">
+            <div class="destination-card-actions">
+              <button mat-icon-button 
+                      (click)="removeDestinationAdapter(instance.adapterInstanceGuid, instance.instanceName)"
+                      color="warn"
+                      class="delete-destination-button"
+                      matTooltip="Remove this destination adapter">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
       <div class="table-container" *ngIf="sqlDisplayedColumns.length > 0">
         <table mat-table [dataSource]="sqlData" class="data-table">
           <!-- Dynamic columns - rendered based on SQL data structure (matches CSV columns exactly) -->

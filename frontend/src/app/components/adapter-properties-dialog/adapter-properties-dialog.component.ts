@@ -206,7 +206,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   onSave(): void {
     this.dialogRef.close({
       instanceName: this.instanceName.trim() || (this.data.adapterType === 'Source' ? 'Source' : 'Destination'),
-      isEnabled: this.isEnabled,
+      isEnabled: this.isEnabled ?? true,
       receiveFolder: this.data.adapterName === 'CSV' ? (this.receiveFolder.trim() || '') : undefined,
       fileMask: this.data.adapterName === 'CSV' ? (this.fileMask.trim() || '*.txt') : undefined,
       batchSize: this.data.adapterName === 'CSV' ? (this.batchSize > 0 ? this.batchSize : 100) : undefined,

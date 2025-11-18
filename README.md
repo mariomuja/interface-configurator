@@ -1,3 +1,9 @@
+<style>
+strong, b {
+  font-weight: 500 !important;
+}
+</style>
+
 # 📊 System Interface Configuration - Interface Configuration Demo
 
 <div align="center">

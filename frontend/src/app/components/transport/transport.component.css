@@ -13,8 +13,14 @@
 .interface-name-container-top {
   margin-bottom: 12px;
   display: flex;
+  align-items: center;
+  gap: 8px;
   justify-content: flex-start;
   width: 100%;
+}
+
+.interface-action-button {
+  flex-shrink: 0;
 }
 
 .interface-name-field-wide {
@@ -203,10 +209,25 @@
   line-height: 20px;
 }
 
-.manage-destinations-button {
+.destinations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.destinations-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+}
+
+.add-destination-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .destinations-container-card {
@@ -226,7 +247,20 @@
 .destination-cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.destination-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 0;
+  margin-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.delete-destination-button {
+  margin-left: auto;
 }
 
 .no-destinations {

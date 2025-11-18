@@ -1,0 +1,38 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+mat-dialog-content {
+  max-height: 70vh;
+  overflow: auto;
+  padding: 16px;
+}
+
+.json-content {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 16px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+mat-dialog-actions {
+  padding: 8px 16px;
+  margin-top: 16px;
+}
+
+mat-dialog-actions button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+

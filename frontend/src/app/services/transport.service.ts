@@ -122,6 +122,14 @@ export class TransportService {
     return this.http.post<any>(`${this.apiUrl}/create-interface-config`, config);
   }
 
+  deleteInterfaceConfiguration(interfaceName: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/DeleteInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}`);
+  }
+
+  getInterfaceConfiguration(interfaceName: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/GetInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}`);
+  }
+
   toggleInterfaceConfiguration(interfaceName: string, adapterType: 'Source' | 'Destination', enabled: boolean): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/toggle-interface-config`, {
       interfaceName,

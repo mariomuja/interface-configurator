@@ -77,7 +77,7 @@ export class TranslationService {
       it: 'Vuoi davvero eliminare completamente la tabella TransportData?\n\nLa tabella verrà ricreata automaticamente al prossimo caricamento CSV.'
     },
     'table.empty': {
-      de: 'Die Zieltabelle wurde gelöscht. Beim nächsten CSV-Upload wird die Tabelle mit den CSV-Spalten automatisch neu erstellt.',
+      de: 'Die Zieltabelle existiert nicht. Beim nächsten CSV-Upload wird die Tabelle mit den CSV-Spalten automatisch neu erstellt.',
       en: 'The destination table has been deleted. On the next CSV upload, the table will be automatically recreated with the CSV columns.',
       fr: 'La table de destination a été supprimée. Lors du prochain téléchargement CSV, la table sera automatiquement recréée avec les colonnes CSV.',
       es: 'La tabla de destino ha sido eliminada. En la próxima carga CSV, la tabla se recreará automáticamente con las columnas CSV.',

@@ -55,12 +55,21 @@ export class DestinationInstancesDialogComponent implements OnInit {
   }
 
   onAddAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+    // Set default configuration based on adapter type
+    let defaultConfiguration: any = {};
+    if (adapterName === 'SqlServer') {
+      defaultConfiguration = {
+        destination: 'TransportData',
+        tableName: 'TransportData'
+      };
+    }
+    
     const newInstance: DestinationAdapterInstance = {
       adapterInstanceGuid: this.generateGuid(),
       instanceName: this.getDefaultInstanceName(adapterName),
       adapterName: adapterName,
       isEnabled: true,
-      configuration: {}
+      configuration: defaultConfiguration
     };
     this.instances.push(newInstance);
   }
