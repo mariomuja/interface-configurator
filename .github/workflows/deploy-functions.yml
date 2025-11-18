@@ -104,8 +104,8 @@ jobs:
             echo "4. Check service principal: az ad sp list --display-name <sp-name>"
             exit 1
           }
-          SUBSCRIPTION_ID=$(echo "$AZ_ACCOUNT_OUTPUT" | jq -r '.id' 2>/dev/null || echo "Could not parse")
-          SUBSCRIPTION_NAME=$(echo "$AZ_ACCOUNT_OUTPUT" | jq -r '.name' 2>/dev/null || echo "Could not parse")
+          SUBSCRIPTION_ID=$(az account show --query id -o tsv 2>/dev/null || echo "Could not get")
+          SUBSCRIPTION_NAME=$(az account show --query name -o tsv 2>/dev/null || echo "Could not get")
           echo "✅ Azure authentication verified"
           echo "  Subscription ID: $SUBSCRIPTION_ID"
           echo "  Subscription Name: $SUBSCRIPTION_NAME"
