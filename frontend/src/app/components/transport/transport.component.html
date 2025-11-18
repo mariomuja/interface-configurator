@@ -1,13 +1,4 @@
 <div class="transport-container">
-  <!-- Interface Name Editor -->
-  <div class="interface-name-container">
-    <mat-form-field appearance="outline" class="interface-name-field">
-      <mat-label>{{ getTranslation('interface.name') }}</mat-label>
-      <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
-      <mat-icon matSuffix>edit</mat-icon>
-    </mat-form-field>
-  </div>
-  
   <div class="data-container">
     <!-- Source Card -->
     <app-adapter-card
@@ -52,6 +43,15 @@
           <mat-icon>list</mat-icon>
           Manage Destinations
         </button>
+      </div>
+      
+      <!-- Interface Name Editor - Compact, left-aligned -->
+      <div class="interface-name-container">
+        <mat-form-field appearance="outline" class="interface-name-field">
+          <mat-label>{{ getTranslation('interface.name') }}</mat-label>
+          <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
+          <mat-icon matSuffix>edit</mat-icon>
+        </mat-form-field>
       </div>
       
       <div class="destination-cards" *ngIf="destinationAdapterInstances.length > 0">
