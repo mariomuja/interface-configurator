@@ -26,7 +26,7 @@ export interface InterfaceJsonViewData {
 export class InterfaceJsonViewDialogComponent {
   constructor(
     public dialogRef: MatDialogRef<InterfaceJsonViewDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: InterfaceJsonViewData
+    @Inject(MAT_DIALOG_DATA) public data?: InterfaceJsonViewData
   ) {}
 
   onClose(): void {
