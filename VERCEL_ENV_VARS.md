@@ -2,6 +2,17 @@
 
 Diese Datei dokumentiert alle Umgebungsvariablen, die in Vercel für die Interface Configurator App konfiguriert werden müssen.
 
+## Wichtig: API Proxy Konfiguration
+
+Die App verwendet eine Vercel Serverless Function (`api/[...path].ts`), die API-Anfragen an Azure Functions weiterleitet. Diese Function benötigt die folgende Umgebungsvariable:
+
+### AZURE_FUNCTION_APP_URL (Optional, aber empfohlen)
+
+- **Beschreibung**: Die URL der Azure Function App, an die API-Anfragen weitergeleitet werden sollen
+- **Wert**: `https://func-integration-main.azurewebsites.net`
+- **Standardwert**: Falls nicht gesetzt, wird `https://func-integration-main.azurewebsites.net` verwendet
+- **Umgebungen**: Production, Preview, Development
+
 ## Azure SQL Database Konfiguration
 
 Die folgenden Umgebungsvariablen sind **erforderlich** für die Datenbankverbindung:
