@@ -153,11 +153,13 @@ var host = new HostBuilder()
             services.AddSingleton<MetricsService>(sp =>
             {
                 // Try to get TelemetryClient from Application Insights (if available)
-                Microsoft.ApplicationInsights.TelemetryClient? telemetryClient = null;
+                // Using object type to avoid dependency on Application Insights package
+                object? telemetryClient = null;
                 try
                 {
                     // Application Insights SDK is automatically configured in Azure Functions
                     // TelemetryClient can be accessed via dependency injection if Application Insights package is added
+                    // MetricsService uses reflection to call TelemetryClient methods if available
                     // For now, we'll use null and MetricsService will handle gracefully
                 }
                 catch
@@ -174,6 +176,25 @@ var host = new HostBuilder()
                 var messageBoxService = sp.GetRequiredService<IMessageBoxService>();
                 var logger = sp.GetService<ILogger<DeadLetterMonitor>>();
                 return new DeadLetterMonitor(messageBoxService, logger);
+            });
+            
+            // Register Processing Statistics Service
+            services.AddScoped<ProcessingStatisticsService>(sp =>
+            {
+                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                if (messageBoxContext == null)
+                {
+                    throw new InvalidOperationException("MessageBoxDbContext is required for ProcessingStatisticsService");
+                }
+                var logger = sp.GetService<ILogger<ProcessingStatisticsService>>();
+                return new ProcessingStatisticsService(messageBoxContext, logger);
+            });
+            
+            // Register CSV Validation Service
+            services.AddSingleton<CsvValidationService>(sp =>
+            {
+                var logger = sp.GetService<ILogger<CsvValidationService>>();
+                return new CsvValidationService(logger);
             });
             
             // Register Adapter Services (these handle null DbContext gracefully)

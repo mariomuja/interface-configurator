@@ -18,6 +18,7 @@ public class MessageBoxDbContext : DbContext
     public DbSet<MessageSubscription> MessageSubscriptions { get; set; }
     public DbSet<AdapterInstance> AdapterInstances { get; set; }
     public DbSet<ProcessCsvBlobTrigger.Models.ProcessLog> ProcessLogs { get; set; }
+    public DbSet<ProcessCsvBlobTrigger.Services.ProcessingStatistics> ProcessingStatistics { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -92,6 +93,24 @@ public class MessageBoxDbContext : DbContext
             entity.HasIndex(e => e.Level).HasDatabaseName("IX_ProcessLogs_Level");
             entity.HasIndex(e => e.InterfaceName).HasDatabaseName("IX_ProcessLogs_InterfaceName");
             entity.HasIndex(e => e.MessageId).HasDatabaseName("IX_ProcessLogs_MessageId");
+        });
+
+        // Configure ProcessingStatistics
+        modelBuilder.Entity<ProcessCsvBlobTrigger.Services.ProcessingStatistics>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+            entity.Property(e => e.ProcessingStartTime)
+                .HasColumnName("ProcessingStartTime")
+                .IsRequired();
+            entity.Property(e => e.ProcessingEndTime)
+                .HasColumnName("ProcessingEndTime")
+                .IsRequired();
+            entity.HasIndex(e => e.InterfaceName).HasDatabaseName("IX_ProcessingStatistics_InterfaceName");
+            entity.HasIndex(e => e.ProcessingEndTime).HasDatabaseName("IX_ProcessingStatistics_ProcessingEndTime");
+            entity.HasIndex(e => new { e.InterfaceName, e.ProcessingEndTime }).HasDatabaseName("IX_ProcessingStatistics_InterfaceName_ProcessingEndTime");
         });
     }
 }

@@ -1,17 +1,19 @@
-using Microsoft.ApplicationInsights;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 
 namespace ProcessCsvBlobTrigger.Services;
 
 /// <summary>
 /// Service for tracking custom metrics and events in Application Insights
+/// Note: Application Insights TelemetryClient is optional - if not available, metrics are skipped
+/// Uses reflection to avoid hard dependency on Application Insights package
 /// </summary>
 public class MetricsService
 {
-    private readonly TelemetryClient? _telemetryClient;
+    private readonly object? _telemetryClient; // Using object to avoid dependency on Application Insights package
     private readonly ILogger<MetricsService>? _logger;
 
-    public MetricsService(TelemetryClient? telemetryClient, ILogger<MetricsService>? logger)
+    public MetricsService(object? telemetryClient, ILogger<MetricsService>? logger)
     {
         _telemetryClient = telemetryClient;
         _logger = logger;
@@ -24,13 +26,15 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackMetric("MessagesProcessed", recordCount, new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackMetric", "MessagesProcessed", recordCount, new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "DurationSeconds", duration.TotalSeconds.ToString("F2") }
             });
 
-            _telemetryClient?.TrackEvent("MessageProcessed", new Dictionary<string, string>
+            InvokeTelemetryMethod("TrackEvent", "MessageProcessed", new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "RecordCount", recordCount.ToString() },
@@ -50,13 +54,15 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackException(ex, new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackException", ex, new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "ErrorType", errorType }
             });
 
-            _telemetryClient?.TrackEvent("ErrorOccurred", new Dictionary<string, string>
+            InvokeTelemetryMethod("TrackEvent", "ErrorOccurred", new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "ErrorType", errorType },
@@ -76,7 +82,9 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackEvent("RetryAttempt", new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackEvent", "RetryAttempt", new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "RetryCount", retryCount.ToString() },
@@ -97,14 +105,16 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackEvent("DeadLetter", new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackEvent", "DeadLetter", new Dictionary<string, string>
             {
                 { "Adapter", adapterName },
                 { "MessageId", messageId.ToString() },
                 { "Reason", reason }
             });
 
-            _telemetryClient?.TrackMetric("DeadLetterCount", 1, new Dictionary<string, string>
+            InvokeTelemetryMethod("TrackMetric", "DeadLetterCount", 1, new Dictionary<string, string>
             {
                 { "Adapter", adapterName }
             });
@@ -122,7 +132,9 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackEvent("DatabaseRetry", new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackEvent", "DatabaseRetry", new Dictionary<string, string>
             {
                 { "Database", databaseName },
                 { "RetryCount", retryCount.ToString() },
@@ -142,7 +154,9 @@ public class MetricsService
     {
         try
         {
-            _telemetryClient?.TrackEvent("HealthCheck", new Dictionary<string, string>
+            if (_telemetryClient == null) return;
+
+            InvokeTelemetryMethod("TrackEvent", "HealthCheck", new Dictionary<string, string>
             {
                 { "CheckName", checkName },
                 { "IsHealthy", isHealthy.ToString() },
@@ -154,5 +168,26 @@ public class MetricsService
             _logger?.LogWarning(ex, "Failed to track health check metric");
         }
     }
-}
 
+    /// <summary>
+    /// Invoke TelemetryClient method using reflection (avoids hard dependency)
+    /// </summary>
+    private void InvokeTelemetryMethod(string methodName, params object[] parameters)
+    {
+        if (_telemetryClient == null) return;
+
+        try
+        {
+            var method = _telemetryClient.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            if (method != null)
+            {
+                method.Invoke(_telemetryClient, parameters);
+            }
+        }
+        catch
+        {
+            // Silently fail if method doesn't exist or invocation fails
+            // This allows the code to work without Application Insights package
+        }
+    }
+}

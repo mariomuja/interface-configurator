@@ -236,21 +236,66 @@ public class DataServiceAdapter : IDataService
                 using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
+                    var rowIndexInBatch = 0;
                     foreach (var row in batch)
                     {
-                        var parameters = new List<SqlParameter>();
-                        foreach (var column in filteredColumnTypes)
+                        try
                         {
-                            var sanitizedColumnName = SanitizeColumnName(column.Key);
-                            var value = row.TryGetValue(column.Key, out var val) ? val : null;
-                            var sqlValue = value != null && !string.IsNullOrWhiteSpace(value)
-                                ? typeValidator.ConvertValue(value, column.Value.DataType)
-                                : DBNull.Value;
+                            var parameters = new List<SqlParameter>();
+                            var columnErrors = new List<string>();
+                            
+                            foreach (var column in filteredColumnTypes)
+                            {
+                                try
+                                {
+                                    var sanitizedColumnName = SanitizeColumnName(column.Key);
+                                    var value = row.TryGetValue(column.Key, out var val) ? val : null;
+                                    var sqlValue = value != null && !string.IsNullOrWhiteSpace(value)
+                                        ? typeValidator.ConvertValue(value, column.Value.DataType)
+                                        : DBNull.Value;
 
-                            parameters.Add(new SqlParameter("@" + sanitizedColumnName, sqlValue ?? DBNull.Value));
+                                    parameters.Add(new SqlParameter("@" + sanitizedColumnName, sqlValue ?? DBNull.Value));
+                                }
+                                catch (Exception colEx)
+                                {
+                                    // Track column-level errors
+                                    columnErrors.Add($"Column '{column.Key}': {colEx.Message}");
+                                }
+                            }
+
+                            if (columnErrors.Count > 0)
+                            {
+                                var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
+                                var errorMsg = $"Row {globalRowIndex} (batch {batchNumber}): Column errors - {string.Join("; ", columnErrors)}";
+                                await SafeLogAsync("error", $"Row {globalRowIndex} column validation failed", errorMsg, cancellationToken);
+                                throw new InvalidOperationException(errorMsg);
+                            }
+
+                            await _context.Database.ExecuteSqlRawAsync(insertSql, parameters.ToArray(), cancellationToken);
                         }
-
-                        await _context.Database.ExecuteSqlRawAsync(insertSql, parameters.ToArray(), cancellationToken);
+                        catch (Microsoft.Data.SqlClient.SqlException sqlEx)
+                        {
+                            var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
+                            var errorDetails = $"Row {globalRowIndex} (batch {batchNumber}): SQL Error {sqlEx.Number} - {sqlEx.Message}";
+                            
+                            // Try to extract column name from error message if available
+                            if (sqlEx.Message.Contains("column") || sqlEx.Message.Contains("Column"))
+                            {
+                                errorDetails += $". Column information may be available in error message.";
+                            }
+                            
+                            await SafeLogAsync("error", $"Row {globalRowIndex} SQL insert failed", errorDetails, cancellationToken);
+                            throw new InvalidOperationException(errorDetails, sqlEx);
+                        }
+                        catch (Exception rowEx)
+                        {
+                            var globalRowIndex = (batchStart + rowIndexInBatch) + 1;
+                            var errorDetails = $"Row {globalRowIndex} (batch {batchNumber}): {rowEx.Message}";
+                            await SafeLogAsync("error", $"Row {globalRowIndex} processing failed", errorDetails, cancellationToken);
+                            throw;
+                        }
+                        
+                        rowIndexInBatch++;
                     }
 
                     await transaction.CommitAsync(cancellationToken);
