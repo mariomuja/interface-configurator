@@ -40,6 +40,7 @@ public class SqlServerAdapter : IAdapter
     // Source-specific properties
     private readonly string? _pollingStatement;
     private readonly int _pollingInterval;
+    private readonly string? _tableName;
     
     // General SQL Server adapter properties
     private readonly bool _useTransaction;
@@ -60,6 +61,7 @@ public class SqlServerAdapter : IAdapter
         string? connectionString = null,
         string? pollingStatement = null,
         int? pollingInterval = null,
+        string? tableName = null,
         bool? useTransaction = null,
         int? batchSize = null,
         int? commandTimeout = null,
@@ -81,6 +83,7 @@ public class SqlServerAdapter : IAdapter
         _adapterInstanceGuid = adapterInstanceGuid;
         _pollingStatement = pollingStatement;
         _pollingInterval = pollingInterval ?? 60;
+        _tableName = tableName;
         _useTransaction = useTransaction ?? false;
         _batchSize = batchSize ?? 1000;
         _commandTimeout = commandTimeout ?? 30;
@@ -118,6 +121,7 @@ public class SqlServerAdapter : IAdapter
             List<string> headers = new List<string>();
 
             // Use polling statement if provided (for source adapters)
+            // If not provided, use default: "SELECT * FROM Table" where Table is _tableName
             if (!string.IsNullOrWhiteSpace(_pollingStatement))
             {
                 selectSql = _pollingStatement;
@@ -125,30 +129,22 @@ public class SqlServerAdapter : IAdapter
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(source))
-                    throw new ArgumentException("Source table name cannot be empty when polling statement is not provided", nameof(source));
-
-                _logger?.LogInformation("Reading data from SQL Server table: {Source}", source);
-
-                // Ensure database exists
-                using var contextForInit = GetContext();
-                await contextForInit.Database.EnsureCreatedAsync(cancellationToken);
-
-                // Get current table structure
-                var columnTypes = await _dynamicTableService.GetCurrentTableStructureAsync(cancellationToken);
-
-                if (columnTypes.Count == 0)
+                // Use default polling statement if table name is provided
+                if (!string.IsNullOrWhiteSpace(_tableName))
                 {
-                    _logger?.LogWarning("Table {Source} has no columns or does not exist", source);
-                    return (new List<string>(), new List<Dictionary<string, string>>());
+                    selectSql = $"SELECT * FROM [{_tableName}]";
+                    _logger?.LogInformation("Reading data using default polling statement: SELECT * FROM [{TableName}]", _tableName);
                 }
-
-                headers = columnTypes.Keys.ToList();
-
-                // Build SELECT query
-                var sanitizedColumns = headers.Select(SanitizeColumnName).ToList();
-                var columnList = string.Join(", ", sanitizedColumns);
-                selectSql = $"SELECT {columnList} FROM [{source}] ORDER BY datetime_created";
+                else if (!string.IsNullOrWhiteSpace(source))
+                {
+                    // Fallback to source parameter if table name not provided
+                    selectSql = $"SELECT * FROM [{source}]";
+                    _logger?.LogInformation("Reading data using source parameter: SELECT * FROM [{Source}]", source);
+                }
+                else
+                {
+                    throw new ArgumentException("Source table name or PollingStatement must be provided", nameof(source));
+                }
             }
 
             // Execute query with batch size support

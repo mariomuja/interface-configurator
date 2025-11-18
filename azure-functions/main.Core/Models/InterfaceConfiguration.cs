@@ -242,6 +242,14 @@ public class InterfaceConfiguration
     public int SqlPollingInterval { get; set; } = 60;
 
     /// <summary>
+    /// Table name for SQL Server adapter.
+    /// When used as Source: Used in default PollingStatement if PollingStatement is not provided (default: "SELECT * FROM Table")
+    /// When used as Destination: Used as the destination table name
+    /// </summary>
+    [MaxLength(200)]
+    public string? SqlTableName { get; set; }
+
+    /// <summary>
     /// Wrap execution in an explicit SQL transaction for SQL Server adapter.
     /// When true, all database operations are wrapped in a transaction that can be committed or rolled back.
     /// Default: false

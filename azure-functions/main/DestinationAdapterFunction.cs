@@ -112,17 +112,24 @@ public class DestinationAdapterFunction
             var destConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(instance.Configuration ?? "{}") 
                 ?? new Dictionary<string, JsonElement>();
 
-            if (!destConfig.TryGetValue("destination", out var destElement))
+            // Get destination table name - prefer TableName from configuration, then destination property, then interface config
+            string? destination = null;
+            if (destConfig.TryGetValue("tableName", out var tableNameElement))
             {
-                _logger.LogWarning("Destination configuration missing 'destination' property for instance '{InstanceName}' in interface '{InterfaceName}'", 
-                    instance.InstanceName, interfaceConfig.InterfaceName);
-                return;
+                destination = tableNameElement.GetString();
+            }
+            else if (destConfig.TryGetValue("destination", out var destElement))
+            {
+                destination = destElement.GetString();
+            }
+            else if (!string.IsNullOrWhiteSpace(interfaceConfig.SqlTableName))
+            {
+                destination = interfaceConfig.SqlTableName;
             }
 
-            var destination = destElement.GetString();
             if (string.IsNullOrWhiteSpace(destination))
             {
-                _logger.LogWarning("Destination is empty for instance '{InstanceName}' in interface '{InterfaceName}'", 
+                _logger.LogWarning("Destination table name is empty for instance '{InstanceName}' in interface '{InterfaceName}'. Please configure TableName.", 
                     instance.InstanceName, interfaceConfig.InterfaceName);
                 return;
             }
@@ -158,6 +165,7 @@ public class DestinationAdapterFunction
                 SqlPassword = interfaceConfig.SqlPassword,
                 SqlIntegratedSecurity = interfaceConfig.SqlIntegratedSecurity,
                 SqlResourceGroup = interfaceConfig.SqlResourceGroup,
+                SqlTableName = interfaceConfig.SqlTableName ?? destination, // Use interface config or instance destination
                 DestinationReceiveFolder = interfaceConfig.DestinationReceiveFolder,
                 DestinationFileMask = interfaceConfig.DestinationFileMask,
                 SqlUseTransaction = interfaceConfig.SqlUseTransaction,

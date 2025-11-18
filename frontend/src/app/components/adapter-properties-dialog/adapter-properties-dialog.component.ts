@@ -44,7 +44,7 @@ export interface AdapterPropertiesData {
   sqlPollingInterval?: number; // Only for Source adapters
   sqlUseTransaction?: boolean; // SQL Server adapter property
   sqlBatchSize?: number; // SQL Server adapter property
-  tableName?: string; // Table name for SqlServer destination adapters
+  tableName?: string; // Table name for SqlServer adapters (used for both source and destination)
   adapterInstanceGuid: string;
 }
 
@@ -240,7 +240,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       sqlResourceGroup: this.data.adapterName === 'SqlServer' ? (this.sqlResourceGroup.trim() || '') : undefined,
       sqlPollingStatement: this.showSqlPollingProperties ? (this.sqlPollingStatement.trim() || '') : undefined,
       sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined,
-      tableName: this.data.adapterName === 'SqlServer' && this.data.adapterType === 'Destination' ? (this.tableName.trim() || 'TransportData') : undefined
+      tableName: this.data.adapterName === 'SqlServer' ? (this.tableName.trim() || 'TransportData') : undefined
     });
   }
 

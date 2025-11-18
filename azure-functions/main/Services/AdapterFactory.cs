@@ -196,6 +196,9 @@ public class AdapterFactory : IAdapterFactory
         string? pollingStatement = isSource ? config.SqlPollingStatement : null;
         int? pollingInterval = isSource ? config.SqlPollingInterval : null;
         
+        // Get table name (used for both source and destination)
+        string? tableName = config.SqlTableName;
+        
         // Get general SQL Server adapter properties (used for both source and destination)
         bool? useTransaction = config.SqlUseTransaction;
         int? batchSize = config.SqlBatchSize;
@@ -244,6 +247,7 @@ public class AdapterFactory : IAdapterFactory
             connectionString,
             pollingStatement,
             pollingInterval,
+            tableName,
             useTransaction,
             batchSize,
             commandTimeout,
