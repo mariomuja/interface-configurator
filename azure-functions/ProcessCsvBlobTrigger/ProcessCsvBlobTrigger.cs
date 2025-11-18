@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using ProcessCsvBlobTrigger.Adapters;
 using ProcessCsvBlobTrigger.Core.Helpers;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 
@@ -9,15 +10,15 @@ namespace ProcessCsvBlobTrigger;
 
 public class ProcessCsvBlobTriggerFunction
 {
-    private readonly ICsvProcessor _csvProcessor;
+    private readonly CsvAdapter _csvAdapter;
     private readonly ILogger<ProcessCsvBlobTriggerFunction> _logger;
     private readonly BlobServiceClient _blobServiceClient;
 
     public ProcessCsvBlobTriggerFunction(
-        ICsvProcessor csvProcessor,
+        CsvAdapter csvAdapter,
         ILogger<ProcessCsvBlobTriggerFunction> logger)
     {
-        _csvProcessor = csvProcessor;
+        _csvAdapter = csvAdapter ?? throw new ArgumentNullException(nameof(csvAdapter));
         _logger = logger;
         
         // Initialize BlobServiceClient for moving blobs between containers
@@ -47,38 +48,38 @@ public class ProcessCsvBlobTriggerFunction
         {
             _logger.LogInformation("Blob trigger received for blob: {BlobName}", blobName);
 
-            // Read blob content from stream
-            byte[] blobContent;
-            using (var memoryStream = new MemoryStream())
+            // Use CsvAdapter to read CSV from blob storage and write to MessageBox
+            // The CsvAdapter.ReadAsync will automatically:
+            // 1. Read CSV from blob storage
+            // 2. Parse CSV content
+            // 3. Debatch records (one record per message)
+            // 4. Write each record to MessageBox as a separate message
+            // The DestinationAdapterFunction (timer-triggered, runs every minute) will then:
+            // 1. Read pending messages from MessageBox
+            // 2. Write them to SQL Server TransportData table
+            // 3. Mark messages as processed
+            try
             {
-                await blobStream.CopyToAsync(memoryStream);
-                blobContent = memoryStream.ToArray();
-            }
-
-            var blobSize = blobContent.Length;
-            _logger.LogInformation("Blob trigger processed blob: {BlobName} ({BlobSize} bytes) from csv-incoming folder", blobName, blobSize);
-
-            var result = await _csvProcessor.ProcessCsvAsync(blobContent, blobName);
-
-            if (!result.Success)
-            {
-                var exception = result.Exception ?? new Exception(result.ErrorMessage ?? "Unknown error occurred");
+                var sourcePath = $"csv-files/csv-incoming/{blobName}";
+                var (headers, records) = await _csvAdapter.ReadAsync(sourcePath, context.CancellationToken);
                 
+                _logger.LogInformation("Successfully processed CSV blob {BlobName}: {HeaderCount} headers, {RecordCount} records written to MessageBox. Destination adapter will process messages within 1 minute.",
+                    blobName, headers.Count, records.Count);
+            }
+            catch (Exception ex)
+            {
                 // Log to Application Insights with full exception details including inner exceptions
-                _logger.LogError(exception, "CSV processing failed for {BlobName}: {ErrorMessage}", blobName, result.ErrorMessage);
+                _logger.LogError(ex, "CSV processing failed for {BlobName}: {ErrorMessage}", blobName, ex.Message);
                 
                 // Also log formatted exception details for better visibility in Application Insights
-                var exceptionDetails = ExceptionHelper.FormatException(exception, includeStackTrace: true);
+                var exceptionDetails = ExceptionHelper.FormatException(ex, includeStackTrace: true);
                 _logger.LogError("CSV processing failed - Full exception details for {BlobName}:\n{ExceptionDetails}", blobName, exceptionDetails);
                 
                 // Move blob to csv-error folder
                 await MoveBlobToFolderAsync("csv-files", "csv-incoming", "csv-error", blobName, "Processing failed");
                 
-                throw exception;
+                throw;
             }
-
-            _logger.LogInformation("Successfully processed {RecordCount} records from {BlobName} in {ChunkCount} chunks",
-                result.RecordsProcessed, blobName, result.ChunksProcessed);
             
             // Move blob to csv-processed folder
             await MoveBlobToFolderAsync("csv-files", "csv-incoming", "csv-processed", blobName, "Processing completed successfully");

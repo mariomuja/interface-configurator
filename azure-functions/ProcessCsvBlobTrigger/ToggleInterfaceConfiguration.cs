@@ -39,15 +39,31 @@ public class ToggleInterfaceConfiguration
                 return badRequestResponse;
             }
 
-            await _configService.SetEnabledAsync(request.InterfaceName, request.Enabled, executionContext.CancellationToken);
+            if (request.AdapterType != "Source" && request.AdapterType != "Destination")
+            {
+                var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "AdapterType must be 'Source' or 'Destination'" }));
+                return badRequestResponse;
+            }
 
-            _logger.LogInformation("Toggled interface configuration '{InterfaceName}' to {Enabled}", request.InterfaceName, request.Enabled);
+            if (request.AdapterType == "Source")
+            {
+                await _configService.SetSourceEnabledAsync(request.InterfaceName, request.Enabled, executionContext.CancellationToken);
+                _logger.LogInformation("Toggled Source adapter for interface configuration '{InterfaceName}' to {Enabled}", request.InterfaceName, request.Enabled);
+            }
+            else
+            {
+                await _configService.SetDestinationEnabledAsync(request.InterfaceName, request.Enabled, executionContext.CancellationToken);
+                _logger.LogInformation("Toggled Destination adapter for interface configuration '{InterfaceName}' to {Enabled}", request.InterfaceName, request.Enabled);
+            }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
-                message = $"Interface configuration '{request.InterfaceName}' {(request.Enabled ? "enabled" : "disabled")}",
+                message = $"{request.AdapterType} adapter for interface configuration '{request.InterfaceName}' {(request.Enabled ? "enabled" : "disabled")}",
                 interfaceName = request.InterfaceName,
+                adapterType = request.AdapterType,
                 enabled = request.Enabled
             }));
             return response;
@@ -65,6 +81,7 @@ public class ToggleInterfaceConfiguration
     private class ToggleInterfaceConfigRequest
     {
         public string InterfaceName { get; set; } = string.Empty;
+        public string AdapterType { get; set; } = string.Empty; // "Source" or "Destination"
         public bool Enabled { get; set; }
     }
 }

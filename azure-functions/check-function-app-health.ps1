@@ -1,7 +1,7 @@
 # Prueft die Gesundheit der Azure Function App und aller Dependencies
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = ""
 )
 
@@ -168,6 +168,11 @@ Write-Host "   - Logs anzeigen: az functionapp log tail --resource-group $Resour
 Write-Host "   - App Settings pruefen: az functionapp config appsettings list --resource-group $ResourceGroup --name $FunctionAppName" -ForegroundColor Yellow
 
 Write-Host ""
+
+
+
+
+
 
 
 

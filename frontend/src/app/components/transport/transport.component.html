@@ -1,75 +1,108 @@
 <div class="transport-container">
+  <!-- Interface Name Editor -->
+  <div class="interface-name-container">
+    <mat-form-field appearance="outline" class="interface-name-field">
+      <mat-label>{{ getTranslation('interface.name') }}</mat-label>
+      <input matInput [(ngModel)]="currentInterfaceName" (blur)="updateInterfaceName()" (keyup.enter)="updateInterfaceName()" />
+      <mat-icon matSuffix>edit</mat-icon>
+    </mat-form-field>
+  </div>
+  
   <div class="data-container">
-    <mat-card class="data-card csv-card">
-      <mat-card-header class="data-card-header">
-        <mat-card-title class="data-card-title">{{ getTranslation('source.csv') }} ({{ csvData.length }} {{ getTranslation('records') }})</mat-card-title>
-        <div class="data-card-actions">
-          <button mat-raised-button color="primary" (click)="startTransport()" [disabled]="isTransporting" class="action-button">
-            <mat-icon>play_arrow</mat-icon>
-            {{ getTranslation('transport.start') }}
-          </button>
-        </div>
-      </mat-card-header>
-      <mat-card-content>
-        <div *ngIf="isLoading" class="spinner-container">
-          <mat-spinner></mat-spinner>
-        </div>
-        <div class="csv-text-container" *ngIf="!isLoading">
-          <textarea 
-            class="csv-text csv-editable" 
-            [(ngModel)]="editableCsvText"
-            (input)="onCsvTextChange()"
-            spellcheck="false"
-            placeholder="CSV-Daten hier bearbeiten..."></textarea>
-        </div>
-      </mat-card-content>
-    </mat-card>
+    <!-- Source Card -->
+    <app-adapter-card
+      [adapterType]="'Source'"
+      [adapterName]="sourceAdapterName"
+      [instanceName]="sourceInstanceName"
+      [isEnabled]="sourceIsEnabled"
+      [receiveFolder]="sourceReceiveFolder"
+      [adapterInstanceGuid]="sourceAdapterInstanceGuid"
+      [isRestarting]="isRestartingSource"
+      [isLoading]="isLoading"
+      [expanded]="sourceCardExpanded"
+      [showReceiveFolder]="sourceAdapterName === 'CSV'"
+      (restart)="restartSourceAdapter()"
+      (expandedChange)="sourceCardExpanded = $event"
+      (primaryAction)="startTransport()"
+      (settingsClick)="openSourceAdapterSettings()">
+      <div class="csv-text-container" *ngIf="!isLoading && sourceAdapterName === 'CSV'">
+        <textarea 
+          class="csv-text csv-editable" 
+          [(ngModel)]="editableCsvText"
+          (input)="onCsvTextChange()"
+          spellcheck="false"
+          placeholder="CSV-Daten hier bearbeiten..."></textarea>
+      </div>
+      <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
+        <p>SQL Server Source Adapter</p>
+        <p *ngIf="sqlPollingStatement" class="polling-statement">
+          <strong>Polling Statement:</strong> {{ sqlPollingStatement }}
+        </p>
+        <p *ngIf="sqlPollingInterval" class="polling-interval">
+          <strong>Polling Interval:</strong> {{ sqlPollingInterval }} seconds
+        </p>
+      </div>
+    </app-adapter-card>
 
-    <mat-card class="data-card sql-card">
-      <mat-card-header class="data-card-header">
-        <mat-card-title class="data-card-title">{{ getTranslation('destination.sql') }} ({{ sqlData.length }} {{ getTranslation('records') }})</mat-card-title>
-        <div class="data-card-actions">
-          <button mat-raised-button color="accent" (click)="dropTable()" class="action-button">
-            <mat-icon>delete_forever</mat-icon>
-            {{ getTranslation('table.drop') }}
-          </button>
-        </div>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="table-container" *ngIf="sqlDisplayedColumns.length > 0">
-          <table mat-table [dataSource]="sqlData" class="data-table">
-            <!-- Dynamic columns - rendered based on SQL data structure (matches CSV columns exactly) -->
-            <ng-container *ngFor="let column of sqlDisplayedColumns" [matColumnDef]="column">
-              <th mat-header-cell *matHeaderCellDef>{{ getColumnDisplayName(column) }}</th>
-              <td mat-cell *matCellDef="let row">
-                <!-- Special handling for date columns -->
-                <span *ngIf="isDateColumn(column)">
-                  {{ getCellValue(row, column) | date:'short' }}
-                </span>
-                <!-- Numeric columns (excluding date and id columns) -->
-                <span *ngIf="!isDateColumn(column) && column.toLowerCase() !== 'id' && isNumericColumn(column, sqlData)">
-                  {{ getCellValue(row, column) | number:'1.2-2' }}
-                </span>
-                <!-- Text/other columns -->
-                <span *ngIf="!isDateColumn(column) && (!isNumericColumn(column, sqlData) || column.toLowerCase() === 'id')">
-                  {{ getCellValue(row, column) }}
-                </span>
-              </td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="sqlDisplayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: sqlDisplayedColumns"></tr>
-            <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" [attr.colspan]="sqlDisplayedColumns.length">
-                {{ getTranslation('no.data.sql') }}
-              </td>
-            </tr>
-          </table>
-        </div>
-        <div class="table-empty-message" *ngIf="sqlDisplayedColumns.length === 0">
-          <p>{{ getTranslation('table.empty') }}</p>
-        </div>
-      </mat-card-content>
-    </mat-card>
+    <!-- Destination Adapter Instances -->
+    <div class="destinations-container">
+      <div class="destinations-header">
+        <h3>Destinations</h3>
+        <button mat-raised-button color="primary" (click)="openDestinationInstancesDialog()" class="manage-destinations-button">
+          <mat-icon>list</mat-icon>
+          Manage Destinations
+        </button>
+      </div>
+      
+      <div class="destination-cards" *ngIf="destinationAdapterInstances.length > 0">
+        <app-adapter-card
+          *ngFor="let instance of destinationAdapterInstances"
+          [adapterType]="'Destination'"
+          [adapterName]="instance.adapterName"
+          [instanceName]="instance.instanceName"
+          [isEnabled]="instance.isEnabled"
+          [adapterInstanceGuid]="instance.adapterInstanceGuid"
+          [isRestarting]="false"
+          [isLoading]="isLoading"
+          [expanded]="true"
+          [showReceiveFolder]="false"
+          (restart)="restartDestinationAdapter()"
+          (expandedChange)="destinationCardExpanded = $event"
+          (primaryAction)="dropTable()"
+          (settingsClick)="openDestinationInstanceSettings(instance)">
+      <div class="table-container" *ngIf="sqlDisplayedColumns.length > 0">
+        <table mat-table [dataSource]="sqlData" class="data-table">
+          <!-- Dynamic columns - rendered based on SQL data structure (matches CSV columns exactly) -->
+          <ng-container *ngFor="let column of sqlDisplayedColumns" [matColumnDef]="column">
+            <th mat-header-cell *matHeaderCellDef>{{ getColumnDisplayName(column) }}</th>
+            <td mat-cell *matCellDef="let row">
+              <!-- Special handling for date columns -->
+              <span *ngIf="isDateColumn(column)">
+                {{ getCellValue(row, column) | date:'short' }}
+              </span>
+              <!-- Numeric columns (excluding date and id columns) -->
+              <span *ngIf="!isDateColumn(column) && column.toLowerCase() !== 'id' && isNumericColumn(column, sqlData)">
+                {{ getCellValue(row, column) | number:'1.2-2' }}
+              </span>
+              <!-- Text/other columns -->
+              <span *ngIf="!isDateColumn(column) && (!isNumericColumn(column, sqlData) || column.toLowerCase() === 'id')">
+                {{ getCellValue(row, column) }}
+              </span>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="sqlDisplayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: sqlDisplayedColumns"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" [attr.colspan]="sqlDisplayedColumns.length">
+              {{ getTranslation('no.data.sql') }}
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="table-empty-message" *ngIf="sqlDisplayedColumns.length === 0">
+        <p>{{ getTranslation('table.empty') }}</p>
+      </div>
+    </app-adapter-card>
   </div>
 
   <mat-card class="log-card">

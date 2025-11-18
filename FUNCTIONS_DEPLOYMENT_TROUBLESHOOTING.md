@@ -47,13 +47,13 @@ func azure functionapp publish func-appe1mz5h --dotnet-isolated
 
 ```powershell
 # Prüfe Function App Status
-az functionapp show --name func-appe1mz5h --resource-group rg-infrastructure-as-code --query "state"
+az functionapp show --name func-appe1mz5h --resource-group rg-interface-configuration --query "state"
 
 # Prüfe App Settings
-az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-infrastructure-as-code --query "[?name=='FUNCTIONS_WORKER_RUNTIME']"
+az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-interface-configuration --query "[?name=='FUNCTIONS_WORKER_RUNTIME']"
 
 # Liste Functions
-az functionapp function list --name func-appe1mz5h --resource-group rg-infrastructure-as-code
+az functionapp function list --name func-appe1mz5h --resource-group rg-interface-configuration
 ```
 
 ### 5. Prüfe Deployment-Paket
@@ -77,7 +77,7 @@ Wenn das direkte Deployment nicht funktioniert:
 $blobUrl = az storage blob generate-sas --account-name stfuncsappe1mz5h --container-name function-releases --name function-app.zip --permissions r --expiry (Get-Date).AddHours(24).ToString("yyyy-MM-ddTHH:mm:ssZ") --full-uri --output tsv
 
 # Setze App Setting
-az functionapp config appsettings set --name func-appe1mz5h --resource-group rg-infrastructure-as-code --settings "WEBSITE_RUN_FROM_PACKAGE=$blobUrl"
+az functionapp config appsettings set --name func-appe1mz5h --resource-group rg-interface-configuration --settings "WEBSITE_RUN_FROM_PACKAGE=$blobUrl"
 ```
 
 ## Nächste Schritte:

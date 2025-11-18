@@ -1,8 +1,8 @@
 # Testet die neue Function App
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
-    [string]$FunctionAppName = "func-csv-to-sql-processor"
+    [string]$ResourceGroup = "rg-interface-configuration",
+    [string]$FunctionAppName = "func-integration-main"
 )
 
 $ErrorActionPreference = "Continue"
@@ -90,6 +90,8 @@ if ($functions) {
 }
 
 Write-Host ""
+
+
 
 
 

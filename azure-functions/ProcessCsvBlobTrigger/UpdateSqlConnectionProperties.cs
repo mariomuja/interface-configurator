@@ -1,0 +1,86 @@
+using System.Text.Json;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+using ProcessCsvBlobTrigger.Core.Interfaces;
+
+namespace ProcessCsvBlobTrigger;
+
+public class UpdateSqlConnectionProperties
+{
+    private readonly IInterfaceConfigurationService _configService;
+    private readonly ILogger<UpdateSqlConnectionProperties> _logger;
+
+    public UpdateSqlConnectionProperties(
+        IInterfaceConfigurationService configService,
+        ILogger<UpdateSqlConnectionProperties> logger)
+    {
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    [Function("UpdateSqlConnectionProperties")]
+    public async Task<HttpResponseData> Run(
+        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "UpdateSqlConnectionProperties")] HttpRequestData req,
+        FunctionContext executionContext)
+    {
+        _logger.LogInformation("UpdateSqlConnectionProperties function triggered");
+
+        try
+        {
+            var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            var request = JsonSerializer.Deserialize<UpdateSqlConnectionPropertiesRequest>(requestBody);
+
+            if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
+            {
+                var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "InterfaceName is required" }));
+                return badRequestResponse;
+            }
+
+            await _configService.UpdateSqlConnectionPropertiesAsync(
+                request.InterfaceName,
+                request.ServerName,
+                request.DatabaseName,
+                request.UserName,
+                request.Password,
+                request.IntegratedSecurity,
+                request.ResourceGroup,
+                executionContext.CancellationToken);
+
+            _logger.LogInformation("SQL connection properties for interface '{InterfaceName}' updated", request.InterfaceName);
+
+            var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await response.WriteStringAsync(JsonSerializer.Serialize(new { 
+                message = $"SQL connection properties for interface '{request.InterfaceName}' updated successfully",
+                interfaceName = request.InterfaceName
+            }));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating SQL connection properties");
+            var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
+            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
+            return errorResponse;
+        }
+    }
+
+    private class UpdateSqlConnectionPropertiesRequest
+    {
+        public string InterfaceName { get; set; } = string.Empty;
+        public string? ServerName { get; set; }
+        public string? DatabaseName { get; set; }
+        public string? UserName { get; set; }
+        public string? Password { get; set; }
+        public bool? IntegratedSecurity { get; set; }
+        public string? ResourceGroup { get; set; }
+    }
+}
+
+
+
+

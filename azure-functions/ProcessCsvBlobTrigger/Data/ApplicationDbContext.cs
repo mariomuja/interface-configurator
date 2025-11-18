@@ -3,6 +3,11 @@ using ProcessCsvBlobTrigger.Models;
 
 namespace ProcessCsvBlobTrigger.Data;
 
+/// <summary>
+/// DbContext for the main application database (app-database)
+/// This context is used by SqlServerAdapter to create and write to TransportData table
+/// TransportData table is created in the main application database, NOT in MessageBox database
+/// </summary>
 public class ApplicationDbContext : DbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -10,6 +15,10 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    /// <summary>
+    /// TransportData table - stores CSV data in the main application database
+    /// This table is created in app-database (not MessageBox database)
+    /// </summary>
     public DbSet<ProcessCsvBlobTrigger.Models.TransportData> TransportData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

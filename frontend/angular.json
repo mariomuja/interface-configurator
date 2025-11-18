@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "infrastructure-as-code": {
+    "interface-configuration": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -13,7 +13,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/infrastructure-as-code",
+            "outputPath": "dist/interface-configuration",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -53,10 +53,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "infrastructure-as-code:build:production"
+              "buildTarget": "interface-configuration:build:production"
             },
             "development": {
-              "buildTarget": "infrastructure-as-code:build:development"
+              "buildTarget": "interface-configuration:build:development"
             }
           },
           "defaultConfiguration": "development"

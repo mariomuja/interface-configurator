@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProcessCsvBlobTrigger.Core.Helpers;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Models;
 using ProcessCsvBlobTrigger.Core.Services;
@@ -9,80 +10,171 @@ namespace ProcessCsvBlobTrigger.Adapters;
 
 /// <summary>
 /// SQL Server Adapter for reading from and writing to SQL Server tables
+/// Uses ApplicationDbContext to access the main application database (app-database)
+/// TransportData table is created/written in the main application database, NOT in MessageBox database
 /// </summary>
 public class SqlServerAdapter : IAdapter
 {
     public string AdapterName => "SqlServer";
+    public string AdapterAlias => "SQL Server";
+    public bool SupportsRead => true;
+    public bool SupportsWrite => true;
 
-    private readonly ApplicationDbContext _context;
+    /// <summary>
+    /// ApplicationDbContext connects to the configured SQL Server database
+    /// Can use either the default context (from DI) or a custom connection string
+    /// </summary>
+    private readonly ApplicationDbContext? _defaultContext;
+    private readonly string? _connectionString;
     private readonly IDynamicTableService _dynamicTableService;
     private readonly IDataService _dataService;
     private readonly IMessageBoxService? _messageBoxService;
     private readonly IMessageSubscriptionService? _subscriptionService;
     private readonly string? _interfaceName;
+    private readonly Guid? _adapterInstanceGuid;
     private readonly ILogger<SqlServerAdapter>? _logger;
     private readonly CsvColumnAnalyzer _columnAnalyzer;
     private readonly TypeValidator _typeValidator;
+    
+    // Source-specific properties
+    private readonly string? _pollingStatement;
+    private readonly int _pollingInterval;
+    
+    // General SQL Server adapter properties
+    private readonly bool _useTransaction;
+    private readonly int _batchSize;
+    private readonly int _commandTimeout;
+    private readonly bool _failOnBadStatement;
+    private readonly IInterfaceConfigurationService? _configService;
 
     public SqlServerAdapter(
-        ApplicationDbContext context,
+        ApplicationDbContext? context,
         IDynamicTableService dynamicTableService,
         IDataService dataService,
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
+        Guid? adapterInstanceGuid = null,
+        string? connectionString = null,
+        string? pollingStatement = null,
+        int? pollingInterval = null,
+        bool? useTransaction = null,
+        int? batchSize = null,
+        int? commandTimeout = null,
+        bool? failOnBadStatement = null,
+        IInterfaceConfigurationService? configService = null,
         ILogger<SqlServerAdapter>? logger = null)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        if (context == null && string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Either context or connectionString must be provided", nameof(context));
+        
+        _defaultContext = context;
+        _connectionString = connectionString;
         _dynamicTableService = dynamicTableService ?? throw new ArgumentNullException(nameof(dynamicTableService));
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
         _messageBoxService = messageBoxService;
         _subscriptionService = subscriptionService;
         _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
+        _adapterInstanceGuid = adapterInstanceGuid;
+        _pollingStatement = pollingStatement;
+        _pollingInterval = pollingInterval ?? 60;
+        _useTransaction = useTransaction ?? false;
+        _batchSize = batchSize ?? 1000;
+        _commandTimeout = commandTimeout ?? 30;
+        _failOnBadStatement = failOnBadStatement ?? false;
+        _configService = configService;
         _logger = logger;
         _columnAnalyzer = new CsvColumnAnalyzer();
         _typeValidator = new TypeValidator();
     }
 
+    /// <summary>
+    /// Gets the ApplicationDbContext, creating a new one with custom connection string if needed
+    /// </summary>
+    private ApplicationDbContext GetContext()
+    {
+        if (_defaultContext != null)
+            return _defaultContext;
+
+        if (string.IsNullOrWhiteSpace(_connectionString))
+            throw new InvalidOperationException("Connection string is required when default context is not available");
+
+        // Create DbContextOptions with custom connection string
+        var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+        optionsBuilder.UseSqlServer(_connectionString);
+        
+        return new ApplicationDbContext(optionsBuilder.Options);
+    }
+
     public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(source))
-            throw new ArgumentException("Source table name cannot be empty", nameof(source));
-
         try
         {
-            _logger?.LogInformation("Reading data from SQL Server table: {Source}", source);
+            string selectSql;
+            List<string> headers = new List<string>();
 
-            // Ensure database exists
-            await _dataService.EnsureDatabaseCreatedAsync(cancellationToken);
-
-            // Get current table structure
-            var columnTypes = await _dynamicTableService.GetCurrentTableStructureAsync(cancellationToken);
-
-            if (columnTypes.Count == 0)
+            // Use polling statement if provided (for source adapters)
+            if (!string.IsNullOrWhiteSpace(_pollingStatement))
             {
-                _logger?.LogWarning("Table {Source} has no columns or does not exist", source);
-                return (new List<string>(), new List<Dictionary<string, string>>());
+                selectSql = _pollingStatement;
+                _logger?.LogInformation("Reading data using polling statement: {PollingStatement}", _pollingStatement);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(source))
+                    throw new ArgumentException("Source table name cannot be empty when polling statement is not provided", nameof(source));
+
+                _logger?.LogInformation("Reading data from SQL Server table: {Source}", source);
+
+                // Ensure database exists
+                using var contextForInit = GetContext();
+                await contextForInit.Database.EnsureCreatedAsync(cancellationToken);
+
+                // Get current table structure
+                var columnTypes = await _dynamicTableService.GetCurrentTableStructureAsync(cancellationToken);
+
+                if (columnTypes.Count == 0)
+                {
+                    _logger?.LogWarning("Table {Source} has no columns or does not exist", source);
+                    return (new List<string>(), new List<Dictionary<string, string>>());
+                }
+
+                headers = columnTypes.Keys.ToList();
+
+                // Build SELECT query
+                var sanitizedColumns = headers.Select(SanitizeColumnName).ToList();
+                var columnList = string.Join(", ", sanitizedColumns);
+                selectSql = $"SELECT {columnList} FROM [{source}] ORDER BY datetime_created";
             }
 
-            var headers = columnTypes.Keys.ToList();
-
-            // Build SELECT query
-            var sanitizedColumns = headers.Select(SanitizeColumnName).ToList();
-            var columnList = string.Join(", ", sanitizedColumns);
-            var selectSql = $"SELECT {columnList} FROM [{source}] ORDER BY datetime_created";
-
-            // Execute query
+            // Execute query with batch size support
             var records = new List<Dictionary<string, string>>();
-            var connection = _context.Database.GetDbConnection();
+            using var context = GetContext();
+            var connection = context.Database.GetDbConnection();
             
             await connection.OpenAsync(cancellationToken);
             try
             {
                 using var command = connection.CreateCommand();
                 command.CommandText = selectSql;
+                command.CommandTimeout = _commandTimeout;
+                
+                _logger?.LogDebug("Using command timeout: {CommandTimeout} seconds, batch size: {BatchSize} for reading data", 
+                    _commandTimeout, _batchSize);
 
                 using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                
+                // Get column names from reader if headers not already determined
+                if (headers.Count == 0)
+                {
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        headers.Add(reader.GetName(i));
+                    }
+                }
+
+                // Read records in batches
+                var batchBuffer = new List<Dictionary<string, string>>();
                 while (await reader.ReadAsync(cancellationToken))
                 {
                     var record = new Dictionary<string, string>();
@@ -92,7 +184,21 @@ public class SqlServerAdapter : IAdapter
                         var value = reader.IsDBNull(i) ? string.Empty : reader.GetValue(i)?.ToString() ?? string.Empty;
                         record[header] = value;
                     }
-                    records.Add(record);
+                    batchBuffer.Add(record);
+                    
+                    // Process batch when buffer reaches batch size
+                    if (batchBuffer.Count >= _batchSize)
+                    {
+                        records.AddRange(batchBuffer);
+                        batchBuffer.Clear();
+                        _logger?.LogDebug("Processed batch of {BatchSize} records", _batchSize);
+                    }
+                }
+                
+                // Add remaining records
+                if (batchBuffer.Count > 0)
+                {
+                    records.AddRange(batchBuffer);
                 }
             }
             finally
@@ -104,18 +210,23 @@ public class SqlServerAdapter : IAdapter
 
             // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
             // Each record is written as a separate message, triggering events
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
             {
-                _logger?.LogInformation("Debatching SQL Server data and writing to MessageBox as Source adapter: Interface={InterfaceName}, Records={RecordCount}", 
-                    _interfaceName, records.Count);
+                _logger?.LogInformation("Debatching SQL Server data and writing to MessageBox as Source adapter: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, Records={RecordCount}", 
+                    _interfaceName, _adapterInstanceGuid.Value, records.Count);
                 var messageIds = await _messageBoxService.WriteMessagesAsync(
                     _interfaceName,
                     AdapterName,
                     "Source",
+                    _adapterInstanceGuid.Value,
                     headers,
                     records,
                     cancellationToken);
                 _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox", messageIds.Count);
+            }
+            else if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            {
+                _logger?.LogWarning("AdapterInstanceGuid is missing. Messages will not be written to MessageBox.");
             }
 
             return (headers, records);
@@ -214,9 +325,17 @@ public class SqlServerAdapter : IAdapter
                 }
                 else
                 {
-                    _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}", _interfaceName);
-                    return;
+                    _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}. Will use provided records if available.", _interfaceName);
+                    // Continue to fallback: use provided records if available
                 }
+            }
+            
+            // If no messages were read from MessageBox, use provided records (fallback for direct calls)
+            // This allows adapters to work both ways: via MessageBox (timer-based) or direct (blob trigger)
+            if (records == null || records.Count == 0)
+            {
+                _logger?.LogInformation("No records from MessageBox and no records provided. Nothing to write.");
+                return;
             }
             
             // Validate headers and records if not reading from MessageBox
@@ -241,10 +360,36 @@ public class SqlServerAdapter : IAdapter
             // Ensure table structure matches
             await EnsureDestinationStructureAsync(destination, columnTypes, cancellationToken);
 
-            // Insert rows using DataService
+            // Insert rows using DataService with optional transaction support
             if (records != null && records.Count > 0)
             {
-                await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                if (_useTransaction)
+                {
+                    // Wrap operations in an explicit transaction
+                    using var context = GetContext();
+                    using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                    try
+                    {
+                        _logger?.LogInformation("Starting transaction for writing {RecordCount} records to table {Destination}", records.Count, destination);
+                        
+                        await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                        
+                        await transaction.CommitAsync(cancellationToken);
+                        _logger?.LogInformation("Transaction committed successfully. Inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        _logger?.LogError(ex, "Transaction rolled back due to error while writing to table {Destination}", destination);
+                        throw;
+                    }
+                }
+                else
+                {
+                    // No transaction - use default behavior
+                    await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                    _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                }
             }
 
             // Mark subscriptions as processed for all messages that were processed

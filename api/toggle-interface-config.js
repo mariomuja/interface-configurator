@@ -35,16 +35,19 @@ module.exports = async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Function App returned ${response.status}: ${errorText}`);
+      throw new Error(`Function App returned status ${response.status} when accessing ${url}: ${errorText}`);
     }
 
     const data = await response.json();
     res.status(200).json(data);
   } catch (error) {
     console.error('Error toggling interface configuration:', error);
+    const accessedUrl = functionAppUrl ? `${functionAppUrl.replace(/\/$/, '')}/api/ToggleInterfaceConfiguration` : 'unknown';
     res.status(500).json({
       error: 'Failed to toggle interface configuration',
-      details: error.message
+      details: error.message,
+      url: accessedUrl,
+      message: `Please check Function App configuration. Attempted to access: ${accessedUrl}. Ensure AZURE_FUNCTION_APP_URL is set correctly.`
     });
   }
 };

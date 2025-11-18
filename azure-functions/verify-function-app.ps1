@@ -1,7 +1,7 @@
 # Verifiziert dass die Azure Function App korrekt konfiguriert ist
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = "func-apprigklebtsay2o"
 )
 
@@ -135,6 +135,11 @@ Write-Host "     3. Starte Function App neu: az functionapp restart --resource-g
 Write-Host "     4. Warte 30-60 Sekunden nach Neustart" -ForegroundColor Gray
 
 Write-Host ""
+
+
+
+
+
 
 
 

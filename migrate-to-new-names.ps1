@@ -1,7 +1,7 @@
 # Migriert Azure-Ressourcen zu neuen beschreibenden Namen
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [switch]$WhatIf
 )
 
@@ -26,7 +26,7 @@ $oldResources = @{
 
 # Neue Ressourcen (beschreibende Namen)
 $newResources = @{
-    "FunctionApp" = "func-csv-to-sql-processor"
+    "FunctionApp" = "func-integration"
     "AppServicePlan" = "plan-func-csv-processor"
     "SqlServer" = "sql-main-database"
     "FunctionsStorage" = "stfunc-csv-processor"
@@ -106,8 +106,10 @@ Write-Host "Naechste Schritte:" -ForegroundColor Cyan
 Write-Host "  1. cd terraform" -ForegroundColor Gray
 Write-Host "  2. terraform plan  # Pruefe die Aenderungen" -ForegroundColor Gray
 Write-Host "  3. terraform apply # Erstelle neue Ressourcen" -ForegroundColor Gray
-Write-Host "  4. Aktualisiere GitHub Secret AZURE_FUNCTIONAPP_NAME auf: func-csv-to-sql-processor" -ForegroundColor Gray
+Write-Host "  4. Aktualisiere GitHub Secret AZURE_FUNCTIONAPP_NAME auf: func-integration" -ForegroundColor Gray
 Write-Host ""
+
+
 
 
 

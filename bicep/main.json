@@ -11,9 +11,9 @@
   "parameters": {
     "resourceGroupName": {
       "type": "string",
-      "defaultValue": "rg-infrastructure-as-code",
+      "defaultValue": "rg-interface-configuration",
       "allowedValues": [
-        "rg-infrastructure-as-code"
+        "rg-interface-configuration"
       ],
       "metadata": {
         "description": "Name of the resource group"
@@ -140,7 +140,7 @@
     },
     "functionsAppName": {
       "type": "string",
-      "defaultValue": "func-app",
+      "defaultValue": "func-integration-main",
       "metadata": {
         "description": "Base name for Functions app (suffix will be added)"
       }

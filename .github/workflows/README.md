@@ -42,7 +42,7 @@ az ad sp create-for-rbac \
 **Output kopieren** und als Secret `AZURE_CREDENTIALS` in GitHub einfügen.
 
 #### 2. `AZURE_RESOURCE_GROUP`
-Name der Resource Group (z.B. `rg-infrastructure-as-code`)
+Name der Resource Group (z.B. `rg-interface-configuration`)
 
 **Abrufen:**
 ```bash
@@ -105,6 +105,11 @@ Die Function App wird von Terraform erstellt und verwaltet. Der Workflow deploye
 
 - [Azure Functions Run from Package](https://learn.microsoft.com/en-us/azure/azure-functions/run-functions-from-deployment-package)
 - [Azure Functions Deployment](https://learn.microsoft.com/en-us/azure/azure-functions/functions-deployment-technologies)
+
+
+
+
+
 
 
 

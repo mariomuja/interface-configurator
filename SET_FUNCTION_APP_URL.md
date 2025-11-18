@@ -4,7 +4,7 @@
 
 **Your Function App URL:**
 ```
-https://func-csv-to-sql-processor.azurewebsites.net
+https://func-integration-main.azurewebsites.net
 ```
 
 ## Quick Setup
@@ -23,12 +23,12 @@ This script will:
 ### Option 2: Vercel Dashboard (Recommended)
 
 1. Go to: https://vercel.com/dashboard
-2. Select your project: `infrastructure-as-code`
+2. Select your project: `interface-configuration`
 3. Go to: **Settings** → **Environment Variables**
 4. Click **Add New**
 5. Enter:
    - **Name**: `AZURE_FUNCTION_APP_URL`
-   - **Value**: `https://func-csv-to-sql-processor.azurewebsites.net`
+   - **Value**: `https://func-integration-main.azurewebsites.net`
    - **Environment**: Select **Production** (and optionally Preview/Development)
 6. Click **Save**
 7. **Redeploy** the project:
@@ -43,7 +43,7 @@ This script will:
 vercel env add AZURE_FUNCTION_APP_URL production
 
 # When prompted, enter:
-https://func-csv-to-sql-processor.azurewebsites.net
+https://func-integration-main.azurewebsites.net
 
 # Redeploy
 vercel deploy --prod
@@ -65,7 +65,7 @@ cd ..
 
 After setting the variable and redeploying:
 
-1. Open your app: https://infrastructure-as-code.vercel.app
+1. Open your app: https://interface-configuration.vercel.app
 2. Click the **"Diagnose"** button
 3. Check that "Function App URL" shows **OK**
 4. Check that "Function App Connectivity" shows **OK**
@@ -78,7 +78,7 @@ If the Function App URL is set but connectivity check fails:
 
 1. **Check Function App is running**:
    ```bash
-   az functionapp show --name func-csv-to-sql-processor --resource-group rg-infrastructure-as-code --query "{state:state, enabled:enabled}"
+   az functionapp show --name func-csv-to-sql-processor --resource-group rg-interface-configuration --query "{state:state, enabled:enabled}"
    ```
 
 2. **Check Function App logs**:
@@ -87,13 +87,13 @@ If the Function App URL is set but connectivity check fails:
 
 3. **Test Function App endpoint manually**:
    ```bash
-   curl https://func-csv-to-sql-processor.azurewebsites.net/api/GetProcessLogs
+   curl https://func-integration-main.azurewebsites.net/api/GetProcessLogs
    ```
    Should return JSON (can be empty array `[]`)
 
 4. **Check CORS settings** (if needed):
    - Azure Portal → Function App → CORS
-   - Add `https://infrastructure-as-code.vercel.app` if needed
+   - Add `https://interface-configuration.vercel.app` if needed
 
 ### Get Function App URL from Azure
 
@@ -106,7 +106,7 @@ az functionapp list --query "[].{Name:name, URL:defaultHostName, ResourceGroup:r
 # Get specific Function App URL
 az functionapp show \
   --name func-csv-to-sql-processor \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --query "defaultHostName" \
   -o tsv
 ```

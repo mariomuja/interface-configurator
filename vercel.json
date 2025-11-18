@@ -2,7 +2,7 @@
   "version": 2,
   "framework": "angular",
   "buildCommand": "cd frontend && npm install && npm run build:prod",
-  "outputDirectory": "frontend/dist/infrastructure-as-code/browser",
+  "outputDirectory": "frontend/dist/interface-configuration/browser",
   "installCommand": "cd frontend && npm install",
   "build": {
     "env": {

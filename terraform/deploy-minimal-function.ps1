@@ -2,8 +2,8 @@
 # Schrittweise: Erst essentiell, dann prüfen, dann weitere Dateien
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
-    [string]$FunctionAppName = "func-appe1mz5h",
+    [string]$ResourceGroup = "rg-interface-configuration",
+    [string]$FunctionAppName = "func-integration",
     [string]$PublishPath = "azure-functions/ProcessCsvBlobTrigger/publish"
 )
 

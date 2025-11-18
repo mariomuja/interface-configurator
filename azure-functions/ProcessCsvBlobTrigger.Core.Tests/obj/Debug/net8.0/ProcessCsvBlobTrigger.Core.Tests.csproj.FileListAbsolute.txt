@@ -286,3 +286,4 @@ C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core.Tests\bin\Debug\net8.0\.azurefunctions\Microsoft.Identity.Client.Extensions.Msal.dll
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core.Tests\bin\Debug\net8.0\.azurefunctions\System.IO.Hashing.dll
 C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core.Tests\bin\Debug\net8.0\.azurefunctions\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
+C:\Users\mario\infrastructure-as-code\azure-functions\ProcessCsvBlobTrigger.Core.Tests\bin\Debug\net8.0\Microsoft.Azure.Functions.Worker.Extensions.Timer.dll

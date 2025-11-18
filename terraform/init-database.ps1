@@ -8,9 +8,9 @@ param(
 
 # Get SQL connection details from Azure
 Write-Host "`n=== Hole SQL-Verbindungsdaten ===" -ForegroundColor Cyan
-$sqlServer = az sql server list --resource-group rg-infrastructure-as-code --query "[0].fullyQualifiedDomainName" -o tsv
-$sqlDatabase = az sql db list --resource-group rg-infrastructure-as-code --server (az sql server list --resource-group rg-infrastructure-as-code --query "[0].name" -o tsv) --query "[0].name" -o tsv
-$sqlAdmin = az sql server list --resource-group rg-infrastructure-as-code --query "[0].administratorLogin" -o tsv
+$sqlServer = az sql server list --resource-group rg-interface-configuration --query "[0].fullyQualifiedDomainName" -o tsv
+$sqlDatabase = az sql db list --resource-group rg-interface-configuration --server (az sql server list --resource-group rg-interface-configuration --query "[0].name" -o tsv) --query "[0].name" -o tsv
+$sqlAdmin = az sql server list --resource-group rg-interface-configuration --query "[0].administratorLogin" -o tsv
 
 Write-Host "SQL Server: $sqlServer" -ForegroundColor White
 Write-Host "SQL Database: $sqlDatabase" -ForegroundColor White

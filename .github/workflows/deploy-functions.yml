@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_NAME: 'func-csv-to-sql-processor' # CSV to SQL Server processor Function App
+  AZURE_FUNCTIONAPP_NAME: 'func-integration-main' # Integration platform Function App
   AZURE_FUNCTIONAPP_PACKAGE_PATH: 'azure-functions/ProcessCsvBlobTrigger'
   DOTNET_VERSION: '8.0.x'
 
@@ -362,7 +362,7 @@ jobs:
       # Note: Required GitHub secrets:
       # 1. AZURE_CREDENTIALS: Service Principal credentials (JSON format)
       #    Create with: az ad sp create-for-rbac --name "github-actions" --role contributor --scopes /subscriptions/{subscription-id}/resourceGroups/{resource-group} --sdk-auth
-      # 2. AZURE_RESOURCE_GROUP: Resource group name (e.g., "rg-infrastructure-as-code")
+      # 2. AZURE_RESOURCE_GROUP: Resource group name (e.g., "rg-interface-configuration")
       # 3. AZURE_FUNCTIONAPP_NAME: Function app name (get from terraform output function_app_name)
       #
       # This workflow uses "Run from Package" mode (WEBSITE_RUN_FROM_PACKAGE=1),

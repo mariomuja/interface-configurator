@@ -2,8 +2,8 @@
 # This script uploads the Function App ZIP to Blob Storage and sets WEBSITE_RUN_FROM_PACKAGE
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
-    [string]$FunctionAppName = "func-appe1mz5h",
+    [string]$ResourceGroup = "rg-interface-configuration",
+    [string]$FunctionAppName = "func-integration",
     [string]$StorageAccountName = "stfuncsappe1mz5h",
     [string]$ContainerName = "function-releases",
     [string]$ZipPath = "azure-functions/ProcessCsvBlobTrigger/publish/function-app.zip"

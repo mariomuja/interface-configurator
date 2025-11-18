@@ -23,3 +23,8 @@ public interface IDynamicTableService
     Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetCurrentTableStructureAsync(CancellationToken cancellationToken = default);
 }
 
+
+
+
+
+

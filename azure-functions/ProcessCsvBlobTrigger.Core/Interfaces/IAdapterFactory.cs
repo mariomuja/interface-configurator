@@ -18,3 +18,6 @@ public interface IAdapterFactory
     Task<IAdapter> CreateDestinationAdapterAsync(InterfaceConfiguration config, CancellationToken cancellationToken = default);
 }
 
+
+
+

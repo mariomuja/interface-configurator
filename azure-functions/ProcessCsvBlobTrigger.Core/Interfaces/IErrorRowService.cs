@@ -13,3 +13,8 @@ public interface IErrorRowService
     Task SaveFailedRowAsync(string originalBlobName, Dictionary<string, string> row, RowProcessingResult result, int rowNumber, CancellationToken cancellationToken = default);
 }
 
+
+
+
+
+

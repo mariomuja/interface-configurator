@@ -1,0 +1,67 @@
+using ProcessCsvBlobTrigger.Core.Interfaces;
+using Xunit;
+
+namespace ProcessCsvBlobTrigger.Core.Tests.Interfaces;
+
+public class ProcessingResultTests
+{
+    [Fact]
+    public void Failure_WithErrorMessage_CreatesFailureResult()
+    {
+        // Arrange
+        var errorMessage = "Test error";
+        var exception = new Exception("Test exception");
+
+        // Act
+        var result = ProcessingResult.Failure(errorMessage, exception);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Equal(0, result.RecordsProcessed);
+        Assert.Equal(0, result.ChunksProcessed);
+        Assert.Equal(errorMessage, result.ErrorMessage);
+        Assert.Equal(exception, result.Exception);
+    }
+
+    [Fact]
+    public void Failure_WithErrorMessageOnly_CreatesFailureResult()
+    {
+        // Arrange
+        var errorMessage = "Test error";
+
+        // Act
+        var result = ProcessingResult.Failure(errorMessage);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Equal(0, result.RecordsProcessed);
+        Assert.Equal(0, result.ChunksProcessed);
+        Assert.Equal(errorMessage, result.ErrorMessage);
+        Assert.Null(result.Exception);
+    }
+
+    [Fact]
+    public void Failure_WithNullException_CreatesFailureResult()
+    {
+        // Arrange
+        var errorMessage = "Test error";
+
+        // Act
+        var result = ProcessingResult.Failure(errorMessage, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Equal(0, result.RecordsProcessed);
+        Assert.Equal(0, result.ChunksProcessed);
+        Assert.Equal(errorMessage, result.ErrorMessage);
+        Assert.Null(result.Exception);
+    }
+}
+
+
+
+
+

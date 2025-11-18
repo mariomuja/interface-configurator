@@ -24,3 +24,8 @@ public class AdapterSettingsContainer
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 }
 
+
+
+
+
+

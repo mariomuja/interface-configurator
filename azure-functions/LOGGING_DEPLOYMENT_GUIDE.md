@@ -58,7 +58,7 @@ The JavaScript `SimpleTestFunction` uses:
    ```bash
    # Ensure Azure Services are allowed
    az sql server firewall-rule create \
-     --resource-group rg-infrastructure-as-code \
+     --resource-group rg-interface-configuration \
      --server <sql-server-name> \
      --name "AllowAzureServices" \
      --start-ip-address "0.0.0.0" \
@@ -184,6 +184,11 @@ Use the provided scripts:
 - `ensure-logging-works-without-db.ps1` - Verifies logging configuration
 - `ensure-function-app-ready.ps1` - Ensures all services are ready
 - `verify-function-app.ps1` - Verifies function app configuration
+
+
+
+
+
 
 
 

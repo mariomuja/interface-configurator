@@ -35,6 +35,7 @@ public class MessageBoxService : IMessageBoxService
         string interfaceName,
         string adapterName,
         string adapterType,
+        Guid adapterInstanceGuid,
         List<string> headers,
         Dictionary<string, string> record,
         CancellationToken cancellationToken = default)
@@ -51,8 +52,8 @@ public class MessageBoxService : IMessageBoxService
         try
         {
             _logger?.LogInformation(
-                "Writing single record message to MessageBox: Interface={InterfaceName}, Adapter={AdapterName}, Type={AdapterType}",
-                interfaceName, adapterName, adapterType);
+                "Writing single record message to MessageBox: Interface={InterfaceName}, Adapter={AdapterName}, Type={AdapterType}, AdapterInstanceGuid={AdapterInstanceGuid}",
+                interfaceName, adapterName, adapterType, adapterInstanceGuid);
 
             // Serialize single record to JSON
             var messageData = new
@@ -68,6 +69,7 @@ public class MessageBoxService : IMessageBoxService
                 InterfaceName = interfaceName,
                 AdapterName = adapterName,
                 AdapterType = adapterType,
+                AdapterInstanceGuid = adapterInstanceGuid,
                 MessageData = messageDataJson,
                 Status = "Pending",
                 datetime_created = DateTime.UtcNow
@@ -102,6 +104,7 @@ public class MessageBoxService : IMessageBoxService
         string interfaceName,
         string adapterName,
         string adapterType,
+        Guid adapterInstanceGuid,
         List<string> headers,
         List<Dictionary<string, string>> records,
         CancellationToken cancellationToken = default)
@@ -118,14 +121,14 @@ public class MessageBoxService : IMessageBoxService
         var messageIds = new List<Guid>();
 
         _logger?.LogInformation(
-            "Debatching {RecordCount} records into individual messages: Interface={InterfaceName}, Adapter={AdapterName}",
-            records.Count, interfaceName, adapterName);
+            "Debatching {RecordCount} records into individual messages: Interface={InterfaceName}, Adapter={AdapterName}, AdapterInstanceGuid={AdapterInstanceGuid}",
+            records.Count, interfaceName, adapterName, adapterInstanceGuid);
 
         // Debatch: create one message per record
         foreach (var record in records)
         {
             var messageId = await WriteSingleRecordMessageAsync(
-                interfaceName, adapterName, adapterType, headers, record, cancellationToken);
+                interfaceName, adapterName, adapterType, adapterInstanceGuid, headers, record, cancellationToken);
             messageIds.Add(messageId);
         }
 
@@ -341,6 +344,72 @@ public class MessageBoxService : IMessageBoxService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error removing message from MessageBox: MessageId={MessageId}", messageId);
+            throw;
+        }
+    }
+
+    public async Task EnsureAdapterInstanceAsync(
+        Guid adapterInstanceGuid,
+        string interfaceName,
+        string instanceName,
+        string adapterName,
+        string adapterType,
+        bool isEnabled,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(interfaceName))
+            throw new ArgumentException("Interface name cannot be empty", nameof(interfaceName));
+        if (string.IsNullOrWhiteSpace(instanceName))
+            throw new ArgumentException("Instance name cannot be empty", nameof(instanceName));
+        if (string.IsNullOrWhiteSpace(adapterName))
+            throw new ArgumentException("Adapter name cannot be empty", nameof(adapterName));
+        if (string.IsNullOrWhiteSpace(adapterType))
+            throw new ArgumentException("Adapter type cannot be empty", nameof(adapterType));
+
+        try
+        {
+            _logger?.LogInformation(
+                "Ensuring adapter instance exists: AdapterInstanceGuid={AdapterInstanceGuid}, Interface={InterfaceName}, InstanceName={InstanceName}",
+                adapterInstanceGuid, interfaceName, instanceName);
+
+            var existingInstance = await _context.AdapterInstances
+                .FirstOrDefaultAsync(a => a.AdapterInstanceGuid == adapterInstanceGuid, cancellationToken);
+
+            if (existingInstance != null)
+            {
+                // Update existing instance
+                existingInstance.InterfaceName = interfaceName;
+                existingInstance.InstanceName = instanceName;
+                existingInstance.AdapterName = adapterName;
+                existingInstance.AdapterType = adapterType;
+                existingInstance.IsEnabled = isEnabled;
+                existingInstance.datetime_updated = DateTime.UtcNow;
+                _logger?.LogInformation("Updated existing adapter instance: AdapterInstanceGuid={AdapterInstanceGuid}", adapterInstanceGuid);
+            }
+            else
+            {
+                // Create new instance
+                var newInstance = new AdapterInstance
+                {
+                    AdapterInstanceGuid = adapterInstanceGuid,
+                    InterfaceName = interfaceName,
+                    InstanceName = instanceName,
+                    AdapterName = adapterName,
+                    AdapterType = adapterType,
+                    IsEnabled = isEnabled,
+                    datetime_created = DateTime.UtcNow
+                };
+                _context.AdapterInstances.Add(newInstance);
+                _logger?.LogInformation("Created new adapter instance: AdapterInstanceGuid={AdapterInstanceGuid}", adapterInstanceGuid);
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex,
+                "Error ensuring adapter instance: AdapterInstanceGuid={AdapterInstanceGuid}, Interface={InterfaceName}",
+                adapterInstanceGuid, interfaceName);
             throw;
         }
     }

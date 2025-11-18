@@ -25,7 +25,7 @@ Die Functions benötigen eine funktionierende Storage Connection.
 
 **Prüfen**:
 ```powershell
-az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-infrastructure-as-code --query "[?name=='AzureWebJobsStorage']"
+az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-interface-configuration --query "[?name=='AzureWebJobsStorage']"
 ```
 
 **Lösung**: Stelle sicher, dass `AzureWebJobsStorage` korrekt gesetzt ist.
@@ -34,7 +34,7 @@ az functionapp config appsettings list --name func-appe1mz5h --resource-group rg
 Manchmal müssen die Functions nach dem Deployment neu registriert werden.
 
 **Lösung**:
-1. Function App neu starten: `az functionapp restart --name func-appe1mz5h --resource-group rg-infrastructure-as-code`
+1. Function App neu starten: `az functionapp restart --name func-appe1mz5h --resource-group rg-interface-configuration`
 2. Warte 2-3 Minuten
 3. Prüfe erneut die Functions-Liste
 
@@ -58,7 +58,7 @@ Stelle sicher, dass `FUNCTIONS_WORKER_RUNTIME=dotnet-isolated` gesetzt ist.
 
 **Prüfen**:
 ```powershell
-az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-infrastructure-as-code --query "[?name=='FUNCTIONS_WORKER_RUNTIME']"
+az functionapp config appsettings list --name func-appe1mz5h --resource-group rg-interface-configuration --query "[?name=='FUNCTIONS_WORKER_RUNTIME']"
 ```
 
 ### 6. Application Insights Problem
@@ -79,7 +79,7 @@ Stelle sicher, dass alle Dateien im richtigen Verzeichnis sind:
 
 1. **Prüfe die Logs**:
    ```powershell
-   az functionapp log tail --name func-appe1mz5h --resource-group rg-infrastructure-as-code
+   az functionapp log tail --name func-appe1mz5h --resource-group rg-interface-configuration
    ```
 
 2. **Prüfe die deployed Dateien** über Kudu:
@@ -89,7 +89,7 @@ Stelle sicher, dass alle Dateien im richtigen Verzeichnis sind:
 
 3. **Prüfe die Function App Status**:
    ```powershell
-   az functionapp show --name func-appe1mz5h --resource-group rg-infrastructure-as-code --query "state"
+   az functionapp show --name func-appe1mz5h --resource-group rg-interface-configuration --query "state"
    ```
 
 4. **Teste die Function direkt**:

@@ -14,6 +14,7 @@ public interface IMessageBoxService
     /// <param name="interfaceName">Name of the interface (e.g., "FromCsvToSqlServerExample")</param>
     /// <param name="adapterName">Name of the adapter (e.g., "CSV", "SqlServer")</param>
     /// <param name="adapterType">Type of adapter: "Source" or "Destination"</param>
+    /// <param name="adapterInstanceGuid">GUID identifying the adapter instance</param>
     /// <param name="headers">Column headers</param>
     /// <param name="record">Single data record (debatching)</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -22,6 +23,7 @@ public interface IMessageBoxService
         string interfaceName,
         string adapterName,
         string adapterType,
+        Guid adapterInstanceGuid,
         List<string> headers,
         Dictionary<string, string> record,
         CancellationToken cancellationToken = default);
@@ -32,6 +34,7 @@ public interface IMessageBoxService
     /// <param name="interfaceName">Name of the interface</param>
     /// <param name="adapterName">Name of the adapter</param>
     /// <param name="adapterType">Type of adapter: "Source" or "Destination"</param>
+    /// <param name="adapterInstanceGuid">GUID identifying the adapter instance</param>
     /// <param name="headers">Column headers</param>
     /// <param name="records">Data records (will be debatched into individual messages)</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -40,8 +43,29 @@ public interface IMessageBoxService
         string interfaceName,
         string adapterName,
         string adapterType,
+        Guid adapterInstanceGuid,
         List<string> headers,
         List<Dictionary<string, string>> records,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ensures an adapter instance exists in the AdapterInstances table
+    /// Creates or updates the adapter instance record
+    /// </summary>
+    /// <param name="adapterInstanceGuid">GUID identifying the adapter instance</param>
+    /// <param name="interfaceName">Name of the interface</param>
+    /// <param name="instanceName">User-editable instance name</param>
+    /// <param name="adapterName">Name of the adapter</param>
+    /// <param name="adapterType">Type of adapter: "Source" or "Destination"</param>
+    /// <param name="isEnabled">Whether the adapter instance is enabled</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task EnsureAdapterInstanceAsync(
+        Guid adapterInstanceGuid,
+        string interfaceName,
+        string instanceName,
+        string adapterName,
+        string adapterType,
+        bool isEnabled,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -73,7 +73,7 @@ az storage blob list \
 
 # Setze WEBSITE_RUN_FROM_PACKAGE
 az functionapp config appsettings set \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --name func-appe1mz5h \
   --settings WEBSITE_RUN_FROM_PACKAGE="<blob-url>"
 ```
@@ -95,6 +95,11 @@ az functionapp config appsettings set \
 1. Workflow aktualisieren, um `WEBSITE_RUN_FROM_PACKAGE` automatisch zu setzen
 2. Oder manuell nach jedem Deployment setzen
 3. Function App neu starten nach dem Setzen
+
+
+
+
+
 
 
 

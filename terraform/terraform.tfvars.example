@@ -12,14 +12,14 @@ client_secret   = "your-service-principal-client-secret"  # or null if using ARM
 tenant_id       = "your-azure-tenant-id"  # or null if using ARM_TENANT_ID
 
 # Resource Group
-resource_group_name = "rg-infrastructure-as-code"
+resource_group_name = "rg-interface-configuration"
 location            = "West Europe"
 environment         = "prod"
 
 # SQL Database Configuration
 sql_admin_login    = "sql_admin"
 sql_admin_password = "CHANGE_ME_STRONG_PASSWORD"
-sql_database_name  = "app_database"
+sql_database_name  = "app-database"
 sql_license_type   = "LicenseIncluded"  # LicenseIncluded or BasePrice
 sql_sku_name       = "S0"  # S0, S1, P1, GP_S_Gen5_2, BC_Gen5_2, etc.
 sql_max_size_gb    = 2  # Maximum database size in GB
@@ -37,13 +37,13 @@ current_ip_address = ""  # Your current IP address if allow_current_ip = true
 # Functions (optional)
 enable_function_app    = false
 functions_app_plan_name = "plan-funcs-app"
-functions_app_name      = "func-app"
+functions_app_name      = "func-integration"
 functions_sku_name      = "Y1"  # Consumption plan (will be migrated to EP1 Flex Consumption before Sep 2028)
 
 # GitHub Source Control (optional - enables continuous deployment from GitHub)
 # If provided, Function App will automatically deploy from GitHub repository
 # Leave empty to use GitHub Actions deployment instead
-github_repo_url  = ""  # e.g., "https://github.com/mariomuja/infrastructure-as-code"
+github_repo_url  = ""  # e.g., "https://github.com/mariomuja/interface-configuration"
 github_branch    = "main"
 github_repo_path = "azure-functions/ProcessCsvBlobTrigger"  # Path to Function App code in repo
 

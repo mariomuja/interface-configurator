@@ -1,7 +1,7 @@
 # Stellt sicher, dass Logging auch ohne Datenbank funktioniert
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = "func-apprigklebtsay2o"
 )
 
@@ -135,6 +135,11 @@ Write-Host "     Die LoggingServiceAdapter loggt immer zuerst zu Console/ILogger
 Write-Host "     Database-Logging ist optional und wird nur verwendet wenn verfuegbar" -ForegroundColor Gray
 
 Write-Host ""
+
+
+
+
+
 
 
 

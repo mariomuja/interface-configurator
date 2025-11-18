@@ -1,5 +1,210 @@
 [
   {
+    "name": "AddDestinationAdapterInstance",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.AddDestinationAdapterInstance.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "route": "AddDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "ClearProcessLogs",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.ClearProcessLogsFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post"
+        ],
+        "route": "ClearProcessLogs",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "CreateInterfaceConfiguration",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.CreateInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "DestinationAdapterFunction",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.DestinationAdapterFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "timerInfo",
+        "direction": "In",
+        "type": "timerTrigger",
+        "schedule": "0 */1 * * * *",
+        "properties": {}
+      }
+    ]
+  },
+  {
+    "name": "GetDestinationAdapterInstances",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.GetDestinationAdapterInstances.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "get"
+        ],
+        "route": "GetDestinationAdapterInstances",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetInterfaceConfigurations",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.GetInterfaceConfigurations.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "get"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetProcessLogs",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.GetProcessLogsFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "GetProcessLogs",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "InitializeMessageBox",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.InitializeMessageBoxFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post"
+        ],
+        "route": "InitializeMessageBox",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "ProcessCsvBlobTrigger",
     "scriptFile": "ProcessCsvBlobTrigger.dll",
     "entryPoint": "ProcessCsvBlobTrigger.ProcessCsvBlobTriggerFunction.Run",
@@ -17,6 +222,424 @@
         "properties": {
           "supportsDeferredBinding": "True"
         }
+      }
+    ]
+  },
+  {
+    "name": "RemoveDestinationAdapterInstance",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.RemoveDestinationAdapterInstance.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "delete"
+        ],
+        "route": "RemoveDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "RestartAdapter",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.RestartAdapter.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "SourceAdapterFunction",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.SourceAdapterFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "timerInfo",
+        "direction": "In",
+        "type": "timerTrigger",
+        "schedule": "0 */1 * * * *",
+        "properties": {}
+      }
+    ]
+  },
+  {
+    "name": "ToggleInterfaceConfiguration",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.ToggleInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateBatchSize",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateBatchSize.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateBatchSize",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationAdapterInstance",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateDestinationAdapterInstance.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationFileMask",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateDestinationFileMask.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateDestinationFileMask",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationReceiveFolder",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateDestinationReceiveFolder.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateDestinationReceiveFolder",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateFieldSeparator",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateFieldSeparator.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateFieldSeparator",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateFileMask",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateFileMask.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateFileMask",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateInstanceName",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateInstanceName.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateInterfaceName",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateInterfaceName.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateReceiveFolder",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateReceiveFolder.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "post"
+        ],
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlConnectionProperties",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateSqlConnectionProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateSqlConnectionProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlPollingProperties",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateSqlPollingProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateSqlPollingProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlTransactionProperties",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.UpdateSqlTransactionProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Function",
+        "methods": [
+          "put"
+        ],
+        "route": "UpdateSqlTransactionProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
       }
     ]
   }

@@ -70,6 +70,14 @@ public class SourceAdapterFunction
 
     private async Task ProcessSourceConfigurationAsync(InterfaceConfiguration config, CancellationToken cancellationToken)
     {
+        // Check if this adapter instance is enabled
+        // This check is redundant since GetEnabledSourceConfigurationsAsync already filters, but provides extra safety
+        if (!config.SourceIsEnabled)
+        {
+            _logger.LogDebug("Source adapter for interface '{InterfaceName}' is disabled. Skipping processing.", config.InterfaceName);
+            return;
+        }
+
         _logger.LogInformation("Processing source configuration: Interface={InterfaceName}, Adapter={AdapterName}", 
             config.InterfaceName, config.SourceAdapterName);
 
@@ -93,8 +101,47 @@ public class SourceAdapterFunction
                 return;
             }
 
+            // If ReceiveFolder is configured, check for new files in that folder
+            // For CSV adapter, ReceiveFolder is a blob storage path (e.g., "csv-files/csv-incoming")
+            if (!string.IsNullOrWhiteSpace(config.SourceReceiveFolder) && config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Checking ReceiveFolder '{ReceiveFolder}' for new files: Interface={InterfaceName}", 
+                    config.SourceReceiveFolder, config.InterfaceName);
+                
+                // Note: In Azure Blob Storage, new files trigger BlobTrigger automatically
+                // This timer function will process files that may have been missed or need reprocessing
+                // The ReceiveFolder path will be used as the source when processing
+                source = config.SourceReceiveFolder;
+                _logger.LogInformation("Using ReceiveFolder as source: {Source}", source);
+            }
+
+            // For SQL Server adapter with polling statement, use empty source
+            // The adapter will execute the polling statement instead of reading from a table
+            if (config.SourceAdapterName.Equals("SqlServer", StringComparison.OrdinalIgnoreCase) && 
+                !string.IsNullOrWhiteSpace(config.SqlPollingStatement))
+            {
+                _logger.LogInformation("SQL Server adapter with polling statement configured: Interface={InterfaceName}, PollingInterval={PollingInterval}s", 
+                    config.InterfaceName, config.SqlPollingInterval);
+                
+                // Pass empty string - adapter will use polling statement internally
+                source = string.Empty;
+                _logger.LogInformation("Using polling statement for SQL Server adapter: {PollingStatement}", config.SqlPollingStatement);
+            }
+
             // Create source adapter
             var adapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
+
+            // Check if adapter supports reading
+            if (!adapter.SupportsRead)
+            {
+                _logger.LogError(
+                    "Adapter '{AdapterName}' (Alias: '{AdapterAlias}') does not support reading. " +
+                    "It cannot be used as a source adapter. Interface: '{InterfaceName}'",
+                    adapter.AdapterName, adapter.AdapterAlias, config.InterfaceName);
+                throw new NotSupportedException(
+                    $"Adapter '{adapter.AdapterAlias}' does not support reading (cannot be used as source). " +
+                    $"The ReadAsync functionality has not been implemented for this adapter.");
+            }
 
             // Read from source (adapter will automatically debatch and write to MessageBox)
             var (headers, records) = await adapter.ReadAsync(source, cancellationToken);

@@ -1,44 +1,94 @@
 using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
+using ProcessCsvBlobTrigger.Data;
 
 namespace ProcessCsvBlobTrigger;
 
 /// <summary>
-/// HTTP endpoint to retrieve process logs from in-memory store
+/// HTTP endpoint to retrieve process logs from MessageBox database
 /// </summary>
 public class GetProcessLogsFunction
 {
-    private readonly IInMemoryLoggingService _loggingService;
+    private readonly MessageBoxDbContext _context;
     private readonly ILogger<GetProcessLogsFunction> _logger;
 
     public GetProcessLogsFunction(
-        IInMemoryLoggingService loggingService,
+        MessageBoxDbContext context,
         ILogger<GetProcessLogsFunction> logger)
     {
-        _loggingService = loggingService;
+        _context = context;
         _logger = logger;
     }
 
     [Function("GetProcessLogs")]
-    public HttpResponseData Run(
+    public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetProcessLogs")] HttpRequestData req,
         FunctionContext context)
     {
         try
         {
-            var logs = _loggingService.GetAllLogs();
-            
-            // Order by datetime_created descending (newest first)
-            var orderedLogs = logs.OrderByDescending(l => l.datetime_created).ToList();
+            // Ensure database and tables exist before querying
+            try
+            {
+                var created = await _context.Database.EnsureCreatedAsync(context.CancellationToken);
+                if (created)
+                {
+                    _logger.LogInformation("MessageBox database and tables created automatically. Tables: Messages, MessageSubscriptions, ProcessLogs");
+                }
+            }
+            catch (Exception ensureEx)
+            {
+                _logger.LogWarning(ensureEx, "Could not ensure ProcessLogs table exists. Will attempt query anyway.");
+            }
+
+            var logs = await _context.ProcessLogs
+                .OrderByDescending(l => l.datetime_created)
+                .Select(l => new
+                {
+                    id = l.Id,
+                    datetime_created = l.datetime_created,
+                    level = l.Level,
+                    message = l.Message,
+                    details = l.Details,
+                    component = l.Component,
+                    interfaceName = l.InterfaceName,
+                    messageId = l.MessageId
+                })
+                .ToListAsync();
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            response.WriteString(System.Text.Json.JsonSerializer.Serialize(orderedLogs));
+            
+            // Use camelCase JSON serialization
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            };
+            response.WriteString(System.Text.Json.JsonSerializer.Serialize(logs, jsonOptions));
 
             return response;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException sqlEx)
+        {
+            // Handle SQL errors gracefully - if table doesn't exist, return empty array
+            if (sqlEx.Number == 208 || sqlEx.Message.Contains("Invalid object name") || sqlEx.Message.Contains("does not exist"))
+            {
+                _logger.LogWarning("ProcessLogs table does not exist yet. Returning empty array. Tables will be created automatically.");
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                response.WriteString("[]");
+                return response;
+            }
+            
+            _logger.LogError(sqlEx, "SQL error retrieving process logs: {ErrorNumber} - {Message}", sqlEx.Number, sqlEx.Message);
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { error = sqlEx.Message }));
+            return errorResponse;
         }
         catch (Exception ex)
         {

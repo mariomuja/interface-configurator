@@ -1,7 +1,7 @@
 # Stellt sicher, dass die Azure Function App bereit ist und alle Services verfuegbar sind
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = "func-apprigklebtsay2o"
 )
 
@@ -165,6 +165,11 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 Write-Host "Versuchen Sie jetzt, die Functions aufzulisten:" -ForegroundColor Yellow
 Write-Host "  az functionapp function list --resource-group $ResourceGroup --name $FunctionAppName" -ForegroundColor Cyan
 Write-Host ""
+
+
+
+
+
 
 
 

@@ -4,7 +4,7 @@
 
 ### Function App Resources
 - **Current**: `func-apprigklebtsay2o`
-- **New**: `func-csv-to-sql-processor`
+- **New**: `func-integration`
 - **Reason**: Clearly indicates CSV to SQL Server processing functionality
 
 - **Current**: `plan-funcs-apprigklebtsay2o`
@@ -27,7 +27,7 @@
 
 ### Resource Group
 - **Current**: `rg-infrastructure-as-code`
-- **New**: `rg-infrastructure-as-code` (keep as is)
+- **New**: `rg-interface-configuration`
 - **Reason**: Already descriptive
 
 ## Naming Convention Rules Applied

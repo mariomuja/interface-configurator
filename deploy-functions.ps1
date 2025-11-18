@@ -3,7 +3,7 @@
 
 param(
     [string]$FunctionAppName = "func-appe1mz5h",
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$PackagePath = "azure-functions\ProcessCsvBlobTrigger\function-app.zip"
 )
 

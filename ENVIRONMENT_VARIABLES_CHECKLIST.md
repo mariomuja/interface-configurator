@@ -170,3 +170,7 @@ vercel env add AZURE_STORAGE_CONNECTION_STRING
 vercel env add AZURE_FUNCTION_APP_URL
 ```
 
+
+
+
+

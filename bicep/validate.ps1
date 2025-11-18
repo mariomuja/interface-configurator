@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Mandatory = $false)]
-    [string]$ResourceGroupName = "rg-infrastructure-as-code",
+    [string]$ResourceGroupName = "rg-interface-configuration",
     
     [Parameter(Mandatory = $false)]
     [string]$ParametersFile = "parameters.json"

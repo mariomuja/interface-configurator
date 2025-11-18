@@ -87,17 +87,18 @@ module.exports = async (req, res) => {
             details: `Connected successfully. Found ${logs.length} log entries.`
           });
         } else {
+          const errorText = await response.text();
           diagnostics.checks.push({
             name: 'Function App Connectivity',
             status: 'FAILED',
-            details: `HTTP ${response.status}: ${await response.text()}`
+            details: `HTTP ${response.status} when accessing ${logsUrl}: ${errorText}`
           });
         }
       } catch (error) {
         diagnostics.checks.push({
           name: 'Function App Connectivity',
           status: 'ERROR',
-          details: `Cannot connect: ${error.message}`
+          details: `Cannot connect to ${logsUrl}: ${error.message}`
         });
       }
     }
@@ -169,4 +170,5 @@ module.exports = async (req, res) => {
 
   res.status(200).json(diagnostics);
 };
+
 

@@ -44,7 +44,7 @@ Das ZIP-Package muss folgende Dateien enthalten:
 
 ```bash
 az functionapp show \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --name func-appe1mz5h \
   --query "{state: state, hostNames: defaultHostName}"
 ```
@@ -53,7 +53,7 @@ az functionapp show \
 
 ```bash
 az functionapp config appsettings list \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --name func-appe1mz5h \
   --query "[?name=='WEBSITE_RUN_FROM_PACKAGE']"
 ```
@@ -62,7 +62,7 @@ az functionapp config appsettings list \
 
 ```bash
 az functionapp restart \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --name func-appe1mz5h
 ```
 
@@ -97,6 +97,11 @@ Der aktualisierte Workflow:
 2. Prüfe die Logs im GitHub Actions
 3. Prüfe die Function App Logs im Azure Portal
 4. Falls das Problem weiterhin besteht, entferne `WEBSITE_RUN_FROM_PACKAGE` komplett
+
+
+
+
+
 
 
 

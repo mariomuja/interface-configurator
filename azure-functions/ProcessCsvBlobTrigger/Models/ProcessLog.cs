@@ -37,6 +37,13 @@ public class ProcessLog
     [MaxLength(200)]
     [Column("Component")]
     public string? Component { get; set; }
+    
+    [MaxLength(200)]
+    [Column("InterfaceName")]
+    public string? InterfaceName { get; set; }
+    
+    [Column("MessageId")]
+    public Guid? MessageId { get; set; }
 }
 
 

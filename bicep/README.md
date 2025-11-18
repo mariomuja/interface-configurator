@@ -67,7 +67,7 @@ Edit `parameters.json` or create environment-specific files (`parameters.dev.jso
 {
   "parameters": {
     "resourceGroupName": {
-      "value": "rg-infrastructure-as-code"
+      "value": "rg-interface-configuration"
     },
     "location": {
       "value": "Central US"
@@ -133,11 +133,11 @@ You can also deploy manually using Azure CLI:
 
 ```powershell
 # Create resource group
-az group create --name rg-infrastructure-as-code --location "Central US"
+az group create --name rg-interface-configuration --location "Central US"
 
 # Deploy template
 az deployment group create `
-    --resource-group rg-infrastructure-as-code `
+    --resource-group rg-interface-configuration `
     --template-file main.bicep `
     --parameters parameters.json `
     --name infrastructure-deployment-$(Get-Date -Format 'yyyyMMdd-HHmmss')
@@ -152,7 +152,7 @@ az deployment group create `
 
 ### Optional Parameters
 
-- `resourceGroupName` - Name of the resource group (default: `rg-infrastructure-as-code`)
+- `resourceGroupName` - Name of the resource group (default: `rg-interface-configuration`)
 - `location` - Azure region (default: `West Europe`)
 - `sqlLocation` - SQL Server location (default: uses main location)
 - `environment` - Environment name: `dev`, `staging`, or `prod` (default: `prod`)
@@ -185,7 +185,7 @@ View outputs:
 
 ```powershell
 az deployment group show `
-    --resource-group rg-infrastructure-as-code `
+    --resource-group rg-interface-configuration `
     --name <deployment-name> `
     --query properties.outputs
 ```

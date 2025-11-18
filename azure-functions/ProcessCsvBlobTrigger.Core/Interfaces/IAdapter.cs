@@ -8,9 +8,25 @@ namespace ProcessCsvBlobTrigger.Core.Interfaces;
 public interface IAdapter
 {
     /// <summary>
-    /// Name of the adapter (e.g., "CSV", "SqlServer", "JSON", "SAP")
+    /// Technical name of the adapter (e.g., "CSV", "SqlServer", "JSON", "SAP")
     /// </summary>
     string AdapterName { get; }
+
+    /// <summary>
+    /// Display alias for the adapter (e.g., "CSV", "SQL Server", "JSON", "SAP")
+    /// This is used for UI display and can be translated
+    /// </summary>
+    string AdapterAlias { get; }
+
+    /// <summary>
+    /// Indicates whether this adapter supports reading (can be used as source)
+    /// </summary>
+    bool SupportsRead { get; }
+
+    /// <summary>
+    /// Indicates whether this adapter supports writing (can be used as destination)
+    /// </summary>
+    bool SupportsWrite { get; }
 
     /// <summary>
     /// Reads data from the source and returns headers and records
@@ -45,4 +61,5 @@ public interface IAdapter
     /// <param name="cancellationToken">Cancellation token</param>
     Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default);
 }
+
 

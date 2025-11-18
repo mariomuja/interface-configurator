@@ -1,11 +1,15 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { DocumentationComponent } from './components/documentation/documentation.component';
+import { DocumentationDialogComponent } from './components/documentation/documentation-dialog.component';
 import { TranslationService, Language } from './services/translation.service';
 
 @Component({
@@ -16,6 +20,9 @@ import { TranslationService, Language } from './services/translation.service';
     MatToolbarModule,
     MatSelectModule,
     MatFormFieldModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDialogModule,
     FormsModule,
     CommonModule,
     DocumentationComponent
@@ -25,12 +32,16 @@ import { TranslationService, Language } from './services/translation.service';
       <div class="toolbar-content">
         <div class="app-title-section">
           <span class="app-title">{{ getTranslation('app.title') }}</span>
-          <p class="app-description">There's much more happening behind the scenes than what you see in the UI. My vision is to completely eliminate the need for IMPLEMENTING interfaces and transform it into CONFIGURING interfaces. By avoiding implementation effort, we can use the SAME codebase for all your data integration interfaces.</p>
+          <p class="app-description">There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.</p>
         </div>
         <div class="toolbar-right">
+          <button mat-button class="documentation-link" (click)="openDocumentation()">
+            <mat-icon>menu_book</mat-icon>
+            Read the documentation
+          </button>
           <div class="profile-card">
             <div class="profile-text">
-              <strong>Mario Muja</strong><br><span>Hamburg, Germany</span><br>
+              <strong>Mario Muja</strong><span>Hamburg, Germany</span><br>
               <span class="contact-links">
                 <a href="tel:+4915204641473" target="_blank" rel="noopener noreferrer">Call me: +49 1520 464 14 73</a> / 
                 <a href="tel:+393453450098" target="_blank" rel="noopener noreferrer">+39 345 345 00 98</a><br>
@@ -115,17 +126,38 @@ import { TranslationService, Language } from './services/translation.service';
       margin-left: auto;
     }
     
+    .documentation-link {
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+    
+    .documentation-link:hover {
+      color: rgba(255, 255, 255, 1);
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .documentation-link mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+    }
+    
     .profile-card {
-      background: linear-gradient(145deg, #6b6b6b, #5a5a5a);
+      background: linear-gradient(145deg, #d3d3d3, #c0c0c0);
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 12px;
       line-height: 1.4;
       box-shadow: 
-        0 4px 8px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+        0 4px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(0, 0, 0, 0.1);
       transition: all 0.3s ease;
       position: relative;
       overflow: hidden;
@@ -150,20 +182,20 @@ import { TranslationService, Language } from './services/translation.service';
     }
     
            .profile-text {
-             color: white;
+             color: #333;
              position: relative;
              z-index: 1;
              line-height: 1.3;
            }
            
            .profile-text strong {
-             display: block;
-             margin-bottom: 0;
-             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+             display: inline;
+             margin-right: 8px;
+             text-shadow: none;
            }
            
            .profile-text span {
-             display: inline-block;
+             display: inline;
              margin: 0;
            }
     
@@ -172,15 +204,15 @@ import { TranslationService, Language } from './services/translation.service';
     }
     
     .contact-links a {
-      color: white;
+      color: #0066cc;
       text-decoration: none;
       margin: 0 2px;
       transition: color 0.2s ease;
     }
     
     .contact-links a:hover {
-      color: #ffd700;
-      text-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+      color: #004499;
+      text-decoration: underline;
     }
     
     .language-selector {
@@ -190,13 +222,13 @@ import { TranslationService, Language } from './services/translation.service';
     .language-field {
       width: 140px;
       margin: 0;
-      background: linear-gradient(145deg, #6b6b6b, #5a5a5a);
+      background: linear-gradient(145deg, #d3d3d3, #c0c0c0);
       border-radius: 8px;
       box-shadow: 
-        0 4px 8px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+        0 4px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(0, 0, 0, 0.1);
       transition: all 0.3s ease;
       overflow: hidden;
     }
@@ -223,23 +255,23 @@ import { TranslationService, Language } from './services/translation.service';
     
     .language-field ::ng-deep .mat-mdc-select-value,
     .language-field ::ng-deep .mat-mdc-select-trigger {
-      color: white !important;
+      color: #333 !important;
     }
     
     .language-field ::ng-deep .mat-mdc-form-field-label {
-      color: rgba(255, 255, 255, 0.7) !important;
+      color: rgba(0, 0, 0, 0.6) !important;
     }
     
     .language-field ::ng-deep .mat-mdc-form-field-focus-overlay {
-      background-color: rgba(255, 255, 255, 0.1);
+      background-color: rgba(0, 0, 0, 0.05);
     }
     
     .language-field ::ng-deep .mdc-line-ripple::before {
-      border-bottom-color: rgba(255, 255, 255, 0.3) !important;
+      border-bottom-color: rgba(0, 0, 0, 0.2) !important;
     }
     
     .language-field ::ng-deep .mdc-line-ripple::after {
-      border-bottom-color: rgba(255, 255, 255, 0.5) !important;
+      border-bottom-color: rgba(0, 0, 0, 0.4) !important;
     }
     
     .language-field ::ng-deep .mat-mdc-form-field-subscript-wrapper {
@@ -280,9 +312,10 @@ import { TranslationService, Language } from './services/translation.service';
   `]
 })
 export class AppComponent implements OnInit {
-  title = 'infrastructure-as-code';
+  title = 'interface-configuration';
   currentLanguage: Language = 'de';
   availableLanguages: Language[] = [];
+  private dialog = inject(MatDialog);
 
   constructor(private translationService: TranslationService) {}
 
@@ -301,6 +334,15 @@ export class AppComponent implements OnInit {
 
   onLanguageChange(language: Language): void {
     this.translationService.setLanguage(language);
+  }
+
+  openDocumentation(): void {
+    this.dialog.open(DocumentationDialogComponent, {
+      width: '90%',
+      maxWidth: '1000px',
+      maxHeight: '90vh',
+      panelClass: 'documentation-dialog'
+    });
   }
 }
 

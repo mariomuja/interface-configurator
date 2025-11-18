@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "resourceGroupName": {
-      "value": "rg-infrastructure-as-code-dev"
+      "value": "rg-interface-configuration-dev"
     },
     "location": {
       "value": "West Europe"

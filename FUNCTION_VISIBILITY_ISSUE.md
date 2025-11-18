@@ -45,7 +45,7 @@ Wenn `WEBSITE_RUN_FROM_PACKAGE` auf eine URL gesetzt ist, muss die Function App 
 
 ```bash
 az functionapp config appsettings list \
-  --resource-group rg-infrastructure-as-code \
+  --resource-group rg-interface-configuration \
   --name func-appe1mz5h \
   --query "[?name=='WEBSITE_RUN_FROM_PACKAGE']"
 ```
@@ -74,7 +74,7 @@ Falls Azure es nicht automatisch setzt:
 2. Setze manuell:
    ```bash
    az functionapp config appsettings set \
-     --resource-group rg-infrastructure-as-code \
+     --resource-group rg-interface-configuration \
      --name func-appe1mz5h \
      --settings WEBSITE_RUN_FROM_PACKAGE="<blob-url>"
    ```
@@ -90,6 +90,11 @@ Falls Azure es nicht automatisch setzt:
 ## Hinweis zur Testversion
 
 Die Azure Testversion sollte **nicht** das Problem sein. Azure Functions im Consumption Plan funktionieren auch mit Free Tier / Testversionen. Das Problem ist wahrscheinlich technisch (Package-Loading oder Konfiguration).
+
+
+
+
+
 
 
 

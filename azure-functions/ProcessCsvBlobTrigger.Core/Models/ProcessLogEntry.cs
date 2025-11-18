@@ -14,3 +14,8 @@ public class ProcessLogEntry
     public string? Component { get; set; }
 }
 
+
+
+
+
+

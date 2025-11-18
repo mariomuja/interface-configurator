@@ -28,7 +28,7 @@ variable "tenant_id" {
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
-  default     = "rg-infrastructure-as-code"
+  default     = "rg-interface-configuration"
 }
 
 variable "location" {
@@ -50,9 +50,9 @@ variable "environment" {
 }
 
 variable "storage_account_name" {
-  description = "Name for storage account (descriptive, no suffix)"
+  description = "Name for storage account (descriptive, no suffix, no hyphens - Azure requirement)"
   type        = string
-  default     = "stapp-general"
+  default     = "stappgeneral"
 }
 
 variable "sql_server_name" {
@@ -148,9 +148,9 @@ variable "functions_app_plan_name" {
 }
 
 variable "functions_app_name" {
-  description = "Name for Functions app (descriptive, no suffix) - CSV to SQL Server processor"
+  description = "Name for Functions app (descriptive, no suffix) - Integration platform"
   type        = string
-  default     = "func-csv-to-sql-processor"
+  default     = "func-integration-main"
 }
 
 variable "functions_sku_name" {

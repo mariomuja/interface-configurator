@@ -42,7 +42,7 @@ cd azure-functions
 Compress-Archive -Path "SimpleTestFunction", "host.json", "package.json" -DestinationPath "function-app.zip" -Force
 
 # 2. Upload zu Blob Storage
-$storageKey = az storage account keys list --resource-group rg-infrastructure-as-code --account-name stfuncsapprigklebtsay2o --query "[0].value" -o tsv
+$storageKey = az storage account keys list --resource-group rg-interface-configuration --account-name stfuncsapprigklebtsay2o --query "[0].value" -o tsv
 az storage blob upload --account-name stfuncsapprigklebtsay2o --account-key $storageKey --container-name function-releases --name "function-app.zip" --file function-app.zip --overwrite
 
 # 3. SAS Token generieren
@@ -51,13 +51,13 @@ $sasToken = az storage container generate-sas --name function-releases --account
 
 # 4. WEBSITE_RUN_FROM_PACKAGE setzen
 $packageUrl = "https://stfuncsapprigklebtsay2o.blob.core.windows.net/function-releases/function-app.zip?$sasToken"
-az functionapp config appsettings set --resource-group rg-infrastructure-as-code --name func-apprigklebtsay2o --settings "WEBSITE_RUN_FROM_PACKAGE=$packageUrl"
+az functionapp config appsettings set --resource-group rg-interface-configuration --name func-apprigklebtsay2o --settings "WEBSITE_RUN_FROM_PACKAGE=$packageUrl"
 ```
 
 ### Schritt 3: Function App neu starten
 
 ```bash
-az functionapp restart --resource-group rg-infrastructure-as-code --name func-apprigklebtsay2o
+az functionapp restart --resource-group rg-interface-configuration --name func-apprigklebtsay2o
 ```
 
 **WICHTIG:** Warten Sie 30-60 Sekunden nach dem Neustart, bevor Sie die Functions auflisten.
@@ -75,7 +75,7 @@ Stellen Sie sicher, dass alle Services verfügbar sind:
 ### Function App Status prüfen
 
 ```bash
-az functionapp show --resource-group rg-infrastructure-as-code --name func-apprigklebtsay2o --query "{state:state, defaultHostName:defaultHostName}"
+az functionapp show --resource-group rg-interface-configuration --name func-apprigklebtsay2o --query "{state:state, defaultHostName:defaultHostName}"
 ```
 
 ### Functions auflisten
@@ -83,7 +83,7 @@ az functionapp show --resource-group rg-infrastructure-as-code --name func-appri
 ```bash
 # Über REST API (zuverlässiger)
 az rest --method GET \
-  --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-infrastructure-as-code/providers/Microsoft.Web/sites/func-apprigklebtsay2o/functions?api-version=2022-03-01" \
+  --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-interface-configuration/providers/Microsoft.Web/sites/func-apprigklebtsay2o/functions?api-version=2022-03-01" \
   --output json
 ```
 
@@ -138,6 +138,11 @@ Dieses Script:
 - **Azure Portal**: Prüfen Sie die Function App Logs im Portal
 - **Kudu Console**: `https://func-apprigklebtsay2o.scm.azurewebsites.net`
 - **Application Insights**: Falls konfiguriert, prüfen Sie die Telemetrie
+
+
+
+
+
 
 
 

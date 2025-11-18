@@ -1,0 +1,89 @@
+<h2 mat-dialog-title>
+  <mat-icon>list</mat-icon>
+  Destination Adapter Instances
+</h2>
+
+<mat-dialog-content>
+  <div class="dialog-content">
+    <p class="description">
+      Manage destination adapter instances. All instances subscribe to the same MessageBox data from the source adapter.
+      Each instance runs in a separate process.
+    </p>
+
+    <!-- Add Adapter Buttons -->
+    <div class="add-adapter-section">
+      <h3>Add Destination Adapter</h3>
+      <div class="adapter-buttons">
+        <button mat-raised-button 
+                *ngFor="let adapter of availableAdapters"
+                (click)="onAddAdapter(adapter.name)"
+                [color]="'primary'"
+                class="adapter-button">
+          <mat-icon>{{ adapter.icon }}</mat-icon>
+          <span>Add {{ adapter.displayName }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Instance List -->
+    <div class="instances-section">
+      <h3>Configured Instances ({{ instances.length }})</h3>
+      <div class="instances-list" *ngIf="instances.length > 0">
+        <mat-card *ngFor="let instance of instances" class="instance-card">
+          <mat-card-header>
+            <div class="card-header-content">
+              <mat-icon class="adapter-icon">{{ getAdapterIcon(instance.adapterName) }}</mat-icon>
+              <div class="instance-info">
+                <mat-card-title>{{ instance.instanceName }}</mat-card-title>
+                <mat-card-subtitle>{{ getAdapterDisplayName(instance.adapterName) }}</mat-card-subtitle>
+              </div>
+              <div class="card-actions">
+                <button mat-icon-button 
+                        (click)="onOpenSettings(instance, $event)"
+                        matTooltip="Open settings for this instance"
+                        color="primary">
+                  <mat-icon>settings</mat-icon>
+                </button>
+                <button mat-icon-button 
+                        (click)="onRemoveAdapter(instance.adapterInstanceGuid)"
+                        matTooltip="Remove this instance"
+                        color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="instance-details">
+              <div class="detail-item">
+                <mat-icon>fingerprint</mat-icon>
+                <span class="detail-label">GUID:</span>
+                <span class="detail-value">{{ instance.adapterInstanceGuid.substring(0, 8) }}...</span>
+              </div>
+              <div class="detail-item">
+                <mat-icon [class.enabled]="instance.isEnabled" [class.disabled]="!instance.isEnabled">
+                  {{ instance.isEnabled ? 'check_circle' : 'cancel' }}
+                </mat-icon>
+                <span class="detail-label">Status:</span>
+                <span class="detail-value">{{ instance.isEnabled ? 'Enabled' : 'Disabled' }}</span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+      <div class="no-instances" *ngIf="instances.length === 0">
+        <mat-icon>info</mat-icon>
+        <p>No destination adapter instances configured. Click "Add" buttons above to add instances.</p>
+      </div>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()" color="warn">Cancel</button>
+  <button mat-raised-button (click)="onSave()" color="primary">
+    <mat-icon>save</mat-icon>
+    Save
+  </button>
+</mat-dialog-actions>
+

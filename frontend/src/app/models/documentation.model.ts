@@ -6,10 +6,82 @@ export interface DocumentationChapter {
 
 export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
   {
+    id: 'readme',
+    title: 'README - Architecture Overview',
+    content: `
+      <h2>📊 Integration Configuration - Interface Configuration Demo</h2>
+      <p>This application demonstrates a revolutionary approach to <strong>data integration</strong>: <strong>Configuration over Implementation</strong>. Instead of writing custom code for each new interface between systems, you simply <strong>configure</strong> what you want to connect—and it just works. No new implementation artifacts required.</p>
+      
+      <h3>The Vision: Configure, Don't Implement</h3>
+      <p><strong>Traditional Approach (Implementation-Based):</strong></p>
+      <ul>
+        <li>Each new interface requires custom code</li>
+        <li>Business logic mixed with integration logic</li>
+        <li>High maintenance overhead</li>
+        <li>Difficult to scale</li>
+      </ul>
+      
+      <p><strong>This Approach (Configuration-Based):</strong></p>
+      <ul>
+        <li><strong>Tell the system what to connect</strong> (e.g., "CSV → SQL Server" or "SQL Server → SAP")</li>
+        <li><strong>Use the same code</strong> for all interfaces</li>
+        <li><strong>Zero implementation effort</strong> for new interfaces</li>
+        <li><strong>Pluggable adapters</strong> handle the complexity</li>
+      </ul>
+      
+      <h3>Key Architectural Concepts</h3>
+      
+      <h4>1. Universal Adapters</h4>
+      <p>Each adapter can be used as <strong>both source and destination</strong>:</p>
+      <ul>
+        <li><strong>CsvAdapter</strong>: Can read CSV files (source) or write CSV files (destination)</li>
+        <li><strong>SqlServerAdapter</strong>: Can read from SQL tables (source) or write to SQL tables (destination)</li>
+        <li>Future adapters (JSON, SAP, REST APIs) follow the same pattern</li>
+      </ul>
+      
+      <h4>2. MessageBox Pattern</h4>
+      <p>The <strong>MessageBox</strong> acts as a staging area ensuring <strong>guaranteed delivery</strong>:</p>
+      <ul>
+        <li><strong>Debatching</strong>: Each record is stored as a separate message</li>
+        <li><strong>Event-Driven</strong>: Triggers destination adapters when messages are added</li>
+        <li><strong>Guaranteed Delivery</strong>: Messages remain until all destinations confirm processing</li>
+        <li><strong>Multiple Destinations</strong>: One source can feed multiple destinations</li>
+      </ul>
+      
+      <h4>3. Configuration-Based Integration</h4>
+      <p>Interfaces are defined by <strong>configuration, not code</strong>:</p>
+      <ul>
+        <li>Zero implementation overhead for new interfaces</li>
+        <li>Runtime configuration updates without redeployment</li>
+        <li>Independent enable/disable control for each adapter</li>
+        <li>User-editable instance names and settings</li>
+      </ul>
+      
+      <h3>Architecture Flow</h3>
+      <ol>
+        <li><strong>Source Adapter</strong> reads data and debatches into individual messages</li>
+        <li><strong>MessageBox</strong> stores each message and triggers events</li>
+        <li><strong>Destination Adapters</strong> subscribe to messages and process them</li>
+        <li><strong>Guaranteed Delivery</strong>: Messages removed only after all destinations confirm</li>
+      </ol>
+      
+      <h3>Benefits</h3>
+      <ul>
+        <li>🚀 <strong>Zero Implementation</strong>: New interfaces = configuration only</li>
+        <li>🔄 <strong>Reusability</strong>: Same adapters work for all interfaces</li>
+        <li>✅ <strong>Guaranteed Delivery</strong>: Data never lost</li>
+        <li>📈 <strong>Scalability</strong>: Add new adapters without touching existing code</li>
+        <li>⚡ <strong>Speed</strong>: Deploy new interfaces in minutes, not weeks</li>
+      </ul>
+      
+      <p><em>For detailed architecture documentation, see the other chapters in this documentation.</em></p>
+    `
+  },
+  {
     id: 'overview',
     title: 'Übersicht',
     content: `
-      <h2>CSV zu SQL Server Transport</h2>
+      <h2>Integration Configuration</h2>
       <p>Diese Anwendung demonstriert einen vollständigen Daten-Transport-Workflow von CSV-Dateien in eine SQL Server Datenbank unter Verwendung von Infrastructure as Code (IaC) Prinzipien.</p>
       <h3>Funktionsweise:</h3>
       <ol>
@@ -220,7 +292,7 @@ export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
       
       <h3>5. Resource Group</h3>
       <ul>
-        <li><strong>Name:</strong> rg-infrastructure-as-code</li>
+        <li><strong>Name:</strong> rg-interface-configuration</li>
         <li><strong>Region:</strong> Central US</li>
         <li><strong>Verwaltung:</strong> Alle Ressourcen werden zentral in einer Resource Group verwaltet</li>
       </ul>
@@ -283,6 +355,185 @@ export const DOCUMENTATION_CHAPTERS: DocumentationChapter[] = [
         <li><strong>Verarbeitung:</strong> Sequenziell (ein Chunk nach dem anderen)</li>
         <li><strong>Transaktionen:</strong> Jeder Chunk wird in einer eigenen Datenbank-Transaktion verarbeitet</li>
         <li><strong>Rollback:</strong> Bei Fehlern wird der gesamte Chunk zurückgerollt</li>
+      </ul>
+    `
+  },
+  {
+    id: 'architecture-adapters',
+    title: 'Adapter Pattern Architecture',
+    content: `
+      <h2>Adapter Pattern Architecture</h2>
+      <p>The adapter pattern is the core architectural concept that enables <strong>configuration-based integration</strong>. Instead of writing custom code for each interface, adapters provide a unified interface for reading from and writing to different data sources.</p>
+      
+      <h3>Universal Adapters</h3>
+      <p>Each adapter can be used as <strong>both source and destination</strong>:</p>
+      
+      <h4>CsvAdapter</h4>
+      <p><strong>As Source:</strong></p>
+      <ul>
+        <li>Reads CSV files from Azure Blob Storage</li>
+        <li>Supports folder monitoring via <code>ReceiveFolder</code> property</li>
+        <li>Debatches data into individual records</li>
+        <li>Writes each record to MessageBox as a separate message</li>
+      </ul>
+      
+      <p><strong>As Destination:</strong></p>
+      <ul>
+        <li>Reads messages from MessageBox</li>
+        <li>Transforms message data back to CSV format</li>
+        <li>Writes CSV files to Azure Blob Storage</li>
+      </ul>
+      
+      <h4>SqlServerAdapter</h4>
+      <p><strong>As Source:</strong></p>
+      <ul>
+        <li>Reads data from SQL Server tables</li>
+        <li>Debatches into individual records</li>
+        <li>Writes each record to MessageBox</li>
+      </ul>
+      
+      <p><strong>As Destination:</strong></p>
+      <ul>
+        <li>Reads messages from MessageBox</li>
+        <li>Ensures destination table structure matches schema</li>
+        <li>Writes records to SQL Server tables</li>
+        <li>Dynamic schema management (creates/modifies tables automatically)</li>
+      </ul>
+      
+      <h3>IAdapter Interface</h3>
+      <p>All adapters implement the <code>IAdapter</code> interface with methods for:</p>
+      <ul>
+        <li><code>ReadAsync()</code>: Reads data from source</li>
+        <li><code>WriteAsync()</code>: Writes data to destination</li>
+        <li><code>GetSchemaAsync()</code>: Gets schema information</li>
+        <li><code>EnsureDestinationStructureAsync()</code>: Ensures destination structure exists</li>
+      </ul>
+      
+      <h3>Adding New Adapters</h3>
+      <p>To add a new adapter (e.g., JSON, SAP, REST API):</p>
+      <ol>
+        <li>Create a new class implementing <code>IAdapter</code></li>
+        <li>Implement all required methods</li>
+        <li>Register the adapter in dependency injection</li>
+        <li>No changes needed to existing code!</li>
+      </ol>
+    `
+  },
+  {
+    id: 'architecture-messagebox',
+    title: 'MessageBox Pattern Architecture',
+    content: `
+      <h2>MessageBox Pattern Architecture</h2>
+      <p>The MessageBox is a central staging area (similar to Microsoft BizTalk Server) that ensures <strong>guaranteed delivery</strong> of data. All data flows through the MessageBox, enabling event-driven processing and reliable message routing.</p>
+      
+      <h3>Core Concepts</h3>
+      
+      <h4>Debatching</h4>
+      <p>Source adapters <strong>debatch</strong> data into individual records:</p>
+      <ul>
+        <li>Each record becomes a separate message in MessageBox</li>
+        <li>Messages are independent and can be processed separately</li>
+        <li>Enables parallel processing and error isolation</li>
+      </ul>
+      
+      <h4>Event-Driven Processing</h4>
+      <p>When a message is added to MessageBox:</p>
+      <ol>
+        <li>An event is triggered in the Event Queue</li>
+        <li>Destination adapters subscribe to messages</li>
+        <li>Each adapter processes messages independently</li>
+        <li>Subscriptions track processing status</li>
+      </ol>
+      
+      <h4>Guaranteed Delivery</h4>
+      <p>Messages remain in MessageBox until <strong>all</strong> subscribing destination adapters have successfully processed them:</p>
+      <ul>
+        <li>If one destination fails, others can still process</li>
+        <li>Failed messages remain for retry</li>
+        <li>No data loss until all destinations confirm</li>
+      </ul>
+      
+      <h3>Database Schema</h3>
+      <p>The MessageBox uses three main tables:</p>
+      <ul>
+        <li><strong>Messages</strong>: Stores individual messages (debatched records)</li>
+        <li><strong>MessageSubscriptions</strong>: Tracks which adapters have processed which messages</li>
+        <li><strong>AdapterInstances</strong>: Maintains metadata about adapter instances</li>
+      </ul>
+      
+      <h3>Message Flow</h3>
+      <ol>
+        <li><strong>Source Adapter</strong> writes debatched records to MessageBox</li>
+        <li><strong>Event Queue</strong> triggers destination adapters</li>
+        <li><strong>Destination Adapters</strong> subscribe and process messages</li>
+        <li><strong>System checks</strong> if all subscriptions are processed</li>
+        <li><strong>Message removed</strong> only after all destinations confirm</li>
+      </ol>
+      
+      <h3>Multiple Destinations</h3>
+      <p>The MessageBox pattern supports <strong>one source → multiple destinations</strong>:</p>
+      <ul>
+        <li>One source creates messages in MessageBox</li>
+        <li>Multiple destination adapters can subscribe</li>
+        <li>Each adapter processes independently</li>
+        <li>Message removed only when ALL destinations confirm</li>
+      </ul>
+    `
+  },
+  {
+    id: 'architecture-interface-config',
+    title: 'Interface Configuration System',
+    content: `
+      <h2>Interface Configuration System</h2>
+      <p>The Interface Configuration system enables <strong>configuration-based integration</strong> by allowing users to define interfaces without writing code. Each interface configuration specifies:</p>
+      <ul>
+        <li>Source adapter and its configuration</li>
+        <li>Destination adapter and its configuration</li>
+        <li>Enable/disable flags for independent control</li>
+        <li>Instance names for UI display</li>
+        <li>Adapter instance GUIDs for tracking</li>
+      </ul>
+      
+      <h3>Storage</h3>
+      <p>Configurations are stored in Azure Blob Storage as JSON:</p>
+      <ul>
+        <li><strong>Container</strong>: <code>function-config</code></li>
+        <li><strong>File</strong>: <code>interface-configurations.json</code></li>
+        <li><strong>Format</strong>: JSON array of <code>InterfaceConfiguration</code> objects</li>
+      </ul>
+      
+      <p>Configurations are also loaded into memory on Function App startup for fast access.</p>
+      
+      <h3>Configuration Lifecycle</h3>
+      <ol>
+        <li><strong>Creation</strong>: User defines source and destination adapters</li>
+        <li><strong>Updates</strong>: Configuration changes are atomic (in-memory + JSON file)</li>
+        <li><strong>Deletion</strong>: Interface removed and adapter processes stop</li>
+      </ol>
+      
+      <h3>Adapter Instance Management</h3>
+      <p>Each adapter instance has:</p>
+      <ul>
+        <li><strong>AdapterInstanceGuid</strong>: Unique identifier for tracking</li>
+        <li><strong>InstanceName</strong>: User-editable name for UI display</li>
+        <li><strong>IsEnabled</strong>: Enable/disable flag for process control</li>
+        <li><strong>InterfaceName</strong>: Links adapter to interface configuration</li>
+      </ul>
+      
+      <h3>Process Execution</h3>
+      <p>Source and destination adapters run as separate Azure Functions (Timer Triggers):</p>
+      <ul>
+        <li><strong>Source Process</strong>: Loads enabled source configurations and processes them</li>
+        <li><strong>Destination Process</strong>: Loads enabled destination configurations and processes messages from MessageBox</li>
+      </ul>
+      
+      <h3>Benefits</h3>
+      <ul>
+        <li>✅ <strong>Zero Code Changes</strong>: New interfaces = configuration only</li>
+        <li>✅ <strong>Runtime Updates</strong>: Change configurations without redeployment</li>
+        <li>✅ <strong>Independent Control</strong>: Enable/disable adapters independently</li>
+        <li>✅ <strong>User-Friendly</strong>: Editable instance names and settings</li>
+        <li>✅ <strong>Scalability</strong>: Add unlimited interfaces with same codebase</li>
       </ul>
     `
   }

@@ -16,9 +16,9 @@ if (-not (Get-Command vercel -ErrorAction SilentlyContinue)) {
     Write-Host ""
     Write-Host "Alternatively, set the variable manually:" -ForegroundColor Yellow
     Write-Host "  1. Go to: https://vercel.com/dashboard" -ForegroundColor Cyan
-    Write-Host "  2. Select project: infrastructure-as-code" -ForegroundColor Cyan
+    Write-Host "  2. Select project: interface-configuration" -ForegroundColor Cyan
     Write-Host "  3. Go to: Settings -> Environment Variables" -ForegroundColor Cyan
-    Write-Host "  4. Add: AZURE_FUNCTION_APP_URL = https://func-csv-to-sql-processor.azurewebsites.net" -ForegroundColor Cyan
+    Write-Host "  4. Add: AZURE_FUNCTION_APP_URL = https://func-integration-main.azurewebsites.net" -ForegroundColor Cyan
     exit 1
 }
 
@@ -49,8 +49,8 @@ if ([string]::IsNullOrEmpty($FunctionAppUrl)) {
             $account = az account show 2>$null | ConvertFrom-Json
             if ($account) {
                 $url = az functionapp show `
-                    --name func-csv-to-sql-processor `
-                    --resource-group rg-infrastructure-as-code `
+                    --name func-integration-main `
+                    --resource-group rg-interface-configuration `
                     --query "defaultHostName" `
                     -o tsv 2>$null
                 
@@ -64,7 +64,7 @@ if ([string]::IsNullOrEmpty($FunctionAppUrl)) {
     
     # Use default if still not found
     if ([string]::IsNullOrEmpty($FunctionAppUrl)) {
-        $FunctionAppUrl = "https://func-csv-to-sql-processor.azurewebsites.net"
+        $FunctionAppUrl = "https://func-integration-main.azurewebsites.net"
         Write-Host "Using default URL: $FunctionAppUrl" -ForegroundColor Yellow
     }
 }
@@ -128,7 +128,7 @@ try {
         Write-Host ""
         Write-Host "⚠ Vercel CLI command may have failed. Please set manually:" -ForegroundColor Yellow
         Write-Host "  1. Go to: https://vercel.com/dashboard" -ForegroundColor Cyan
-        Write-Host "  2. Select project: infrastructure-as-code" -ForegroundColor Cyan
+        Write-Host "  2. Select project: interface-configuration" -ForegroundColor Cyan
         Write-Host "  3. Go to: Settings -> Environment Variables" -ForegroundColor Cyan
         Write-Host "  4. Add new variable:" -ForegroundColor Cyan
         Write-Host "     Name: AZURE_FUNCTION_APP_URL" -ForegroundColor White
@@ -142,8 +142,9 @@ try {
     Write-Host ""
     Write-Host "Please set manually:" -ForegroundColor Yellow
     Write-Host "  1. Go to: https://vercel.com/dashboard" -ForegroundColor Cyan
-    Write-Host "  2. Select project: infrastructure-as-code" -ForegroundColor Cyan
+    Write-Host "  2. Select project: interface-configuration" -ForegroundColor Cyan
     Write-Host "  3. Go to: Settings -> Environment Variables" -ForegroundColor Cyan
     Write-Host "  4. Add: AZURE_FUNCTION_APP_URL = $FunctionAppUrl" -ForegroundColor Cyan
 }
+
 

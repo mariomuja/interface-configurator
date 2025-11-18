@@ -34,12 +34,12 @@ public class CsvProcessingService : ICsvProcessingService
         return records;
     }
 
-    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersAsync(string csvContent, CancellationToken cancellationToken = default)
+    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersAsync(string csvContent, string? fieldSeparator = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(csvContent))
             return (new List<string>(), new List<Dictionary<string, string>>());
 
-        var separator = await GetFieldSeparatorAsync(cancellationToken);
+        var separator = !string.IsNullOrWhiteSpace(fieldSeparator) ? fieldSeparator : await GetFieldSeparatorAsync(cancellationToken);
 
         var lines = csvContent
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)

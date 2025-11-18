@@ -50,7 +50,7 @@ Falls das Script nicht funktioniert, kannst du die Secrets auch manuell setzen:
 az ad sp create-for-rbac \
   --name "github-actions-functions" \
   --role contributor \
-  --scopes /subscriptions/{subscription-id}/resourceGroups/rg-infrastructure-as-code \
+  --scopes /subscriptions/{subscription-id}/resourceGroups/rg-interface-configuration \
   --sdk-auth
 ```
 
@@ -58,19 +58,19 @@ Kopiere den JSON-Output.
 
 ### 2. GitHub Secrets setzen
 
-Gehe zu: https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions
+Gehe zu: https://github.com/mariomuja/interface-configuration/settings/secrets/actions
 
 Setze folgende Secrets:
 
 - **AZURE_CREDENTIALS**: Der komplette JSON-Output aus Schritt 1
-- **AZURE_RESOURCE_GROUP**: `rg-infrastructure-as-code`
+- **AZURE_RESOURCE_GROUP**: `rg-interface-configuration`
 - **AZURE_FUNCTIONAPP_NAME**: Hole mit `terraform output function_app_name`
 
 ## Nach dem Setup
 
 Der GitHub Actions Workflow wird automatisch ausgelöst wenn:
 - Code in `azure-functions/**` geändert wird
-- Du manuell den Workflow startest: https://github.com/mariomuja/infrastructure-as-code/actions
+- Du manuell den Workflow startest: https://github.com/mariomuja/interface-configuration/actions
 
 ## Troubleshooting
 
@@ -87,6 +87,11 @@ gh auth login
 ```bash
 az login
 ```
+
+
+
+
+
 
 
 

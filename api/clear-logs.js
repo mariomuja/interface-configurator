@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Function App returned status ${response.status}: ${errorText}`);
+      throw new Error(`Function App returned status ${response.status} when accessing ${clearUrl}: ${errorText}`);
     }
 
     const result = await response.json();
@@ -44,10 +44,15 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error('Error clearing process logs:', error);
     
+    // Extract URL from error message if available
+    const urlMatch = error.message.match(/https?:\/\/[^\s]+/);
+    const accessedUrl = urlMatch ? urlMatch[0] : (functionAppUrl ? `${functionAppUrl.replace(/\/$/, '')}/api/ClearProcessLogs` : 'unknown');
+    
     res.status(500).json({ 
       error: 'Failed to clear process logs', 
       details: error.message,
-      message: 'Please check Function App configuration and ensure AZURE_FUNCTION_APP_URL is set'
+      url: accessedUrl,
+      message: `Please check Function App configuration. Attempted to access: ${accessedUrl}. Ensure AZURE_FUNCTION_APP_URL is set correctly.`
     });
   }
 };

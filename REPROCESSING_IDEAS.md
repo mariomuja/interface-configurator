@@ -186,3 +186,8 @@ Rows in the `csv-error` folder require manual validation by integration engineer
 - Validation: Re-validate before reprocessing
 - Rollback: Ability to undo reprocessing if needed
 
+
+
+
+
+

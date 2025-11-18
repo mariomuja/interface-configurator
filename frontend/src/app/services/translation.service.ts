@@ -21,11 +21,11 @@ export class TranslationService {
   
   private translations: Translations = {
     'app.title': {
-      de: 'CSV zu SQL Server Transport',
-      en: 'CSV to SQL Server Transport',
-      fr: 'Transport CSV vers SQL Server',
-      es: 'Transporte CSV a SQL Server',
-      it: 'Trasporto CSV a SQL Server'
+      de: 'Integration Configuration',
+      en: 'Integration Configuration',
+      fr: 'Configuration d\'intégration',
+      es: 'Configuración de integración',
+      it: 'Configurazione integrazione'
     },
     'source.csv': {
       de: 'Quelle - CSV-Daten',
@@ -138,6 +138,27 @@ export class TranslationService {
       fr: 'Aucune donnée SQL disponible',
       es: 'No hay datos SQL disponibles',
       it: 'Nessun dato SQL disponibile'
+    },
+    'interface.name': {
+      de: 'Schnittstellen-Name',
+      en: 'Interface Name',
+      fr: 'Nom de l\'interface',
+      es: 'Nombre de interfaz',
+      it: 'Nome interfaccia'
+    },
+    'adapter.csv': {
+      de: 'CSV',
+      en: 'CSV',
+      fr: 'CSV',
+      es: 'CSV',
+      it: 'CSV'
+    },
+    'adapter.sqlserver': {
+      de: 'SQL Server',
+      en: 'SQL Server',
+      fr: 'SQL Server',
+      es: 'SQL Server',
+      it: 'SQL Server'
     }
   };
 
@@ -186,4 +207,6 @@ export class TranslationService {
     return ['de', 'en', 'fr', 'es', 'it'];
   }
 }
+
+
 

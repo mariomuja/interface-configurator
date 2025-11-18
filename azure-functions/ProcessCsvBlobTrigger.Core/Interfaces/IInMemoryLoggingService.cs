@@ -18,3 +18,8 @@ public interface IInMemoryLoggingService : ILoggingService
     void ClearLogs();
 }
 
+
+
+
+
+

@@ -25,7 +25,7 @@ describe('AppComponent', () => {
   it('should have title', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toBe('infrastructure-as-code');
+    expect(app.title).toBe('interface-configuration');
   });
 
   it('should display app title in toolbar', () => {

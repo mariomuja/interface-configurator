@@ -43,3 +43,8 @@ public class AdapterConfiguration
     public bool IsActive { get; set; } = true;
 }
 
+
+
+
+
+

@@ -1,0 +1,169 @@
+.data-card {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-card ::ng-deep .mat-expansion-panel-header {
+  padding: 12px 16px;
+}
+
+.data-card ::ng-deep .mat-expansion-panel-body {
+  padding: 16px;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.adapter-type-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.adapter-type-icon.csv-icon {
+  color: #2196f3;
+}
+
+.adapter-type-icon.sql-icon {
+  color: #4caf50;
+}
+
+.settings-button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.2s ease;
+}
+
+.settings-button:hover {
+  color: rgba(255, 255, 255, 1);
+}
+
+.settings-button mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+}
+
+.restart-button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+.restart-button mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+}
+
+.instance-name-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.instance-name-text {
+  font-weight: 500;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.status-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  flex: 0 0 auto;
+}
+
+.status-icon.enabled {
+  color: #4caf50;
+}
+
+.status-icon.disabled {
+  color: #f44336;
+}
+
+.guid-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 4px 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+}
+
+.guid-display mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+
+.guid-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.action-button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+  line-height: 36px;
+}
+
+.action-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
+}
+
+.spinner-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.data-card ::ng-deep .mat-expansion-panel-header-title {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.data-card ::ng-deep .mat-expansion-panel-header-description {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+

@@ -30,6 +30,10 @@ public class MessageBoxMessage
     public string AdapterType { get; set; } = string.Empty; // "Source" or "Destination"
 
     [Required]
+    [Column("AdapterInstanceGuid")]
+    public Guid AdapterInstanceGuid { get; set; } // GUID identifying the adapter instance that created this message
+
+    [Required]
     [Column("MessageData", TypeName = "nvarchar(max)")]
     public string MessageData { get; set; } = string.Empty; // JSON: {"headers": [...], "record": {...}} - single record per message
 

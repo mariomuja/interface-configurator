@@ -1,7 +1,7 @@
 # Cleanup script to remove duplicate and unnecessary Azure resources
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [switch]$WhatIf
 )
 
@@ -173,6 +173,11 @@ foreach ($resource in $resourcesToDelete) {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Cleanup Complete!" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
+
+
+
+
+
 
 
 

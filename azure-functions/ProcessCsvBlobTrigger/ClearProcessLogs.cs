@@ -1,35 +1,39 @@
 using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Core.Interfaces;
+using ProcessCsvBlobTrigger.Data;
 
 namespace ProcessCsvBlobTrigger;
 
 /// <summary>
-/// HTTP endpoint to clear process logs from in-memory store
+/// HTTP endpoint to clear process logs from MessageBox database
 /// </summary>
 public class ClearProcessLogsFunction
 {
-    private readonly IInMemoryLoggingService _loggingService;
+    private readonly MessageBoxDbContext _context;
     private readonly ILogger<ClearProcessLogsFunction> _logger;
 
     public ClearProcessLogsFunction(
-        IInMemoryLoggingService loggingService,
+        MessageBoxDbContext context,
         ILogger<ClearProcessLogsFunction> logger)
     {
-        _loggingService = loggingService;
+        _context = context;
         _logger = logger;
     }
 
     [Function("ClearProcessLogs")]
-    public HttpResponseData Run(
+    public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ClearProcessLogs")] HttpRequestData req,
         FunctionContext context)
     {
         try
         {
-            _loggingService.ClearLogs();
+            // Delete all logs from MessageBox database
+            var logs = await _context.ProcessLogs.ToListAsync();
+            _context.ProcessLogs.RemoveRange(logs);
+            await _context.SaveChangesAsync();
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

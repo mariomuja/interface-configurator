@@ -19,7 +19,7 @@ echo "✓ Azure CLI gefunden"
 echo "[2/5] Prüfe GitHub CLI..."
 if ! command -v gh &> /dev/null; then
     echo "✗ GitHub CLI nicht gefunden. Bitte installieren: https://cli.github.com/"
-    echo "  Oder setze die Secrets manuell über: https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions"
+    echo "  Oder setze die Secrets manuell über: https://github.com/mariomuja/interface-configuration/settings/secrets/actions"
     exit 1
 fi
 echo "✓ GitHub CLI gefunden"
@@ -33,7 +33,7 @@ if [ -z "$SUBSCRIPTION_ID" ]; then
 fi
 echo "✓ Subscription ID: $SUBSCRIPTION_ID"
 
-RESOURCE_GROUP="rg-infrastructure-as-code"
+RESOURCE_GROUP="rg-interface-configuration"
 echo "  Resource Group: $RESOURCE_GROUP"
 
 # Schritt 4: Hole Function App Name aus Terraform
@@ -117,9 +117,14 @@ echo "  • AZURE_RESOURCE_GROUP = $RESOURCE_GROUP"
 echo "  • AZURE_FUNCTIONAPP_NAME = $FUNCTION_APP_NAME"
 echo ""
 echo "Nächste Schritte:"
-echo "  1. Teste den Workflow: https://github.com/mariomuja/infrastructure-as-code/actions"
+echo "  1. Teste den Workflow: https://github.com/mariomuja/interface-configuration/actions"
 echo "  2. Oder pushe eine Änderung zu azure-functions/**"
 echo ""
+
+
+
+
+
 
 
 

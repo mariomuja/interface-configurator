@@ -29,13 +29,13 @@ Siehe auch: [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
    az ad sp create-for-rbac \
      --name "github-actions-functions" \
      --role contributor \
-     --scopes /subscriptions/{subscription-id}/resourceGroups/rg-infrastructure-as-code \
+     --scopes /subscriptions/{subscription-id}/resourceGroups/rg-interface-configuration \
      --sdk-auth
    ```
 
-2. **GitHub Secrets setzen** (https://github.com/mariomuja/infrastructure-as-code/settings/secrets/actions):
+2. **GitHub Secrets setzen** (https://github.com/mariomuja/interface-configuration/settings/secrets/actions):
    - `AZURE_CREDENTIALS`: JSON-Output aus Schritt 1
-   - `AZURE_RESOURCE_GROUP`: `rg-infrastructure-as-code`
+   - `AZURE_RESOURCE_GROUP`: `rg-interface-configuration`
    - `AZURE_FUNCTIONAPP_NAME`: `terraform output function_app_name`
 
 ## Workflow

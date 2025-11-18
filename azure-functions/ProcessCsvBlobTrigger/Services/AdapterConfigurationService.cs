@@ -270,7 +270,7 @@ public class AdapterConfigurationService : IAdapterConfigurationService
         }
     }
 
-    private async Task SetDefaultCsvSeparatorAsync()
+    private Task SetDefaultCsvSeparatorAsync()
     {
         var defaultSetting = new AdapterSetting
         {
@@ -285,5 +285,6 @@ public class AdapterConfigurationService : IAdapterConfigurationService
 
         var key = BuildCacheKey(CsvAdapterName, "Source", "FieldSeparator");
         _settingsCache.AddOrUpdate(key, defaultSetting, (k, old) => defaultSetting);
+        return Task.CompletedTask;
     }
 }

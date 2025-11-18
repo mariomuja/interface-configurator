@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ProcessCsvBlobTrigger.Adapters;
 using ProcessCsvBlobTrigger.Core.Interfaces;
-using ProcessCsvBlobTrigger.Core.Processors;
 using ProcessCsvBlobTrigger.Core.Services;
 using ProcessCsvBlobTrigger.Data;
 using ProcessCsvBlobTrigger.Services;
@@ -30,14 +29,22 @@ var host = new HostBuilder()
             }
             else
             {
+                // Main application database connection (app-database)
+                // This database contains TransportData table and other application tables
                 var connectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog={sqlDatabase};Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+                
+                // MessageBox database connection (separate database for staging/messaging)
+                // This database contains Messages, MessageSubscriptions, and ProcessLogs tables ONLY
+                // TransportData table is NOT created here - it belongs to the main application database
                 var messageBoxConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=MessageBox;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
                 
-                // Register DbContext for main database
+                // Register DbContext for main application database (app-database)
+                // SqlServerAdapter uses this context to create/write to TransportData table
                 services.AddDbContext<ApplicationDbContext>(options =>
                     options.UseSqlServer(connectionString));
                 
-                // Register MessageBoxDbContext for MessageBox database
+                // Register MessageBoxDbContext for MessageBox database (separate database)
+                // Contains Messages, MessageSubscriptions, ProcessLogs - NOT TransportData
                 services.AddDbContext<MessageBoxDbContext>(options =>
                     options.UseSqlServer(messageBoxConnectionString));
                 
@@ -153,7 +160,7 @@ var host = new HostBuilder()
                 {
                     throw new InvalidOperationException("BlobServiceClient is required for CsvAdapter");
                 }
-                return new CsvAdapter(csvProcessingService, adapterConfig, blobServiceClient, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", logger);
+                return new CsvAdapter(csvProcessingService, adapterConfig, blobServiceClient, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, logger);
             });
             
             // SQL Server Adapter (for destination) - register as named service
@@ -169,21 +176,9 @@ var host = new HostBuilder()
                 {
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", logger);
+                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, logger);
             });
             
-            // Register Processor with source and destination adapters
-            services.AddScoped<ICsvProcessor>(sp =>
-            {
-                var csvAdapter = sp.GetRequiredService<CsvAdapter>();
-                var sqlAdapter = sp.GetRequiredService<SqlServerAdapter>();
-                var errorRowService = sp.GetRequiredService<IErrorRowService>();
-                var loggingService = sp.GetRequiredService<ILoggingService>();
-                var logger = sp.GetRequiredService<ILogger<CsvProcessor>>();
-                var csvProcessingService = sp.GetService<ICsvProcessingService>(); // For backward compatibility
-                
-                return new CsvProcessor(csvAdapter, sqlAdapter, errorRowService, loggingService, logger, csvProcessingService);
-            });
         }
         catch (Exception ex)
         {

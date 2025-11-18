@@ -1,0 +1,49 @@
+<mat-expansion-panel [(expanded)]="expanded" (opened)="onExpandedChange(true)" (closed)="onExpandedChange(false)" 
+                     [class]="'data-card ' + (adapterName === 'CSV' ? 'csv-card' : 'sql-card')">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <div class="card-header-left">
+        <mat-icon class="adapter-type-icon" [class.csv-icon]="adapterName === 'CSV'" [class.sql-icon]="adapterName === 'SqlServer'">
+          {{ adapterName === 'CSV' ? 'description' : 'storage' }}
+        </mat-icon>
+        
+        <button mat-icon-button (click)="onSettings(); $event.stopPropagation()" 
+                class="settings-button" matTooltip="Adapter-Eigenschaften öffnen">
+          <mat-icon>settings</mat-icon>
+        </button>
+        
+        <button mat-icon-button (click)="onRestart(); $event.stopPropagation()" [disabled]="isRestarting" 
+                class="restart-button" matTooltip="Adapter-Prozess neu starten">
+          <mat-icon>{{ isRestarting ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+        </button>
+        
+        <div class="instance-name-display">
+          <span class="instance-name-text">{{ instanceName || (adapterType === 'Source' ? 'Source' : 'Destination') }}</span>
+          <mat-icon class="status-icon" [class.enabled]="isEnabled" [class.disabled]="!isEnabled" 
+                    [matTooltip]="isEnabled ? 'Adapter ist aktiviert' : 'Adapter ist deaktiviert'">
+            {{ isEnabled ? 'check_circle' : 'cancel' }}
+          </mat-icon>
+        </div>
+        
+        <div class="guid-display" *ngIf="adapterInstanceGuid" matTooltip="Adapter Instance GUID: {{ adapterInstanceGuid }}">
+          <mat-icon>fingerprint</mat-icon>
+          <span class="guid-text">{{ adapterInstanceGuid.substring(0, 8) }}...</span>
+        </div>
+      </div>
+    </mat-panel-title>
+    <mat-panel-description>
+      <button mat-raised-button [color]="getPrimaryActionColor()" (click)="onPrimaryAction(); $event.stopPropagation()" 
+              class="action-button">
+        <mat-icon>{{ getPrimaryActionIcon() }}</mat-icon>
+        {{ getPrimaryActionLabel() }}
+      </button>
+    </mat-panel-description>
+  </mat-expansion-panel-header>
+  
+  <div *ngIf="isLoading" class="spinner-container">
+    <mat-spinner></mat-spinner>
+  </div>
+  
+  <ng-content></ng-content>
+</mat-expansion-panel>
+

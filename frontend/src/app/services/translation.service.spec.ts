@@ -42,13 +42,13 @@ describe('TranslationService', () => {
 
   it('should translate German text', () => {
     service.setLanguage('de');
-    expect(service.translate('app.title')).toBe('CSV zu SQL Server Transport');
+    expect(service.translate('app.title')).toBe('Integration Configuration');
     expect(service.translate('source.csv')).toBe('Quelle - CSV-Daten');
   });
 
   it('should translate English text', () => {
     service.setLanguage('en');
-    expect(service.translate('app.title')).toBe('CSV to SQL Server Transport');
+    expect(service.translate('app.title')).toBe('Integration Configuration');
     expect(service.translate('source.csv')).toBe('Source - CSV Data');
   });
 

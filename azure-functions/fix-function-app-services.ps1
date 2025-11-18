@@ -1,7 +1,7 @@
 # Stellt sicher, dass alle benoetigten Services fuer die Azure Function App verfuegbar sind
 
 param(
-    [string]$ResourceGroup = "rg-infrastructure-as-code",
+    [string]$ResourceGroup = "rg-interface-configuration",
     [string]$FunctionAppName = "func-apprigklebtsay2o"
 )
 
@@ -182,6 +182,11 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Fertig!" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
+
+
+
+
+
 
 
 

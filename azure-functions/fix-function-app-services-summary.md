@@ -37,7 +37,7 @@ Die Function App wurde neu gestartet und sollte jetzt verfügbar sein.
    # Im Azure Portal
    # Oder ueber REST API
    az rest --method GET \
-     --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-infrastructure-as-code/providers/Microsoft.Web/sites/func-apprigklebtsay2o/functions?api-version=2022-03-01"
+     --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-interface-configuration/providers/Microsoft.Web/sites/func-apprigklebtsay2o/functions?api-version=2022-03-01"
    ```
 
 3. **Testen Sie die Function direkt**:
@@ -62,6 +62,11 @@ Die Function App wurde neu gestartet und sollte jetzt verfügbar sein.
 - **WEBSITE_USE_PLACEHOLDER=0** ist wichtig, damit Functions geladen werden
 - Nach Neustart benoetigt die Function App Zeit zum Initialisieren
 - Das Package muss die korrekte Struktur haben
+
+
+
+
+
 
 
 

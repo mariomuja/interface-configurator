@@ -174,3 +174,7 @@ The Azure Function will automatically create the `TransportData` table when proc
 - `POST /api/init-database` - Creates TransportData table if it doesn't exist
 - `GET /api/diagnose` - Checks all configurations including SQL connection
 
+
+
+
+

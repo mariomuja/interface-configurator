@@ -3,9 +3,9 @@
 
 @description('Name of the resource group')
 @allowed([
-  'rg-infrastructure-as-code'
+  'rg-interface-configuration'
 ])
-param resourceGroupName string = 'rg-infrastructure-as-code'
+param resourceGroupName string = 'rg-interface-configuration'
 
 @description('Azure region for resources')
 param location string = 'West Europe'
@@ -21,14 +21,14 @@ param sqlLocation string = ''
 ])
 param environment string = 'prod'
 
-@description('Base name for storage account (suffix will be added)')
-param storageAccountName string = 'stapp'
+@description('Name for storage account (descriptive, no suffix, no hyphens - Azure requirement)')
+param storageAccountName string = 'stappgeneral'
 
-@description('Base name for SQL Server (suffix will be added)')
-param sqlServerName string = 'sql-infrastructure'
+@description('Name for SQL Server (descriptive, no suffix)')
+param sqlServerName string = 'sql-main-database'
 
 @description('Name of the SQL database')
-param sqlDatabaseName string = 'app_database'
+param sqlDatabaseName string = 'app-database'
 
 @description('SQL Server administrator login')
 @secure()
@@ -60,14 +60,14 @@ param allowCurrentIp bool = false
 @description('Current IP address for SQL firewall rule')
 param currentIpAddress string = ''
 
-@description('Base name for Functions storage account (suffix will be added)')
-param functionsStorageName string = 'stfuncsapp'
+@description('Name for Functions storage account (descriptive, no suffix, no hyphens - Azure requirement)')
+param functionsStorageName string = 'stfunccsvprocessor'
 
-@description('Base name for Functions app service plan (suffix will be added)')
-param functionsAppPlanName string = 'plan-funcs-app'
+@description('Name for Functions app service plan (descriptive, no suffix)')
+param functionsAppPlanName string = 'plan-func-csv-processor'
 
 @description('Base name for Functions app (suffix will be added)')
-param functionsAppName string = 'func-app'
+param functionsAppName string = 'func-integration-main'
 
 @description('SKU name for Functions app service plan. Use Y1 for Consumption (current), EP1 for Flex Consumption (migration required before Sep 2028)')
 @allowed([

@@ -274,6 +274,23 @@
           "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Storage.Blobs.dll": {}
         }
       },
+      "Microsoft.Azure.Functions.Worker.Extensions.Timer/4.3.1": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Azure.Functions.Worker.Core": "1.18.0",
+          "Microsoft.Azure.Functions.Worker.Extensions.Abstractions": "1.3.0"
+        },
+        "compile": {
+          "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.Azure.Functions.Worker.Grpc/1.17.0": {
         "type": "package",
         "dependencies": {
@@ -2204,6 +2221,19 @@
           }
         }
       },
+      "SSH.NET/2024.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Renci.SshNet.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Renci.SshNet.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "System.AppContext/4.3.0": {
         "type": "package",
         "dependencies": {
@@ -3902,13 +3932,15 @@
           "Microsoft.Azure.Functions.Worker": "1.23.0",
           "Microsoft.Azure.Functions.Worker.Extensions.Http": "3.2.0",
           "Microsoft.Azure.Functions.Worker.Extensions.Storage.Blobs": "6.2.0",
+          "Microsoft.Azure.Functions.Worker.Extensions.Timer": "4.3.1",
           "Microsoft.Azure.Functions.Worker.Sdk": "1.18.1",
           "Microsoft.Data.SqlClient": "5.1.6",
           "Microsoft.EntityFrameworkCore.SqlServer": "8.0.11",
           "Microsoft.EntityFrameworkCore.Tools": "8.0.11",
           "Microsoft.Extensions.DependencyInjection": "8.0.1",
           "Microsoft.Extensions.Hosting": "8.0.1",
-          "ProcessCsvBlobTrigger.Core": "1.0.0"
+          "ProcessCsvBlobTrigger.Core": "1.0.0",
+          "SSH.NET": "2023.0.2"
         },
         "compile": {
           "bin/placeholder/ProcessCsvBlobTrigger.dll": {}
@@ -4310,6 +4342,20 @@
         "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Storage.Blobs.dll",
         "microsoft.azure.functions.worker.extensions.storage.blobs.6.2.0.nupkg.sha512",
         "microsoft.azure.functions.worker.extensions.storage.blobs.nuspec"
+      ]
+    },
+    "Microsoft.Azure.Functions.Worker.Extensions.Timer/4.3.1": {
+      "sha512": "uNKWSuelJi2SG2e6Dc+s7l3yBkXZCkYnF/OcssXlONY+vM+AP+rm/wPR7iJ5xeDgOp5sOCKHEu5XYsbhZsfCRg==",
+      "type": "package",
+      "path": "microsoft.azure.functions.worker.extensions.timer/4.3.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "icon.png",
+        "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.dll",
+        "lib/netstandard2.0/Microsoft.Azure.Functions.Worker.Extensions.Timer.xml",
+        "microsoft.azure.functions.worker.extensions.timer.4.3.1.nupkg.sha512",
+        "microsoft.azure.functions.worker.extensions.timer.nuspec"
       ]
     },
     "Microsoft.Azure.Functions.Worker.Grpc/1.17.0": {
@@ -7325,6 +7371,31 @@
         "runtime.ubuntu.16.10-x64.runtime.native.system.security.cryptography.openssl.4.3.0.nupkg.sha512",
         "runtime.ubuntu.16.10-x64.runtime.native.system.security.cryptography.openssl.nuspec",
         "runtimes/ubuntu.16.10-x64/native/System.Security.Cryptography.Native.OpenSsl.so"
+      ]
+    },
+    "SSH.NET/2024.0.0": {
+      "sha512": "klFPBbrGtFY9V8kbh5PQwlexj7Z8fwbpwABvLX0QzCmzW06rkLknEeM1l6np2hkUfg5an5w/GzHUhWTHN1TJpA==",
+      "type": "package",
+      "path": "ssh.net/2024.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "SS-NET-icon-h500.png",
+        "lib/net462/Renci.SshNet.dll",
+        "lib/net462/Renci.SshNet.xml",
+        "lib/net6.0/Renci.SshNet.dll",
+        "lib/net6.0/Renci.SshNet.xml",
+        "lib/net7.0/Renci.SshNet.dll",
+        "lib/net7.0/Renci.SshNet.xml",
+        "lib/net8.0/Renci.SshNet.dll",
+        "lib/net8.0/Renci.SshNet.xml",
+        "lib/netstandard2.0/Renci.SshNet.dll",
+        "lib/netstandard2.0/Renci.SshNet.xml",
+        "lib/netstandard2.1/Renci.SshNet.dll",
+        "lib/netstandard2.1/Renci.SshNet.xml",
+        "ssh.net.2024.0.0.nupkg.sha512",
+        "ssh.net.nuspec"
       ]
     },
     "System.AppContext/4.3.0": {
@@ -11496,5 +11567,17 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.200/PortableRuntimeIdentifierGraph.json"
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "ProcessCsvBlobTrigger depends on SSH.NET (>= 2023.0.2) but SSH.NET 2023.0.2 was not found. SSH.NET 2024.0.0 was resolved instead.",
+      "libraryId": "SSH.NET",
+      "targetGraphs": [
+        "net8.0"
+      ]
+    }
+  ]
 }

@@ -10,7 +10,7 @@ Die SQL-Datenbank enthält noch keine Tabellen (`TransportData` und `ProcessLogs
 Führen Sie das PowerShell-Script aus:
 
 ```powershell
-cd C:\Users\mario\infrastructure-as-code
+cd C:\Users\mario\interface-configuration
 .\terraform\init-database.ps1 -SqlPassword "IhrSQLPasswort"
 ```
 

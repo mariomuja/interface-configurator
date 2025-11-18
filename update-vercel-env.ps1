@@ -6,11 +6,11 @@ Write-Host ""
 
 # Get Azure resources
 Write-Host "1. Getting Azure SQL Server details..." -ForegroundColor Yellow
-$sqlServer = az sql server show --name sql-main-database --resource-group rg-infrastructure-as-code --query "fullyQualifiedDomainName" -o tsv
+$sqlServer = az sql server show --name sql-main-database --resource-group rg-interface-configuration --query "fullyQualifiedDomainName" -o tsv
 Write-Host "   SQL Server: $sqlServer" -ForegroundColor Gray
 
 Write-Host "2. Getting Storage Account connection string..." -ForegroundColor Yellow
-$storageConn = az storage account show-connection-string --name stappgeneral --resource-group rg-infrastructure-as-code --query "connectionString" -o tsv
+$storageConn = az storage account show-connection-string --name stappgeneral --resource-group rg-interface-configuration --query "connectionString" -o tsv
 Write-Host "   Storage Connection String retrieved" -ForegroundColor Gray
 
 # Database details
@@ -68,5 +68,7 @@ Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Check Vercel dashboard for deployment status" -ForegroundColor Gray
 Write-Host "  2. Test the application endpoints" -ForegroundColor Gray
 Write-Host "  3. Verify database connection in Vercel logs" -ForegroundColor Gray
+
+
 
 
