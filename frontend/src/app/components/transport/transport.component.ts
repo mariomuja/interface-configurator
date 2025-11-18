@@ -1107,6 +1107,94 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  updateSqlConnectionProperties(
+    serverName?: string,
+    databaseName?: string,
+    userName?: string,
+    password?: string,
+    integratedSecurity?: boolean,
+    resourceGroup?: string
+  ): void {
+    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    
+    if (!defaultConfig) {
+      return;
+    }
+
+    // Update local properties immediately for responsive UI
+    if (serverName !== undefined) this.sqlServerName = serverName;
+    if (databaseName !== undefined) this.sqlDatabaseName = databaseName;
+    if (userName !== undefined) this.sqlUserName = userName;
+    if (password !== undefined) this.sqlPassword = password;
+    if (integratedSecurity !== undefined) this.sqlIntegratedSecurity = integratedSecurity;
+    if (resourceGroup !== undefined) this.sqlResourceGroup = resourceGroup;
+
+    this.transportService.updateSqlConnectionProperties(
+      this.DEFAULT_INTERFACE_NAME,
+      serverName,
+      databaseName,
+      userName,
+      password,
+      integratedSecurity,
+      resourceGroup
+    ).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('SQL Server Verbindungseigenschaften aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating SQL connection properties:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Server Verbindungseigenschaften');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+        // Restore previous values
+        this.loadInterfaceConfigurations();
+      }
+    });
+  }
+
+  updateSqlPollingProperties(
+    pollingStatement?: string,
+    pollingInterval?: number
+  ): void {
+    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    
+    if (!defaultConfig) {
+      return;
+    }
+
+    // Update local properties immediately for responsive UI
+    if (pollingStatement !== undefined) this.sqlPollingStatement = pollingStatement;
+    if (pollingInterval !== undefined) this.sqlPollingInterval = pollingInterval;
+
+    this.transportService.updateSqlPollingProperties(
+      this.DEFAULT_INTERFACE_NAME,
+      pollingStatement,
+      pollingInterval
+    ).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('SQL Server Polling-Eigenschaften aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating SQL polling properties:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Server Polling-Eigenschaften');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+        // Restore previous values
+        this.loadInterfaceConfigurations();
+      }
+    });
+  }
+
   openSourceAdapterSettings(): void {
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
     const dialogData: AdapterPropertiesData = {
@@ -1139,7 +1227,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Update instance name if changed
         if (result.instanceName !== this.sourceInstanceName) {
           this.sourceInstanceName = result.instanceName;
-          this.updateSourceInstanceName(result.instanceName);
+          this.updateSourceInstanceName();
         }
 
         // Update enabled status if changed
