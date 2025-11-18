@@ -143,13 +143,32 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       next: (configs) => {
         this.interfaceConfigurations = configs || [];
         
+        // Ensure default interface appears in the list even if it doesn't exist yet
+        const defaultExists = this.interfaceConfigurations.some(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+        if (!defaultExists) {
+          // Add default interface as a placeholder (will be created when needed)
+          this.interfaceConfigurations.unshift({
+            interfaceName: this.DEFAULT_INTERFACE_NAME,
+            sourceAdapterName: 'CSV',
+            destinationAdapterName: 'SqlServer',
+            sourceInstanceName: 'Source',
+            destinationInstanceName: 'Destination',
+            sourceIsEnabled: true,
+            destinationIsEnabled: true,
+            _isPlaceholder: true // Mark as placeholder so we know it needs to be created
+          });
+        }
+        
         // If no current interface is set, select the first available or default
         if (!this.currentInterfaceName) {
           if (this.interfaceConfigurations.length > 0) {
-            // Select first available interface
+            // Select first available interface (should be default if it was just added)
             this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
-            this.selectedInterfaceConfig = this.interfaceConfigurations[0];
-            this.loadInterfaceData();
+            const selectedConfig = this.interfaceConfigurations[0];
+            this.selectedInterfaceConfig = selectedConfig._isPlaceholder ? null : selectedConfig;
+            if (!selectedConfig._isPlaceholder) {
+              this.loadInterfaceData();
+            }
           } else {
             // No interfaces exist, use default name (will be created when needed)
             this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
@@ -159,14 +178,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           // Current interface is set, verify it still exists
           const currentConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
           if (currentConfig) {
-            this.selectedInterfaceConfig = currentConfig;
-            this.loadInterfaceData();
+            this.selectedInterfaceConfig = currentConfig._isPlaceholder ? null : currentConfig;
+            if (!currentConfig._isPlaceholder) {
+              this.loadInterfaceData();
+            }
           } else {
             // Current interface no longer exists, select first available or default
             if (this.interfaceConfigurations.length > 0) {
               this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
-              this.selectedInterfaceConfig = this.interfaceConfigurations[0];
-              this.loadInterfaceData();
+              const selectedConfig = this.interfaceConfigurations[0];
+              this.selectedInterfaceConfig = selectedConfig._isPlaceholder ? null : selectedConfig;
+              if (!selectedConfig._isPlaceholder) {
+                this.loadInterfaceData();
+              }
             } else {
               this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
               this.selectedInterfaceConfig = null;
@@ -1640,10 +1664,45 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onInterfaceSelectionChange(event: any): void {
     const selectedName = event.value;
-    const config = this.interfaceConfigurations.find(c => c.interfaceName === selectedName);
-    if (config) {
-      this.selectedInterfaceConfig = config;
-      this.loadInterfaceData();
+    if (selectedName && selectedName !== this.currentInterfaceName) {
+      this.currentInterfaceName = selectedName;
+      const config = this.interfaceConfigurations.find(c => c.interfaceName === selectedName);
+      if (config) {
+        // Check if this is a placeholder that needs to be created
+        if (config._isPlaceholder) {
+          // Create the default interface configuration
+          this.transportService.createInterfaceConfiguration({
+            interfaceName: this.DEFAULT_INTERFACE_NAME,
+            sourceAdapterName: 'CSV',
+            sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming' }),
+            destinationAdapterName: 'SqlServer',
+            destinationConfiguration: JSON.stringify({ destination: 'TransportData' }),
+            description: 'Default CSV to SQL Server interface'
+          }).subscribe({
+            next: (createdConfig) => {
+              // Reload configurations to get the real one
+              this.loadInterfaceConfigurations();
+              this.snackBar.open('Default interface created successfully', 'OK', { duration: 3000 });
+            },
+            error: (error) => {
+              console.error('Error creating default interface:', error);
+              const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Standard-Interfaces');
+              this.snackBar.open(detailedMessage, 'Schließen', { 
+                duration: 10000,
+                panelClass: ['error-snackbar'],
+                verticalPosition: 'top',
+                horizontalPosition: 'center'
+              });
+            }
+          });
+          this.selectedInterfaceConfig = null;
+        } else {
+          this.selectedInterfaceConfig = config;
+          this.loadInterfaceData();
+        }
+      } else {
+        this.selectedInterfaceConfig = null;
+      }
     }
   }
 
