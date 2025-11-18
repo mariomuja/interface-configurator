@@ -406,9 +406,9 @@
   box-sizing: border-box;
   flex: 1;
   overflow: auto;
-  white-space: pre;
-  word-wrap: normal;
-  overflow-wrap: normal;
+  white-space: pre-wrap; /* Changed from pre to pre-wrap to preserve line breaks */
+  word-wrap: break-word; /* Allow wrapping of long lines */
+  overflow-wrap: break-word; /* Allow wrapping of long words */
   color: #333;
 }
 
@@ -425,6 +425,14 @@
 
 .csv-editable span {
   font-weight: 500;
+}
+
+/* Ensure line breaks are preserved in contenteditable */
+.csv-editable br {
+  display: block;
+  content: "";
+  margin: 0;
+  line-height: 1.5;
 }
 
 .table-empty-message {
