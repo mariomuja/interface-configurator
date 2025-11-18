@@ -5,9 +5,15 @@ param(
     [string]$FunctionAppName = "",
     [string]$FunctionAppUrl = "",
     [string]$InterfaceName = "FromCsvToSqlServerExample",
-    [string]$CsvBlobPath = "csv-incoming/test.csv",
+    [string]$CsvBlobPath = "csv-files/csv-incoming/test.csv",
     [string]$TableName = "TransportData"
 )
+
+# Helper function for URL encoding (PowerShell native)
+function Encode-UriComponent {
+    param([string]$Value)
+    [System.Uri]::EscapeDataString($Value)
+}
 
 # Get Function App URL
 if ([string]::IsNullOrEmpty($FunctionAppUrl)) {
@@ -41,7 +47,7 @@ Write-Host ""
 # Test 2: GetProcessingStatistics (specific interface)
 Write-Host "=== Test 2: GetProcessingStatistics (interface: $InterfaceName) ===" -ForegroundColor Yellow
 try {
-    $url = "$FunctionAppUrl/api/GetProcessingStatistics?interfaceName=$([System.Web.HttpUtility]::UrlEncode($InterfaceName))"
+    $url = "$FunctionAppUrl/api/GetProcessingStatistics?interfaceName=$(Encode-UriComponent $InterfaceName)"
     $response = Invoke-RestMethod -Uri $url -Method Get -ContentType "application/json"
     Write-Host "✅ Success! Retrieved statistics for interface: $InterfaceName" -ForegroundColor Green
     Write-Host "Total Rows Processed: $($response.totalRowsProcessed)" -ForegroundColor Cyan
@@ -60,7 +66,7 @@ Write-Host ""
 # Test 3: GetSqlTableSchema
 Write-Host "=== Test 3: GetSqlTableSchema (interface: $InterfaceName, table: $TableName) ===" -ForegroundColor Yellow
 try {
-    $url = "$FunctionAppUrl/api/GetSqlTableSchema?interfaceName=$([System.Web.HttpUtility]::UrlEncode($InterfaceName))&tableName=$([System.Web.HttpUtility]::UrlEncode($TableName))"
+    $url = "$FunctionAppUrl/api/GetSqlTableSchema?interfaceName=$(Encode-UriComponent $InterfaceName)&tableName=$(Encode-UriComponent $TableName)"
     $response = Invoke-RestMethod -Uri $url -Method Get -ContentType "application/json"
     Write-Host "✅ Success! Retrieved SQL schema for table: $TableName" -ForegroundColor Green
     Write-Host "Table: $($response.tableName)" -ForegroundColor Cyan
@@ -82,7 +88,7 @@ Write-Host ""
 # Test 4: ValidateCsvFile
 Write-Host "=== Test 4: ValidateCsvFile (blob: $CsvBlobPath) ===" -ForegroundColor Yellow
 try {
-    $url = "$FunctionAppUrl/api/ValidateCsvFile?blobPath=$([System.Web.HttpUtility]::UrlEncode($CsvBlobPath))"
+    $url = "$FunctionAppUrl/api/ValidateCsvFile?blobPath=$(Encode-UriComponent $CsvBlobPath)"
     $response = Invoke-RestMethod -Uri $url -Method Get -ContentType "application/json"
     Write-Host "✅ Success! Validated CSV file" -ForegroundColor Green
     Write-Host "Is Valid: $($response.isValid)" -ForegroundColor $(if ($response.isValid) { "Green" } else { "Red" })
@@ -109,7 +115,7 @@ Write-Host ""
 # Test 5: CompareCsvSqlSchema
 Write-Host "=== Test 5: CompareCsvSqlSchema (interface: $InterfaceName, CSV: $CsvBlobPath, Table: $TableName) ===" -ForegroundColor Yellow
 try {
-    $url = "$FunctionAppUrl/api/CompareCsvSqlSchema?interfaceName=$([System.Web.HttpUtility]::UrlEncode($InterfaceName))&csvBlobPath=$([System.Web.HttpUtility]::UrlEncode($CsvBlobPath))&tableName=$([System.Web.HttpUtility]::UrlEncode($TableName))"
+    $url = "$FunctionAppUrl/api/CompareCsvSqlSchema?interfaceName=$(Encode-UriComponent $InterfaceName)&csvBlobPath=$(Encode-UriComponent $CsvBlobPath)&tableName=$(Encode-UriComponent $TableName)"
     $response = Invoke-RestMethod -Uri $url -Method Get -ContentType "application/json"
     Write-Host "✅ Success! Compared CSV and SQL schemas" -ForegroundColor Green
     Write-Host "Is Compatible: $($response.isCompatible)" -ForegroundColor $(if ($response.isCompatible) { "Green" } else { "Red" })
