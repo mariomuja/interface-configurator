@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -62,6 +63,7 @@ public class GetProcessLogsFunction
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             
             // Use camelCase JSON serialization
             var jsonOptions = new System.Text.Json.JsonSerializerOptions
@@ -80,6 +82,7 @@ public class GetProcessLogsFunction
                 _logger.LogWarning("ProcessLogs table does not exist yet. Returning empty array. Tables will be created automatically.");
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(response);
                 response.WriteString("[]");
                 return response;
             }
@@ -87,6 +90,7 @@ public class GetProcessLogsFunction
             _logger.LogError(sqlEx, "SQL error retrieving process logs: {ErrorNumber} - {Message}", sqlEx.Number, sqlEx.Message);
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { error = sqlEx.Message }));
             return errorResponse;
         }
@@ -95,6 +99,7 @@ public class GetProcessLogsFunction
             _logger.LogError(ex, "Error retrieving process logs");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
