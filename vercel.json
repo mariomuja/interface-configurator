@@ -21,8 +21,8 @@
     }
   ],
   "functions": {
-    "frontend/api/[...path].ts": {
-      "includeFiles": "frontend/api/**"
+    "api/[...path].ts": {
+      "includeFiles": "api/**"
     }
   }
 }
