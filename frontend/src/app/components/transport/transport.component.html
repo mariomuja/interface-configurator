@@ -3,7 +3,7 @@
   <div class="interface-name-container-top">
     <mat-form-field appearance="outline" class="interface-name-field-wide">
       <mat-label>{{ getTranslation('interface.name') }}</mat-label>
-      <mat-select [(ngModel)]="currentInterfaceName" (selectionChange)="onInterfaceSelectionChange($event)">
+      <mat-select [(ngModel)]="currentInterfaceName" (selectionChange)="onInterfaceSelectionChange($event)" [placeholder]="getTranslation('interface.name')">
         <mat-option *ngFor="let config of interfaceConfigurations" [value]="config.interfaceName">
           {{ config.interfaceName }}
         </mat-option>

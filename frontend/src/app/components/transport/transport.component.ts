@@ -142,78 +142,36 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transportService.getInterfaceConfigurations().subscribe({
       next: (configs) => {
         this.interfaceConfigurations = configs || [];
-        // Update current interface name and instance names from configuration
-        const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
-        if (defaultConfig) {
-          this.currentInterfaceName = defaultConfig.interfaceName;
-          this.sourceInstanceName = defaultConfig.sourceInstanceName || 'Source';
-          this.destinationInstanceName = defaultConfig.destinationInstanceName || 'Destination';
-          this.sourceIsEnabled = defaultConfig.sourceIsEnabled ?? true;
-          this.destinationIsEnabled = defaultConfig.destinationIsEnabled ?? true;
-          this.sourceAdapterName = (defaultConfig.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
-          this.sourceReceiveFolder = defaultConfig.sourceReceiveFolder || '';
-          this.sourceFileMask = defaultConfig.sourceFileMask || '*.txt';
-          this.sourceBatchSize = defaultConfig.sourceBatchSize ?? 100;
-          this.sourceFieldSeparator = defaultConfig.sourceFieldSeparator || '║';
-          this.destinationReceiveFolder = defaultConfig.destinationReceiveFolder || '';
-          this.destinationFileMask = defaultConfig.destinationFileMask || '*.txt';
-          this.sourceAdapterInstanceGuid = defaultConfig.sourceAdapterInstanceGuid || '';
-          this.destinationAdapterInstanceGuid = defaultConfig.destinationAdapterInstanceGuid || '';
-          
-          // Load CsvData from configuration if available
-          if (defaultConfig.csvData) {
-            this.editableCsvText = defaultConfig.csvData;
-            this.formattedCsvHtml = this.formatCsvAsHtml();
-            // Update the contenteditable div with formatted HTML
-            setTimeout(() => {
-              if (this.csvEditor?.nativeElement) {
-                this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
-              }
-            }, 0);
-            this.onCsvTextChange(); // Parse CSV text into csvData array
+        
+        // If no current interface is set, select the first available or default
+        if (!this.currentInterfaceName) {
+          if (this.interfaceConfigurations.length > 0) {
+            // Select first available interface
+            this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
+            this.selectedInterfaceConfig = this.interfaceConfigurations[0];
+            this.loadInterfaceData();
+          } else {
+            // No interfaces exist, use default name (will be created when needed)
+            this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
+            this.selectedInterfaceConfig = null;
           }
-          
-          // SQL Server properties
-          this.sqlServerName = defaultConfig.sqlServerName || '';
-          this.sqlDatabaseName = defaultConfig.sqlDatabaseName || '';
-          this.sqlUserName = defaultConfig.sqlUserName || '';
-          this.sqlPassword = defaultConfig.sqlPassword || '';
-          this.sqlIntegratedSecurity = defaultConfig.sqlIntegratedSecurity ?? false;
-          this.sqlResourceGroup = defaultConfig.sqlResourceGroup || '';
-          this.sqlPollingStatement = defaultConfig.sqlPollingStatement || '';
-          this.sqlPollingInterval = defaultConfig.sqlPollingInterval ?? 60;
-          this.sqlUseTransaction = defaultConfig.sqlUseTransaction ?? false;
-          this.sqlBatchSize = defaultConfig.sqlBatchSize ?? 1000;
-          
-          // Ensure field separator is set to ║
-          if (defaultConfig.sourceFieldSeparator !== '║') {
-            this.updateFieldSeparator('║');
+        } else {
+          // Current interface is set, verify it still exists
+          const currentConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
+          if (currentConfig) {
+            this.selectedInterfaceConfig = currentConfig;
+            this.loadInterfaceData();
+          } else {
+            // Current interface no longer exists, select first available or default
+            if (this.interfaceConfigurations.length > 0) {
+              this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
+              this.selectedInterfaceConfig = this.interfaceConfigurations[0];
+              this.loadInterfaceData();
+            } else {
+              this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
+              this.selectedInterfaceConfig = null;
+            }
           }
-        } else if (!this.currentInterfaceName) {
-          // Set default name if no configuration exists yet
-          this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
-          this.sourceInstanceName = 'Source';
-          this.destinationInstanceName = 'Destination';
-          this.sourceIsEnabled = true;
-          this.destinationIsEnabled = true;
-          this.sourceAdapterName = 'CSV';
-          this.sourceReceiveFolder = '';
-          this.sourceFileMask = '*.txt';
-          this.sourceBatchSize = 100;
-          this.sourceFieldSeparator = '║';
-          this.destinationReceiveFolder = '';
-          this.destinationFileMask = '*.txt';
-          this.sourceAdapterInstanceGuid = '';
-          this.destinationAdapterInstanceGuid = '';
-          // SQL Server properties
-          this.sqlServerName = '';
-          this.sqlDatabaseName = '';
-          this.sqlUserName = '';
-          this.sqlPassword = '';
-          this.sqlIntegratedSecurity = false;
-          this.sqlResourceGroup = '';
-          this.sqlPollingStatement = '';
-          this.sqlPollingInterval = 60;
         }
       },
       error: (error) => {

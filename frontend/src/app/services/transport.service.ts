@@ -119,7 +119,7 @@ export class TransportService {
     destinationConfiguration?: string;
     description?: string;
   }): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/create-interface-config`, config);
+    return this.http.post<any>(`${this.apiUrl}/CreateInterfaceConfiguration`, config);
   }
 
   deleteInterfaceConfiguration(interfaceName: string): Observable<any> {
@@ -131,7 +131,7 @@ export class TransportService {
   }
 
   toggleInterfaceConfiguration(interfaceName: string, adapterType: 'Source' | 'Destination', enabled: boolean): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/toggle-interface-config`, {
+    return this.http.post<any>(`${this.apiUrl}/ToggleInterfaceConfiguration`, {
       interfaceName,
       adapterType,
       enabled
@@ -139,14 +139,14 @@ export class TransportService {
   }
 
   updateInterfaceName(oldInterfaceName: string, newInterfaceName: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/update-interface-name`, {
+    return this.http.post<any>(`${this.apiUrl}/UpdateInterfaceName`, {
       oldInterfaceName,
       newInterfaceName
     });
   }
 
   updateInstanceName(interfaceName: string, instanceType: 'Source' | 'Destination', instanceName: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/update-instance-name`, {
+    return this.http.post<any>(`${this.apiUrl}/UpdateInstanceName`, {
       interfaceName,
       instanceType,
       instanceName
@@ -154,14 +154,14 @@ export class TransportService {
   }
 
   restartAdapter(interfaceName: string, adapterType: 'Source' | 'Destination'): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/restart-adapter`, {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/RestartAdapter`, {
       interfaceName,
       adapterType
     });
   }
 
   updateReceiveFolder(interfaceName: string, receiveFolder: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/update-receive-folder`, {
+    return this.http.post<any>(`${this.apiUrl}/UpdateReceiveFolder`, {
       interfaceName,
       receiveFolder
     });
@@ -255,12 +255,8 @@ export class TransportService {
   }
 
   removeDestinationAdapterInstance(interfaceName: string, adapterInstanceGuid: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}/RemoveDestinationAdapterInstance`, {
-      body: {
-        interfaceName,
-        adapterInstanceGuid
-      }
-    });
+    // Use query parameters for DELETE request (more standard than body)
+    return this.http.delete<any>(`${this.apiUrl}/RemoveDestinationAdapterInstance?interfaceName=${encodeURIComponent(interfaceName)}&adapterInstanceGuid=${encodeURIComponent(adapterInstanceGuid)}`);
   }
 
   updateDestinationAdapterInstance(

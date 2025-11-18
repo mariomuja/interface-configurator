@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -25,10 +26,18 @@ public class CreateInterfaceConfiguration
 
     [Function("CreateInterfaceConfiguration")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "CreateInterfaceConfiguration")] HttpRequestData req,
         FunctionContext executionContext)
     {
         _logger.LogInformation("CreateInterfaceConfiguration function triggered");
+
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
 
         try
         {
@@ -39,6 +48,7 @@ public class CreateInterfaceConfiguration
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Request body is required" }));
                 return badRequestResponse;
             }
@@ -79,6 +89,7 @@ public class CreateInterfaceConfiguration
                 _logger.LogInformation("Interface configuration '{InterfaceName}' already exists, returning existing configuration", request.InterfaceName);
                 var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(response);
                 await response.WriteStringAsync(JsonSerializer.Serialize(existing));
                 return response;
             }
@@ -105,6 +116,7 @@ public class CreateInterfaceConfiguration
 
             var successResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
             successResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(successResponse);
             await successResponse.WriteStringAsync(JsonSerializer.Serialize(config));
             return successResponse;
         }
@@ -113,6 +125,7 @@ public class CreateInterfaceConfiguration
             _logger.LogError(ex, "Error creating interface configuration");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
