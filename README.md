@@ -1,6 +1,6 @@
 <style>
 strong, b {
-  font-weight: 500 !important;
+  font-weight: 300 !important;
 }
 </style>
 
