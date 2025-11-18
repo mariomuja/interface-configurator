@@ -159,8 +159,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const defaultExists = this.interfaceConfigurations.some(c => 
           c.interfaceName === this.DEFAULT_INTERFACE_NAME && !c._isPlaceholder
         );
-        if (!defaultExists) {
-          // Automatically create the default interface
+        const defaultPlaceholderExists = this.interfaceConfigurations.some(c => 
+          c.interfaceName === this.DEFAULT_INTERFACE_NAME && c._isPlaceholder
+        );
+        
+        if (!defaultExists && !defaultPlaceholderExists) {
+          // Add placeholder first so it appears in dropdown immediately
+          this.interfaceConfigurations.unshift({
+            interfaceName: this.DEFAULT_INTERFACE_NAME,
+            sourceAdapterName: 'CSV',
+            destinationAdapterName: 'SqlServer',
+            sourceInstanceName: 'Source',
+            destinationInstanceName: 'Destination',
+            sourceIsEnabled: true,
+            destinationIsEnabled: true,
+            _isPlaceholder: true
+          });
+          
+          // Then attempt to create the interface in the backend
           this.transportService.createInterfaceConfiguration({
             interfaceName: this.DEFAULT_INTERFACE_NAME,
             sourceAdapterName: 'CSV',
@@ -170,25 +186,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             description: 'Default CSV to SQL Server interface'
           }).subscribe({
             next: (createdConfig) => {
-              // Reload configurations to get the real one
+              // Reload configurations to get the real one (will replace placeholder)
               this.loadInterfaceConfigurations();
             },
             error: (error) => {
               console.error('Error creating default interface:', error);
-              // If creation fails, add as placeholder so it still appears in dropdown
-              this.interfaceConfigurations.unshift({
-                interfaceName: this.DEFAULT_INTERFACE_NAME,
-                sourceAdapterName: 'CSV',
-                destinationAdapterName: 'SqlServer',
-                sourceInstanceName: 'Source',
-                destinationInstanceName: 'Destination',
-                sourceIsEnabled: true,
-                destinationIsEnabled: true,
-                _isPlaceholder: true
-              });
+              // Placeholder is already added, so it will appear in dropdown
+              // Continue with normal flow below
             }
           });
-          return; // Exit early, will reload after creation
         }
         
         // If no current interface is set, select the first available or default
