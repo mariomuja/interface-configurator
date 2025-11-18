@@ -144,6 +144,15 @@ public class ProcessCsvBlobTriggerFunction
                 return;
             }
             
+            // Check if target blob already exists (idempotency check)
+            if (await targetBlobClient.ExistsAsync())
+            {
+                _logger.LogInformation("Target blob {BlobName} already exists at {TargetPath}, skipping move (idempotent)", blobName, targetBlobPath);
+                // Delete source blob since target already exists
+                await sourceBlobClient.DeleteIfExistsAsync();
+                return;
+            }
+            
             // Copy blob to target folder
             await targetBlobClient.StartCopyFromUriAsync(sourceBlobClient.Uri);
             

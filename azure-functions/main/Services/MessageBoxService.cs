@@ -68,6 +68,24 @@ public class MessageBoxService : IMessageBoxService
             // Calculate message hash for idempotency checking
             var messageHash = CalculateMessageHash(messageDataJson);
 
+            // Check for duplicate message (idempotency check)
+            // Look for existing message with same hash, interface, and adapter within last 24 hours
+            var existingMessage = await _context.Messages
+                .Where(m => m.MessageHash == messageHash 
+                    && m.InterfaceName == interfaceName
+                    && m.AdapterName == adapterName
+                    && m.AdapterInstanceGuid == adapterInstanceGuid
+                    && m.datetime_created > DateTime.UtcNow.AddHours(-24))
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existingMessage != null)
+            {
+                _logger?.LogInformation(
+                    "Duplicate message detected (same hash). Returning existing MessageId={MessageId}, Interface={InterfaceName}",
+                    existingMessage.MessageId, interfaceName);
+                return existingMessage.MessageId; // Idempotent: return existing message ID
+            }
+
             var message = new MessageBoxMessage
             {
                 MessageId = Guid.NewGuid(),
@@ -251,21 +269,48 @@ public class MessageBoxService : IMessageBoxService
         {
             _logger?.LogInformation("Marking message as processed: MessageId={MessageId}", messageId);
 
-            var message = await _context.Messages
-                .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+            // Use atomic update to prevent race conditions and ensure idempotency
+            // Only update if message is not already processed
+            var rowsAffected = await _context.Database.ExecuteSqlRawAsync(
+                @"UPDATE Messages 
+                  SET Status = 'Processed', 
+                      datetime_processed = GETUTCDATE(),
+                      ProcessingDetails = {0},
+                      InProgressUntil = NULL
+                  WHERE MessageId = {1}
+                    AND Status != 'Processed'
+                    AND Status != 'DeadLetter'",
+                processingDetails ?? (object)DBNull.Value, messageId, cancellationToken);
 
-            if (message == null)
+            if (rowsAffected == 0)
             {
-                throw new InvalidOperationException($"Message not found: {messageId}");
+                // Check if message exists and current status
+                var message = await _context.Messages
+                    .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+
+                if (message == null)
+                {
+                    throw new InvalidOperationException($"Message not found: {messageId}");
+                }
+
+                if (message.Status == "Processed")
+                {
+                    _logger?.LogInformation(
+                        "Message {MessageId} is already Processed (idempotent operation)", messageId);
+                    return; // Idempotent: already processed
+                }
+
+                if (message.Status == "DeadLetter")
+                {
+                    _logger?.LogWarning(
+                        "Message {MessageId} is in DeadLetter status, cannot mark as processed", messageId);
+                    return; // Cannot process dead letter messages
+                }
             }
-
-            message.Status = "Processed";
-            message.datetime_processed = DateTime.UtcNow;
-            message.ProcessingDetails = processingDetails;
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger?.LogInformation("Successfully marked message as processed: MessageId={MessageId}", messageId);
+            else
+            {
+                _logger?.LogInformation("Successfully marked message as processed: MessageId={MessageId}", messageId);
+            }
 
             // Check if all subscriptions are processed, then remove message
             if (_subscriptionService != null)
@@ -341,35 +386,58 @@ public class MessageBoxService : IMessageBoxService
     {
         try
         {
-            var message = await _context.Messages
-                .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+            // Use optimistic concurrency with database-level check to prevent race conditions
+            // This ensures only one instance can acquire the lock
+            var now = DateTime.UtcNow;
+            var lockUntil = now.AddMinutes(lockTimeoutMinutes);
 
-            if (message == null)
-            {
-                throw new InvalidOperationException($"Message not found: {messageId}");
-            }
+            // Try to acquire lock atomically using raw SQL with WHERE clause
+            // This prevents race conditions by checking and updating in a single operation
+            var rowsAffected = await _context.Database.ExecuteSqlRawAsync(
+                @"UPDATE Messages 
+                  SET Status = 'InProgress', 
+                      InProgressUntil = {0}
+                  WHERE MessageId = {1}
+                    AND (Status != 'InProgress' 
+                         OR InProgressUntil IS NULL 
+                         OR InProgressUntil <= {2})
+                    AND Status != 'Processed'
+                    AND Status != 'DeadLetter'",
+                lockUntil, messageId, now, cancellationToken);
 
-            // Check if message is already locked and lock hasn't expired
-            if (message.Status == "InProgress" && message.InProgressUntil.HasValue)
+            if (rowsAffected == 0)
             {
-                if (message.InProgressUntil.Value > DateTime.UtcNow)
+                // Check if message exists and why lock wasn't acquired
+                var message = await _context.Messages
+                    .FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+
+                if (message == null)
+                {
+                    throw new InvalidOperationException($"Message not found: {messageId}");
+                }
+
+                if (message.Status == "InProgress" && message.InProgressUntil.HasValue && message.InProgressUntil.Value > now)
                 {
                     _logger?.LogWarning(
                         "Message {MessageId} is already locked until {LockUntil}", 
                         messageId, message.InProgressUntil.Value);
                     return false; // Lock already held
                 }
-                // Lock expired, proceed to acquire new lock
-            }
 
-            // Acquire lock
-            message.Status = "InProgress";
-            message.InProgressUntil = DateTime.UtcNow.AddMinutes(lockTimeoutMinutes);
-            await _context.SaveChangesAsync(cancellationToken);
+                if (message.Status == "Processed" || message.Status == "DeadLetter")
+                {
+                    _logger?.LogWarning(
+                        "Message {MessageId} is already {Status}, cannot acquire lock", 
+                        messageId, message.Status);
+                    return false; // Message already processed
+                }
+
+                return false; // Lock acquisition failed for unknown reason
+            }
 
             _logger?.LogInformation(
                 "Message {MessageId} locked for processing until {LockUntil}", 
-                messageId, message.InProgressUntil.Value);
+                messageId, lockUntil);
             return true;
         }
         catch (Exception ex)

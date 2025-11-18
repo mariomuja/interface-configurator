@@ -41,6 +41,10 @@ public class MessageBoxDbContext : DbContext
             entity.HasIndex(e => e.datetime_created).HasDatabaseName("IX_Messages_datetime_created");
             entity.HasIndex(e => new { e.Status, e.InterfaceName }).HasDatabaseName("IX_Messages_Status_InterfaceName");
             entity.HasIndex(e => e.AdapterInstanceGuid).HasDatabaseName("IX_Messages_AdapterInstanceGuid");
+            // Unique index on MessageHash for idempotency (prevent duplicate messages)
+            // Note: This is a non-unique index to allow multiple messages with same hash if needed
+            // The idempotency check in code handles duplicate detection
+            entity.HasIndex(e => e.MessageHash).HasDatabaseName("IX_Messages_MessageHash");
         });
 
         // Configure MessageSubscription

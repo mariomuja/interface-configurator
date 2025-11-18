@@ -259,6 +259,26 @@ public class DataServiceAdapter : IDataService
                     await SafeLogAsync("info", $"Batch {batchNumber}/{totalBatches} inserted",
                         $"Rows: {batch.Count}, Total inserted: {totalInserted}/{rows.Count}", cancellationToken);
                 }
+                catch (Microsoft.Data.SqlClient.SqlException sqlEx)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    
+                    // Handle duplicate key violations gracefully (idempotency)
+                    // SQL Server error 2627 = Violation of PRIMARY KEY constraint
+                    // SQL Server error 2601 = Cannot insert duplicate key row
+                    if (sqlEx.Number == 2627 || sqlEx.Number == 2601)
+                    {
+                        await SafeLogAsync("warning", $"Batch {batchNumber}/{totalBatches} skipped (duplicate key)",
+                            $"Duplicate key violation detected. This may indicate idempotent retry. Rows in batch: {batch.Count}", cancellationToken);
+                        // Don't throw - treat as idempotent operation (already inserted)
+                        totalInserted += batch.Count; // Count as inserted for logging
+                        continue; // Continue with next batch
+                    }
+                    
+                    await SafeLogAsync("error", $"Batch {batchNumber}/{totalBatches} failed",
+                        $"SQL Error {sqlEx.Number}: {sqlEx.Message}, Rows in batch: {batch.Count}", cancellationToken);
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync(cancellationToken);
