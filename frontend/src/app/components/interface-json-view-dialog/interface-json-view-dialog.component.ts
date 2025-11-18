@@ -34,6 +34,10 @@ export class InterfaceJsonViewDialogComponent {
   }
 
   copyToClipboard(): void {
+    if (!this.data?.jsonString) {
+      console.error('No data available to copy');
+      return;
+    }
     navigator.clipboard.writeText(this.data.jsonString).then(() => {
       // Could show a snackbar here if needed
     }).catch(err => {
