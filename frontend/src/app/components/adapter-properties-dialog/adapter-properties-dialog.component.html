@@ -243,6 +243,13 @@
       <h3>Polling Configuration (Source Only)</h3>
 
       <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Table Name</mat-label>
+        <input matInput [(ngModel)]="tableName" placeholder="TransportData" />
+        <mat-icon matSuffix matTooltip="Table name for SQL Server adapter. Used in default PollingStatement if PollingStatement is not provided (default: 'SELECT * FROM Table')." matTooltipPosition="left">help_outline</mat-icon>
+        <mat-hint>Table name (e.g., "TransportData")</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
         <mat-label>Polling Statement</mat-label>
         <textarea matInput [(ngModel)]="sqlPollingStatement" rows="3" placeholder="SELECT * FROM Orders WHERE Processed = 0"></textarea>
         <mat-icon matSuffix matTooltip="SQL SELECT or EXEC statement to poll for new data. This statement is executed periodically according to the Polling Interval. Example: 'SELECT * FROM Orders WHERE Processed = 0' or 'EXEC sp_GetNewOrders'. The results are debatched and written to MessageBox." matTooltipPosition="left">help_outline</mat-icon>
