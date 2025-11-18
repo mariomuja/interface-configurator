@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Live Preview](https://img.shields.io/badge/🌐_Live_Preview-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://interface-configuration.vercel.app)
+[![Live Preview](https://img.shields.io/badge/🌐_Live_Preview-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://integration-configurator.vercel.app)
 [![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com)
 [![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://www.terraform.io)
 [![Angular](https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.io)
