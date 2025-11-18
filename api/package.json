@@ -4,10 +4,8 @@
   "description": "API for Integration Configuration API",
   "dependencies": {
     "@azure/storage-blob": "^12.22.0",
+    "@vercel/node": "^3.2.29",
     "mssql": "^10.0.1",
     "uuid": "^9.0.1"
   }
 }
-
-
-
