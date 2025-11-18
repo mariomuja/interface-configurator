@@ -43,6 +43,7 @@ export interface AdapterPropertiesData {
   sqlPollingInterval?: number; // Only for Source adapters
   sqlUseTransaction?: boolean; // SQL Server adapter property
   sqlBatchSize?: number; // SQL Server adapter property
+  tableName?: string; // Table name for SqlServer destination adapters
   adapterInstanceGuid: string;
 }
 
@@ -95,6 +96,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   sqlPollingInterval: number = 60;
   sqlUseTransaction: boolean = false;
   sqlBatchSize: number = 1000;
+  tableName: string = 'TransportData'; // Table name for SqlServer destination adapters
   connectionString: string = '';
   adapterInstanceGuid: string = '';
 
@@ -132,6 +134,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.sqlResourceGroup = this.data.sqlResourceGroup || '';
     this.sqlPollingStatement = this.data.sqlPollingStatement || '';
     this.sqlPollingInterval = this.data.sqlPollingInterval ?? 60;
+    this.tableName = this.data.tableName || 'TransportData';
     this.adapterInstanceGuid = this.data.adapterInstanceGuid || '';
     this.updateConnectionString();
   }
@@ -232,7 +235,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       sqlIntegratedSecurity: this.data.adapterName === 'SqlServer' ? this.sqlIntegratedSecurity : undefined,
       sqlResourceGroup: this.data.adapterName === 'SqlServer' ? (this.sqlResourceGroup.trim() || '') : undefined,
       sqlPollingStatement: this.showSqlPollingProperties ? (this.sqlPollingStatement.trim() || '') : undefined,
-      sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined
+      sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined,
+      tableName: this.data.adapterName === 'SqlServer' && this.data.adapterType === 'Destination' ? (this.tableName.trim() || 'TransportData') : undefined
     });
   }
 

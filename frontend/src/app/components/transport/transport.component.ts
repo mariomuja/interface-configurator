@@ -2137,14 +2137,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 fullInstance.destinationFileMask = instanceConfig.destinationFileMask || instance.fileMask || instanceConfig.fileMask || '*.txt';
               }
               
-              // If it's a SqlServer adapter, include SQL-specific properties
+              // If it's a SqlServer adapter, include SQL-specific properties from instance config first, then interface config
               if (instance.adapterName === 'SqlServer') {
-                fullInstance.destination = instanceConfig.destination || instanceConfig.tableName || '';
-                fullInstance.tableName = instanceConfig.tableName || instanceConfig.destination || '';
+                fullInstance.destination = instanceConfig.destination || instanceConfig.tableName || 'TransportData';
+                fullInstance.tableName = instanceConfig.tableName || instanceConfig.destination || 'TransportData';
+                // Load from instance config first, fall back to interface config
                 fullInstance.sqlServerName = instanceConfig.sqlServerName || this.sqlServerName || '';
                 fullInstance.sqlDatabaseName = instanceConfig.sqlDatabaseName || this.sqlDatabaseName || '';
                 fullInstance.sqlUserName = instanceConfig.sqlUserName || this.sqlUserName || '';
-                fullInstance.sqlPassword = instanceConfig.sqlPassword ? '***' : ''; // Don't expose password
+                fullInstance.sqlPassword = instanceConfig.sqlPassword ? '***' : (this.sqlPassword ? '***' : ''); // Don't expose password
                 fullInstance.sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined 
                   ? instanceConfig.sqlIntegratedSecurity 
                   : (this.sqlIntegratedSecurity ?? false);
@@ -2251,7 +2252,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             isEnabled: true,
             configuration: {
               destination: 'TransportData',
-              tableName: 'TransportData'
+              tableName: 'TransportData',
+              // Include SQL connection properties from interface configuration if available
+              sqlServerName: defaultConfig?.sqlServerName || '',
+              sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
+              sqlUserName: defaultConfig?.sqlUserName || '',
+              sqlPassword: defaultConfig?.sqlPassword || '',
+              sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
+              sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
             }
           };
           
@@ -2289,6 +2297,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         console.error('Error loading destination adapter instances:', error);
         // If API fails, create default instance locally
         const adapterInstanceGuid = this.generateGuid();
+        const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
         const defaultSqlServerInstance = {
           adapterInstanceGuid: adapterInstanceGuid,
           instanceName: 'Destination 1',
@@ -2296,7 +2305,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           isEnabled: true,
           configuration: {
             destination: 'TransportData',
-            tableName: 'TransportData'
+            tableName: 'TransportData',
+            // SQL connection properties will be loaded from interface configuration when available
+            sqlServerName: defaultConfig?.sqlServerName || '',
+            sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
+            sqlUserName: defaultConfig?.sqlUserName || '',
+            sqlPassword: defaultConfig?.sqlPassword || '',
+            sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
+            sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
           }
         };
         this.destinationAdapterInstances = [defaultSqlServerInstance];
@@ -2306,12 +2322,21 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addDestinationAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    
     // Set default configuration based on adapter type
     let defaultConfiguration: any = {};
     if (adapterName === 'SqlServer') {
       defaultConfiguration = {
         destination: 'TransportData',
-        tableName: 'TransportData'
+        tableName: 'TransportData',
+        // Include SQL connection properties from interface configuration if available
+        sqlServerName: defaultConfig?.sqlServerName || '',
+        sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
+        sqlUserName: defaultConfig?.sqlUserName || '',
+        sqlPassword: defaultConfig?.sqlPassword || '',
+        sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
+        sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
       };
     }
     
@@ -2543,18 +2568,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   openDestinationInstanceSettings(instance: DestinationAdapterInstance): void {
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
     
-    // Parse configuration for SqlServer adapter to get table name
-    let sqlTableName = 'TransportData'; // Default
-    if (instance.adapterName === 'SqlServer' && instance.configuration) {
+    // Parse configuration for SqlServer adapter to get properties
+    let instanceConfig: any = {};
+    if (instance.configuration) {
       try {
-        const config = typeof instance.configuration === 'string' 
+        instanceConfig = typeof instance.configuration === 'string' 
           ? JSON.parse(instance.configuration) 
           : instance.configuration;
-        sqlTableName = config.destination || config.tableName || 'TransportData';
       } catch (e) {
         console.warn('Failed to parse destination adapter configuration:', e);
+        instanceConfig = {};
       }
     }
+    
+    // For SqlServer adapters, load properties from instance config first, fall back to interface config
+    const sqlTableName = instanceConfig.tableName || instanceConfig.destination || 'TransportData';
+    const sqlServerName = instanceConfig.sqlServerName || defaultConfig?.sqlServerName || '';
+    const sqlDatabaseName = instanceConfig.sqlDatabaseName || defaultConfig?.sqlDatabaseName || '';
+    const sqlUserName = instanceConfig.sqlUserName || defaultConfig?.sqlUserName || '';
+    const sqlPassword = instanceConfig.sqlPassword || defaultConfig?.sqlPassword || '';
+    const sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined ? instanceConfig.sqlIntegratedSecurity : (defaultConfig?.sqlIntegratedSecurity ?? false);
+    const sqlResourceGroup = instanceConfig.sqlResourceGroup || defaultConfig?.sqlResourceGroup || '';
     
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
@@ -2567,12 +2601,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       fieldSeparator: defaultConfig?.sourceFieldSeparator || '║',
       destinationReceiveFolder: instance.adapterName === 'CSV' ? (defaultConfig?.destinationReceiveFolder || '') : undefined,
       destinationFileMask: instance.adapterName === 'CSV' ? (defaultConfig?.destinationFileMask || '*.txt') : undefined,
-      sqlServerName: defaultConfig?.sqlServerName || '',
-      sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
-      sqlUserName: defaultConfig?.sqlUserName || '',
-      sqlPassword: defaultConfig?.sqlPassword || '',
-      sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
-      sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
+      sqlServerName: sqlServerName,
+      sqlDatabaseName: sqlDatabaseName,
+      sqlUserName: sqlUserName,
+      sqlPassword: sqlPassword,
+      sqlIntegratedSecurity: sqlIntegratedSecurity,
+      sqlResourceGroup: sqlResourceGroup,
+      tableName: instance.adapterName === 'SqlServer' ? sqlTableName : undefined
     };
 
     const dialogRef = this.dialog.open(AdapterPropertiesDialogComponent, {
@@ -2610,12 +2645,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       configuration = { ...configuration, destination: properties.destinationReceiveFolder };
     }
     
-    // Ensure SqlServer adapters have TransportData table configuration
+    // Update SqlServer adapter configuration with SQL properties and table name
     if (instance.adapterName === 'SqlServer') {
       configuration = {
         ...configuration,
-        destination: 'TransportData',
-        tableName: 'TransportData'
+        // Table name from dialog or default to TransportData
+        destination: properties.tableName || configuration.destination || 'TransportData',
+        tableName: properties.tableName || configuration.tableName || 'TransportData',
+        // SQL connection properties from dialog (store in instance config)
+        sqlServerName: properties.sqlServerName !== undefined ? properties.sqlServerName : (configuration.sqlServerName || ''),
+        sqlDatabaseName: properties.sqlDatabaseName !== undefined ? properties.sqlDatabaseName : (configuration.sqlDatabaseName || ''),
+        sqlUserName: properties.sqlUserName !== undefined ? properties.sqlUserName : (configuration.sqlUserName || ''),
+        sqlPassword: properties.sqlPassword !== undefined ? properties.sqlPassword : (configuration.sqlPassword || ''),
+        sqlIntegratedSecurity: properties.sqlIntegratedSecurity !== undefined ? properties.sqlIntegratedSecurity : (configuration.sqlIntegratedSecurity !== undefined ? configuration.sqlIntegratedSecurity : false),
+        sqlResourceGroup: properties.sqlResourceGroup !== undefined ? properties.sqlResourceGroup : (configuration.sqlResourceGroup || '')
       };
     }
     

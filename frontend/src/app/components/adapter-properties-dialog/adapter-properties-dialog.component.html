@@ -115,9 +115,17 @@
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Resource Group</mat-label>
-        <input matInput [(ngModel)]="sqlResourceGroup" placeholder="rg-my-resource-group" />
+        <input matInput [(ngModel)]="sqlResourceGroup" (ngModelChange)="onSqlPropertyChange()" placeholder="rg-my-resource-group" />
         <mat-icon matSuffix matTooltip="Azure Resource Group name (for Azure SQL managed database access). Used for Azure-specific security and access management." matTooltipPosition="left">help_outline</mat-icon>
         <mat-hint>Azure Resource Group (optional, for Azure SQL)</mat-hint>
+      </mat-form-field>
+
+      <!-- Table Name (only for Destination adapters) -->
+      <mat-form-field appearance="outline" class="full-width" *ngIf="data.adapterType === 'Destination'">
+        <mat-label>Table Name</mat-label>
+        <input matInput [(ngModel)]="tableName" placeholder="TransportData" />
+        <mat-icon matSuffix matTooltip="The name of the destination table in the SQL Server database. The table will be automatically created with dynamic columns based on the CSV data structure." matTooltipPosition="left">help_outline</mat-icon>
+        <mat-hint>Destination table name (e.g., "TransportData")</mat-hint>
       </mat-form-field>
 
       <!-- Connection String Display -->
