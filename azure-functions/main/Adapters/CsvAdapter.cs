@@ -243,7 +243,7 @@ public class CsvAdapter : IAdapter
             await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
             // Upload CSV data to csv-incoming folder
-            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var blobClient = containerClient.GetBlobClient(blobPath);
             var content = Encoding.UTF8.GetBytes(_csvData);
             
             await blobClient.UploadAsync(
@@ -1004,7 +1004,7 @@ public class CsvAdapter : IAdapter
             await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
             // Upload CSV content to csv-incoming folder
-            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var blobClient = containerClient.GetBlobClient(blobPath);
             var content = Encoding.UTF8.GetBytes(csvContent);
             
             await blobClient.UploadAsync(
@@ -1053,7 +1053,7 @@ public class CsvAdapter : IAdapter
             await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
             // Upload CSV content to csv-incoming folder
-            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var blobClient = containerClient.GetBlobClient(blobPath);
             var content = Encoding.UTF8.GetBytes(csvContent);
             
             await blobClient.UploadAsync(

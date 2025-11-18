@@ -107,8 +107,8 @@ public class SourceAdapterFunction
                         config.InterfaceName, config.CsvData.Length);
 
                     // Create adapter and process CsvData (will upload to csv-incoming)
-                    var adapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
-                    if (adapter is CsvAdapter csvAdapter)
+                    var csvSourceAdapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
+                    if (csvSourceAdapter is CsvAdapter csvAdapter)
                     {
                         csvAdapter.CsvData = config.CsvData; // This will trigger upload to csv-incoming
                         _logger.LogInformation("CsvData set on adapter, file will be uploaded to csv-incoming and processed via blob trigger");

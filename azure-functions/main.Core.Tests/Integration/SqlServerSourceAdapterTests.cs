@@ -10,7 +10,6 @@ using InterfaceConfigurator.Main.Core.Services;
 using Xunit;
 using System.Linq;
 using System.Data.Common;
-using Microsoft.Data.Sqlite;
 
 namespace InterfaceConfigurator.Main.Core.Tests.Integration;
 
@@ -36,11 +35,9 @@ public class SqlServerSourceAdapterTests : IDisposable
             .UseInMemoryDatabase(databaseName: $"MessageBox_{Guid.NewGuid()}")
             .Options;
 
-        // Use SQLite in-memory database for ApplicationDbContext to test SQL queries
-        var connection = new SqliteConnection("DataSource=:memory:");
-        connection.Open();
+        // Use in-memory database for ApplicationDbContext to test SQL queries
         var appOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlite(connection)
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
         _messageBoxContext = new MessageBoxDbContext(messageBoxOptions);
@@ -52,7 +49,7 @@ public class SqlServerSourceAdapterTests : IDisposable
         _messageBoxService = new MessageBoxService(_messageBoxContext, mockEventQueue.Object, mockSubscriptionService.Object, messageBoxLogger.Object);
         
         _dynamicTableService = new DynamicTableService(_applicationContext, new Mock<ILogger<DynamicTableService>>().Object);
-        _dataService = new DataService(_applicationContext, new Mock<ILogger<DataService>>().Object);
+        _dataService = new DataServiceAdapter(_applicationContext, new Mock<ILoggingService>().Object, new Mock<ILogger<DataServiceAdapter>>().Object);
         _mockSqlLogger = new Mock<ILogger<SqlServerAdapter>>();
 
         _messageBoxContext.Database.EnsureCreated();

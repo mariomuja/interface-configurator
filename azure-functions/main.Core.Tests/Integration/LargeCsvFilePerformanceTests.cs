@@ -48,7 +48,7 @@ public class LargeCsvFilePerformanceTests : IDisposable
         var mockSubscriptionService = new Mock<IMessageSubscriptionService>();
         _messageBoxService = new MessageBoxService(_messageBoxContext, mockEventQueue.Object, mockSubscriptionService.Object, logger.Object);
         
-        _dynamicTableService = new DynamicTableService(_applicationContext, new Mock<ILoggingService>().Object, new Mock<ILogger<DynamicTableService>>().Object);
+        _dynamicTableService = new DynamicTableService(_applicationContext, new Mock<ILogger<DynamicTableService>>().Object);
         _dataService = new DataServiceAdapter(_applicationContext, new Mock<ILoggingService>().Object, new Mock<ILogger<DataServiceAdapter>>().Object);
         
         _mockAdapterConfig = new Mock<IAdapterConfigurationService>();
@@ -69,8 +69,12 @@ public class LargeCsvFilePerformanceTests : IDisposable
         // Arrange
         var csvContent = GenerateLargeCsvContent(10000); // 10,000 rows
         var adapterInstanceGuid = Guid.NewGuid();
+        var mockBlobServiceClient = new Mock<Azure.Storage.Blobs.BlobServiceClient>();
         
         var csvAdapter = new CsvAdapter(
+            _csvProcessingService,
+            _mockAdapterConfig.Object,
+            mockBlobServiceClient.Object,
             _messageBoxService,
             null,
             InterfaceName,
@@ -81,27 +85,28 @@ public class LargeCsvFilePerformanceTests : IDisposable
             "║",
             null,
             null,
-            _csvProcessingService,
-            _mockAdapterConfig.Object,
-            null,
-            _mockCsvLogger.Object,
             "RAW",
-            csvContent);
+            null, null, null, null, null, null, null, null, null, null,
+            _mockCsvLogger.Object);
+        csvAdapter.CsvData = csvContent; // Set CSV data via property
 
         var sqlAdapter = new SqlServerAdapter(
             _applicationContext,
             _dynamicTableService,
             _dataService,
-            _mockSqlLogger.Object,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterInstanceGuid,
+            null,
+            null,
+            null,
+            "TransportData",
             null,
             null,
             null,
             null,
-            null,
-            null,
-            null,
-            null,
-            "TransportData");
+            _mockSqlLogger.Object);
 
         // Act
         var stopwatch = Stopwatch.StartNew();
@@ -129,7 +134,12 @@ public class LargeCsvFilePerformanceTests : IDisposable
         var csvContent = GenerateLargeCsvContent(50000); // 50,000 rows
         var adapterInstanceGuid = Guid.NewGuid();
         
+        var mockBlobServiceClient = new Mock<Azure.Storage.Blobs.BlobServiceClient>();
+        
         var csvAdapter = new CsvAdapter(
+            _csvProcessingService,
+            _mockAdapterConfig.Object,
+            mockBlobServiceClient.Object,
             _messageBoxService,
             null,
             InterfaceName,
@@ -140,27 +150,28 @@ public class LargeCsvFilePerformanceTests : IDisposable
             "║",
             null,
             null,
-            _csvProcessingService,
-            _mockAdapterConfig.Object,
-            null,
-            _mockCsvLogger.Object,
             "RAW",
-            csvContent);
+            null, null, null, null, null, null, null, null, null, null,
+            _mockCsvLogger.Object);
+        csvAdapter.CsvData = csvContent; // Set CSV data via property
 
         var sqlAdapter = new SqlServerAdapter(
             _applicationContext,
             _dynamicTableService,
             _dataService,
-            _mockSqlLogger.Object,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterInstanceGuid,
+            null,
+            null,
+            null,
+            "TransportData",
             null,
             null,
             null,
             null,
-            null,
-            null,
-            null,
-            null,
-            "TransportData");
+            _mockSqlLogger.Object);
 
         // Act
         var (headers, records) = await csvAdapter.ReadAsync("", CancellationToken.None);

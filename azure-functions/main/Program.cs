@@ -269,7 +269,7 @@ var host = new HostBuilder()
                 {
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, logger);
+                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, logger);
             });
             
         }
