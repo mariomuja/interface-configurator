@@ -2419,6 +2419,51 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  onDestinationInstanceEnabledChange(instanceGuid: string, enabled: boolean): void {
+    const instance = this.destinationAdapterInstances.find(i => i.adapterInstanceGuid === instanceGuid);
+    if (!instance) {
+      console.error(`Destination adapter instance ${instanceGuid} not found`);
+      return;
+    }
+    
+    // Update enabled property immediately in local array for UI responsiveness
+    instance.isEnabled = enabled;
+    
+    // Update instance properties via API
+    let configuration = instance.configuration || {};
+    if (typeof configuration === 'string') {
+      try {
+        configuration = JSON.parse(configuration);
+      } catch (e) {
+        configuration = {};
+      }
+    }
+    
+    this.transportService.updateDestinationAdapterInstance(
+      this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
+      instanceGuid,
+      instance.instanceName,
+      enabled,
+      JSON.stringify(configuration)
+    ).subscribe({
+      next: () => {
+        this.snackBar.open(`Destination adapter "${instance.instanceName}" ${enabled ? 'enabled' : 'disabled'}`, 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating destination adapter instance enabled state:', error);
+        // Revert local change on error
+        instance.isEnabled = !enabled;
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Destination Adapters');
+        this.snackBar.open(detailedMessage, 'Schließen', { 
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+      }
+    });
+  }
+
   private generateGuid(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0;
@@ -2674,7 +2719,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Update instance properties via API
     this.transportService.updateDestinationAdapterInstance(
-      this.DEFAULT_INTERFACE_NAME,
+      this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
       instanceGuid,
       properties.instanceName || instance.instanceName,
       properties.isEnabled !== undefined ? properties.isEnabled : instance.isEnabled,

@@ -118,10 +118,11 @@
             [isLoading]="isLoading"
             [expanded]="getDestinationCardExpanded(instance.adapterInstanceGuid)"
             [showReceiveFolder]="false"
-            [isDisabled]="i > 0"
+            [isDisabled]="false"
             [primaryActionDisabled]="isDropTableDisabled()"
             (restart)="restartDestinationAdapter()"
             (expandedChange)="setDestinationCardExpanded(instance.adapterInstanceGuid, $event)"
+            (enabledChange)="onDestinationInstanceEnabledChange(instance.adapterInstanceGuid, $event)"
             (primaryAction)="dropTable()"
             (settingsClick)="openDestinationInstanceSettings(instance)">
             <div class="destination-card-actions">

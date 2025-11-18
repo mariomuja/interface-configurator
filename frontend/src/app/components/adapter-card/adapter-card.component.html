@@ -25,11 +25,20 @@
         
         <div class="instance-name-display">
           <span class="instance-name-text">{{ instanceName || (adapterType === 'Source' ? 'Source' : 'Destination') }}</span>
-          <mat-icon *ngIf="isDisabled" class="warning-icon" 
-                    matTooltip="Multiple destinations are not yet supported. Only the first destination will be active.">
+          <mat-icon *ngIf="isDisabled && adapterType === 'Destination' && adapterName === 'SqlServer'" class="warning-icon" 
+                    matTooltip="Die Zieltabelle existiert nicht. Beim nächsten CSV-Upload wird die Tabelle mit den CSV-Spalten automatisch neu erstellt.">
             info
           </mat-icon>
         </div>
+        
+        <!-- Enabled toggle for destination adapters -->
+        <mat-slide-toggle *ngIf="adapterType === 'Destination'" 
+                          [(ngModel)]="isEnabled" 
+                          (ngModelChange)="onEnabledChange()"
+                          color="primary"
+                          [disabled]="isDisabled"
+                          matTooltip="Enable or disable this destination adapter instance">
+        </mat-slide-toggle>
         
         <div class="guid-display" *ngIf="adapterInstanceGuid" matTooltip="Adapter Instance GUID: {{ adapterInstanceGuid }}">
           <mat-icon>fingerprint</mat-icon>
