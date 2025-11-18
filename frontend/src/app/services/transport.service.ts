@@ -16,24 +16,10 @@ export class TransportService {
   constructor(private http: HttpClient) {}
 
   private getApiUrl(): string {
-    // Check if we're in browser environment
-    if (typeof window !== 'undefined') {
-      // Check for environment variable injected at build time
-      // Vercel will replace this during build if NEXT_PUBLIC_ or VERCEL_ env vars are set
-      // For Angular, we need to use a different approach
-      const functionAppUrl = (window as any).__AZURE_FUNCTION_APP_URL__;
-      if (functionAppUrl) {
-        return functionAppUrl;
-      }
-      
-      // Check if we're on Vercel (production) - use Azure Functions directly
-      // In production, call Azure Functions directly instead of proxying
-      if (window.location.hostname.includes('vercel.app')) {
-        return 'https://func-integration-main.azurewebsites.net/api';
-      }
-    }
-    
-    // Default: use relative path for local development
+    // Always use relative /api path
+    // This will be handled by Vercel serverless functions (api/*.js) in production
+    // or Angular proxy config in development
+    // The Vercel serverless functions handle CORS and proxy to Azure Functions
     return '/api';
   }
 
