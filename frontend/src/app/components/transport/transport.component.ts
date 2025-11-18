@@ -143,6 +143,18 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       next: (configs) => {
         this.interfaceConfigurations = configs || [];
         
+        // Remove any placeholder entries that now have real interfaces
+        this.interfaceConfigurations = this.interfaceConfigurations.filter(config => {
+          // If this is a placeholder but a real interface with the same name exists, remove the placeholder
+          if (config._isPlaceholder) {
+            const realExists = this.interfaceConfigurations.some(c => 
+              c.interfaceName === config.interfaceName && !c._isPlaceholder
+            );
+            return !realExists; // Keep placeholder only if real doesn't exist
+          }
+          return true; // Keep all real interfaces
+        });
+        
         // Ensure default interface appears in the list even if it doesn't exist yet
         const defaultExists = this.interfaceConfigurations.some(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
         if (!defaultExists) {
@@ -1819,10 +1831,23 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Check if this is a placeholder interface
-    const localConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
-    if (localConfig && localConfig._isPlaceholder) {
+    // Check if this is a placeholder interface - find the real one, not placeholder
+    const localConfig = this.interfaceConfigurations.find(c => 
+      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
+    );
+    
+    // If only placeholder exists, show error
+    const placeholderConfig = this.interfaceConfigurations.find(c => 
+      c.interfaceName === this.currentInterfaceName && c._isPlaceholder
+    );
+    
+    if (!localConfig && placeholderConfig) {
       this.snackBar.open('Please create the interface first before viewing JSON', 'OK', { duration: 3000 });
+      return;
+    }
+    
+    if (!localConfig && !placeholderConfig) {
+      this.snackBar.open('Interface not found. Please reload the page.', 'OK', { duration: 3000 });
       return;
     }
 
