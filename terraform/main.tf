@@ -165,6 +165,11 @@ resource "azurerm_application_insights" "functions" {
   tags = {
     Environment = var.environment
   }
+
+  # Ignore workspace_id changes - Azure automatically creates/manages this
+  lifecycle {
+    ignore_changes = [workspace_id]
+  }
 }
 
 # Storage Account for Functions (if needed)
@@ -208,7 +213,8 @@ resource "azurerm_linux_function_app" "main" {
 
   site_config {
     application_stack {
-      node_version = "20"
+      dotnet_version              = "8.0"
+      use_dotnet_isolated_runtime = true
     }
     
     dynamic "cors" {
