@@ -1866,7 +1866,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // If not found locally, try to load from API
-    // Only show "create interface" error if API fails AND we have a placeholder
+    // But first check if we have any interface data (even if incomplete) in interfaceConfigurations
+    const anyMatchingConfig = this.interfaceConfigurations.find(c => 
+      c.interfaceName === this.currentInterfaceName && !c._isPlaceholder
+    );
+    
+    if (anyMatchingConfig) {
+      // We have some data locally, use it even if incomplete
+      this.transportService.getDestinationAdapterInstances(this.currentInterfaceName).subscribe({
+        next: (instances) => {
+          const fullConfig = {
+            ...anyMatchingConfig,
+            destinationAdapterInstances: instances || []
+          };
+          this.openJsonViewDialog(fullConfig);
+        },
+        error: (error) => {
+          console.error('Error loading destination adapter instances:', error);
+          // Show dialog with just the interface config (without instances)
+          this.openJsonViewDialog(anyMatchingConfig);
+        }
+      });
+      return;
+    }
+    
+    // No local data found, try API
     this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: (config) => {
         // Successfully loaded from API - update local cache and show JSON
