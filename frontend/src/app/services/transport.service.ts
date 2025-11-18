@@ -8,9 +8,17 @@ import { CsvRecord, SqlRecord, ProcessLog } from '../models/data.model';
   providedIn: 'root'
 })
 export class TransportService {
-  private apiUrl = '/api';
+  // Use Azure Function App URL if available, otherwise fall back to relative /api
+  // This allows the app to work both locally (with proxy) and on Vercel (with Azure Functions)
+  private apiUrl = this.getApiUrl();
 
   constructor(private http: HttpClient) {}
+
+  private getApiUrl(): string {
+    // Vercel will proxy /api/* requests to Azure Functions via vercel.json
+    // This allows the frontend to use relative paths while Vercel handles the proxying
+    return '/api';
+  }
 
   getSampleCsvData(): Observable<CsvRecord[]> {
     // Note: This endpoint doesn't exist yet - returning empty array for now
