@@ -130,7 +130,7 @@ az functionapp function list `
 ```
 
 ### Verify Vercel:
-- Check deployment: https://interface-configuration.vercel.app
+- Check deployment: https://integration-configurator.vercel.app
 - Check dashboard: https://vercel.com/dashboard
 
 ## Troubleshooting

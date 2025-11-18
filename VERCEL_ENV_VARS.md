@@ -56,7 +56,7 @@ Die folgenden Umgebungsvariablen sind **erforderlich** für Blob Storage:
 ### Über das Vercel Dashboard
 
 1. Gehe zu [vercel.com](https://vercel.com) und logge dich ein
-2. Wähle dein Projekt `infrastructure-as-code`
+2. Wähle dein Projekt `integration-configurator`
 3. Gehe zu **Settings** → **Environment Variables**
 4. Füge jede Variable hinzu:
    - **Key**: z.B. `AZURE_SQL_SERVER`
