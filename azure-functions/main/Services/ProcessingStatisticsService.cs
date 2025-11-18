@@ -10,9 +10,9 @@ namespace ProcessCsvBlobTrigger.Services;
 public class ProcessingStatisticsService
 {
     private readonly MessageBoxDbContext _context;
-    private readonly ILogger<ProcessingStatisticsService>? _logger;
+    private readonly ILogger? _logger;
 
-    public ProcessingStatisticsService(MessageBoxDbContext context, ILogger<ProcessingStatisticsService>? logger = null)
+    public ProcessingStatisticsService(MessageBoxDbContext context, ILogger? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger;

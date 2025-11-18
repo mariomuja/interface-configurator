@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Adapters;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Services;
 
@@ -14,13 +13,16 @@ namespace ProcessCsvBlobTrigger;
 /// </summary>
 public class GetSqlTableSchemaFunction
 {
+    private readonly IInterfaceConfigurationService _configService;
     private readonly IAdapterFactory _adapterFactory;
     private readonly ILogger<GetSqlTableSchemaFunction> _logger;
 
     public GetSqlTableSchemaFunction(
+        IInterfaceConfigurationService configService,
         IAdapterFactory adapterFactory,
         ILogger<GetSqlTableSchemaFunction> logger)
     {
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _adapterFactory = adapterFactory ?? throw new ArgumentNullException(nameof(adapterFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -32,13 +34,10 @@ public class GetSqlTableSchemaFunction
     {
         try
         {
-            // Parse query parameters
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(req.Url.Query);
-            query.TryGetValue("tableName", out var tableNameValues);
-            query.TryGetValue("interfaceName", out var interfaceNameValues);
-            
-            var tableName = tableNameValues.FirstOrDefault() ?? "TransportData";
-            var interfaceName = interfaceNameValues.FirstOrDefault();
+            // Parse query parameters using System.Web.HttpUtility (like other endpoints)
+            var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var tableName = queryParams["tableName"] ?? "TransportData";
+            var interfaceName = queryParams["interfaceName"];
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {
@@ -48,8 +47,18 @@ public class GetSqlTableSchemaFunction
                 return errorResponse;
             }
 
+            // Get interface configuration
+            var config = await _configService.GetConfigurationAsync(interfaceName, context.CancellationToken);
+            if (config == null)
+            {
+                var errorResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Interface '{interfaceName}' not found" }));
+                return errorResponse;
+            }
+
             // Get SQL Server adapter
-            var adapter = await _adapterFactory.CreateAdapterAsync("SqlServer", interfaceName, "Destination", Guid.Empty, context.CancellationToken);
+            var adapter = await _adapterFactory.CreateDestinationAdapterAsync(config, context.CancellationToken);
             
             if (adapter == null)
             {

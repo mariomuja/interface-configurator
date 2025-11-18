@@ -31,13 +31,10 @@ public class ValidateCsvFileFunction
     {
         try
         {
-            // Parse query parameters
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(req.Url.Query);
-            query.TryGetValue("blobPath", out var blobPathValues);
-            query.TryGetValue("delimiter", out var delimiterValues);
-            
-            var blobPath = blobPathValues.FirstOrDefault();
-            var expectedDelimiter = delimiterValues.FirstOrDefault();
+            // Parse query parameters using System.Web.HttpUtility (like other endpoints)
+            var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var blobPath = queryParams["blobPath"];
+            var expectedDelimiter = queryParams["delimiter"];
 
             if (string.IsNullOrWhiteSpace(blobPath))
             {
@@ -63,7 +60,7 @@ public class ValidateCsvFileFunction
             var csvContent = downloadResult.Value.Content.ToString();
 
             // Validate CSV
-            var validationService = new CsvValidationService(_logger);
+            var validationService = new ProcessCsvBlobTrigger.Services.CsvValidationService(_logger);
             var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter);
 
             var response = req.CreateResponse(HttpStatusCode.OK);

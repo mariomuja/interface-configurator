@@ -31,15 +31,11 @@ public class GetProcessingStatisticsFunction
     {
         try
         {
-            // Parse query parameters
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(req.Url.Query);
-            query.TryGetValue("interfaceName", out var interfaceNameValues);
-            query.TryGetValue("startDate", out var startDateValues);
-            query.TryGetValue("endDate", out var endDateValues);
-            
-            var interfaceName = interfaceNameValues.FirstOrDefault();
-            var startDateStr = startDateValues.FirstOrDefault();
-            var endDateStr = endDateValues.FirstOrDefault();
+            // Parse query parameters using System.Web.HttpUtility (like other endpoints)
+            var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var interfaceName = queryParams["interfaceName"];
+            var startDateStr = queryParams["startDate"];
+            var endDateStr = queryParams["endDate"];
 
             DateTime? startDate = null;
             DateTime? endDate = null;
@@ -54,7 +50,7 @@ public class GetProcessingStatisticsFunction
                 endDate = ed;
             }
 
-            var statisticsService = new ProcessingStatisticsService(_context, _logger);
+            var statisticsService = new ProcessCsvBlobTrigger.Services.ProcessingStatisticsService(_context, _logger);
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {

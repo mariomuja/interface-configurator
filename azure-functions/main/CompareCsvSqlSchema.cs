@@ -4,7 +4,6 @@ using Azure.Storage.Blobs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using ProcessCsvBlobTrigger.Adapters;
 using ProcessCsvBlobTrigger.Core.Interfaces;
 using ProcessCsvBlobTrigger.Core.Services;
 
@@ -16,15 +15,18 @@ namespace ProcessCsvBlobTrigger;
 public class CompareCsvSqlSchemaFunction
 {
     private readonly BlobServiceClient _blobServiceClient;
+    private readonly IInterfaceConfigurationService _configService;
     private readonly IAdapterFactory _adapterFactory;
     private readonly ILogger<CompareCsvSqlSchemaFunction> _logger;
 
     public CompareCsvSqlSchemaFunction(
         BlobServiceClient blobServiceClient,
+        IInterfaceConfigurationService configService,
         IAdapterFactory adapterFactory,
         ILogger<CompareCsvSqlSchemaFunction> logger)
     {
         _blobServiceClient = blobServiceClient ?? throw new ArgumentNullException(nameof(blobServiceClient));
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _adapterFactory = adapterFactory ?? throw new ArgumentNullException(nameof(adapterFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -36,15 +38,11 @@ public class CompareCsvSqlSchemaFunction
     {
         try
         {
-            // Parse query parameters
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(req.Url.Query);
-            query.TryGetValue("csvBlobPath", out var csvBlobPathValues);
-            query.TryGetValue("tableName", out var tableNameValues);
-            query.TryGetValue("interfaceName", out var interfaceNameValues);
-            
-            var csvBlobPath = csvBlobPathValues.FirstOrDefault();
-            var sqlTableName = tableNameValues.FirstOrDefault() ?? "TransportData";
-            var interfaceName = interfaceNameValues.FirstOrDefault();
+            // Parse query parameters using System.Web.HttpUtility (like other endpoints)
+            var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var csvBlobPath = queryParams["csvBlobPath"];
+            var sqlTableName = queryParams["tableName"] ?? "TransportData";
+            var interfaceName = queryParams["interfaceName"];
 
             if (string.IsNullOrWhiteSpace(csvBlobPath))
             {
@@ -62,8 +60,18 @@ public class CompareCsvSqlSchemaFunction
                 return errorResponse;
             }
 
+            // Get interface configuration
+            var config = await _configService.GetConfigurationAsync(interfaceName, context.CancellationToken);
+            if (config == null)
+            {
+                var errorResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Interface '{interfaceName}' not found" }));
+                return errorResponse;
+            }
+
             // Get CSV schema
-            var csvAdapter = await _adapterFactory.CreateAdapterAsync("CSV", interfaceName, "Source", Guid.Empty, context.CancellationToken);
+            var csvAdapter = await _adapterFactory.CreateSourceAdapterAsync(config, context.CancellationToken);
             if (csvAdapter == null)
             {
                 var errorResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -75,7 +83,7 @@ public class CompareCsvSqlSchemaFunction
             var csvSchema = await csvAdapter.GetSchemaAsync(csvBlobPath, context.CancellationToken);
 
             // Get SQL schema
-            var sqlAdapter = await _adapterFactory.CreateAdapterAsync("SqlServer", interfaceName, "Destination", Guid.Empty, context.CancellationToken);
+            var sqlAdapter = await _adapterFactory.CreateDestinationAdapterAsync(config, context.CancellationToken);
             if (sqlAdapter == null)
             {
                 var errorResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -127,8 +135,8 @@ public class CompareCsvSqlSchemaFunction
                 missingInCsv = missingInCsv,
                 typeMismatches = typeMismatches,
                 isCompatible = missingInSql.Count == 0 && typeMismatches.Count == 0,
-                csvColumns = csvSchema.Keys.ToList(),
-                sqlColumns = sqlSchema.Keys.ToList()
+                csvColumns = csvSchema.Keys.Select(k => k).ToList(),
+                sqlColumns = sqlSchema.Keys.Select(k => k).ToList()
             }, new JsonSerializerOptions { WriteIndented = true }));
 
             return response;

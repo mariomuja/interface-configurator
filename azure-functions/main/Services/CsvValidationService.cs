@@ -8,9 +8,9 @@ namespace ProcessCsvBlobTrigger.Services;
 /// </summary>
 public class CsvValidationService
 {
-    private readonly ILogger<CsvValidationService>? _logger;
+    private readonly ILogger? _logger;
 
-    public CsvValidationService(ILogger<CsvValidationService>? logger = null)
+    public CsvValidationService(ILogger? logger = null)
     {
         _logger = logger;
     }
@@ -156,11 +156,12 @@ public class CsvValidationService
 
     private string DetectDelimiter(string csvContent, string? expectedDelimiter = null)
     {
+        var firstLineForCheck = csvContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).FirstOrDefault();
+        
         if (!string.IsNullOrEmpty(expectedDelimiter))
         {
             // Verify expected delimiter exists
-            var firstLine = csvContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).FirstOrDefault();
-            if (firstLine != null && firstLine.Contains(expectedDelimiter))
+            if (firstLineForCheck != null && firstLineForCheck.Contains(expectedDelimiter))
             {
                 return expectedDelimiter;
             }
@@ -168,7 +169,7 @@ public class CsvValidationService
 
         // Common delimiters to check
         var delimiters = new[] { ",", ";", "\t", "|" };
-        var firstLine = csvContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).FirstOrDefault();
+        var firstLine = firstLineForCheck;
 
         if (string.IsNullOrEmpty(firstLine))
             return ","; // Default
