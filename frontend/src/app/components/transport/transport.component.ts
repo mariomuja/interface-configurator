@@ -2047,30 +2047,36 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             this.destinationCardExpandedStates.set(instance.adapterInstanceGuid, true);
           }
         });
-        // If no instances exist, create a default SqlServerAdapter instance pointing to TransferData table
+        // If no instances exist, create a default SqlServerAdapter instance pointing to TransportData table
         if (this.destinationAdapterInstances.length === 0) {
           const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
           
           // Create default SqlServerAdapter destination instance pointing to TransportData table in app database
+          const adapterInstanceGuid = this.generateGuid();
           const defaultSqlServerInstance = {
-            adapterInstanceGuid: this.generateGuid(),
-            instanceName: 'SQL Server Destination',
+            adapterInstanceGuid: adapterInstanceGuid,
+            instanceName: 'Destination 1',
             adapterName: 'SqlServer',
             isEnabled: true,
-            configuration: JSON.stringify({
+            configuration: {
               destination: 'TransportData',
               tableName: 'TransportData'
-            })
+            }
           };
           
-          // Add the default instance via API
+          // Add locally first so it appears immediately
+          this.destinationAdapterInstances = [defaultSqlServerInstance];
+          this.destinationCardExpandedStates.set(adapterInstanceGuid, true);
+          
+          // Then try to add via API
           this.transportService.addDestinationAdapterInstance(
             this.DEFAULT_INTERFACE_NAME,
             defaultSqlServerInstance.adapterName,
             defaultSqlServerInstance.instanceName,
-            defaultSqlServerInstance.configuration
+            JSON.stringify(defaultSqlServerInstance.configuration)
           ).subscribe({
             next: (createdInstance) => {
+              // Replace local instance with server instance
               this.destinationAdapterInstances = [createdInstance];
               // Update interface configuration with SQL Server connection properties if available
               if (defaultConfig) {
@@ -2082,26 +2088,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             },
             error: (error) => {
               console.error('Error creating default SqlServerAdapter instance:', error);
-              // Fallback: use legacy properties if API call fails
-              if (defaultConfig && defaultConfig.destinationAdapterName) {
-                this.destinationAdapterInstances = [{
-                  adapterInstanceGuid: defaultConfig.destinationAdapterInstanceGuid || this.generateGuid(),
-                  instanceName: defaultConfig.destinationInstanceName || 'Destination',
-                  adapterName: defaultConfig.destinationAdapterName,
-                  isEnabled: defaultConfig.destinationIsEnabled ?? true,
-                  configuration: defaultConfig.destinationConfiguration || '{}'
-                }];
-              } else {
-                // Use the default SqlServerAdapter instance locally even if API call fails
-                this.destinationAdapterInstances = [defaultSqlServerInstance];
-              }
+              // Keep the local instance even if API call fails
+              // The instance is already added locally above
             }
           });
         }
       },
       error: (error) => {
         console.error('Error loading destination adapter instances:', error);
-        this.destinationAdapterInstances = [];
+        // If API fails, create default instance locally
+        const adapterInstanceGuid = this.generateGuid();
+        const defaultSqlServerInstance = {
+          adapterInstanceGuid: adapterInstanceGuid,
+          instanceName: 'Destination 1',
+          adapterName: 'SqlServer',
+          isEnabled: true,
+          configuration: {
+            destination: 'TransportData',
+            tableName: 'TransportData'
+          }
+        };
+        this.destinationAdapterInstances = [defaultSqlServerInstance];
+        this.destinationCardExpandedStates.set(adapterInstanceGuid, true);
       }
     });
   }
@@ -2131,7 +2139,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Generate GUID
     const adapterInstanceGuid = this.generateGuid();
     
-    // Add the instance via API
+    // Create local instance first (so it appears immediately)
+    const localInstance = {
+      adapterInstanceGuid: adapterInstanceGuid,
+      instanceName: instanceName,
+      adapterName: adapterName,
+      isEnabled: true,
+      configuration: defaultConfiguration
+    };
+    
+    // Add locally first
+    this.destinationAdapterInstances = [...this.destinationAdapterInstances, localInstance];
+    this.destinationCardExpandedStates.set(adapterInstanceGuid, true);
+    
+    // Then try to add via API
     this.transportService.addDestinationAdapterInstance(
       this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
       adapterName,
@@ -2139,17 +2160,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       JSON.stringify(defaultConfiguration)
     ).subscribe({
       next: (createdInstance) => {
+        // Replace local instance with server instance
+        const index = this.destinationAdapterInstances.findIndex(i => i.adapterInstanceGuid === adapterInstanceGuid);
+        if (index >= 0) {
+          this.destinationAdapterInstances[index] = createdInstance;
+        }
         this.snackBar.open(`Destination adapter "${instanceName}" added successfully`, 'OK', { duration: 3000 });
-        this.loadDestinationAdapterInstances();
       },
       error: (error) => {
         console.error('Error adding destination adapter:', error);
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Hinzufügen des Destination Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
+        // Keep the local instance even if API fails
+        this.snackBar.open(`Destination adapter "${instanceName}" added locally (API call failed)`, 'OK', { 
+          duration: 5000,
+          panelClass: ['warning-snackbar']
         });
       }
     });

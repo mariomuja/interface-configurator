@@ -46,6 +46,7 @@
       [isLoading]="isLoading"
       [expanded]="sourceCardExpanded"
       [showReceiveFolder]="sourceAdapterName === 'CSV'"
+      [primaryActionDisabled]="destinationAdapterInstances.length === 0"
       (restart)="restartSourceAdapter()"
       (expandedChange)="sourceCardExpanded = $event"
       (primaryAction)="startTransport()"
