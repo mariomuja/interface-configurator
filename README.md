@@ -4,7 +4,7 @@ strong, b {
 }
 </style>
 
-# 📊 System Interface Configuration - Interface Configuration Demo
+# 📊 Interface Configuration Demo
 
 <div align="center">
 
