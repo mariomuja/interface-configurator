@@ -428,7 +428,7 @@ public class SqlServerAdapter : IAdapter
                         _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
                     rowsFailed = records.Count;
                     rowsSucceeded = 0;
