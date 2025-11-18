@@ -1,5 +1,6 @@
 using System.Text;
 using System.Linq;
+using System.IO;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
@@ -143,6 +144,7 @@ public class CsvAdapter : IAdapter
 
     /// <summary>
     /// Processes the CsvData property by parsing it and debatching to MessageBox
+    /// For RAW adapter type: Creates a file from CsvData and uploads it to csv-incoming folder
     /// </summary>
     public async Task ProcessCsvDataAsync(CancellationToken cancellationToken = default)
     {
@@ -152,16 +154,24 @@ public class CsvAdapter : IAdapter
             return;
         }
 
-        if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
-        {
-            _logger?.LogWarning("Cannot process CsvData: MessageBoxService, InterfaceName, or AdapterInstanceGuid is missing");
-            return;
-        }
-
         try
         {
-            _logger?.LogInformation("Processing CsvData property: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, DataLength={DataLength}",
-                _interfaceName, _adapterInstanceGuid.Value, _csvData.Length);
+            _logger?.LogInformation("Processing CsvData property: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, AdapterType={AdapterType}, DataLength={DataLength}",
+                _interfaceName, _adapterInstanceGuid, _adapterType, _csvData.Length);
+
+            // For RAW adapter type: Create file from CsvData and upload to csv-incoming
+            if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+            {
+                await UploadCsvDataToIncomingAsync(cancellationToken);
+                return; // File upload will trigger blob trigger which processes the file
+            }
+
+            // For other adapter types, process directly to MessageBox (legacy behavior)
+            if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+            {
+                _logger?.LogWarning("Cannot process CsvData: MessageBoxService, InterfaceName, or AdapterInstanceGuid is missing");
+                return;
+            }
 
             // Parse CSV using CsvProcessingService with configured field separator
             var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(_csvData, _fieldSeparator, cancellationToken);
@@ -207,28 +217,85 @@ public class CsvAdapter : IAdapter
         }
     }
 
+    /// <summary>
+    /// Uploads CsvData to csv-incoming folder in blob storage
+    /// This will trigger the blob trigger which processes the file
+    /// </summary>
+    private async Task UploadCsvDataToIncomingAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_csvData))
+        {
+            _logger?.LogWarning("CsvData is empty, cannot upload to csv-incoming");
+            return;
+        }
+
+        try
+        {
+            // Generate unique filename
+            var fileName = $"raw-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            var blobPath = $"csv-incoming/{fileName}";
+            
+            // Get container client (default: csv-files)
+            var containerName = "csv-files";
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure container exists
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            
+            // Upload CSV data to csv-incoming folder
+            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var content = Encoding.UTF8.GetBytes(_csvData);
+            
+            await blobClient.UploadAsync(
+                new BinaryData(content),
+                new Azure.Storage.Blobs.Models.BlobUploadOptions
+                {
+                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
+                    {
+                        ContentType = "text/csv"
+                    }
+                },
+                cancellationToken);
+
+            _logger?.LogInformation("Successfully uploaded CsvData to csv-incoming folder: {FileName}, DataLength={DataLength}",
+                fileName, _csvData.Length);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error uploading CsvData to csv-incoming folder");
+            throw;
+        }
+    }
+
     public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(source))
+        if (string.IsNullOrWhiteSpace(source) && !_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Source path cannot be empty", nameof(source));
 
         try
         {
-            _logger?.LogInformation("Reading CSV from source: {Source}, AdapterType: {AdapterType}", source, _adapterType);
+            _logger?.LogInformation("Reading CSV from source: {Source}, AdapterType: {AdapterType}", source ?? "RAW", _adapterType);
 
-            // Check adapter type: SFTP or FILE (Azure Blob Storage)
-            if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+            // Check adapter type: RAW, SFTP, or FILE (Azure Blob Storage)
+            if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+            {
+                // For RAW type, process CsvData and upload to csv-incoming
+                // The blob trigger will then process the file
+                await ProcessCsvDataAsync(cancellationToken);
+                return (new List<string>(), new List<Dictionary<string, string>>()); // Empty result, file processing happens via blob trigger
+            }
+            else if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
             {
                 return await ReadFromSftpAsync(source, cancellationToken);
             }
-            else
+            else // FILE type
             {
                 return await ReadFromBlobStorageAsync(source, cancellationToken);
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error reading CSV from source: {Source}", source);
+            _logger?.LogError(ex, "Error reading CSV from source: {Source}", source ?? "RAW");
             throw;
         }
     }
@@ -315,39 +382,12 @@ public class CsvAdapter : IAdapter
 
                     allRecords.AddRange(records);
 
-                    // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
-                    // Process records in batches of _batchSize, then debatch each batch into single rows
-                    if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
+                    // For FILE adapter type: Copy file to csv-incoming folder if reading from a different folder
+                    // This will trigger the blob trigger which processes the file
+                    // Only copy if source folder is not already csv-incoming
+                    if (!csvFile.Contains("csv-incoming/"))
                     {
-                        _logger?.LogInformation("Processing CSV data from {CsvFile} in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}", 
-                            csvFile, _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
-                        
-                        // Process records in batches
-                        for (int i = 0; i < records.Count; i += _batchSize)
-                        {
-                            var batch = records.Skip(i).Take(_batchSize).ToList();
-                            var batchNumber = (i / _batchSize) + 1;
-                            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
-                            
-                            _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches} from {CsvFile}: {BatchRecordCount} records", 
-                                batchNumber, totalBatches, csvFile, batch.Count);
-                            
-                            // Debatch batch into single rows and write to MessageBox
-                            var messageIds = await _messageBoxService.WriteMessagesAsync(
-                                _interfaceName,
-                                AdapterName,
-                                "Source",
-                                _adapterInstanceGuid.Value,
-                                headers,
-                                batch,
-                                cancellationToken);
-                            
-                            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches} of {CsvFile}", 
-                                messageIds.Count, batchNumber, totalBatches, csvFile);
-                        }
-                        
-                        _logger?.LogInformation("Completed processing all batches from {CsvFile}: {TotalRecords} records debatched into {TotalMessages} messages", 
-                            csvFile, records.Count, records.Count);
+                        await CopyFileToIncomingAsync(csvContent, csvFile, cancellationToken);
                     }
                 }
                 catch (Exception ex)
@@ -495,33 +535,9 @@ public class CsvAdapter : IAdapter
 
                     allRecords.AddRange(records);
 
-                    // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
-                    if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
-                    {
-                        _logger?.LogInformation("Processing CSV data from SFTP {RemoteFilePath} in batches of {BatchSize} rows", 
-                            remoteFilePath, _batchSize);
-                        
-                        // Process records in batches
-                        for (int i = 0; i < records.Count; i += _batchSize)
-                        {
-                            var batch = records.Skip(i).Take(_batchSize).ToList();
-                            var batchNumber = (i / _batchSize) + 1;
-                            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
-                            
-                            // Debatch batch into single rows and write to MessageBox
-                            var messageIds = await _messageBoxService.WriteMessagesAsync(
-                                _interfaceName,
-                                AdapterName,
-                                "Source",
-                                _adapterInstanceGuid.Value,
-                                headers,
-                                batch,
-                                cancellationToken);
-                            
-                            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches} of SFTP {RemoteFilePath}", 
-                                messageIds.Count, batchNumber, totalBatches, remoteFilePath);
-                        }
-                    }
+                    // For SFTP adapter type: Upload file to csv-incoming folder
+                    // This will trigger the blob trigger which processes the file
+                    await UploadFileToIncomingAsync(csvContent, file.Name, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -966,6 +982,99 @@ public class CsvAdapter : IAdapter
         }
         
         return result;
+    }
+
+    /// <summary>
+    /// Uploads a file (from SFTP or other source) to csv-incoming folder in blob storage
+    /// This will trigger the blob trigger which processes the file
+    /// </summary>
+    private async Task UploadFileToIncomingAsync(string csvContent, string originalFileName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Generate unique filename preserving original name
+            var fileName = $"{Path.GetFileNameWithoutExtension(originalFileName)}-{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
+            var blobPath = $"csv-incoming/{fileName}";
+            
+            // Get container client (default: csv-files)
+            var containerName = "csv-files";
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure container exists
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            
+            // Upload CSV content to csv-incoming folder
+            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var content = Encoding.UTF8.GetBytes(csvContent);
+            
+            await blobClient.UploadAsync(
+                new BinaryData(content),
+                new Azure.Storage.Blobs.Models.BlobUploadOptions
+                {
+                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
+                    {
+                        ContentType = "text/csv"
+                    }
+                },
+                cancellationToken);
+
+            _logger?.LogInformation("Successfully uploaded file to csv-incoming folder: {FileName} (from {OriginalFileName}), DataLength={DataLength}",
+                fileName, originalFileName, csvContent.Length);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error uploading file to csv-incoming folder: {OriginalFileName}", originalFileName);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Copies a file from blob storage to csv-incoming folder
+    /// This will trigger the blob trigger which processes the file
+    /// </summary>
+    private async Task CopyFileToIncomingAsync(string csvContent, string sourceBlobPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Extract filename from source path
+            var fileName = sourceBlobPath.Contains('/') 
+                ? sourceBlobPath.Substring(sourceBlobPath.LastIndexOf('/') + 1)
+                : sourceBlobPath;
+            
+            // Generate unique filename
+            var uniqueFileName = $"{Path.GetFileNameWithoutExtension(fileName)}-{Guid.NewGuid()}{Path.GetExtension(fileName)}";
+            var blobPath = $"csv-incoming/{uniqueFileName}";
+            
+            // Get container client (default: csv-files)
+            var containerName = "csv-files";
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure container exists
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            
+            // Upload CSV content to csv-incoming folder
+            var blobClient = containerClient.GetBlockBlobClient(blobPath);
+            var content = Encoding.UTF8.GetBytes(csvContent);
+            
+            await blobClient.UploadAsync(
+                new BinaryData(content),
+                new Azure.Storage.Blobs.Models.BlobUploadOptions
+                {
+                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
+                    {
+                        ContentType = "text/csv"
+                    }
+                },
+                cancellationToken);
+
+            _logger?.LogInformation("Successfully copied file to csv-incoming folder: {FileName} (from {SourcePath}), DataLength={DataLength}",
+                uniqueFileName, sourceBlobPath, csvContent.Length);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error copying file to csv-incoming folder: {SourcePath}", sourceBlobPath);
+            throw;
+        }
     }
 }
 

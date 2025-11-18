@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Adapters;
 using System.Text.Json;
 
 namespace InterfaceConfigurator.Main;
@@ -87,6 +88,35 @@ public class SourceAdapterFunction
             var sourceConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(config.SourceConfiguration) 
                 ?? new Dictionary<string, JsonElement>();
 
+            // Check adapter type for CSV adapter
+            string? adapterType = null;
+            if (config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase))
+            {
+                adapterType = config.CsvAdapterType ?? "FILE";
+                
+                // For RAW adapter type, process CsvData directly
+                if (adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(config.CsvData))
+                    {
+                        _logger.LogWarning("CsvData is empty for RAW adapter type in interface '{InterfaceName}'", config.InterfaceName);
+                        return;
+                    }
+
+                    _logger.LogInformation("Processing RAW adapter type: Interface={InterfaceName}, CsvDataLength={DataLength}", 
+                        config.InterfaceName, config.CsvData.Length);
+
+                    // Create adapter and process CsvData (will upload to csv-incoming)
+                    var adapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
+                    if (adapter is CsvAdapter csvAdapter)
+                    {
+                        csvAdapter.CsvData = config.CsvData; // This will trigger upload to csv-incoming
+                        _logger.LogInformation("CsvData set on adapter, file will be uploaded to csv-incoming and processed via blob trigger");
+                    }
+                    return; // File processing happens via blob trigger
+                }
+            }
+
             if (!sourceConfig.TryGetValue("source", out var sourceElement))
             {
                 _logger.LogWarning("Source configuration missing 'source' property for interface '{InterfaceName}'", 
@@ -105,12 +135,13 @@ public class SourceAdapterFunction
             // For CSV adapter, ReceiveFolder is a blob storage path (e.g., "csv-files/csv-incoming")
             if (!string.IsNullOrWhiteSpace(config.SourceReceiveFolder) && config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogInformation("Checking ReceiveFolder '{ReceiveFolder}' for new files: Interface={InterfaceName}", 
-                    config.SourceReceiveFolder, config.InterfaceName);
+                _logger.LogInformation("Checking ReceiveFolder '{ReceiveFolder}' for new files: Interface={InterfaceName}, AdapterType={AdapterType}", 
+                    config.SourceReceiveFolder, config.InterfaceName, adapterType);
                 
-                // Note: In Azure Blob Storage, new files trigger BlobTrigger automatically
-                // This timer function will process files that may have been missed or need reprocessing
-                // The ReceiveFolder path will be used as the source when processing
+                // For FILE adapter type: Poll folder and copy files to csv-incoming
+                // For SFTP adapter type: Read from SFTP and upload files to csv-incoming
+                // Note: In Azure Blob Storage, new files in csv-incoming trigger BlobTrigger automatically
+                // This timer function will process files from other folders and copy them to csv-incoming
                 source = config.SourceReceiveFolder;
                 _logger.LogInformation("Using ReceiveFolder as source: {Source}", source);
             }

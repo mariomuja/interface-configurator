@@ -22,7 +22,8 @@ export interface AdapterPropertiesData {
   destinationReceiveFolder?: string; // Only for CSV adapters when used as destination
   destinationFileMask?: string; // Only for CSV adapters when used as destination
   // SFTP properties (only for CSV Source adapters)
-  csvAdapterType?: string; // "FILE" or "SFTP"
+  csvAdapterType?: string; // "RAW", "FILE", or "SFTP"
+  csvData?: string; // CSV data content for RAW adapter type
   sftpHost?: string;
   sftpPort?: number;
   sftpUsername?: string;
@@ -75,7 +76,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   destinationReceiveFolder: string = '';
   destinationFileMask: string = '*.txt';
   // SFTP properties
-  csvAdapterType: string = 'FILE';
+  csvAdapterType: string = 'RAW'; // Default to RAW for our example
+  csvData: string = ''; // CSV data content for RAW adapter type
   sftpHost: string = '';
   sftpPort: number = 22;
   sftpUsername: string = '';
@@ -115,7 +117,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.destinationReceiveFolder = this.data.destinationReceiveFolder || '';
     this.destinationFileMask = this.data.destinationFileMask || '*.txt';
     // SFTP properties
-    this.csvAdapterType = this.data.csvAdapterType || 'FILE';
+    this.csvAdapterType = this.data.csvAdapterType || 'RAW';
+    this.csvData = this.data.csvData || '';
     this.sftpHost = this.data.sftpHost || '';
     this.sftpPort = this.data.sftpPort ?? 22;
     this.sftpUsername = this.data.sftpUsername || '';
@@ -217,7 +220,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       destinationReceiveFolder: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationReceiveFolder.trim() || '') : undefined,
       destinationFileMask: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationFileMask.trim() || '*.txt') : undefined,
       // SFTP properties (only for CSV Source adapters)
-      csvAdapterType: this.showSftpProperties ? (this.csvAdapterType || 'FILE') : undefined,
+      csvAdapterType: this.showSftpProperties ? (this.csvAdapterType || 'RAW') : undefined,
+      csvData: this.showRawProperties ? (this.csvData.trim() || '') : undefined,
       sftpHost: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpHost.trim() || '') : undefined,
       sftpPort: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPort > 0 ? this.sftpPort : 22) : undefined,
       sftpUsername: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpUsername.trim() || '') : undefined,
@@ -274,6 +278,10 @@ export class AdapterPropertiesDialogComponent implements OnInit {
 
   get showFileProperties(): boolean {
     return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' && this.csvAdapterType === 'FILE';
+  }
+
+  get showRawProperties(): boolean {
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' && this.csvAdapterType === 'RAW';
   }
 
   get dialogTitle(): string {

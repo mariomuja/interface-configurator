@@ -15,10 +15,11 @@
     <mat-form-field appearance="outline" class="full-width" *ngIf="showSftpProperties">
       <mat-label>Adapter Type</mat-label>
       <mat-select [(ngModel)]="csvAdapterType">
+        <mat-option value="RAW">RAW (Data in Property CsvData)</mat-option>
         <mat-option value="FILE">FILE (Azure Blob Storage)</mat-option>
         <mat-option value="SFTP">SFTP (SFTP Server)</mat-option>
       </mat-select>
-      <mat-icon matSuffix matTooltip="Select the adapter type: FILE (Azure Blob Storage) or SFTP (SFTP server). When SFTP is selected, FILE properties are ignored." matTooltipPosition="left">help_outline</mat-icon>
+      <mat-icon matSuffix matTooltip="Select the adapter type: RAW (data from CsvData property), FILE (Azure Blob Storage polling), or SFTP (SFTP server). RAW: Creates file from CsvData and moves to csv-incoming. FILE: Polls folder and copies files to csv-incoming. SFTP: Receives files via SFTP and moves to csv-incoming." matTooltipPosition="left">help_outline</mat-icon>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width" *ngIf="showReceiveFolder">
@@ -154,6 +155,18 @@
         <input matInput type="number" [(ngModel)]="sqlBatchSize" min="1" placeholder="1000" />
         <mat-icon matSuffix matTooltip="Number of rows fetched at once when reading data from SQL Server. Larger batch sizes improve performance for large result sets but use more memory. Smaller batch sizes use less memory but may be slower. Default: 1000 rows per batch." matTooltipPosition="left">help_outline</mat-icon>
         <mat-hint>Number of rows per batch (default: 1000)</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- RAW Properties (Source only, when RAW adapter type) -->
+    <div *ngIf="showRawProperties" class="raw-section">
+      <h3>RAW Data Configuration</h3>
+      
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>CSV Data</mat-label>
+        <textarea matInput [(ngModel)]="csvData" rows="10" placeholder="id║name║email&#10;1║John Doe║john@example.com&#10;2║Jane Smith║jane@example.com"></textarea>
+        <mat-icon matSuffix matTooltip="CSV data content. When adapter type is RAW, this data will be written to a file and moved to csv-incoming folder for processing. Use the configured field separator (default: ║) to separate columns." matTooltipPosition="left">help_outline</mat-icon>
+        <mat-hint>Enter CSV data with headers and rows, separated by the field separator (default: ║)</mat-hint>
       </mat-form-field>
     </div>
 
