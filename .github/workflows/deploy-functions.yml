@@ -349,5 +349,6 @@ jobs:
       #
       # This workflow uses func azure functionapp publish --dotnet-isolated to deploy,
       # which handles the deployment process automatically including setting WEBSITE_RUN_FROM_PACKAGE.
-      # The dotnet publish command uses --self-contained false to create a framework-dependent deployment.
+      # The dotnet publish command uses --no-self-contained to create a framework-dependent deployment.
+      # MEMORY: ALWAYS build with --no-self-contained flag for Azure Functions to ensure smaller packages and faster deployments.
 
