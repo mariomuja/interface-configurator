@@ -69,12 +69,13 @@ describe('TransportService', () => {
   it('should start transport', () => {
     const mockResponse = { message: 'Transport started', fileId: 'test-id' };
 
-    service.startTransport().subscribe(response => {
+    service.startTransport('MyInterface', 'csv-content').subscribe(response => {
       expect(response).toEqual(mockResponse);
     });
 
     const req = httpMock.expectOne('/api/start-transport');
     expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ interfaceName: 'MyInterface', csvContent: 'csv-content' });
     req.flush(mockResponse);
   });
 

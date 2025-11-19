@@ -43,8 +43,9 @@ export class TransportService {
     return this.http.get<ProcessLog[]>(`${this.apiUrl}/GetProcessLogs`);
   }
 
-  startTransport(csvContent?: string): Observable<{ message: string; fileId: string }> {
+  startTransport(interfaceName: string, csvContent?: string): Observable<{ message: string; fileId: string }> {
     return this.http.post<{ message: string; fileId: string }>(`${this.apiUrl}/start-transport`, {
+      interfaceName,
       csvContent: csvContent
     });
   }

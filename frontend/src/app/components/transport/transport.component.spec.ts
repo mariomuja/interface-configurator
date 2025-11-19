@@ -80,7 +80,7 @@ describe('TransportComponent', () => {
   it('should start transport', () => {
     transportService.startTransport.and.returnValue(of({ message: 'Success', fileId: 'test-id' }));
     component.startTransport();
-    expect(transportService.startTransport).toHaveBeenCalled();
+    expect(transportService.startTransport).toHaveBeenCalledWith('FromCsvToSqlServerExample', jasmine.any(String));
   });
 
   it('should handle transport error', fakeAsync(() => {

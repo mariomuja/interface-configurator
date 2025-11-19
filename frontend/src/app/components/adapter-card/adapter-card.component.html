@@ -61,6 +61,18 @@
     <mat-spinner></mat-spinner>
   </div>
   
+  <!-- CSV Data Display (for CSV Source adapters) -->
+  <div class="csv-text-container" *ngIf="!isLoading && adapterName === 'CSV' && adapterType === 'Source'">
+    <div 
+      #csvEditor
+      class="csv-text csv-editable" 
+      contenteditable="true"
+      (input)="onCsvDataInput($event)"
+      (blur)="onCsvDataBlur()"
+      spellcheck="false"
+      [attr.data-placeholder]="'CSV-Daten hier bearbeiten...'"></div>
+  </div>
+  
   <ng-content></ng-content>
 </mat-expansion-panel>
 

@@ -116,8 +116,15 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.fieldSeparator = this.data.fieldSeparator || '║';
     this.destinationReceiveFolder = this.data.destinationReceiveFolder || '';
     this.destinationFileMask = this.data.destinationFileMask || '*.txt';
-    // SFTP properties
-    this.csvAdapterType = this.data.csvAdapterType || 'RAW';
+    // SFTP / adapter type
+    if (this.data.adapterName === 'CSV') {
+      const fallbackType = this.data.adapterType === 'Destination' ? 'FILE' : 'RAW';
+      let selectedType = (this.data.csvAdapterType || fallbackType).toUpperCase();
+      if (this.data.adapterType === 'Destination' && selectedType === 'RAW') {
+        selectedType = 'FILE';
+      }
+      this.csvAdapterType = selectedType;
+    }
     this.csvData = this.data.csvData || '';
     this.sftpHost = this.data.sftpHost || '';
     this.sftpPort = this.data.sftpPort ?? 22;
@@ -220,7 +227,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       destinationReceiveFolder: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationReceiveFolder.trim() || '') : undefined,
       destinationFileMask: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationFileMask.trim() || '*.txt') : undefined,
       // SFTP properties (only for CSV Source adapters)
-      csvAdapterType: this.showSftpProperties ? (this.csvAdapterType || 'RAW') : undefined,
+      csvAdapterType: this.data.adapterName === 'CSV' ? (this.csvAdapterType || (this.data.adapterType === 'Destination' ? 'FILE' : 'RAW')) : undefined,
       csvData: this.showRawProperties ? (this.csvData.trim() || '') : undefined,
       sftpHost: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpHost.trim() || '') : undefined,
       sftpPort: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPort > 0 ? this.sftpPort : 22) : undefined,
@@ -257,11 +264,11 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   }
 
   get showFieldSeparator(): boolean {
-    return this.data.adapterName === 'CSV';
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination';
   }
 
   get showDestinationProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination';
+    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' && this.csvAdapterType === 'FILE';
   }
 
   get showSqlServerProperties(): boolean {
@@ -273,7 +280,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   }
 
   get showSftpProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source';
+    return this.data.adapterName === 'CSV' && this.csvAdapterType === 'SFTP';
   }
 
   get showFileProperties(): boolean {

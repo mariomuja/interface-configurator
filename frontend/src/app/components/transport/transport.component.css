@@ -190,20 +190,6 @@
   flex: 1;
 }
 
-/* Source Card Header */
-.source-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 4px 0;
-}
-
-.card-header-label {
-  font-size: 13px;
-  font-weight: 500;
-}
-
 /* Toggle Card Button */
 .toggle-card-button {
   width: 32px;

@@ -61,6 +61,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   csvData: CsvRecord[] = [];
   editableCsvText: string = '';
   formattedCsvHtml: string = '';
+  csvDataText: string = ''; // CsvData property value (bound to adapter card)
   sqlData: SqlRecord[] = [];
   processLogs: ProcessLog[] = [];
   logDataSource = new MatTableDataSource<ProcessLog & { component?: string }>([]);
@@ -109,6 +110,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
   
   readonly DEFAULT_INTERFACE_NAME = 'FromCsvToSqlServerExample';
+  
+  private getActiveInterfaceName(): string {
+    return this.currentInterfaceName && this.currentInterfaceName.trim().length > 0
+      ? this.currentInterfaceName.trim()
+      : this.DEFAULT_INTERFACE_NAME;
+  }
+
+  private getInterfaceConfig(interfaceName?: string): any | undefined {
+    const name = interfaceName || this.getActiveInterfaceName();
+    return this.interfaceConfigurations.find(c => c.interfaceName === name);
+  }
   
   // Track if table exists (based on whether we have columns loaded)
   tableExists: boolean = false;
@@ -166,7 +178,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           }
         }
         
-        this.interfaceConfigurations = uniqueConfigs;
+        // Sort interfaces alphabetically for a stable dropdown order
+        this.interfaceConfigurations = uniqueConfigs.sort((a, b) => 
+          a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' })
+        );
         
         // Ensure default interface exists - create it if it doesn't
         const defaultExists = this.interfaceConfigurations.some(c => 
@@ -229,50 +244,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           });
         }
         
-        // Ensure we only have the default interface - remove any other interfaces
-        // This ensures only one interface is configured when the application starts
-        this.interfaceConfigurations = this.interfaceConfigurations.filter(config => 
-          config.interfaceName === this.DEFAULT_INTERFACE_NAME
-        );
-        
-        // If no current interface is set, select the first available or default
-        if (!this.currentInterfaceName) {
-          if (this.interfaceConfigurations.length > 0) {
-            // Select first available interface (should be default if it was just added)
-            this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
-            const selectedConfig = this.interfaceConfigurations[0];
-            this.selectedInterfaceConfig = selectedConfig._isPlaceholder ? null : selectedConfig;
-            if (!selectedConfig._isPlaceholder) {
-              this.loadInterfaceData();
-            }
-          } else {
-            // No interfaces exist, use default name (will be created when needed)
-            this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
-            this.selectedInterfaceConfig = null;
-          }
-        } else {
-          // Current interface is set, verify it still exists
-          const currentConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
-          if (currentConfig) {
-            this.selectedInterfaceConfig = currentConfig._isPlaceholder ? null : currentConfig;
-            if (!currentConfig._isPlaceholder) {
-              this.loadInterfaceData();
-            }
-          } else {
-            // Current interface no longer exists, select first available or default
-            if (this.interfaceConfigurations.length > 0) {
-              this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
-              const selectedConfig = this.interfaceConfigurations[0];
-              this.selectedInterfaceConfig = selectedConfig._isPlaceholder ? null : selectedConfig;
-              if (!selectedConfig._isPlaceholder) {
-                this.loadInterfaceData();
-              }
-            } else {
-              this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
-              this.selectedInterfaceConfig = null;
-            }
-          }
-        }
+        this.ensureInterfaceSelection();
       },
       error: (error) => {
         console.error('Error loading interface configurations:', error);
@@ -760,115 +732,86 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   startTransport(): void {
     this.isTransporting = true;
-    
-    // Ensure interface configuration exists before starting transport
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
-    
-    if (!defaultConfig) {
-      // Create default interface configuration
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
+
+    if (!activeConfig) {
       this.transportService.createInterfaceConfiguration({
-        interfaceName: this.DEFAULT_INTERFACE_NAME,
-        sourceAdapterName: 'CSV',
-        sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming' }),
-        destinationAdapterName: 'SqlServer',
+        interfaceName,
+        sourceAdapterName: this.sourceAdapterName,
+        sourceConfiguration: JSON.stringify({ source: this.sourceReceiveFolder || 'csv-files/csv-incoming' }),
+        destinationAdapterName: this.destinationAdapterInstances[0]?.adapterName || 'SqlServer',
         destinationConfiguration: JSON.stringify({ destination: 'TransportData' }),
-        description: 'Default CSV to SQL Server interface'
+        description: 'CSV to SQL Server interface'
       }).subscribe({
         next: () => {
           this.loadInterfaceConfigurations();
-          this.uploadAndStartTransport();
+          this.uploadAndStartTransport(interfaceName);
         },
         error: (error) => {
           console.error('Error creating interface configuration:', error);
-          console.error('Full error object:', JSON.stringify(error, null, 2));
-          
-          // Extract detailed error message with all available information
           const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen der Interface-Konfiguration');
-          
-          // Show error but continue anyway (non-blocking)
           this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
             duration: 12000,
             panelClass: ['error-snackbar'],
             verticalPosition: 'top',
             horizontalPosition: 'center'
           });
-          
-          this.uploadAndStartTransport();
+          this.uploadAndStartTransport(interfaceName);
+        }
+      });
+      return;
+    }
+
+    const ensureDestination = () => {
+      if (!activeConfig.destinationIsEnabled) {
+        this.transportService.toggleInterfaceConfiguration(interfaceName, 'Destination', true).subscribe({
+          next: () => {
+            this.loadInterfaceConfigurations();
+            this.uploadAndStartTransport(interfaceName);
+          },
+          error: (error) => {
+            const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
+            this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
+              duration: 12000,
+              panelClass: ['error-snackbar'],
+              verticalPosition: 'top',
+              horizontalPosition: 'center'
+            });
+            this.uploadAndStartTransport(interfaceName);
+          }
+        });
+      } else {
+        this.uploadAndStartTransport(interfaceName);
+      }
+    };
+
+    if (!activeConfig.sourceIsEnabled) {
+      this.transportService.toggleInterfaceConfiguration(interfaceName, 'Source', true).subscribe({
+        next: () => {
+          this.loadInterfaceConfigurations();
+          ensureDestination();
+        },
+        error: (error) => {
+          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Source-Adapters');
+          this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
+            duration: 12000,
+            panelClass: ['error-snackbar'],
+            verticalPosition: 'top',
+            horizontalPosition: 'center'
+          });
+          this.uploadAndStartTransport(interfaceName);
         }
       });
     } else {
-      // Ensure both Source and Destination are enabled
-      if (!defaultConfig.sourceIsEnabled || !defaultConfig.destinationIsEnabled) {
-        // Enable Source if disabled
-        if (!defaultConfig.sourceIsEnabled) {
-          this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, 'Source', true).subscribe({
-            next: () => {
-              this.loadInterfaceConfigurations();
-              // Continue to enable Destination if needed
-              if (!defaultConfig.destinationIsEnabled) {
-                this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, 'Destination', true).subscribe({
-                  next: () => {
-                    this.loadInterfaceConfigurations();
-                    this.uploadAndStartTransport();
-                  },
-                  error: (error) => {
-                    console.error('Error enabling Destination adapter:', error);
-                    const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
-                    this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-                      duration: 12000,
-                      panelClass: ['error-snackbar'],
-                      verticalPosition: 'top',
-                      horizontalPosition: 'center'
-                    });
-                    this.uploadAndStartTransport();
-                  }
-                });
-              } else {
-                this.uploadAndStartTransport();
-              }
-            },
-            error: (error) => {
-              console.error('Error enabling Source adapter:', error);
-              const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Source-Adapters');
-              this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-                duration: 12000,
-                panelClass: ['error-snackbar'],
-                verticalPosition: 'top',
-                horizontalPosition: 'center'
-              });
-              this.uploadAndStartTransport();
-            }
-          });
-        } else if (!defaultConfig.destinationIsEnabled) {
-          // Only Destination needs to be enabled
-          this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, 'Destination', true).subscribe({
-            next: () => {
-              this.loadInterfaceConfigurations();
-              this.uploadAndStartTransport();
-            },
-            error: (error) => {
-              console.error('Error enabling Destination adapter:', error);
-              const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
-              this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-                duration: 12000,
-                panelClass: ['error-snackbar'],
-                verticalPosition: 'top',
-                horizontalPosition: 'center'
-              });
-              this.uploadAndStartTransport();
-            }
-          });
-        }
-      } else {
-        this.uploadAndStartTransport();
-      }
+      ensureDestination();
     }
   }
   
-  private uploadAndStartTransport(): void {
+  private uploadAndStartTransport(interfaceName: string): void {
     // Use edited CSV text if available, otherwise use formatted CSV from csvData
     const csvContent = this.editableCsvText || this.formatCsvAsText();
-    this.transportService.startTransport(csvContent).subscribe({
+    this.transportService.startTransport(interfaceName, csvContent).subscribe({
       next: (response) => {
         // Show a more user-friendly message about the MessageBox architecture
         const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
@@ -1017,27 +960,29 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.currentInterfaceName || this.currentInterfaceName.trim() === '') {
       this.snackBar.open('Interface-Name darf nicht leer sein', 'OK', { duration: 3000 });
       // Restore previous name
-      const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
-      this.currentInterfaceName = defaultConfig?.interfaceName || this.DEFAULT_INTERFACE_NAME;
+      const activeConfig = this.getInterfaceConfig();
+      this.currentInterfaceName = activeConfig?.interfaceName || this.DEFAULT_INTERFACE_NAME;
       return;
     }
 
     const trimmedName = this.currentInterfaceName.trim();
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeInterfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       // Configuration doesn't exist yet, will be created when transport starts
       return;
     }
 
-    if (trimmedName === defaultConfig.interfaceName) {
+    if (trimmedName === activeConfig.interfaceName) {
       // No change
       return;
     }
 
     // Update interface name via API
-    this.transportService.updateInterfaceName(this.DEFAULT_INTERFACE_NAME, trimmedName).subscribe({
+    this.transportService.updateInterfaceName(activeInterfaceName, trimmedName).subscribe({
       next: () => {
+        this.currentInterfaceName = trimmedName;
         this.loadInterfaceConfigurations();
         this.snackBar.open('Interface-Name aktualisiert', 'OK', { duration: 3000 });
       },
@@ -1051,24 +996,25 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous name
-        this.currentInterfaceName = defaultConfig.interfaceName;
+        this.currentInterfaceName = activeConfig.interfaceName;
       }
     });
   }
 
   updateSourceInstanceName(): void {
     const trimmedName = this.sourceInstanceName.trim() || 'Source';
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeInterfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
-    if (trimmedName === defaultConfig.sourceInstanceName) {
+    if (trimmedName === (activeConfig.sourceInstanceName || 'Source')) {
       return;
     }
 
-    this.transportService.updateInstanceName(this.DEFAULT_INTERFACE_NAME, 'Source', trimmedName).subscribe({
+    this.transportService.updateInstanceName(activeInterfaceName, 'Source', trimmedName).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
       },
@@ -1082,26 +1028,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous name
-        this.sourceInstanceName = defaultConfig.sourceInstanceName || 'Source';
+        this.sourceInstanceName = activeConfig.sourceInstanceName || 'Source';
       }
     });
   }
 
   updateDestinationInstanceName(name?: string): void {
     const trimmedName = (name || this.destinationInstanceName).trim() || 'Destination';
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeInterfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
-    if (trimmedName === defaultConfig.destinationInstanceName) {
+    if (trimmedName === (activeConfig.destinationInstanceName || 'Destination')) {
       return;
     }
 
     this.destinationInstanceName = trimmedName; // Update immediately for responsive UI
 
-    this.transportService.updateInstanceName(this.DEFAULT_INTERFACE_NAME, 'Destination', trimmedName).subscribe({
+    this.transportService.updateInstanceName(activeInterfaceName, 'Destination', trimmedName).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
       },
@@ -1115,25 +1062,26 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous name
-        this.destinationInstanceName = defaultConfig.destinationInstanceName || 'Destination';
+        this.destinationInstanceName = activeConfig.destinationInstanceName || 'Destination';
       }
     });
   }
 
   onSourceEnabledChange(): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeInterfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       // Restore previous value
       this.sourceIsEnabled = true;
       return;
     }
 
-    if (this.sourceIsEnabled === defaultConfig.sourceIsEnabled) {
+    if (this.sourceIsEnabled === (activeConfig.sourceIsEnabled ?? true)) {
       return;
     }
 
-    this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, 'Source', this.sourceIsEnabled).subscribe({
+    this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', this.sourceIsEnabled).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open(
@@ -1152,25 +1100,26 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.sourceIsEnabled = defaultConfig.sourceIsEnabled ?? true;
+        this.sourceIsEnabled = activeConfig.sourceIsEnabled ?? true;
       }
     });
   }
 
   onDestinationEnabledChange(): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeInterfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       // Restore previous value
       this.destinationIsEnabled = true;
       return;
     }
 
-    if (this.destinationIsEnabled === defaultConfig.destinationIsEnabled) {
+    if (this.destinationIsEnabled === (activeConfig.destinationIsEnabled ?? true)) {
       return;
     }
 
-    this.transportService.toggleInterfaceConfiguration(this.DEFAULT_INTERFACE_NAME, 'Destination', this.destinationIsEnabled).subscribe({
+    this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Destination', this.destinationIsEnabled).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open(
@@ -1189,7 +1138,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.destinationIsEnabled = defaultConfig.destinationIsEnabled ?? true;
+        this.destinationIsEnabled = activeConfig.destinationIsEnabled ?? true;
       }
     });
   }
@@ -1240,19 +1189,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   updateReceiveFolder(folder?: string): void {
     const folderValue = folder || this.sourceReceiveFolder;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
-    if (folderValue === (defaultConfig.sourceReceiveFolder || '')) {
+    if (folderValue === (activeConfig.sourceReceiveFolder || '')) {
       return;
     }
 
     this.sourceReceiveFolder = folderValue; // Update immediately for responsive UI
 
-    this.transportService.updateReceiveFolder(this.DEFAULT_INTERFACE_NAME, folderValue).subscribe({
+    this.transportService.updateReceiveFolder(interfaceName, folderValue).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('Receive Folder aktualisiert', 'OK', { duration: 3000 });
@@ -1267,27 +1217,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.sourceReceiveFolder = defaultConfig.sourceReceiveFolder || '';
+        this.sourceReceiveFolder = activeConfig.sourceReceiveFolder || '';
       }
     });
   }
 
   updateFileMask(fileMask?: string): void {
     const fileMaskValue = fileMask || this.sourceFileMask;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
     const normalizedMask = fileMaskValue.trim() || '*.txt';
-    if (normalizedMask === (defaultConfig.sourceFileMask || '*.txt')) {
+    if (normalizedMask === (activeConfig.sourceFileMask || '*.txt')) {
       return;
     }
 
     this.sourceFileMask = normalizedMask; // Update immediately for responsive UI
 
-    this.transportService.updateFileMask(this.DEFAULT_INTERFACE_NAME, normalizedMask).subscribe({
+    this.transportService.updateFileMask(interfaceName, normalizedMask).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('File Mask aktualisiert', 'OK', { duration: 3000 });
@@ -1302,27 +1253,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.sourceFileMask = defaultConfig.sourceFileMask || '*.txt';
+        this.sourceFileMask = activeConfig.sourceFileMask || '*.txt';
       }
     });
   }
 
   updateBatchSize(batchSize?: number): void {
     const batchSizeValue = batchSize ?? this.sourceBatchSize;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
     const normalizedBatchSize = batchSizeValue > 0 ? batchSizeValue : 100;
-    if (normalizedBatchSize === (defaultConfig.sourceBatchSize ?? 100)) {
+    if (normalizedBatchSize === (activeConfig.sourceBatchSize ?? 100)) {
       return;
     }
 
     this.sourceBatchSize = normalizedBatchSize; // Update immediately for responsive UI
 
-    this.transportService.updateBatchSize(this.DEFAULT_INTERFACE_NAME, normalizedBatchSize).subscribe({
+    this.transportService.updateBatchSize(interfaceName, normalizedBatchSize).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('Batch Size aktualisiert', 'OK', { duration: 3000 });
@@ -1337,7 +1289,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.sourceBatchSize = defaultConfig.sourceBatchSize ?? 100;
+        this.sourceBatchSize = activeConfig.sourceBatchSize ?? 100;
       }
     });
   }
@@ -1350,9 +1302,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     integratedSecurity?: boolean,
     resourceGroup?: string
   ): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
@@ -1365,7 +1318,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     if (resourceGroup !== undefined) this.sqlResourceGroup = resourceGroup;
 
     this.transportService.updateSqlConnectionProperties(
-      this.DEFAULT_INTERFACE_NAME,
+      interfaceName,
       serverName,
       databaseName,
       userName,
@@ -1518,10 +1471,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationAdapterSettings(): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeConfig = this.getInterfaceConfig();
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
-      adapterName: this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME)?.destinationAdapterName === 'CSV' ? 'CSV' : 'SqlServer',
+      adapterName: activeConfig?.destinationAdapterName === 'CSV' ? 'CSV' : 'SqlServer',
       instanceName: this.destinationInstanceName,
       isEnabled: this.destinationIsEnabled,
       receiveFolder: this.destinationReceiveFolder,
@@ -1594,20 +1547,21 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   updateFieldSeparator(fieldSeparator?: string): void {
     const fieldSeparatorValue = fieldSeparator ?? this.sourceFieldSeparator;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
     const normalizedSeparator = fieldSeparatorValue.trim() || '║';
-    if (normalizedSeparator === (defaultConfig.sourceFieldSeparator || '║')) {
+    if (normalizedSeparator === (activeConfig.sourceFieldSeparator || '║')) {
       return;
     }
 
     this.sourceFieldSeparator = normalizedSeparator; // Update immediately for responsive UI
 
-    this.transportService.updateFieldSeparator(this.DEFAULT_INTERFACE_NAME, normalizedSeparator).subscribe({
+    this.transportService.updateFieldSeparator(interfaceName, normalizedSeparator).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('Field Separator aktualisiert', 'OK', { duration: 3000 });
@@ -1622,27 +1576,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.sourceFieldSeparator = defaultConfig.sourceFieldSeparator || '║';
+        this.sourceFieldSeparator = activeConfig.sourceFieldSeparator || '║';
       }
     });
   }
 
   updateDestinationReceiveFolder(destinationReceiveFolder?: string): void {
     const destinationReceiveFolderValue = destinationReceiveFolder ?? this.destinationReceiveFolder;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
     const normalizedFolder = destinationReceiveFolderValue.trim() || '';
-    if (normalizedFolder === (defaultConfig.destinationReceiveFolder || '')) {
+    if (normalizedFolder === (activeConfig.destinationReceiveFolder || '')) {
       return;
     }
 
     this.destinationReceiveFolder = normalizedFolder; // Update immediately for responsive UI
 
-    this.transportService.updateDestinationReceiveFolder(this.DEFAULT_INTERFACE_NAME, normalizedFolder).subscribe({
+    this.transportService.updateDestinationReceiveFolder(interfaceName, normalizedFolder).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('Destination Receive Folder aktualisiert', 'OK', { duration: 3000 });
@@ -1657,27 +1612,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.destinationReceiveFolder = defaultConfig.destinationReceiveFolder || '';
+        this.destinationReceiveFolder = activeConfig.destinationReceiveFolder || '';
       }
     });
   }
 
   updateDestinationFileMask(destinationFileMask?: string): void {
     const destinationFileMaskValue = destinationFileMask ?? this.destinationFileMask;
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
     const normalizedMask = destinationFileMaskValue.trim() || '*.txt';
-    if (normalizedMask === (defaultConfig.destinationFileMask || '*.txt')) {
+    if (normalizedMask === (activeConfig.destinationFileMask || '*.txt')) {
       return;
     }
 
     this.destinationFileMask = normalizedMask; // Update immediately for responsive UI
 
-    this.transportService.updateDestinationFileMask(this.DEFAULT_INTERFACE_NAME, normalizedMask).subscribe({
+    this.transportService.updateDestinationFileMask(interfaceName, normalizedMask).subscribe({
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open('Destination File Mask aktualisiert', 'OK', { duration: 3000 });
@@ -1692,7 +1648,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         // Restore previous value
-        this.destinationFileMask = defaultConfig.destinationFileMask || '*.txt';
+        this.destinationFileMask = activeConfig.destinationFileMask || '*.txt';
       }
     });
   }
@@ -1786,50 +1742,75 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   loadInterfaceData(): void {
     if (!this.currentInterfaceName) return;
+
+    this.applyDefaultInterfaceState();
     
     const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
-    if (config && !config._isPlaceholder) {
-      this.selectedInterfaceConfig = config;
-      // Load all data for the selected interface
-      this.sourceInstanceName = config.sourceInstanceName || 'Source';
-      this.destinationInstanceName = config.destinationInstanceName || 'Destination';
-      this.sourceIsEnabled = config.sourceIsEnabled ?? true;
-      this.destinationIsEnabled = config.destinationIsEnabled ?? true;
-      this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
-      this.sourceReceiveFolder = config.sourceReceiveFolder || '';
-      this.sourceFileMask = config.sourceFileMask || '*.txt';
-      this.sourceBatchSize = config.sourceBatchSize ?? 100;
-      this.sourceFieldSeparator = config.sourceFieldSeparator || '║';
-      this.destinationReceiveFolder = config.destinationReceiveFolder || '';
-      this.destinationFileMask = config.destinationFileMask || '*.txt';
-      this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
-      this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
-      
-      // Load SQL Server properties
-      this.sqlServerName = config.sqlServerName || '';
-      this.sqlDatabaseName = config.sqlDatabaseName || '';
-      this.sqlUserName = config.sqlUserName || '';
-      this.sqlPassword = config.sqlPassword || '';
-      this.sqlIntegratedSecurity = config.sqlIntegratedSecurity ?? false;
-      this.sqlResourceGroup = config.sqlResourceGroup || '';
-      this.sqlPollingStatement = config.sqlPollingStatement || '';
-      
-      // Reload adapter instances and data
-      this.loadDestinationAdapterInstances();
-      this.loadSqlData();
+    if (!config || config._isPlaceholder) {
+      this.selectedInterfaceConfig = null;
       this.loadSampleCsvData();
+      return;
     }
+
+    this.selectedInterfaceConfig = config;
+    // Load all data for the selected interface
+    this.sourceInstanceName = config.sourceInstanceName || this.sourceInstanceName;
+    this.destinationInstanceName = config.destinationInstanceName || this.destinationInstanceName;
+    this.sourceIsEnabled = config.sourceIsEnabled ?? this.sourceIsEnabled;
+    this.destinationIsEnabled = config.destinationIsEnabled ?? this.destinationIsEnabled;
+    this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
+    this.sourceReceiveFolder = config.sourceReceiveFolder || this.sourceReceiveFolder;
+    this.sourceFileMask = config.sourceFileMask || this.sourceFileMask;
+    this.sourceBatchSize = config.sourceBatchSize ?? this.sourceBatchSize;
+    this.sourceFieldSeparator = config.sourceFieldSeparator || this.sourceFieldSeparator;
+    this.destinationReceiveFolder = config.destinationReceiveFolder || this.destinationReceiveFolder;
+    this.destinationFileMask = config.destinationFileMask || this.destinationFileMask;
+    this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
+    this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
+    
+    // Load SQL Server properties
+    this.sqlServerName = config.sqlServerName || this.sqlServerName;
+    this.sqlDatabaseName = config.sqlDatabaseName || this.sqlDatabaseName;
+    this.sqlUserName = config.sqlUserName || this.sqlUserName;
+    this.sqlPassword = config.sqlPassword || this.sqlPassword;
+    this.sqlIntegratedSecurity = config.sqlIntegratedSecurity ?? this.sqlIntegratedSecurity;
+    this.sqlResourceGroup = config.sqlResourceGroup || this.sqlResourceGroup;
+    this.sqlPollingStatement = config.sqlPollingStatement || this.sqlPollingStatement;
+    this.sqlPollingInterval = config.sqlPollingInterval ?? this.sqlPollingInterval;
+    this.sqlUseTransaction = config.sqlUseTransaction ?? this.sqlUseTransaction;
+    this.sqlBatchSize = config.sqlBatchSize ?? this.sqlBatchSize;
+    
+    // Load CsvData property
+    this.csvDataText = config.csvData || this.csvDataText;
+    
+    // Reload adapter instances and data
+    this.loadDestinationAdapterInstances();
+    this.loadSqlData();
+    this.loadSampleCsvData();
   }
 
   openAddInterfaceDialog(): void {
     // Simple prompt for now - can be replaced with a proper dialog component
     const interfaceName = prompt('Enter interface name:');
-    if (!interfaceName || interfaceName.trim() === '') return;
+    if (interfaceName === null) {
+      // User cancelled the dialog
+      return;
+    }
 
     const trimmedName = interfaceName.trim();
+    if (!trimmedName) {
+      this.snackBar.open('Interface name cannot be empty.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (trimmedName.length < 5) {
+      this.snackBar.open('Interface name must be at least 5 characters long.', 'OK', { duration: 3000 });
+      return;
+    }
     
     // Check if name already exists
-    if (this.interfaceConfigurations.some(c => c.interfaceName === trimmedName)) {
+    if (this.interfaceConfigurations.some(
+      c => c.interfaceName?.toLowerCase() === trimmedName.toLowerCase()
+    )) {
       this.snackBar.open('Interface name already exists', 'OK', { duration: 3000 });
       return;
     }
@@ -1841,10 +1822,26 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       destinationAdapterName: 'SqlServer'
     }).subscribe({
       next: () => {
+        // Optimistically add placeholder so it appears immediately
+        const placeholderConfig = {
+          interfaceName: trimmedName,
+          sourceAdapterName: 'CSV',
+          destinationAdapterName: 'SqlServer',
+          sourceInstanceName: 'Source',
+          destinationInstanceName: 'Destination',
+          sourceIsEnabled: true,
+          destinationIsEnabled: true,
+          _isPlaceholder: true
+        };
+        this.interfaceConfigurations = [
+          ...this.interfaceConfigurations.filter(c => c.interfaceName !== trimmedName),
+          placeholderConfig
+        ].sort((a, b) => a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' }));
+        this.currentInterfaceName = trimmedName;
+        this.selectedInterfaceConfig = null;
+        
         this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
         this.loadInterfaceConfigurations();
-        this.currentInterfaceName = trimmedName;
-        setTimeout(() => this.loadInterfaceData(), 500);
       },
       error: (error) => {
         console.error('Error creating interface:', error);
@@ -1868,15 +1865,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.transportService.deleteInterfaceConfiguration(this.currentInterfaceName).subscribe({
       next: () => {
         this.snackBar.open('Interface deleted successfully', 'OK', { duration: 3000 });
+        this.currentInterfaceName = '';
+        this.selectedInterfaceConfig = null;
+        this.applyDefaultInterfaceState();
         this.loadInterfaceConfigurations();
-        // Select first available interface or default
-        if (this.interfaceConfigurations.length > 0) {
-          this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
-          setTimeout(() => this.loadInterfaceData(), 500);
-        } else {
-          this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
-          this.selectedInterfaceConfig = null;
-        }
       },
       error: (error) => {
         console.error('Error deleting interface:', error);
@@ -1889,6 +1881,62 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         });
       }
     });
+  }
+
+  private ensureInterfaceSelection(): void {
+    if (!this.interfaceConfigurations || this.interfaceConfigurations.length === 0) {
+      this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
+      this.selectedInterfaceConfig = null;
+      this.applyDefaultInterfaceState();
+      return;
+    }
+
+    if (!this.currentInterfaceName) {
+      this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
+    } else {
+      const exists = this.interfaceConfigurations.some(c => c.interfaceName === this.currentInterfaceName);
+      if (!exists) {
+        this.currentInterfaceName = this.interfaceConfigurations[0].interfaceName;
+      }
+    }
+
+    this.loadInterfaceData();
+  }
+
+  private applyDefaultInterfaceState(): void {
+    this.sourceAdapterName = 'CSV';
+    this.sourceInstanceName = 'Source';
+    this.sourceIsEnabled = true;
+    this.sourceReceiveFolder = '';
+    this.sourceFileMask = '*.txt';
+    this.sourceBatchSize = 1000;
+    this.sourceFieldSeparator = '║';
+    this.sourceAdapterInstanceGuid = '';
+
+    this.destinationInstanceName = 'Destination';
+    this.destinationIsEnabled = true;
+    this.destinationReceiveFolder = '';
+    this.destinationFileMask = '*.txt';
+    this.destinationAdapterInstanceGuid = '';
+    this.destinationAdapterInstances = [];
+    this.destinationCardExpandedStates.clear();
+
+    this.csvData = [];
+    this.csvDataText = '';
+    this.editableCsvText = '';
+    this.formattedCsvHtml = '';
+    this.tableExists = false;
+
+    this.sqlServerName = '';
+    this.sqlDatabaseName = '';
+    this.sqlUserName = '';
+    this.sqlPassword = '';
+    this.sqlIntegratedSecurity = false;
+    this.sqlResourceGroup = '';
+    this.sqlPollingStatement = '';
+    this.sqlPollingInterval = 60;
+    this.sqlUseTransaction = false;
+    this.sqlBatchSize = 1000;
   }
 
   showInterfaceJson(): void {
@@ -2231,7 +2279,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   loadDestinationAdapterInstances(): void {
-    const interfaceName = this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME;
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     this.transportService.getDestinationAdapterInstances(interfaceName).subscribe({
       next: (instances) => {
         this.destinationAdapterInstances = instances || [];
@@ -2258,7 +2307,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               
               // Save updated configuration
               this.transportService.updateDestinationAdapterInstance(
-                this.DEFAULT_INTERFACE_NAME,
+                interfaceName,
                 instance.adapterInstanceGuid,
                 instance.instanceName,
                 instance.isEnabled,
@@ -2281,7 +2330,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         });
         // If no instances exist, create a default SqlServerAdapter instance pointing to TransportData table
         if (this.destinationAdapterInstances.length === 0) {
-          const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+          const configForDefaults = activeConfig;
           
           // Create default SqlServerAdapter destination instance pointing to TransportData table in app database
           const adapterInstanceGuid = this.generateGuid();
@@ -2294,12 +2343,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               destination: 'TransportData',
               tableName: 'TransportData',
               // Include SQL connection properties from interface configuration if available
-              sqlServerName: defaultConfig?.sqlServerName || '',
-              sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
-              sqlUserName: defaultConfig?.sqlUserName || '',
-              sqlPassword: defaultConfig?.sqlPassword || '',
-              sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
-              sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
+              sqlServerName: configForDefaults?.sqlServerName || '',
+              sqlDatabaseName: configForDefaults?.sqlDatabaseName || '',
+              sqlUserName: configForDefaults?.sqlUserName || '',
+              sqlPassword: configForDefaults?.sqlPassword || '',
+              sqlIntegratedSecurity: configForDefaults?.sqlIntegratedSecurity ?? false,
+              sqlResourceGroup: configForDefaults?.sqlResourceGroup || ''
             }
           };
           
@@ -2309,7 +2358,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           
           // Then try to add via API
           this.transportService.addDestinationAdapterInstance(
-            this.DEFAULT_INTERFACE_NAME,
+            interfaceName,
             defaultSqlServerInstance.adapterName,
             defaultSqlServerInstance.instanceName,
             JSON.stringify(defaultSqlServerInstance.configuration)
@@ -2318,8 +2367,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               // Replace local instance with server instance
               this.destinationAdapterInstances = [createdInstance];
               // Update interface configuration with SQL Server connection properties if available
-              if (defaultConfig) {
-                if (defaultConfig.sqlServerName && defaultConfig.sqlDatabaseName) {
+              if (configForDefaults) {
+                if (configForDefaults.sqlServerName && configForDefaults.sqlDatabaseName) {
                   // SQL connection properties are already set in the interface configuration
                   // The SqlServerAdapter will use these from the interface configuration
                 }
@@ -2337,7 +2386,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         console.error('Error loading destination adapter instances:', error);
         // If API fails, create default instance locally
         const adapterInstanceGuid = this.generateGuid();
-        const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+        const configForDefaults = activeConfig;
         const defaultSqlServerInstance = {
           adapterInstanceGuid: adapterInstanceGuid,
           instanceName: 'Destination 1',
@@ -2347,12 +2396,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             destination: 'TransportData',
             tableName: 'TransportData',
             // SQL connection properties will be loaded from interface configuration when available
-            sqlServerName: defaultConfig?.sqlServerName || '',
-            sqlDatabaseName: defaultConfig?.sqlDatabaseName || '',
-            sqlUserName: defaultConfig?.sqlUserName || '',
-            sqlPassword: defaultConfig?.sqlPassword || '',
-            sqlIntegratedSecurity: defaultConfig?.sqlIntegratedSecurity ?? false,
-            sqlResourceGroup: defaultConfig?.sqlResourceGroup || ''
+            sqlServerName: configForDefaults?.sqlServerName || '',
+            sqlDatabaseName: configForDefaults?.sqlDatabaseName || '',
+            sqlUserName: configForDefaults?.sqlUserName || '',
+            sqlPassword: configForDefaults?.sqlPassword || '',
+            sqlIntegratedSecurity: configForDefaults?.sqlIntegratedSecurity ?? false,
+            sqlResourceGroup: configForDefaults?.sqlResourceGroup || ''
           }
         };
         this.destinationAdapterInstances = [defaultSqlServerInstance];
@@ -2651,9 +2700,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationInstanceSettings(instance: DestinationAdapterInstance): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    // Parse configuration for SqlServer adapter to get properties
+    // Parse configuration for adapter instance
     let instanceConfig: any = {};
     if (instance.configuration) {
       try {
@@ -2666,14 +2716,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }
     
+    const csvAdapterType = (instanceConfig.csvAdapterType || instanceConfig.adapterType || 'FILE').toString().toUpperCase();
+    const destinationReceiveFolder = instanceConfig.destinationReceiveFolder || instanceConfig.destination || activeConfig?.destinationReceiveFolder || '';
+    const destinationFileMask = instanceConfig.destinationFileMask || activeConfig?.destinationFileMask || '*.txt';
+    const fieldSeparator = (instanceConfig.fieldSeparator || activeConfig?.sourceFieldSeparator || '║').toString();
+    
     // For SqlServer adapters, load properties from instance config first, fall back to interface config
-    const sqlTableName = instanceConfig.tableName || instanceConfig.destination || 'TransportData';
-    const sqlServerName = instanceConfig.sqlServerName || defaultConfig?.sqlServerName || '';
-    const sqlDatabaseName = instanceConfig.sqlDatabaseName || defaultConfig?.sqlDatabaseName || '';
-    const sqlUserName = instanceConfig.sqlUserName || defaultConfig?.sqlUserName || '';
-    const sqlPassword = instanceConfig.sqlPassword || defaultConfig?.sqlPassword || '';
-    const sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined ? instanceConfig.sqlIntegratedSecurity : (defaultConfig?.sqlIntegratedSecurity ?? false);
-    const sqlResourceGroup = instanceConfig.sqlResourceGroup || defaultConfig?.sqlResourceGroup || '';
+    const sqlTableName = instanceConfig.tableName || instanceConfig.destination || activeConfig?.SqlTableName || 'TransportData';
+    const sqlServerName = instanceConfig.sqlServerName || activeConfig?.sqlServerName || '';
+    const sqlDatabaseName = instanceConfig.sqlDatabaseName || activeConfig?.sqlDatabaseName || '';
+    const sqlUserName = instanceConfig.sqlUserName || activeConfig?.sqlUserName || '';
+    const sqlPassword = instanceConfig.sqlPassword || activeConfig?.sqlPassword || '';
+    const sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined ? instanceConfig.sqlIntegratedSecurity : (activeConfig?.sqlIntegratedSecurity ?? false);
+    const sqlResourceGroup = instanceConfig.sqlResourceGroup || activeConfig?.sqlResourceGroup || '';
     
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
@@ -2681,17 +2736,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       instanceName: instance.instanceName,
       isEnabled: instance.isEnabled ?? true,
       adapterInstanceGuid: instance.adapterInstanceGuid,
-      receiveFolder: instance.adapterName === 'CSV' ? (defaultConfig?.destinationReceiveFolder || '') : undefined,
-      fileMask: instance.adapterName === 'CSV' ? (defaultConfig?.destinationFileMask || '*.txt') : undefined,
-      fieldSeparator: defaultConfig?.sourceFieldSeparator || '║',
-      destinationReceiveFolder: instance.adapterName === 'CSV' ? (defaultConfig?.destinationReceiveFolder || '') : undefined,
-      destinationFileMask: instance.adapterName === 'CSV' ? (defaultConfig?.destinationFileMask || '*.txt') : undefined,
+      receiveFolder: instance.adapterName === 'CSV' ? destinationReceiveFolder : undefined,
+      fileMask: instance.adapterName === 'CSV' ? destinationFileMask : undefined,
+      fieldSeparator: instance.adapterName === 'CSV' ? fieldSeparator : undefined,
+      destinationReceiveFolder: instance.adapterName === 'CSV' ? destinationReceiveFolder : undefined,
+      destinationFileMask: instance.adapterName === 'CSV' ? destinationFileMask : undefined,
       sqlServerName: sqlServerName,
       sqlDatabaseName: sqlDatabaseName,
       sqlUserName: sqlUserName,
       sqlPassword: sqlPassword,
       sqlIntegratedSecurity: sqlIntegratedSecurity,
       sqlResourceGroup: sqlResourceGroup,
+      csvAdapterType: instance.adapterName === 'CSV' ? csvAdapterType : undefined,
+      sftpHost: instanceConfig.sftpHost || '',
+      sftpPort: instanceConfig.sftpPort ?? 22,
+      sftpUsername: instanceConfig.sftpUsername || '',
+      sftpPassword: instanceConfig.sftpPassword || '',
+      sftpSshKey: instanceConfig.sftpSshKey || '',
+      sftpFolder: instanceConfig.sftpFolder || '',
+      sftpFileMask: instanceConfig.sftpFileMask || '*.txt',
+      sftpMaxConnectionPoolSize: instanceConfig.sftpMaxConnectionPoolSize ?? 5,
+      sftpFileBufferSize: instanceConfig.sftpFileBufferSize ?? 8192,
       tableName: instance.adapterName === 'SqlServer' ? sqlTableName : undefined
     };
 
@@ -2704,6 +2769,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       if (result) {
         // Update the instance
         this.updateDestinationInstance(instance.adapterInstanceGuid, result);
+        if (instance.adapterName === 'SqlServer') {
+          this.updateSqlConnectionProperties(
+            result.sqlServerName,
+            result.sqlDatabaseName,
+            result.sqlUserName,
+            result.sqlPassword,
+            result.sqlIntegratedSecurity,
+            result.sqlResourceGroup
+          );
+        }
       }
     });
   }
@@ -2726,8 +2801,42 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     
     // Update configuration for CSV adapters
-    if (properties.destinationReceiveFolder !== undefined && instance.adapterName === 'CSV') {
-      configuration = { ...configuration, destination: properties.destinationReceiveFolder };
+    if (instance.adapterName === 'CSV') {
+      const selectedAdapterType = (properties.csvAdapterType || configuration.csvAdapterType || configuration.adapterType || 'FILE').toString().toUpperCase();
+      const normalizedFieldSeparator = ((properties.fieldSeparator ?? configuration.fieldSeparator ?? '║').toString().trim()) || '║';
+      
+      configuration = {
+        ...configuration,
+        csvAdapterType: selectedAdapterType,
+        adapterType: selectedAdapterType,
+        fieldSeparator: normalizedFieldSeparator
+      };
+
+      if (selectedAdapterType === 'FILE') {
+        const receiveFolder = properties.destinationReceiveFolder ?? configuration.destinationReceiveFolder ?? configuration.destination ?? '';
+        const fileMask = properties.destinationFileMask ?? configuration.destinationFileMask ?? '*.txt';
+
+        configuration = {
+          ...configuration,
+          destination: receiveFolder,
+          destinationReceiveFolder: receiveFolder,
+          destinationFileMask: fileMask
+        };
+      } else if (selectedAdapterType === 'SFTP') {
+        configuration = {
+          ...configuration,
+          sftpHost: properties.sftpHost ?? configuration.sftpHost ?? '',
+          sftpPort: properties.sftpPort ?? configuration.sftpPort ?? 22,
+          sftpUsername: properties.sftpUsername ?? configuration.sftpUsername ?? '',
+          sftpPassword: properties.sftpPassword ?? configuration.sftpPassword ?? '',
+          sftpSshKey: properties.sftpSshKey ?? configuration.sftpSshKey ?? '',
+          sftpFolder: properties.sftpFolder ?? configuration.sftpFolder ?? '',
+          sftpFileMask: properties.sftpFileMask ?? configuration.sftpFileMask ?? '*.txt',
+          sftpMaxConnectionPoolSize: properties.sftpMaxConnectionPoolSize ?? configuration.sftpMaxConnectionPoolSize ?? 5,
+          sftpFileBufferSize: properties.sftpFileBufferSize ?? configuration.sftpFileBufferSize ?? 8192,
+          destination: properties.sftpFolder ?? configuration.sftpFolder ?? ''
+        };
+      }
     }
     
     // Update SqlServer adapter configuration with SQL properties and table name
@@ -2977,6 +3086,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.snackBar.open('CSV-Format könnte ungültig sein. Bitte überprüfen Sie die Syntax.', 'OK', {
         duration: 3000
       });
+    }
+  }
+
+  onCsvDataChange(newCsvData: string): void {
+    this.csvDataText = newCsvData;
+    // Update CsvData property via API
+    if (this.currentInterfaceName) {
+      this.updateCsvDataProperty(newCsvData);
     }
   }
 

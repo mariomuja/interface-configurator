@@ -97,7 +97,7 @@ public class AdapterFactory : IAdapterFactory
         string? destinationReceiveFolder = isSource ? null : config.DestinationReceiveFolder; // Only Destination adapters have destination receive folder
         string? destinationFileMask = isSource ? null : config.DestinationFileMask; // Only Destination adapters have destination file mask
         
-        // Get SFTP properties (only for source adapters)
+        // Get SFTP/adapter properties
         string? adapterType = isSource ? config.CsvAdapterType : null;
         string? sftpHost = isSource ? config.SftpHost : null;
         int? sftpPort = isSource ? config.SftpPort : null;
@@ -108,6 +108,46 @@ public class AdapterFactory : IAdapterFactory
         string? sftpFileMask = isSource ? config.SftpFileMask : null;
         int? sftpMaxConnectionPoolSize = isSource ? config.SftpMaxConnectionPoolSize : null;
         int? sftpFileBufferSize = isSource ? config.SftpFileBufferSize : null;
+
+        if (!isSource && configDict != null)
+        {
+            string? TryGetString(string key)
+            {
+                if (configDict.TryGetValue(key, out var element) && element.ValueKind == JsonValueKind.String)
+                {
+                    return element.GetString();
+                }
+                return null;
+            }
+
+            fieldSeparator = TryGetString("fieldSeparator") ?? fieldSeparator;
+            destinationReceiveFolder = TryGetString("destinationReceiveFolder") ?? TryGetString("destination") ?? destinationReceiveFolder;
+            destinationFileMask = TryGetString("destinationFileMask") ?? destinationFileMask;
+
+            adapterType = TryGetString("csvAdapterType") ?? TryGetString("adapterType") ?? adapterType;
+
+            if (adapterType != null && adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+            {
+                sftpHost = TryGetString("sftpHost") ?? sftpHost;
+                if (configDict.TryGetValue("sftpPort", out var sftpPortElement) && sftpPortElement.ValueKind == JsonValueKind.Number && sftpPortElement.TryGetInt32(out var portValue))
+                {
+                    sftpPort = portValue;
+                }
+                sftpUsername = TryGetString("sftpUsername") ?? sftpUsername;
+                sftpPassword = TryGetString("sftpPassword") ?? sftpPassword;
+                sftpSshKey = TryGetString("sftpSshKey") ?? sftpSshKey;
+                sftpFolder = TryGetString("sftpFolder") ?? sftpFolder;
+                sftpFileMask = TryGetString("sftpFileMask") ?? sftpFileMask;
+                if (configDict.TryGetValue("sftpMaxConnectionPoolSize", out var poolSizeElement) && poolSizeElement.ValueKind == JsonValueKind.Number && poolSizeElement.TryGetInt32(out var poolValue))
+                {
+                    sftpMaxConnectionPoolSize = poolValue;
+                }
+                if (configDict.TryGetValue("sftpFileBufferSize", out var bufferElement) && bufferElement.ValueKind == JsonValueKind.Number && bufferElement.TryGetInt32(out var bufferValue))
+                {
+                    sftpFileBufferSize = bufferValue;
+                }
+            }
+        }
 
         // Ensure adapter instance exists in MessageBox
         if (messageBoxService != null)

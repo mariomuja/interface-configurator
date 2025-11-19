@@ -59,9 +59,20 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   try {
+    let requestBody = req.body || {};
+    if (typeof requestBody === 'string') {
+      try {
+        requestBody = JSON.parse(requestBody);
+      } catch {
+        requestBody = {};
+      }
+    }
+
     // Ensure interface configuration exists before uploading CSV
     const functionAppUrl = process.env.AZURE_FUNCTION_APP_URL || process.env.FUNCTION_APP_URL;
-    const interfaceName = process.env.INTERFACE_NAME || 'FromCsvToSqlServerExample';
+    const interfaceName = (requestBody.interfaceName && requestBody.interfaceName.trim()) 
+      ? requestBody.interfaceName.trim() 
+      : (process.env.INTERFACE_NAME || 'FromCsvToSqlServerExample');
     
     if (functionAppUrl) {
       try {
@@ -132,8 +143,8 @@ module.exports = async (req, res) => {
     
     // Use CSV content from request body if provided, otherwise generate sample data
     let csvContent;
-    if (req.body && req.body.csvContent && typeof req.body.csvContent === 'string' && req.body.csvContent.trim() !== '') {
-      csvContent = req.body.csvContent;
+    if (requestBody.csvContent && typeof requestBody.csvContent === 'string' && requestBody.csvContent.trim() !== '') {
+      csvContent = requestBody.csvContent;
       console.log('Using CSV content from request body');
     } else {
       // Generate CSV data
@@ -150,9 +161,28 @@ module.exports = async (req, res) => {
     await blockBlobClient.upload(csvContent, csvContent.length, {
       blobHTTPHeaders: { blobContentType: 'text/csv' }
     });
+
+    // Trigger transport pipeline immediately via Azure Function
+    if (functionAppUrl) {
+      try {
+        const pipelineUrl = `${functionAppUrl.replace(/\/$/, '')}/api/RunTransportPipeline`;
+        const fetch = require('node-fetch');
+        await fetch(pipelineUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            interfaceName,
+            csvContent
+          }),
+          timeout: 10000
+        });
+      } catch (pipelineError) {
+        console.warn('RunTransportPipeline call failed (pipeline will continue asynchronously):', pipelineError.message);
+      }
+    }
     
     res.status(200).json({
-      message: 'CSV file uploaded. The source adapter will process it and write data to MessageBox. Destination adapters will then read from MessageBox and write to their configured destinations. After processing, the file will be moved to csv-processed or csv-error folder.',
+      message: 'CSV file uploaded and transport pipeline triggered. The source adapter will process the data and forward it via MessageBox to all enabled destination adapters.',
       fileId: fileName,
       blobUrl: blockBlobClient.url
     });

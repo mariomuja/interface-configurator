@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -31,7 +31,8 @@ export type AdapterName = 'CSV' | 'SqlServer';
   templateUrl: './adapter-card.component.html',
   styleUrl: './adapter-card.component.css'
 })
-export class AdapterCardComponent {
+export class AdapterCardComponent implements OnChanges, AfterViewInit {
+  @ViewChild('csvEditor', { static: false }) csvEditor?: ElementRef<HTMLDivElement>;
   @Input() adapterType: AdapterType = 'Source';
   @Input() adapterName: AdapterName = 'CSV';
   @Input() instanceName: string = '';
@@ -43,12 +44,14 @@ export class AdapterCardComponent {
   @Input() expanded: boolean = true;
   @Input() showReceiveFolder: boolean = false; // Only show for CSV Source adapters
   @Input() cardContent: string = ''; // Content to display in the card body (e.g., CSV text or table)
+  @Input() csvData: string = ''; // CSV data content (bound to CsvData property)
   @Input() isDisabled: boolean = false; // If true, card appears greyed out (for unsupported multiple destinations)
   @Input() primaryActionDisabled: boolean = false; // If true, the primary action button is disabled
 
   @Output() instanceNameChange = new EventEmitter<string>();
   @Output() enabledChange = new EventEmitter<boolean>();
   @Output() receiveFolderChange = new EventEmitter<string>();
+  @Output() csvDataChange = new EventEmitter<string>(); // Emit when CSV data changes
   @Output() restart = new EventEmitter<void>();
   @Output() expandedChange = new EventEmitter<boolean>();
   @Output() primaryAction = new EventEmitter<void>(); // For "Start Transport" or "Drop Table" buttons
@@ -92,6 +95,34 @@ export class AdapterCardComponent {
 
   onSettings(): void {
     this.settingsClick.emit();
+  }
+
+  onCsvDataInput(event: Event): void {
+    const element = event.target as HTMLElement;
+    if (element) {
+      this.csvData = element.textContent || '';
+    }
+  }
+
+  onCsvDataBlur(): void {
+    this.csvDataChange.emit(this.csvData);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['csvData'] && !changes['csvData'].firstChange && this.csvEditor) {
+      // Update the contenteditable div when csvData input changes
+      const currentText = this.csvEditor.nativeElement.textContent || '';
+      if (currentText !== this.csvData) {
+        this.csvEditor.nativeElement.textContent = this.csvData;
+      }
+    }
+  }
+
+  ngAfterViewInit(): void {
+    // Initialize CSV editor content
+    if (this.csvEditor && this.csvData) {
+      this.csvEditor.nativeElement.textContent = this.csvData;
+    }
   }
 
   getPrimaryActionLabel(): string {
