@@ -1324,7 +1324,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   restartSourceAdapter(): void {
     this.isRestartingSource = true;
-    this.transportService.restartAdapter(this.DEFAULT_INTERFACE_NAME, 'Source').subscribe({
+    const interfaceName = this.getActiveInterfaceName();
+    this.transportService.restartAdapter(interfaceName, 'Source').subscribe({
       next: (response) => {
         this.isRestartingSource = false;
         this.snackBar.open(response.message || 'Source adapter wird neu gestartet...', 'OK', { duration: 5000 });
@@ -1346,7 +1347,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   restartDestinationAdapter(): void {
     this.isRestartingDestination = true;
-    this.transportService.restartAdapter(this.DEFAULT_INTERFACE_NAME, 'Destination').subscribe({
+    const interfaceName = this.getActiveInterfaceName();
+    this.transportService.restartAdapter(interfaceName, 'Destination').subscribe({
       next: (response) => {
         this.isRestartingDestination = false;
         this.snackBar.open(response.message || 'Destination adapter wird neu gestartet...', 'OK', { duration: 5000 });
