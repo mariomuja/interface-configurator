@@ -14,6 +14,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
 {
     private const string ConfigFileName = "interface-configurations.json";
     private const string ConfigContainerName = "function-config";
+    private const string DefaultInterfaceName = "FromCsvToSqlServerExample";
     
     private readonly BlobServiceClient? _blobServiceClient;
     private readonly ILogger<InterfaceConfigurationService>? _logger;
@@ -34,6 +35,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         if (_initialized)
             return;
 
+        bool createdDefaultConfiguration = false;
         await _lock.WaitAsync(cancellationToken);
         try
         {
@@ -83,11 +85,24 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                 // Continue with empty configuration
             }
 
+            if (!_configurations.ContainsKey(DefaultInterfaceName))
+            {
+                var defaultConfiguration = CreateDefaultInterfaceConfiguration();
+                _configurations[DefaultInterfaceName] = defaultConfiguration;
+                createdDefaultConfiguration = true;
+                _logger?.LogInformation("Created default interface configuration '{InterfaceName}'", DefaultInterfaceName);
+            }
+
             _initialized = true;
         }
         finally
         {
             _lock.Release();
+        }
+
+        if (createdDefaultConfiguration)
+        {
+            await SaveConfigurationsAsync(cancellationToken);
         }
     }
 
@@ -121,6 +136,71 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             _lock.Release();
         }
+    }
+
+    private InterfaceConfiguration CreateDefaultInterfaceConfiguration()
+    {
+        var now = DateTime.UtcNow;
+
+        var sqlServer = Environment.GetEnvironmentVariable("AZURE_SQL_SERVER") ?? string.Empty;
+        var sqlDatabase = Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE") ?? "AppDatabase";
+        var sqlUser = Environment.GetEnvironmentVariable("AZURE_SQL_USER") ?? string.Empty;
+        var sqlPassword = Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD") ?? string.Empty;
+
+        var destinationInstanceConfig = JsonSerializer.Serialize(new
+        {
+            destination = "TransportData",
+            tableName = "TransportData",
+            sqlServerName = sqlServer,
+            sqlDatabaseName = sqlDatabase,
+            sqlUserName = sqlUser,
+            sqlPassword = sqlPassword,
+            sqlIntegratedSecurity = false
+        });
+
+        var configuration = new InterfaceConfiguration
+        {
+            InterfaceName = DefaultInterfaceName,
+            Description = "Default CSV to SQL Server interface created automatically.",
+            SourceAdapterName = "CSV",
+            SourceConfiguration = JsonSerializer.Serialize(new { source = "csv-incoming", enabled = true }),
+            DestinationAdapterName = "SqlServer",
+            DestinationConfiguration = JsonSerializer.Serialize(new { destination = "TransportData", enabled = true }),
+            SourceIsEnabled = true,
+            DestinationIsEnabled = true,
+            SourceInstanceName = "CSV Source",
+            DestinationInstanceName = "SQL Destination",
+            SourceAdapterInstanceGuid = Guid.NewGuid(),
+            DestinationAdapterInstanceGuid = Guid.NewGuid(),
+            SourceReceiveFolder = "csv-incoming",
+            SourceFileMask = "*.txt",
+            SourceBatchSize = 100,
+            SourceFieldSeparator = "║",
+            CsvAdapterType = "RAW",
+            CsvData = "Id║FirstName║LastName║Email║City\n1║Max║Mustermann║max@example.com║Berlin\n2║Anna║Schmidt║anna@example.com║München",
+            DestinationFileMask = "*.txt",
+            SqlServerName = sqlServer,
+            SqlDatabaseName = sqlDatabase,
+            SqlUserName = sqlUser,
+            SqlPassword = sqlPassword,
+            SqlIntegratedSecurity = false,
+            SqlTableName = "TransportData",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        configuration.DestinationAdapterInstances.Add(new DestinationAdapterInstance
+        {
+            AdapterInstanceGuid = Guid.NewGuid(),
+            InstanceName = "SqlServer Adapter 1",
+            AdapterName = "SqlServer",
+            IsEnabled = true,
+            Configuration = destinationInstanceConfig,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        return configuration;
     }
 
     public async Task<List<InterfaceConfiguration>> GetAllConfigurationsAsync(CancellationToken cancellationToken = default)
