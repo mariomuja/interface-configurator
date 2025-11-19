@@ -42,7 +42,6 @@
       (restart)="restartSourceAdapter()"
       (expandedChange)="sourceCardExpanded = $event"
       (csvDataChange)="onCsvDataChange($event)"
-      (primaryAction)="startTransport()"
       (settingsClick)="openSourceAdapterSettings()">
       <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
         <p>SQL Server Source Adapter</p>
@@ -103,10 +102,10 @@
       </table>
     </div>
     <div class="table-empty-message" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
-      <p>No MessageBox messages yet. Start the transport to write data.</p>
+      <p>No MessageBox messages yet. The CSV source pushes data automatically when it is enabled.</p>
     </div>
     <div class="table-empty-message" *ngIf="!sourceAdapterInstanceGuid">
-      <p>The source adapter instance is not initialized yet. Open the source settings or start the transport to generate messages.</p>
+      <p>The source adapter instance is not initialized yet. Enable the source adapter to start generating messages.</p>
     </div>
   </mat-card-content>
 </mat-card>

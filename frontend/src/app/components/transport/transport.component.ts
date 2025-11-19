@@ -115,6 +115,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
   private demoSampleCsvCache: { text: string; records: CsvRecord[] } | null = null;
+  private autoStartedInterfaces = new Set<string>();
   messageBoxTableData: MessageBoxTableRow[] = [];
   messageBoxRecordColumns: string[] = [];
   messageBoxDisplayedColumns: string[] = ['datetimeCreated', 'status'];
@@ -797,8 +798,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   startTransport(): void {
-    this.isTransporting = true;
     const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return;
+    }
+    this.startTransportForInterface(interfaceName);
+  }
+
+  private startTransportForInterface(interfaceName: string): void {
+    this.isTransporting = true;
     const activeConfig = this.getInterfaceConfig(interfaceName);
 
     if (!activeConfig) {
@@ -874,6 +882,36 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
   
+  private autoStartCsvSourceIfEnabled(interfaceName?: string, options: { force?: boolean } = {}): void {
+    const targetInterface = interfaceName || this.getActiveInterfaceName();
+    if (!targetInterface) {
+      return;
+    }
+
+    if (!options.force && this.autoStartedInterfaces.has(targetInterface)) {
+      return;
+    }
+
+    const config = this.getInterfaceConfig(targetInterface);
+    if (!config) {
+      return;
+    }
+
+    if (config.sourceAdapterName !== 'CSV' || !config.sourceIsEnabled) {
+      if (!config.sourceIsEnabled) {
+        this.autoStartedInterfaces.delete(targetInterface);
+      }
+      return;
+    }
+
+    if (this.isTransporting) {
+      return;
+    }
+
+    this.autoStartedInterfaces.add(targetInterface);
+    this.startTransportForInterface(targetInterface);
+  }
+
   private uploadAndStartTransport(interfaceName: string): void {
     // Use edited CSV text if available, otherwise use formatted CSV from csvData
     const csvContent = this.editableCsvText || this.formatCsvAsText();
@@ -906,6 +944,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           horizontalPosition: 'center'
         });
         this.isTransporting = false;
+        this.autoStartedInterfaces.delete(interfaceName);
       }
     });
   }
@@ -1179,12 +1218,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', this.sourceIsEnabled).subscribe({
       next: () => {
+        if (activeConfig) {
+          activeConfig.sourceIsEnabled = this.sourceIsEnabled;
+        }
         this.loadInterfaceConfigurations();
         this.snackBar.open(
-          `Source adapter ${this.sourceIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.sourceIsEnabled ? 'Der Prozess wird beim nächsten Timer-Trigger gestartet.' : 'Der Prozess stoppt sofort.'}`,
+          `Source adapter ${this.sourceIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.sourceIsEnabled ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
           'OK',
           { duration: 5000 }
         );
+        if (this.sourceIsEnabled) {
+          this.autoStartCsvSourceIfEnabled(activeInterfaceName, { force: true });
+        } else {
+          this.autoStartedInterfaces.delete(activeInterfaceName);
+        }
       },
       error: (error) => {
         console.error('Error toggling source adapter:', error);
@@ -1930,6 +1977,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadDestinationAdapterInstances();
     this.loadSqlData();
     this.loadMessageBoxData();
+    this.autoStartCsvSourceIfEnabled(config.interfaceName);
   }
 
   openAddInterfaceDialog(): void {

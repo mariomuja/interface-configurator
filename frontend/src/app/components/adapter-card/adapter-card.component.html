@@ -46,7 +46,7 @@
         </div>
       </div>
     </mat-panel-title>
-    <mat-panel-description>
+    <mat-panel-description *ngIf="adapterType === 'Destination'">
       <button mat-raised-button [color]="getPrimaryActionColor()" 
               (click)="onPrimaryAction(); $event.stopPropagation()" 
               [disabled]="isDisabled || primaryActionDisabled"

@@ -76,6 +76,7 @@ describe('TransportComponent', () => {
     transportService.updateCsvPollingInterval.and.returnValue(of({}));
     transportService.addDestinationAdapterInstance.and.returnValue(of({}));
     transportService.getMessageBoxMessages.and.returnValue(of([]));
+    transportService.startTransport.and.returnValue(of({ message: 'Auto start', fileId: 'auto' }));
 
     component['refreshSubscription']?.unsubscribe();
   });
@@ -95,6 +96,11 @@ describe('TransportComponent', () => {
     expect(transportService.getProcessLogs).toHaveBeenCalled();
     // Logs are enriched with component property, so we check for length
     expect(component.processLogs.length).toBeGreaterThanOrEqual(mockLogs.length);
+  });
+
+  it('should auto start CSV source when enabled', () => {
+    fixture.detectChanges();
+    expect(transportService.startTransport).toHaveBeenCalled();
   });
 
   it('should start transport', () => {
