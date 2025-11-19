@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
@@ -16,6 +19,8 @@ public class SourceAdapterFunction
     private readonly IInterfaceConfigurationService _configService;
     private readonly IAdapterFactory _adapterFactory;
     private readonly ILogger<SourceAdapterFunction> _logger;
+    private static readonly ConcurrentDictionary<string, DateTime> _lastCsvPollTimes = new();
+    private static readonly ConcurrentDictionary<string, string> _lastCsvDataHashes = new();
 
     public SourceAdapterFunction(
         IInterfaceConfigurationService configService,
@@ -84,6 +89,31 @@ public class SourceAdapterFunction
 
         try
         {
+            var isCsvSource = config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase);
+            var csvPollingInterval = config.CsvPollingInterval > 0 ? config.CsvPollingInterval : 10;
+
+            void UpdateCsvPollTime()
+            {
+                if (isCsvSource)
+                {
+                    _lastCsvPollTimes[config.InterfaceName] = DateTime.UtcNow;
+                }
+            }
+
+            if (isCsvSource)
+            {
+                var lastPoll = _lastCsvPollTimes.GetOrAdd(config.InterfaceName, DateTime.MinValue);
+                var elapsedSeconds = (DateTime.UtcNow - lastPoll).TotalSeconds;
+                if (elapsedSeconds < csvPollingInterval)
+                {
+                    _logger.LogDebug("Skipping CSV source '{InterfaceName}' - waiting {RemainingSeconds:F1}s before next poll (interval {IntervalSeconds}s).",
+                        config.InterfaceName,
+                        csvPollingInterval - elapsedSeconds,
+                        csvPollingInterval);
+                    return;
+                }
+            }
+
             // Parse source configuration
             var sourceConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(config.SourceConfiguration) 
                 ?? new Dictionary<string, JsonElement>();
@@ -106,13 +136,27 @@ public class SourceAdapterFunction
                     _logger.LogInformation("Processing RAW adapter type: Interface={InterfaceName}, CsvDataLength={DataLength}", 
                         config.InterfaceName, config.CsvData.Length);
 
+                    var currentHash = ComputeCsvHash(config.CsvData);
+                    var lastHash = _lastCsvDataHashes.GetOrAdd(config.InterfaceName, string.Empty);
+                    if (string.Equals(currentHash, lastHash, StringComparison.Ordinal))
+                    {
+                        _logger.LogInformation("CsvData has not changed since last processing for interface '{InterfaceName}'. Skipping.", config.InterfaceName);
+                        UpdateCsvPollTime();
+                        return;
+                    }
+
                     // Create adapter and process CsvData (will upload to csv-incoming)
                     var csvSourceAdapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
                     if (csvSourceAdapter is CsvAdapter csvAdapter)
                     {
                         csvAdapter.CsvData = config.CsvData; // This will trigger upload to csv-incoming
                         _logger.LogInformation("CsvData set on adapter, file will be uploaded to csv-incoming and processed via blob trigger");
+                        if (!string.IsNullOrEmpty(currentHash))
+                        {
+                            _lastCsvDataHashes[config.InterfaceName] = currentHash;
+                        }
                     }
+                    UpdateCsvPollTime();
                     return; // File processing happens via blob trigger
                 }
             }
@@ -180,6 +224,8 @@ public class SourceAdapterFunction
             _logger.LogInformation(
                 "Successfully processed source configuration '{InterfaceName}': {RecordCount} records read and written to MessageBox",
                 config.InterfaceName, records.Count);
+
+            UpdateCsvPollTime();
         }
         catch (Exception ex)
         {
@@ -187,6 +233,18 @@ public class SourceAdapterFunction
                 config.InterfaceName, ex.Message);
             throw;
         }
+    }
+
+    private static string ComputeCsvHash(string? data)
+    {
+        if (string.IsNullOrEmpty(data))
+        {
+            return string.Empty;
+        }
+
+        using var sha = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(data);
+        return Convert.ToHexString(sha.ComputeHash(bytes));
     }
 }
 

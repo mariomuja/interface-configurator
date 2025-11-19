@@ -200,6 +200,13 @@ export class TransportService {
     });
   }
 
+  updateCsvPollingInterval(interfaceName: string, pollingInterval: number): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/UpdateCsvPollingInterval`, {
+      interfaceName,
+      pollingInterval
+    });
+  }
+
   updateFieldSeparator(interfaceName: string, fieldSeparator: string): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/UpdateFieldSeparator`, {
       interfaceName,

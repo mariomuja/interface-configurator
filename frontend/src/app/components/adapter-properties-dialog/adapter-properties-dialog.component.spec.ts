@@ -13,6 +13,8 @@ describe('AdapterPropertiesDialogComponent', () => {
     adapterName: 'CSV',
     instanceName: 'TestInstance',
     isEnabled: true,
+    csvAdapterType: 'RAW',
+    csvPollingInterval: 10,
     adapterInstanceGuid: 'test-guid',
     ...overrides
   });
@@ -166,7 +168,7 @@ describe('AdapterPropertiesDialogComponent', () => {
     });
 
     it('should include SFTP properties when csvAdapterType is SFTP', () => {
-      const mockData = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
+      const mockData = createMockData({ adapterName: 'CSV', adapterType: 'Source', csvAdapterType: 'SFTP' });
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [AdapterPropertiesDialogComponent],
@@ -178,7 +180,6 @@ describe('AdapterPropertiesDialogComponent', () => {
       });
       fixture = TestBed.createComponent(AdapterPropertiesDialogComponent);
       component = fixture.componentInstance;
-      component.csvAdapterType = 'SFTP';
       component.sftpHost = 'sftp.example.com';
       component.sftpPort = 2222;
       component.sftpUsername = 'sftp-user';
@@ -191,6 +192,16 @@ describe('AdapterPropertiesDialogComponent', () => {
         sftpHost: 'sftp.example.com',
         sftpPort: 2222,
         sftpUsername: 'sftp-user'
+      }));
+    });
+
+    it('should include CSV polling interval when provided', () => {
+      component.csvPollingInterval = 45;
+      component.ngOnInit();
+      component.onSave();
+
+      expect(dialogRef.close).toHaveBeenCalledWith(jasmine.objectContaining({
+        csvPollingInterval: 45
       }));
     });
   });
@@ -276,14 +287,13 @@ describe('AdapterPropertiesDialogComponent', () => {
 
   describe('getters', () => {
     it('should show receive folder for CSV Source FILE adapter', () => {
-      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
-      component.csvAdapterType = 'FILE';
+      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source', csvAdapterType: 'FILE' });
       component.ngOnInit();
       expect(component.showReceiveFolder).toBe(true);
     });
 
     it('should not show receive folder for CSV Source SFTP adapter', () => {
-      const mockData = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
+      const mockData = createMockData({ adapterName: 'CSV', adapterType: 'Source', csvAdapterType: 'SFTP' });
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [AdapterPropertiesDialogComponent],
@@ -302,7 +312,6 @@ describe('AdapterPropertiesDialogComponent', () => {
 
     it('should show file mask for CSV Source FILE adapter', () => {
       component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
-      component.csvAdapterType = 'FILE';
       component.ngOnInit();
       expect(component.showFileMask).toBe(true);
     });
@@ -344,7 +353,7 @@ describe('AdapterPropertiesDialogComponent', () => {
     });
 
     it('should show SFTP properties for CSV Source adapter', () => {
-      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
+      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source', csvAdapterType: 'SFTP' });
       component.ngOnInit();
       expect(component.showSftpProperties).toBe(true);
     });
@@ -356,8 +365,7 @@ describe('AdapterPropertiesDialogComponent', () => {
     });
 
     it('should show file properties for CSV Source FILE adapter', () => {
-      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source' });
-      component.csvAdapterType = 'FILE';
+      component.data = createMockData({ adapterName: 'CSV', adapterType: 'Source', csvAdapterType: 'FILE' });
       component.ngOnInit();
       expect(component.showFileProperties).toBe(true);
     });

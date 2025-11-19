@@ -81,6 +81,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   sourceFileMask: string = '*.txt';
   sourceBatchSize: number = 100;
   sourceFieldSeparator: string = '║';
+  csvPollingInterval: number = 10;
   destinationReceiveFolder: string = '';
   destinationFileMask: string = '*.txt';
   sourceAdapterInstanceGuid: string = '';
@@ -203,6 +204,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             destinationInstanceName: 'Destination',
             sourceIsEnabled: true,
             destinationIsEnabled: true,
+            csvPollingInterval: 10,
             _isPlaceholder: true
           });
           
@@ -1409,16 +1411,18 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openSourceAdapterSettings(): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const activeConfig = this.getInterfaceConfig();
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
-      adapterName: this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME)?.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV',
+      adapterName: this.sourceAdapterName,
       instanceName: this.sourceInstanceName,
       isEnabled: this.sourceIsEnabled,
       receiveFolder: this.sourceReceiveFolder,
       fileMask: this.sourceFileMask,
       batchSize: this.sourceBatchSize,
       fieldSeparator: this.sourceFieldSeparator,
+      csvAdapterType: activeConfig?.csvAdapterType,
+      csvPollingInterval: this.csvPollingInterval,
       sqlServerName: this.sqlServerName,
       sqlDatabaseName: this.sqlDatabaseName,
       sqlUserName: this.sqlUserName,
@@ -1490,6 +1494,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.fieldSeparator !== undefined && result.fieldSeparator !== this.sourceFieldSeparator) {
           this.sourceFieldSeparator = result.fieldSeparator;
           this.updateFieldSeparator(result.fieldSeparator);
+        }
+
+        if (result.csvPollingInterval !== undefined && result.csvPollingInterval !== this.csvPollingInterval) {
+          this.csvPollingInterval = result.csvPollingInterval;
+          this.updateCsvPollingInterval(result.csvPollingInterval);
         }
       }
     });
@@ -1602,6 +1611,41 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         });
         // Restore previous value
         this.sourceFieldSeparator = activeConfig.sourceFieldSeparator || '║';
+      }
+    });
+  }
+
+  updateCsvPollingInterval(pollingInterval?: number): void {
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
+
+    if (!activeConfig) {
+      return;
+    }
+
+    const normalizedInterval = Math.max(1, Math.floor(pollingInterval ?? this.csvPollingInterval ?? 10));
+    if (normalizedInterval === (activeConfig.csvPollingInterval ?? 10)) {
+      this.csvPollingInterval = normalizedInterval;
+      return;
+    }
+
+    this.csvPollingInterval = normalizedInterval;
+
+    this.transportService.updateCsvPollingInterval(interfaceName, normalizedInterval).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('Polling-Intervall aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating CSV polling interval:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Polling-Intervalls');
+        this.snackBar.open(detailedMessage, 'Schließen', {
+          duration: 10000,
+          panelClass: ['error-snackbar'],
+          verticalPosition: 'top',
+          horizontalPosition: 'center'
+        });
+        this.csvPollingInterval = activeConfig.csvPollingInterval ?? 10;
       }
     });
   }
@@ -1787,6 +1831,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sourceFileMask = config.sourceFileMask || this.sourceFileMask;
     this.sourceBatchSize = config.sourceBatchSize ?? this.sourceBatchSize;
     this.sourceFieldSeparator = config.sourceFieldSeparator || this.sourceFieldSeparator;
+    this.csvPollingInterval = config.csvPollingInterval ?? 10;
     this.destinationReceiveFolder = config.destinationReceiveFolder || this.destinationReceiveFolder;
     this.destinationFileMask = config.destinationFileMask || this.destinationFileMask;
     this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
@@ -1967,6 +2012,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sqlUseTransaction = false;
     this.sqlBatchSize = 1000;
     this.csvDataInitialization.delete(this.getActiveInterfaceName());
+    this.csvPollingInterval = 10;
   }
 
   showInterfaceJson(): void {

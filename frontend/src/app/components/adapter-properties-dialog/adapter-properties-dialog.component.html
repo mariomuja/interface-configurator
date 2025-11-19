@@ -40,6 +40,12 @@
       <mat-icon matSuffix matTooltip="Number of rows read from the CSV file in one chunk before debatching into single rows and writing to MessageBox. Larger batches improve performance for large files but use more memory. Smaller batches use less memory but may be slower. Default: 100 rows per batch." matTooltipPosition="left">help_outline</mat-icon>
     </mat-form-field>
 
+<mat-form-field appearance="outline" class="full-width compact-field" *ngIf="data.adapterName === 'CSV' && data.adapterType === 'Source'" floatLabel="always">
+  <mat-label>Polling Interval (sec)</mat-label>
+  <input matInput class="compact-input" type="number" [(ngModel)]="csvPollingInterval" min="1" />
+  <mat-icon matSuffix matTooltip="Defines how often this CSV adapter checks for new data. RAW: controls how often CsvData is inspected for changes. FILE/SFTP: controls how often the adapter polls the folder or SFTP server for new files. Default: 10 seconds." matTooltipPosition="left">help_outline</mat-icon>
+</mat-form-field>
+
     <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="showFieldSeparator" floatLabel="always">
       <mat-label>Field Separator</mat-label>
       <input matInput class="compact-input" [(ngModel)]="fieldSeparator" maxlength="10" />

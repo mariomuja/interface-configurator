@@ -134,6 +134,10 @@ public class InterfaceConfiguration
     /// </summary>
     [MaxLength(20)]
     public string CsvAdapterType { get; set; } = "FILE";
+    /// <summary>
+    /// Polling interval in seconds for CSV adapters (RAW/FILE/SFTP). Defines how often the adapter checks for new data.
+    /// </summary>
+    public int CsvPollingInterval { get; set; } = 10;
 
     /// <summary>
     /// SFTP server hostname or IP address

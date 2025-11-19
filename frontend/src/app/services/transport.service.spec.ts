@@ -61,7 +61,7 @@ describe('TransportService', () => {
       expect(logs).toEqual(mockLogs);
     });
 
-    const req = httpMock.expectOne('/api/process-logs');
+    const req = httpMock.expectOne('/api/GetProcessLogs');
     expect(req.request.method).toBe('GET');
     req.flush(mockLogs);
   });

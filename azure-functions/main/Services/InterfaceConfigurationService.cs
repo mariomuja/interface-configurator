@@ -106,6 +106,32 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         }
     }
 
+    public async Task UpdateCsvPollingIntervalAsync(string interfaceName, int pollingInterval, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_configurations.TryGetValue(interfaceName, out var config))
+            {
+                var interval = pollingInterval > 0 ? pollingInterval : 10;
+                config.CsvPollingInterval = interval;
+                config.UpdatedAt = DateTime.UtcNow;
+                _logger?.LogInformation("CSV polling interval for interface '{InterfaceName}' updated to {PollingInterval} seconds", interfaceName, interval);
+            }
+            else
+            {
+                _logger?.LogWarning("Interface configuration '{InterfaceName}' not found for updating CSV polling interval", interfaceName);
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        await SaveConfigurationsAsync(cancellationToken);
+    }
+
     private async Task SaveConfigurationsAsync(CancellationToken cancellationToken = default)
     {
         if (_blobServiceClient == null)
@@ -176,6 +202,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             SourceFileMask = "*.txt",
             SourceBatchSize = 100,
             SourceFieldSeparator = "║",
+            CsvPollingInterval = 10,
             CsvAdapterType = "RAW",
             CsvData = "Id║FirstName║LastName║Email║City\n1║Max║Mustermann║max@example.com║Berlin\n2║Anna║Schmidt║anna@example.com║München",
             DestinationFileMask = "*.txt",

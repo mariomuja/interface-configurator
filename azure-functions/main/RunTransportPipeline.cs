@@ -129,6 +129,7 @@ public class RunTransportPipeline
             DestinationInstanceName = "Destination",
             SourceAdapterInstanceGuid = Guid.NewGuid(),
             DestinationAdapterInstanceGuid = Guid.NewGuid(),
+            CsvPollingInterval = 10,
             SqlTableName = "TransportData",
             CreatedAt = DateTime.UtcNow
         };

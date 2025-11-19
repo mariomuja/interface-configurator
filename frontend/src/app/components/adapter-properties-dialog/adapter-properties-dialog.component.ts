@@ -33,6 +33,7 @@ export interface AdapterPropertiesData {
   sftpFileMask?: string;
   sftpMaxConnectionPoolSize?: number;
   sftpFileBufferSize?: number;
+  csvPollingInterval?: number; // Polling interval for CSV adapters
   // SQL Server properties
   sqlServerName?: string;
   sqlDatabaseName?: string;
@@ -87,6 +88,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   sftpFileMask: string = '*.txt';
   sftpMaxConnectionPoolSize: number = 5;
   sftpFileBufferSize: number = 8192;
+  csvPollingInterval: number = 10;
   // SQL Server properties
   sqlServerName: string = '';
   sqlDatabaseName: string = '';
@@ -135,6 +137,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.sftpFileMask = this.data.sftpFileMask || '*.txt';
     this.sftpMaxConnectionPoolSize = this.data.sftpMaxConnectionPoolSize ?? 5;
     this.sftpFileBufferSize = this.data.sftpFileBufferSize ?? 8192;
+    this.csvPollingInterval = this.data.csvPollingInterval ?? 10;
     // SQL Server properties
     this.sqlServerName = this.data.sqlServerName || '';
     this.sqlDatabaseName = this.data.sqlDatabaseName || '';
@@ -238,6 +241,7 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       sftpFileMask: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileMask.trim() || '*.txt') : undefined,
       sftpMaxConnectionPoolSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpMaxConnectionPoolSize > 0 ? this.sftpMaxConnectionPoolSize : 5) : undefined,
       sftpFileBufferSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileBufferSize > 0 ? this.sftpFileBufferSize : 8192) : undefined,
+          csvPollingInterval: this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' ? (this.csvPollingInterval > 0 ? this.csvPollingInterval : 10) : undefined,
       // SQL Server properties
       sqlServerName: this.data.adapterName === 'SqlServer' ? (this.sqlServerName.trim() || '') : undefined,
       sqlDatabaseName: this.data.adapterName === 'SqlServer' ? (this.sqlDatabaseName.trim() || '') : undefined,

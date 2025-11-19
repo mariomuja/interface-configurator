@@ -30,7 +30,8 @@ describe('TransportComponent', () => {
       destinationInstanceName: 'Destination',
       sourceIsEnabled: true,
       destinationIsEnabled: true,
-      csvData: 'Id║Name\n1║Test User'
+      csvData: 'Id║Name\n1║Test User',
+      csvPollingInterval: 10
     }
   ];
 
@@ -43,7 +44,9 @@ describe('TransportComponent', () => {
       'createInterfaceConfiguration',
       'getDestinationAdapterInstances',
       'getInterfaceConfiguration',
-      'updateCsvData'
+      'updateCsvData',
+      'updateCsvPollingInterval',
+      'addDestinationAdapterInstance'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -69,6 +72,8 @@ describe('TransportComponent', () => {
     transportService.getDestinationAdapterInstances.and.returnValue(of([]));
     transportService.getInterfaceConfiguration.and.returnValue(of(mockInterfaceConfigs[0]));
     transportService.updateCsvData.and.returnValue(of({}));
+    transportService.updateCsvPollingInterval.and.returnValue(of({}));
+    transportService.addDestinationAdapterInstance.and.returnValue(of({}));
 
     component['refreshSubscription']?.unsubscribe();
   });

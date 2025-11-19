@@ -100,6 +100,11 @@ public interface IInterfaceConfigurationService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update the polling interval for the CSV adapter.
+    /// </summary>
+    Task UpdateCsvPollingIntervalAsync(string interfaceName, int pollingInterval, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Update the field separator for the CSV adapter.
     /// </summary>
     Task UpdateFieldSeparatorAsync(string interfaceName, string fieldSeparator, CancellationToken cancellationToken = default);
