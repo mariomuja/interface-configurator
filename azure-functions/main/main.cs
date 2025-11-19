@@ -11,15 +11,18 @@ namespace InterfaceConfigurator.Main;
 
 public class MainFunction
 {
-    private readonly CsvAdapter _csvAdapter;
+    private readonly IInterfaceConfigurationService _configService;
+    private readonly IAdapterFactory _adapterFactory;
     private readonly ILogger<MainFunction> _logger;
     private readonly BlobServiceClient _blobServiceClient;
 
     public MainFunction(
-        CsvAdapter csvAdapter,
+        IInterfaceConfigurationService configService,
+        IAdapterFactory adapterFactory,
         ILogger<MainFunction> logger)
     {
-        _csvAdapter = csvAdapter ?? throw new ArgumentNullException(nameof(csvAdapter));
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _adapterFactory = adapterFactory ?? throw new ArgumentNullException(nameof(adapterFactory));
         _logger = logger;
         
         // Initialize BlobServiceClient for moving blobs between containers
@@ -97,10 +100,45 @@ public class MainFunction
                     // Continue processing even if validation fails (non-blocking)
                 }
                 
-                var (headers, records) = await _csvAdapter.ReadAsync(sourcePath, context.CancellationToken);
+                // Get all enabled CSV source configurations and process blob for each
+                // This ensures messages are written with the correct interface name and adapter instance GUID
+                var enabledConfigs = await _configService.GetEnabledSourceConfigurationsAsync(context.CancellationToken);
+                var csvConfigs = enabledConfigs.Where(c => c.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase)).ToList();
                 
-                _logger.LogInformation("Successfully processed CSV blob {BlobName}: {HeaderCount} headers, {RecordCount} records written to MessageBox. Destination adapter will process messages within 1 minute.",
-                    blobName, headers.Count, records.Count);
+                if (!csvConfigs.Any())
+                {
+                    _logger.LogWarning("No enabled CSV source configurations found. CSV blob {BlobName} will not be processed.", blobName);
+                    await MoveBlobToFolderAsync("csv-files", "csv-incoming", "csv-error", blobName, "No enabled CSV source configurations found");
+                    return;
+                }
+                
+                // Process blob for each enabled CSV source configuration
+                foreach (var config in csvConfigs)
+                {
+                    try
+                    {
+                        _logger.LogInformation("Processing CSV blob {BlobName} for interface {InterfaceName} with adapter instance GUID {AdapterInstanceGuid}",
+                            blobName, config.InterfaceName, config.SourceAdapterInstanceGuid);
+                        
+                        // Create adapter with correct interface name and adapter instance GUID
+                        var csvAdapter = await _adapterFactory.CreateSourceAdapterAsync(config, context.CancellationToken);
+                        if (csvAdapter is CsvAdapter csv)
+                        {
+                            var (headers, records) = await csv.ReadAsync(sourcePath, context.CancellationToken);
+                            
+                            _logger.LogInformation("Successfully processed CSV blob {BlobName} for interface {InterfaceName}: {HeaderCount} headers, {RecordCount} records written to MessageBox.",
+                                blobName, config.InterfaceName, headers.Count, records.Count);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing CSV blob {BlobName} for interface {InterfaceName}", blobName, config.InterfaceName);
+                        // Continue with other configurations
+                    }
+                }
+                
+                _logger.LogInformation("Completed processing CSV blob {BlobName} for {ConfigCount} interface configuration(s). Destination adapter will process messages within 1 minute.",
+                    blobName, csvConfigs.Count);
             }
             catch (Exception ex)
             {
