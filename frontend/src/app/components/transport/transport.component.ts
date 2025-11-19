@@ -110,6 +110,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
   
   readonly DEFAULT_INTERFACE_NAME = 'FromCsvToSqlServerExample';
+  private lastSyncedCsvData: string = '';
+  private csvDataInitialization = new Set<string>();
+  private isCsvDataUpdateInFlight = false;
   
   private getActiveInterfaceName(): string {
     return this.currentInterfaceName && this.currentInterfaceName.trim().length > 0
@@ -137,7 +140,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadSampleCsvData();
     this.loadSqlData();
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
@@ -334,68 +336,35 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  loadSampleCsvData(): void {
-    this.isLoading = true;
-    this.transportService.getSampleCsvData().subscribe({
-      next: (data) => {
-        // Use data if available, otherwise generate sample data locally
-        if (!data || data.length === 0) {
-          data = this.generateSampleCsvData();
-        }
-        
-        this.csvData = data;
-        const csvText = this.formatCsvAsText();
-        this.editableCsvText = csvText;
-        this.formattedCsvHtml = this.formatCsvAsHtml();
-        
-        // Update the contenteditable div with formatted HTML
-        setTimeout(() => {
-          if (this.csvEditor?.nativeElement) {
-            this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
-          }
-        }, 0);
-        
-        // Extract columns dynamically from CSV data
-        if (data && data.length > 0) {
-          this.csvDisplayedColumns = this.extractColumns(data);
-        }
-        
-        // Set CsvData property on adapter if interface is configured
-        if (this.currentInterfaceName && csvText && csvText !== this.translationService.translate('no.data.csv')) {
-          this.updateCsvDataProperty(csvText);
-        }
-        
-        // Ensure field separator is set to ║
-        if (this.sourceFieldSeparator !== '║') {
-          this.updateFieldSeparator('║');
-        }
-        
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading CSV data:', error);
-        // Generate sample data locally as fallback
-        const fallbackData = this.generateSampleCsvData();
-        this.csvData = fallbackData;
-        const csvText = this.formatCsvAsText();
-        this.editableCsvText = csvText;
-        this.formattedCsvHtml = this.formatCsvAsHtml();
-        
-        // Update the contenteditable div with formatted HTML
-        setTimeout(() => {
-          if (this.csvEditor?.nativeElement) {
-            this.csvEditor.nativeElement.innerHTML = this.formattedCsvHtml;
-          }
-        }, 0);
-        
-        // Extract columns dynamically from CSV data
-        if (fallbackData && fallbackData.length > 0) {
-          this.csvDisplayedColumns = this.extractColumns(fallbackData);
-        }
-        
-        this.isLoading = false;
-      }
-    });
+  private applyCsvDataLocally(csvText: string, records?: CsvRecord[]): void {
+    this.csvDataText = csvText || '';
+    this.editableCsvText = this.csvDataText;
+    if (records) {
+      this.csvData = records;
+    }
+    this.formattedCsvHtml = this.editableCsvText ? this.formatCsvAsHtml() : '';
+  }
+
+  private ensureCsvDataInitialized(interfaceName: string, existingCsvData?: string): void {
+    if (!interfaceName) {
+      return;
+    }
+
+    if (existingCsvData && existingCsvData.trim().length > 0) {
+      this.csvDataInitialization.delete(interfaceName);
+      return;
+    }
+
+    if (this.csvDataInitialization.has(interfaceName)) {
+      return;
+    }
+
+    this.csvDataInitialization.add(interfaceName);
+    const sampleRecords = this.generateSampleCsvData();
+    const csvText = this.convertRecordsToCsvText(sampleRecords);
+    this.applyCsvDataLocally(csvText, sampleRecords);
+    this.lastSyncedCsvData = csvText;
+    this.updateCsvDataProperty(csvText, { force: true });
   }
 
   generateSampleCsvData(): CsvRecord[] {
@@ -418,23 +387,51 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     return data;
   }
+
+  private convertRecordsToCsvText(records: CsvRecord[]): string {
+    if (!records || records.length === 0) {
+      return '';
+    }
+
+    const columns = this.extractColumns(records);
+    const headerRow = columns.join(this.FIELD_SEPARATOR);
+    const dataRows = records.map(row => {
+      return columns.map(col => {
+        const value = (row as any)[col] ?? '';
+        const valueStr = String(value);
+        if (valueStr.includes(this.FIELD_SEPARATOR) || valueStr.includes('"')) {
+          return `"${valueStr.replace(/"/g, '""')}"`;
+        }
+        return valueStr;
+      }).join(this.FIELD_SEPARATOR);
+    });
+
+    return [headerRow, ...dataRows].join('\n');
+  }
   
   /**
    * Update CsvData property on the adapter
    */
-  updateCsvDataProperty(csvText: string): void {
-    if (!this.currentInterfaceName) {
+  updateCsvDataProperty(csvText: string, options?: { force?: boolean }): void {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
       return;
     }
-    
-    this.transportService.updateCsvData(this.currentInterfaceName, csvText).subscribe({
+
+    const normalizedText = csvText ?? '';
+    if (!options?.force && normalizedText === this.lastSyncedCsvData) {
+      return;
+    }
+
+    this.isCsvDataUpdateInFlight = true;
+    this.transportService.updateCsvData(interfaceName, normalizedText).subscribe({
       next: () => {
-        // Successfully updated CsvData property
-        console.log('CsvData property updated successfully');
+        this.lastSyncedCsvData = normalizedText;
+        this.isCsvDataUpdateInFlight = false;
       },
       error: (error) => {
         console.error('Error updating CsvData property:', error);
-        // Don't show error to user - this is a background operation
+        this.isCsvDataUpdateInFlight = false;
       }
     });
   }
@@ -943,6 +940,35 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.refreshSubscription = interval(3000).subscribe(() => {
       this.loadSqlData();
       this.loadProcessLogs();
+      this.refreshCurrentInterfaceCsvData();
+    });
+  }
+
+  private refreshCurrentInterfaceCsvData(): void {
+    if (this.isCsvDataUpdateInFlight) {
+      return;
+    }
+
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return;
+    }
+
+    this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+      next: (config) => {
+        if (!config || config._isPlaceholder) {
+          return;
+        }
+
+        const incomingCsvData = config.csvData || '';
+        if (incomingCsvData !== this.lastSyncedCsvData) {
+          this.lastSyncedCsvData = incomingCsvData;
+          this.applyCsvDataLocally(incomingCsvData);
+        }
+      },
+      error: (error) => {
+        console.error('Error refreshing interface configuration:', error);
+      }
     });
   }
   
@@ -1747,7 +1773,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
     if (!config || config._isPlaceholder) {
       this.selectedInterfaceConfig = null;
-      this.loadSampleCsvData();
       return;
     }
 
@@ -1780,12 +1805,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sqlBatchSize = config.sqlBatchSize ?? this.sqlBatchSize;
     
     // Load CsvData property
-    this.csvDataText = config.csvData || this.csvDataText;
+    const incomingCsvData = config.csvData || '';
+    this.applyCsvDataLocally(incomingCsvData);
+    this.lastSyncedCsvData = incomingCsvData;
+    this.isCsvDataUpdateInFlight = false;
+    this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
     
     // Reload adapter instances and data
     this.loadDestinationAdapterInstances();
     this.loadSqlData();
-    this.loadSampleCsvData();
   }
 
   openAddInterfaceDialog(): void {
@@ -1924,6 +1952,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.csvDataText = '';
     this.editableCsvText = '';
     this.formattedCsvHtml = '';
+    this.lastSyncedCsvData = '';
+    this.isCsvDataUpdateInFlight = false;
     this.tableExists = false;
 
     this.sqlServerName = '';
@@ -1936,6 +1966,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sqlPollingInterval = 60;
     this.sqlUseTransaction = false;
     this.sqlBatchSize = 1000;
+    this.csvDataInitialization.delete(this.getActiveInterfaceName());
   }
 
   showInterfaceJson(): void {
@@ -3089,11 +3120,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onCsvDataChange(newCsvData: string): void {
-    this.csvDataText = newCsvData;
-    // Update CsvData property via API
-    if (this.currentInterfaceName) {
-      this.updateCsvDataProperty(newCsvData);
-    }
+    this.applyCsvDataLocally(newCsvData);
+    this.updateCsvDataProperty(newCsvData);
   }
 
   /**

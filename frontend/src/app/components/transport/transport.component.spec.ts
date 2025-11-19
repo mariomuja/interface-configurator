@@ -5,17 +5,13 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
-import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
+import { SqlRecord, ProcessLog } from '../../models/data.model';
 
 describe('TransportComponent', () => {
   let component: TransportComponent;
   let fixture: ComponentFixture<TransportComponent>;
   let transportService: jasmine.SpyObj<TransportService>;
   let snackBar: jasmine.SpyObj<MatSnackBar>;
-
-  const mockCsvData: CsvRecord[] = [
-    { id: 1, name: 'Test User', email: 'test@test.com', age: 30, city: 'Berlin', salary: 50000 }
-  ];
 
   const mockSqlData: SqlRecord[] = [
     { id: 1, name: 'Test User', email: 'test@test.com', age: 30, city: 'Berlin', salary: 50000, createdAt: '2024-01-01' }
@@ -25,12 +21,29 @@ describe('TransportComponent', () => {
     { id: 1, timestamp: '2024-01-01T00:00:00Z', level: 'info', message: 'Test log' }
   ];
 
+  const mockInterfaceConfigs = [
+    {
+      interfaceName: 'FromCsvToSqlServerExample',
+      sourceAdapterName: 'CSV',
+      destinationAdapterName: 'SqlServer',
+      sourceInstanceName: 'Source',
+      destinationInstanceName: 'Destination',
+      sourceIsEnabled: true,
+      destinationIsEnabled: true,
+      csvData: 'Id║Name\n1║Test User'
+    }
+  ];
+
   beforeEach(async () => {
     const transportServiceSpy = jasmine.createSpyObj('TransportService', [
-      'getSampleCsvData',
       'getSqlData',
       'getProcessLogs',
       'startTransport',
+      'getInterfaceConfigurations',
+      'createInterfaceConfiguration',
+      'getDestinationAdapterInstances',
+      'getInterfaceConfiguration',
+      'updateCsvData'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -49,19 +62,19 @@ describe('TransportComponent', () => {
     transportService = TestBed.inject(TransportService) as jasmine.SpyObj<TransportService>;
     snackBar = TestBed.inject(MatSnackBar) as jasmine.SpyObj<MatSnackBar>;
 
-    transportService.getSampleCsvData.and.returnValue(of(mockCsvData));
     transportService.getSqlData.and.returnValue(of(mockSqlData));
     transportService.getProcessLogs.and.returnValue(of(mockLogs));
+    transportService.getInterfaceConfigurations.and.returnValue(of(mockInterfaceConfigs));
+    transportService.createInterfaceConfiguration.and.returnValue(of(mockInterfaceConfigs[0]));
+    transportService.getDestinationAdapterInstances.and.returnValue(of([]));
+    transportService.getInterfaceConfiguration.and.returnValue(of(mockInterfaceConfigs[0]));
+    transportService.updateCsvData.and.returnValue(of({}));
+
+    component['refreshSubscription']?.unsubscribe();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  it('should load CSV data on init', () => {
-    fixture.detectChanges();
-    expect(transportService.getSampleCsvData).toHaveBeenCalled();
-    expect(component.csvData).toEqual(mockCsvData);
   });
 
   it('should load SQL data on init', () => {

@@ -35,8 +35,8 @@ describe('InterfaceJsonViewDialogComponent', () => {
   });
 
   it('should initialize with dialog data', () => {
-    expect(component.data.interfaceName).toBe('TestInterface');
-    expect(component.data.jsonString).toBe('{"name": "TestInterface", "source": "CSV"}');
+    expect(component.data?.interfaceName).toBe('TestInterface');
+    expect(component.data?.jsonString).toBe('{"name": "TestInterface", "source": "CSV"}');
   });
 
   it('should close dialog on close', () => {
