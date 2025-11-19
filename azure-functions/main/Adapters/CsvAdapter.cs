@@ -40,6 +40,10 @@ public class CsvAdapter : IAdapter
     // CSV Data property - can be set directly to trigger debatching
     private string? _csvData;
     
+    // Static flag to track if CSV folders have been initialized
+    private static bool _csvFoldersInitialized = false;
+    private static readonly object _csvFoldersLock = new object();
+    
     // SFTP properties
     private readonly string _adapterType;
     private readonly string? _sftpHost;
@@ -218,6 +222,84 @@ public class CsvAdapter : IAdapter
     }
 
     /// <summary>
+    /// Ensures the CSV blob container folders exist (csv-incoming, csv-processed, csv-error)
+    /// Creates placeholder files to initialize the folders if they don't exist
+    /// </summary>
+    private async Task EnsureCsvFoldersExistAsync(CancellationToken cancellationToken)
+    {
+        // Use double-check locking pattern to ensure folders are initialized only once
+        if (_csvFoldersInitialized)
+        {
+            return;
+        }
+
+        lock (_csvFoldersLock)
+        {
+            if (_csvFoldersInitialized)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var containerName = "csv-files";
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure container exists
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+            var folders = new[] { "csv-incoming", "csv-processed", "csv-error" };
+
+            foreach (var folder in folders)
+            {
+                try
+                {
+                    // Create a placeholder file to ensure the folder exists
+                    // In Azure Blob Storage, folders are virtual - they exist when blobs with that prefix exist
+                    // We create a hidden placeholder file that marks the folder as initialized
+                    var placeholderPath = $"{folder}/.folder-initialized";
+                    var placeholderBlob = containerClient.GetBlobClient(placeholderPath);
+
+                    if (!await placeholderBlob.ExistsAsync(cancellationToken))
+                    {
+                        var placeholderContent = Encoding.UTF8.GetBytes($"Folder initialized at {DateTime.UtcNow:O}");
+                        await placeholderBlob.UploadAsync(
+                            new BinaryData(placeholderContent),
+                            new Azure.Storage.Blobs.Models.BlobUploadOptions
+                            {
+                                HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
+                                {
+                                    ContentType = "text/plain"
+                                }
+                            },
+                            cancellationToken);
+
+                        _logger?.LogInformation("Created CSV folder: {Folder} in container {Container}", folder, containerName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error creating placeholder for folder {Folder}", folder);
+                    // Continue with other folders even if one fails
+                }
+            }
+
+            lock (_csvFoldersLock)
+            {
+                _csvFoldersInitialized = true;
+            }
+
+            _logger?.LogInformation("CSV folders initialization completed: csv-incoming, csv-processed, csv-error");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error ensuring CSV folders exist");
+            // Don't throw - allow adapter to continue even if folder creation fails
+        }
+    }
+
+    /// <summary>
     /// Uploads CsvData to csv-incoming folder in blob storage
     /// This will trigger the blob trigger which processes the file
     /// </summary>
@@ -231,6 +313,9 @@ public class CsvAdapter : IAdapter
 
         try
         {
+            // Ensure CSV folders exist before uploading
+            await EnsureCsvFoldersExistAsync(cancellationToken);
+
             // Generate unique filename
             var fileName = $"raw-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
             var blobPath = $"csv-incoming/{fileName}";
@@ -992,6 +1077,9 @@ public class CsvAdapter : IAdapter
     {
         try
         {
+            // Ensure CSV folders exist before uploading
+            await EnsureCsvFoldersExistAsync(cancellationToken);
+
             // Generate unique filename preserving original name
             var fileName = $"{Path.GetFileNameWithoutExtension(originalFileName)}-{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
             var blobPath = $"csv-incoming/{fileName}";
@@ -1036,6 +1124,9 @@ public class CsvAdapter : IAdapter
     {
         try
         {
+            // Ensure CSV folders exist before copying
+            await EnsureCsvFoldersExistAsync(cancellationToken);
+
             // Extract filename from source path
             var fileName = sourceBlobPath.Contains('/') 
                 ? sourceBlobPath.Substring(sourceBlobPath.LastIndexOf('/') + 1)

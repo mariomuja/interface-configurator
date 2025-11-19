@@ -45,8 +45,8 @@ public class DestinationAdapterFunction
                 _logger.LogInformation("Released {Count} stale message locks", staleLocksReleased);
             }
 
-            // Get all enabled interface configurations
-            var configurations = await _configService.GetEnabledDestinationConfigurationsAsync(context.CancellationToken);
+            // Get all enabled interface configurations across ALL sessions (for background processing)
+            var configurations = await _configService.GetAllEnabledDestinationConfigurationsAcrossSessionsAsync(context.CancellationToken);
 
             if (!configurations.Any())
             {
@@ -62,8 +62,11 @@ public class DestinationAdapterFunction
             {
                 try
                 {
+                    // Get sessionId from config (set by GetAllEnabledDestinationConfigurationsAcrossSessionsAsync)
+                    var sessionId = config.SessionId ?? "default";
+                    
                     // Get all destination adapter instances for this interface
-                    var destinationInstances = await _configService.GetDestinationAdapterInstancesAsync(config.InterfaceName, context.CancellationToken);
+                    var destinationInstances = await _configService.GetDestinationAdapterInstancesAsync(config.InterfaceName, sessionId, context.CancellationToken);
                     
                     // Filter to only enabled instances
                     var enabledInstances = destinationInstances.Where(i => i.IsEnabled).ToList();

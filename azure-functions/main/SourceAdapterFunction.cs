@@ -21,6 +21,7 @@ public class SourceAdapterFunction
     private readonly ILogger<SourceAdapterFunction> _logger;
     private static readonly ConcurrentDictionary<string, DateTime> _lastCsvPollTimes = new();
     private static readonly ConcurrentDictionary<string, string> _lastCsvDataHashes = new();
+    private static readonly ConcurrentDictionary<string, DateTime> _lastSqlServerPollTimes = new();
 
     public SourceAdapterFunction(
         IInterfaceConfigurationService configService,
@@ -41,8 +42,8 @@ public class SourceAdapterFunction
 
         try
         {
-            // Get all enabled interface configurations
-            var configurations = await _configService.GetEnabledSourceConfigurationsAsync(context.CancellationToken);
+            // Get all enabled interface configurations across ALL sessions (for background processing)
+            var configurations = await _configService.GetAllEnabledSourceConfigurationsAcrossSessionsAsync(context.CancellationToken);
 
             if (!configurations.Any())
             {
@@ -90,16 +91,23 @@ public class SourceAdapterFunction
         try
         {
             var isCsvSource = config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase);
+            var isSqlServerSource = config.SourceAdapterName.Equals("SqlServer", StringComparison.OrdinalIgnoreCase);
             var csvPollingInterval = config.CsvPollingInterval > 0 ? config.CsvPollingInterval : 10;
+            var sqlPollingInterval = config.SqlPollingInterval > 0 ? config.SqlPollingInterval : 60;
 
-            void UpdateCsvPollTime()
+            void UpdatePollTime()
             {
                 if (isCsvSource)
                 {
                     _lastCsvPollTimes[config.InterfaceName] = DateTime.UtcNow;
                 }
+                else if (isSqlServerSource)
+                {
+                    _lastSqlServerPollTimes[config.InterfaceName] = DateTime.UtcNow;
+                }
             }
 
+            // Check CSV polling interval
             if (isCsvSource)
             {
                 var lastPoll = _lastCsvPollTimes.GetOrAdd(config.InterfaceName, DateTime.MinValue);
@@ -110,6 +118,21 @@ public class SourceAdapterFunction
                         config.InterfaceName,
                         csvPollingInterval - elapsedSeconds,
                         csvPollingInterval);
+                    return;
+                }
+            }
+
+            // Check SqlServer polling interval
+            if (isSqlServerSource && !string.IsNullOrWhiteSpace(config.SqlPollingStatement))
+            {
+                var lastPoll = _lastSqlServerPollTimes.GetOrAdd(config.InterfaceName, DateTime.MinValue);
+                var elapsedSeconds = (DateTime.UtcNow - lastPoll).TotalSeconds;
+                if (elapsedSeconds < sqlPollingInterval)
+                {
+                    _logger.LogDebug("Skipping SqlServer source '{InterfaceName}' - waiting {RemainingSeconds:F1}s before next poll (interval {IntervalSeconds}s).",
+                        config.InterfaceName,
+                        sqlPollingInterval - elapsedSeconds,
+                        sqlPollingInterval);
                     return;
                 }
             }
@@ -141,7 +164,7 @@ public class SourceAdapterFunction
                     if (string.Equals(currentHash, lastHash, StringComparison.Ordinal))
                     {
                         _logger.LogInformation("CsvData has not changed since last processing for interface '{InterfaceName}'. Skipping.", config.InterfaceName);
-                        UpdateCsvPollTime();
+                        UpdatePollTime();
                         return;
                     }
 
@@ -156,7 +179,7 @@ public class SourceAdapterFunction
                             _lastCsvDataHashes[config.InterfaceName] = currentHash;
                         }
                     }
-                    UpdateCsvPollTime();
+                    UpdatePollTime();
                     return; // File processing happens via blob trigger
                 }
             }
@@ -225,7 +248,7 @@ public class SourceAdapterFunction
                 "Successfully processed source configuration '{InterfaceName}': {RecordCount} records read and written to MessageBox",
                 config.InterfaceName, records.Count);
 
-            UpdateCsvPollTime();
+            UpdatePollTime();
         }
         catch (Exception ex)
         {

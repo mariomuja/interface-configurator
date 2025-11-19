@@ -387,7 +387,8 @@
 .csv-editable {
   width: 100%;
   min-height: 90px;
-  max-height: calc(33vh - 40px);
+  /* Show approximately 10 rows: (12px font-size * 1.5 line-height * 10 rows) + 32px padding (16px top + 16px bottom) = 212px */
+  max-height: 212px;
   border: none;
   outline: none;
   resize: none;
@@ -398,7 +399,8 @@
   padding: 16px;
   box-sizing: border-box;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto; /* Vertical scrollbar to see the rest */
+  overflow-x: auto; /* Horizontal scrollbar for long lines */
   white-space: pre-wrap; /* Changed from pre to pre-wrap to preserve line breaks */
   word-wrap: break-word; /* Allow wrapping of long lines */
   overflow-wrap: break-word; /* Allow wrapping of long words */

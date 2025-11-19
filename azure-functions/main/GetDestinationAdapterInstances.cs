@@ -39,6 +39,7 @@ public class GetDestinationAdapterInstances
         {
             var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             var interfaceName = queryParams["interfaceName"];
+            var sessionId = queryParams["sessionId"];
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {
@@ -49,7 +50,7 @@ public class GetDestinationAdapterInstances
                 return badRequestResponse;
             }
 
-            var instances = await _configService.GetDestinationAdapterInstancesAsync(interfaceName, executionContext.CancellationToken);
+            var instances = await _configService.GetDestinationAdapterInstancesAsync(interfaceName, sessionId, executionContext.CancellationToken);
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

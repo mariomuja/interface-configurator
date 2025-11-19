@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { CsvRecord, SqlRecord, ProcessLog } from '../models/data.model';
+import { SessionService } from './session.service';
 
 @Injectable({
   providedIn: 'root'
@@ -13,7 +14,10 @@ export class TransportService {
   // In development, it will use /api which can be proxied via Angular proxy config
   private apiUrl = this.getApiUrl();
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private sessionService: SessionService
+  ) {}
 
   private getApiUrl(): string {
     // Always use relative /api path
@@ -95,7 +99,8 @@ export class TransportService {
   }
 
   getInterfaceConfigurations(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/GetInterfaceConfigurations`);
+    const sessionId = this.sessionService.getSessionId();
+    return this.http.get<any[]>(`${this.apiUrl}/GetInterfaceConfigurations?sessionId=${encodeURIComponent(sessionId)}`);
   }
 
   createInterfaceConfiguration(config: {
@@ -106,65 +111,85 @@ export class TransportService {
     destinationConfiguration?: string;
     description?: string;
   }): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/CreateInterfaceConfiguration`, config);
+    const sessionId = this.sessionService.getSessionId();
+    return this.http.post<any>(`${this.apiUrl}/CreateInterfaceConfiguration`, {
+      ...config,
+      sessionId
+    });
   }
 
   deleteInterfaceConfiguration(interfaceName: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}/DeleteInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}`);
+    const sessionId = this.sessionService.getSessionId();
+    return this.http.delete<any>(`${this.apiUrl}/DeleteInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}&sessionId=${encodeURIComponent(sessionId)}`);
   }
 
   getInterfaceConfiguration(interfaceName: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/GetInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}`);
+    const sessionId = this.sessionService.getSessionId();
+    return this.http.get<any>(`${this.apiUrl}/GetInterfaceConfiguration?interfaceName=${encodeURIComponent(interfaceName)}&sessionId=${encodeURIComponent(sessionId)}`);
   }
 
   toggleInterfaceConfiguration(interfaceName: string, adapterType: 'Source' | 'Destination', enabled: boolean): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<any>(`${this.apiUrl}/ToggleInterfaceConfiguration`, {
       interfaceName,
       adapterType,
-      enabled
+      enabled,
+      sessionId
     });
   }
 
   updateInterfaceName(oldInterfaceName: string, newInterfaceName: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<any>(`${this.apiUrl}/UpdateInterfaceName`, {
       oldInterfaceName,
-      newInterfaceName
+      newInterfaceName,
+      sessionId
     });
   }
 
   updateInstanceName(interfaceName: string, instanceType: 'Source' | 'Destination', instanceName: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<any>(`${this.apiUrl}/UpdateInstanceName`, {
       interfaceName,
       instanceType,
-      instanceName
+      instanceName,
+      sessionId
     });
   }
 
   restartAdapter(interfaceName: string, adapterType: 'Source' | 'Destination'): Observable<{ message: string }> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<{ message: string }>(`${this.apiUrl}/RestartAdapter`, {
       interfaceName,
-      adapterType
+      adapterType,
+      sessionId
     });
   }
 
   updateReceiveFolder(interfaceName: string, receiveFolder: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<any>(`${this.apiUrl}/UpdateReceiveFolder`, {
       interfaceName,
-      receiveFolder
+      receiveFolder,
+      sessionId
     });
   }
 
   updateFileMask(interfaceName: string, fileMask: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateFileMask`, {
       interfaceName,
-      fileMask
+      fileMask,
+      sessionId
     });
   }
 
   updateBatchSize(interfaceName: string, batchSize: number): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateBatchSize`, {
       interfaceName,
-      batchSize
+      batchSize,
+      sessionId
     });
   }
 
@@ -177,6 +202,7 @@ export class TransportService {
     integratedSecurity?: boolean,
     resourceGroup?: string
   ): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateSqlConnectionProperties`, {
       interfaceName,
       serverName,
@@ -184,7 +210,8 @@ export class TransportService {
       userName,
       password,
       integratedSecurity,
-      resourceGroup
+      resourceGroup,
+      sessionId
     });
   }
 
@@ -193,45 +220,57 @@ export class TransportService {
     pollingStatement?: string,
     pollingInterval?: number
   ): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateSqlPollingProperties`, {
       interfaceName,
       pollingStatement,
-      pollingInterval
+      pollingInterval,
+      sessionId
     });
   }
 
   updateCsvPollingInterval(interfaceName: string, pollingInterval: number): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateCsvPollingInterval`, {
       interfaceName,
-      pollingInterval
+      pollingInterval,
+      sessionId
     });
   }
 
   updateFieldSeparator(interfaceName: string, fieldSeparator: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateFieldSeparator`, {
       interfaceName,
-      fieldSeparator
+      fieldSeparator,
+      sessionId
     });
   }
 
   updateCsvData(interfaceName: string, csvData: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateCsvData`, {
       interfaceName,
-      csvData
+      csvData,
+      sessionId
     });
   }
 
   updateDestinationReceiveFolder(interfaceName: string, destinationReceiveFolder: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateDestinationReceiveFolder`, {
       interfaceName,
-      destinationReceiveFolder
+      destinationReceiveFolder,
+      sessionId
     });
   }
 
   updateDestinationFileMask(interfaceName: string, destinationFileMask: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateDestinationFileMask`, {
       interfaceName,
-      destinationFileMask
+      destinationFileMask,
+      sessionId
     });
   }
 
@@ -245,21 +284,25 @@ export class TransportService {
   }
 
   getDestinationAdapterInstances(interfaceName: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/GetDestinationAdapterInstances?interfaceName=${encodeURIComponent(interfaceName)}`);
+    const sessionId = this.sessionService.getSessionId();
+    return this.http.get<any[]>(`${this.apiUrl}/GetDestinationAdapterInstances?interfaceName=${encodeURIComponent(interfaceName)}&sessionId=${encodeURIComponent(sessionId)}`);
   }
 
   addDestinationAdapterInstance(interfaceName: string, adapterName: string, instanceName?: string, configuration?: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.post<any>(`${this.apiUrl}/AddDestinationAdapterInstance`, {
       interfaceName,
       adapterName,
       instanceName,
-      configuration
+      configuration,
+      sessionId
     });
   }
 
   removeDestinationAdapterInstance(interfaceName: string, adapterInstanceGuid: string): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     // Use query parameters for DELETE request (more standard than body)
-    return this.http.delete<any>(`${this.apiUrl}/RemoveDestinationAdapterInstance?interfaceName=${encodeURIComponent(interfaceName)}&adapterInstanceGuid=${encodeURIComponent(adapterInstanceGuid)}`);
+    return this.http.delete<any>(`${this.apiUrl}/RemoveDestinationAdapterInstance?interfaceName=${encodeURIComponent(interfaceName)}&adapterInstanceGuid=${encodeURIComponent(adapterInstanceGuid)}&sessionId=${encodeURIComponent(sessionId)}`);
   }
 
   updateDestinationAdapterInstance(
@@ -269,12 +312,14 @@ export class TransportService {
     isEnabled?: boolean,
     configuration?: string
   ): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateDestinationAdapterInstance`, {
       interfaceName,
       adapterInstanceGuid,
       instanceName,
       isEnabled,
-      configuration
+      configuration,
+      sessionId
     });
   }
 
@@ -283,10 +328,12 @@ export class TransportService {
     useTransaction?: boolean,
     batchSize?: number
   ): Observable<any> {
+    const sessionId = this.sessionService.getSessionId();
     return this.http.put<any>(`${this.apiUrl}/UpdateSqlTransactionProperties`, {
       interfaceName,
       useTransaction,
-      batchSize
+      batchSize,
+      sessionId
     });
   }
 }

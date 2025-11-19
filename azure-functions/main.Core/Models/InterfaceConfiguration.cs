@@ -287,5 +287,12 @@ public class InterfaceConfiguration
 
     [MaxLength(500)]
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Session ID that owns this configuration (not persisted, used for cross-session queries)
+    /// This property is set by InterfaceConfigurationService when aggregating configurations across sessions
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? SessionId { get; set; }
 }
 

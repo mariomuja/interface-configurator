@@ -268,6 +268,34 @@
     ]
   },
   {
+    "name": "GetMessageBoxMessages",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetMessageBoxMessages.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetMessageBoxMessages",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "GetProcessingStatistics",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.GetProcessingStatisticsFunction.Run",
@@ -465,10 +493,40 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "RestartAdapter",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "RunTransportPipeline",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.RunTransportPipeline.RunAsync",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "RunTransportPipeline",
         "properties": {}
       },
       {
@@ -537,9 +595,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateBatchSize",
         "properties": {}
@@ -580,6 +639,34 @@
     ]
   },
   {
+    "name": "UpdateCsvPollingInterval",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateCsvPollingInterval.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateCsvPollingInterval",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "UpdateDestinationAdapterInstance",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.UpdateDestinationAdapterInstance.Run",
@@ -592,9 +679,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateDestinationAdapterInstance",
         "properties": {}
@@ -619,9 +707,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateDestinationFileMask",
         "properties": {}
@@ -646,9 +735,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateDestinationReceiveFolder",
         "properties": {}
@@ -673,9 +763,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateFieldSeparator",
         "properties": {}
@@ -700,9 +791,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateFileMask",
         "properties": {}
@@ -727,10 +819,12 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "UpdateInstanceName",
         "properties": {}
       },
       {
@@ -753,10 +847,12 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "UpdateInterfaceName",
         "properties": {}
       },
       {
@@ -779,10 +875,12 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "post"
+          "post",
+          "options"
         ],
+        "route": "UpdateReceiveFolder",
         "properties": {}
       },
       {
@@ -805,9 +903,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateSqlConnectionProperties",
         "properties": {}
@@ -832,9 +931,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateSqlPollingProperties",
         "properties": {}
@@ -859,9 +959,10 @@
         "name": "req",
         "direction": "In",
         "type": "httpTrigger",
-        "authLevel": "Function",
+        "authLevel": "Anonymous",
         "methods": [
-          "put"
+          "put",
+          "options"
         ],
         "route": "UpdateSqlTransactionProperties",
         "properties": {}

@@ -39,6 +39,7 @@ public class GetInterfaceConfiguration
         {
             var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             var interfaceName = queryParams["interfaceName"];
+            var sessionId = queryParams["sessionId"];
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {
@@ -49,7 +50,7 @@ public class GetInterfaceConfiguration
                 return badRequestResponse;
             }
 
-            var configuration = await _configService.GetConfigurationAsync(interfaceName, executionContext.CancellationToken);
+            var configuration = await _configService.GetConfigurationAsync(interfaceName, sessionId, executionContext.CancellationToken);
 
             if (configuration == null)
             {

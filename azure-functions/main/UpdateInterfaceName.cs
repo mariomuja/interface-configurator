@@ -49,8 +49,10 @@ public class UpdateInterfaceName
                 return badRequestResponse;
             }
 
+            var sessionId = request.SessionId;
+
             // Get existing configuration
-            var config = await _configService.GetConfigurationAsync(request.OldInterfaceName, executionContext.CancellationToken);
+            var config = await _configService.GetConfigurationAsync(request.OldInterfaceName, sessionId, executionContext.CancellationToken);
             if (config == null)
             {
                 var notFoundResponse = req.CreateResponse(System.Net.HttpStatusCode.NotFound);
@@ -61,7 +63,7 @@ public class UpdateInterfaceName
             }
 
             // Check if new name already exists
-            var existingWithNewName = await _configService.GetConfigurationAsync(request.NewInterfaceName, executionContext.CancellationToken);
+            var existingWithNewName = await _configService.GetConfigurationAsync(request.NewInterfaceName, sessionId, executionContext.CancellationToken);
             if (existingWithNewName != null && existingWithNewName.InterfaceName != request.OldInterfaceName)
             {
                 var conflictResponse = req.CreateResponse(System.Net.HttpStatusCode.Conflict);
@@ -71,16 +73,11 @@ public class UpdateInterfaceName
                 return conflictResponse;
             }
 
-            // Update interface name
-            config.InterfaceName = request.NewInterfaceName;
-            config.UpdatedAt = DateTime.UtcNow;
-            await _configService.SaveConfigurationAsync(config, executionContext.CancellationToken);
+            // Update interface name using service method
+            await _configService.UpdateInterfaceNameAsync(request.OldInterfaceName, request.NewInterfaceName, sessionId, executionContext.CancellationToken);
 
-            // Delete old configuration if name changed
-            if (request.OldInterfaceName != request.NewInterfaceName)
-            {
-                await _configService.DeleteConfigurationAsync(request.OldInterfaceName, executionContext.CancellationToken);
-            }
+            // Get updated configuration
+            config = await _configService.GetConfigurationAsync(request.NewInterfaceName, sessionId, executionContext.CancellationToken);
 
             _logger.LogInformation("Updated interface name from '{OldName}' to '{NewName}'", request.OldInterfaceName, request.NewInterfaceName);
 
@@ -105,6 +102,7 @@ public class UpdateInterfaceName
     {
         public string OldInterfaceName { get; set; } = string.Empty;
         public string NewInterfaceName { get; set; } = string.Empty;
+        public string? SessionId { get; set; }
     }
 }
 

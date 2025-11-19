@@ -58,15 +58,17 @@ public class ToggleInterfaceConfiguration
                 return badRequestResponse;
             }
 
+            var sessionId = request.SessionId;
+
             if (request.AdapterType == "Source")
             {
-                await _configService.SetSourceEnabledAsync(request.InterfaceName, request.Enabled, executionContext.CancellationToken);
-                _logger.LogInformation("Toggled Source adapter for interface configuration '{InterfaceName}' to {Enabled}", request.InterfaceName, request.Enabled);
+                await _configService.SetSourceEnabledAsync(request.InterfaceName, request.Enabled, sessionId, executionContext.CancellationToken);
+                _logger.LogInformation("Toggled Source adapter for interface configuration '{InterfaceName}' to {Enabled} (session: {SessionId})", request.InterfaceName, request.Enabled, sessionId);
             }
             else
             {
-                await _configService.SetDestinationEnabledAsync(request.InterfaceName, request.Enabled, executionContext.CancellationToken);
-                _logger.LogInformation("Toggled Destination adapter for interface configuration '{InterfaceName}' to {Enabled}", request.InterfaceName, request.Enabled);
+                await _configService.SetDestinationEnabledAsync(request.InterfaceName, request.Enabled, sessionId, executionContext.CancellationToken);
+                _logger.LogInformation("Toggled Destination adapter for interface configuration '{InterfaceName}' to {Enabled} (session: {SessionId})", request.InterfaceName, request.Enabled, sessionId);
             }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
@@ -96,6 +98,7 @@ public class ToggleInterfaceConfiguration
         public string InterfaceName { get; set; } = string.Empty;
         public string AdapterType { get; set; } = string.Empty; // "Source" or "Destination"
         public bool Enabled { get; set; }
+        public string? SessionId { get; set; }
     }
 }
 
