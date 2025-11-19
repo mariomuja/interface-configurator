@@ -45,44 +45,44 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             if (_blobServiceClient == null)
             {
                 _logger?.LogWarning("BlobServiceClient is null. Interface configurations will be in-memory only.");
-                _initialized = true;
-                return;
             }
-
-            try
+            else
             {
-                var containerClient = _blobServiceClient.GetBlobContainerClient(ConfigContainerName);
-                await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-
-                var blobClient = containerClient.GetBlobClient(ConfigFileName);
-                
-                if (await blobClient.ExistsAsync(cancellationToken))
+                try
                 {
-                    var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
-                    var jsonContent = downloadResult.Value.Content.ToString();
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(ConfigContainerName);
+                    await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+                    var blobClient = containerClient.GetBlobClient(ConfigFileName);
                     
-                    if (!string.IsNullOrWhiteSpace(jsonContent))
+                    if (await blobClient.ExistsAsync(cancellationToken))
                     {
-                        var configs = JsonSerializer.Deserialize<List<InterfaceConfiguration>>(jsonContent);
-                        if (configs != null)
+                        var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
+                        var jsonContent = downloadResult.Value.Content.ToString();
+                        
+                        if (!string.IsNullOrWhiteSpace(jsonContent))
                         {
-                            foreach (var config in configs)
+                            var configs = JsonSerializer.Deserialize<List<InterfaceConfiguration>>(jsonContent);
+                            if (configs != null)
                             {
-                                _configurations[config.InterfaceName] = config;
+                                foreach (var config in configs)
+                                {
+                                    _configurations[config.InterfaceName] = config;
+                                }
+                                _logger?.LogInformation("Loaded {Count} interface configurations from storage", configs.Count);
                             }
-                            _logger?.LogInformation("Loaded {Count} interface configurations from storage", configs.Count);
                         }
                     }
+                    else
+                    {
+                        _logger?.LogInformation("Interface configurations file not found. Starting with empty configuration.");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger?.LogInformation("Interface configurations file not found. Starting with empty configuration.");
+                    _logger?.LogError(ex, "Error loading interface configurations from storage");
+                    // Continue with empty configuration
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error loading interface configurations from storage");
-                // Continue with empty configuration
             }
 
             if (!_configurations.ContainsKey(DefaultInterfaceName))
