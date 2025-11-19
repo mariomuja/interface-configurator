@@ -106,6 +106,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   private refreshSubscription?: Subscription;
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
+  private demoSampleCsvCache: { text: string; records: CsvRecord[] } | null = null;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
@@ -141,6 +142,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
+    this.populateSampleCsvForDemo(true);
     this.loadSqlData();
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
@@ -362,11 +364,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.csvDataInitialization.add(interfaceName);
-    const sampleRecords = this.generateSampleCsvData();
-    const csvText = this.convertRecordsToCsvText(sampleRecords);
-    this.applyCsvDataLocally(csvText, sampleRecords);
-    this.lastSyncedCsvData = csvText;
-    this.updateCsvDataProperty(csvText, { force: true });
+    const sample = this.getDemoSampleCsv();
+    this.applyCsvDataLocally(sample.text, sample.records);
+    this.lastSyncedCsvData = sample.text;
+    this.updateCsvDataProperty(sample.text, { force: true });
+  }
+
+  private getDemoSampleCsv(): { text: string; records: CsvRecord[] } {
+    if (this.demoSampleCsvCache) {
+      return this.demoSampleCsvCache;
+    }
+    const records = this.generateSampleCsvData();
+    const text = this.convertRecordsToCsvText(records);
+    this.demoSampleCsvCache = { text, records };
+    return this.demoSampleCsvCache;
+  }
+
+  private populateSampleCsvForDemo(force: boolean = false): void {
+    if (!force && this.csvDataText && this.csvDataText.trim().length > 0) {
+      return;
+    }
+    const sample = this.getDemoSampleCsv();
+    this.applyCsvDataLocally(sample.text, sample.records);
   }
 
   generateSampleCsvData(): CsvRecord[] {
@@ -1817,6 +1836,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
     if (!config || config._isPlaceholder) {
       this.selectedInterfaceConfig = null;
+      this.populateSampleCsvForDemo(true);
       return;
     }
 
@@ -1960,6 +1980,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
       this.selectedInterfaceConfig = null;
       this.applyDefaultInterfaceState();
+      this.populateSampleCsvForDemo(true);
       return;
     }
 
