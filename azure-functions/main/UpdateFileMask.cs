@@ -81,7 +81,6 @@ public class UpdateFileMask
     {
         public string InterfaceName { get; set; } = string.Empty;
         public string? FileMask { get; set; }
-        public string? SessionId { get; set; }
     }
 }
 

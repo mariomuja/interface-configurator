@@ -39,10 +39,14 @@ public class ApplicationDatabaseInitializer : IHostedService
                 return;
             }
 
+            // Add timeout to prevent hanging on connection issues
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
             // Ensure database exists and tables are created
             // EnsureCreatedAsync will create the database if it doesn't exist (if permissions allow)
             // and will create all tables defined in the DbContext if they don't exist
-            var created = await applicationContext.Database.EnsureCreatedAsync(cancellationToken);
+            var created = await applicationContext.Database.EnsureCreatedAsync(linkedCts.Token);
 
             if (created)
             {
@@ -52,6 +56,11 @@ public class ApplicationDatabaseInitializer : IHostedService
             {
                 _logger.LogInformation("Application database and tables already exist. Tables: TransportData");
             }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Application database initialization timed out after 30 seconds. Database may be unreachable or firewall rules may need to be updated.");
+            // Don't throw - allow function app to start even if database initialization fails
         }
         catch (Microsoft.Data.SqlClient.SqlException sqlEx)
         {

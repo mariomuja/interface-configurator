@@ -85,8 +85,16 @@ public class LargeCsvFilePerformanceTests : IDisposable
             "║",
             null,
             null,
-            "RAW",
-            null, null, null, null, null, null, null, null, null, null,
+            "RAW", // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockCsvLogger.Object);
         csvAdapter.CsvData = csvContent; // Set CSV data via property
 
@@ -98,15 +106,17 @@ public class LargeCsvFilePerformanceTests : IDisposable
             null,
             InterfaceName,
             adapterInstanceGuid,
-            null,
-            null,
-            null,
-            "TransportData",
-            null,
-            null,
-            null,
-            null,
-            _mockSqlLogger.Object);
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            "TransportData", // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act
         var stopwatch = Stopwatch.StartNew();
@@ -150,8 +160,16 @@ public class LargeCsvFilePerformanceTests : IDisposable
             "║",
             null,
             null,
-            "RAW",
-            null, null, null, null, null, null, null, null, null, null,
+            "RAW", // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockCsvLogger.Object);
         csvAdapter.CsvData = csvContent; // Set CSV data via property
 
@@ -163,15 +181,17 @@ public class LargeCsvFilePerformanceTests : IDisposable
             null,
             InterfaceName,
             adapterInstanceGuid,
-            null,
-            null,
-            null,
-            "TransportData",
-            null,
-            null,
-            null,
-            null,
-            _mockSqlLogger.Object);
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            "TransportData", // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act
         var (headers, records) = await csvAdapter.ReadAsync("", CancellationToken.None);

@@ -91,24 +91,24 @@ public class SqlServerSourceAdapterTests : IDisposable
         var pollingStatement = $"SELECT Id, Name, Email, Age FROM [{TableName}]";
 
         var adapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: adapterGuid,
-            connectionString: null,
-            pollingStatement: pollingStatement,
-            pollingInterval: 60,
-            tableName: TableName,
-            useTransaction: false,
-            batchSize: 1000,
-            commandTimeout: 30,
-            failOnBadStatement: false,
-            configService: null,
-            logger: _mockSqlLogger.Object,
-            statisticsService: null);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterGuid,
+            null, // connectionString
+            pollingStatement, // pollingStatement
+            60, // pollingInterval
+            TableName, // tableName
+            false, // useTransaction
+            1000, // batchSize
+            30, // commandTimeout
+            false, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Read data (should debatch to MessageBox)
         var (headers, records) = await adapter.ReadAsync(string.Empty, CancellationToken.None);
@@ -147,24 +147,24 @@ public class SqlServerSourceAdapterTests : IDisposable
         // No polling statement provided - should use default "SELECT * FROM TableName"
 
         var adapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: adapterGuid,
-            connectionString: null,
-            pollingStatement: null, // No polling statement - should use default
-            pollingInterval: 60,
-            tableName: TableName, // Table name provided
-            useTransaction: false,
-            batchSize: 1000,
-            commandTimeout: 30,
-            failOnBadStatement: false,
-            configService: null,
-            logger: _mockSqlLogger.Object,
-            statisticsService: null);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterGuid,
+            null, // connectionString
+            null, // pollingStatement
+            60, // pollingInterval
+            TableName, // tableName
+            false, // useTransaction
+            1000, // batchSize
+            30, // commandTimeout
+            false, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Read data using default polling statement
         var (headers, records) = await adapter.ReadAsync(string.Empty, CancellationToken.None);
@@ -186,24 +186,24 @@ public class SqlServerSourceAdapterTests : IDisposable
         var pollingInterval = 30; // 30 seconds
 
         var adapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: adapterGuid,
-            connectionString: null,
-            pollingStatement: $"SELECT * FROM [{TableName}]",
-            pollingInterval: pollingInterval,
-            tableName: TableName,
-            useTransaction: false,
-            batchSize: 1000,
-            commandTimeout: 30,
-            failOnBadStatement: false,
-            configService: null,
-            logger: _mockSqlLogger.Object,
-            statisticsService: null);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterGuid,
+            null, // connectionString
+            $"SELECT * FROM [{TableName}]", // pollingStatement
+            pollingInterval, // pollingInterval
+            TableName, // tableName
+            false, // useTransaction
+            1000, // batchSize
+            30, // commandTimeout
+            false, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Read data
         var (headers, records) = await adapter.ReadAsync(string.Empty, CancellationToken.None);
@@ -222,24 +222,24 @@ public class SqlServerSourceAdapterTests : IDisposable
         var pollingStatement = $"SELECT Id, Name, Email, Age FROM [{TableName}] WHERE Age > 25";
 
         var adapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: adapterGuid,
-            connectionString: null,
-            pollingStatement: pollingStatement,
-            pollingInterval: 60,
-            tableName: TableName,
-            useTransaction: false,
-            batchSize: 1000,
-            commandTimeout: 30,
-            failOnBadStatement: false,
-            configService: null,
-            logger: _mockSqlLogger.Object,
-            statisticsService: null);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            adapterGuid,
+            null, // connectionString
+            pollingStatement, // pollingStatement
+            60, // pollingInterval
+            TableName, // tableName
+            false, // useTransaction
+            1000, // batchSize
+            30, // commandTimeout
+            false, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Read data with filtered statement
         var (headers, records) = await adapter.ReadAsync(string.Empty, CancellationToken.None);

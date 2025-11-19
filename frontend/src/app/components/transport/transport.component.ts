@@ -604,11 +604,47 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   loadMessageBoxData(): void {
     const interfaceName = this.getActiveInterfaceName();
-    if (!interfaceName || !this.sourceAdapterInstanceGuid) {
+    if (!interfaceName) {
       this.messageBoxTableData = [];
       this.messageBoxRecordColumns = [];
       this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
       this.isLoadingMessageBox = false;
+      return;
+    }
+    
+    // If source adapter is not enabled, don't try to load MessageBox data
+    if (!this.sourceIsEnabled) {
+      this.messageBoxTableData = [];
+      this.messageBoxRecordColumns = [];
+      this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
+      this.isLoadingMessageBox = false;
+      return;
+    }
+    
+    // If enabled but GUID is missing, try to reload configuration to get it
+    if (!this.sourceAdapterInstanceGuid) {
+      // Try to reload configuration to get the GUID
+      this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+        next: (config) => {
+          if (config && config.sourceAdapterInstanceGuid) {
+            this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid;
+            // Retry loading MessageBox data with the GUID
+            this.loadMessageBoxData();
+          } else {
+            // Still no GUID, show empty state
+            this.messageBoxTableData = [];
+            this.messageBoxRecordColumns = [];
+            this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
+            this.isLoadingMessageBox = false;
+          }
+        },
+        error: () => {
+          this.messageBoxTableData = [];
+          this.messageBoxRecordColumns = [];
+          this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
+          this.isLoadingMessageBox = false;
+        }
+      });
       return;
     }
 
@@ -1538,7 +1574,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       batchSize: this.sourceBatchSize,
       fieldSeparator: this.sourceFieldSeparator,
       csvAdapterType: activeConfig?.csvAdapterType,
+      csvData: this.csvDataText || activeConfig?.csvData || '',
       csvPollingInterval: this.csvPollingInterval,
+      // SFTP properties
+      sftpHost: activeConfig?.sftpHost || '',
+      sftpPort: activeConfig?.sftpPort ?? 22,
+      sftpUsername: activeConfig?.sftpUsername || '',
+      sftpPassword: activeConfig?.sftpPassword || '',
+      sftpSshKey: activeConfig?.sftpSshKey || '',
+      sftpFolder: activeConfig?.sftpFolder || '',
+      sftpFileMask: activeConfig?.sftpFileMask || '*.txt',
+      sftpMaxConnectionPoolSize: activeConfig?.sftpMaxConnectionPoolSize ?? 5,
+      sftpFileBufferSize: activeConfig?.sftpFileBufferSize ?? 8192,
+      // SQL Server properties
       sqlServerName: this.sqlServerName,
       sqlDatabaseName: this.sqlDatabaseName,
       sqlUserName: this.sqlUserName,
@@ -1547,6 +1595,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       sqlResourceGroup: this.sqlResourceGroup,
       sqlPollingStatement: this.sqlPollingStatement,
       sqlPollingInterval: this.sqlPollingInterval,
+      sqlUseTransaction: this.sqlUseTransaction,
+      sqlBatchSize: this.sqlBatchSize,
       adapterInstanceGuid: this.sourceAdapterInstanceGuid
     };
 
@@ -1615,6 +1665,85 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.csvPollingInterval !== undefined && result.csvPollingInterval !== this.csvPollingInterval) {
           this.csvPollingInterval = result.csvPollingInterval;
           this.updateCsvPollingInterval(result.csvPollingInterval);
+        }
+
+        // Update CSV adapter type if changed (only for CSV adapters)
+        if (result.csvAdapterType !== undefined && result.csvAdapterType !== activeConfig?.csvAdapterType) {
+          // Note: csvAdapterType update endpoint may need to be created
+          // For now, reload configurations after other updates complete
+          this.loadInterfaceConfigurations();
+        }
+
+        // Update CSV data if changed (only for CSV adapters with RAW type)
+        if (result.csvData !== undefined && result.csvData !== this.csvDataText) {
+          this.transportService.updateCsvData(this.getActiveInterfaceName(), result.csvData).subscribe({
+            next: () => {
+              this.csvDataText = result.csvData;
+              this.loadInterfaceConfigurations();
+              this.snackBar.open('CSV Data aktualisiert', 'OK', { duration: 3000 });
+            },
+            error: (error) => {
+              console.error('Error updating CSV data:', error);
+              const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der CSV Data');
+              this.snackBar.open(detailedMessage, 'Schließen', {
+                duration: 10000,
+                panelClass: ['error-snackbar'],
+                verticalPosition: 'top',
+                horizontalPosition: 'center'
+              });
+            }
+          });
+        }
+
+        // Update SFTP properties if changed (only for CSV adapters with SFTP type)
+        if (this.sourceAdapterName === 'CSV' && result.csvAdapterType === 'SFTP') {
+          const sftpChanged = result.sftpHost !== undefined || result.sftpPort !== undefined ||
+            result.sftpUsername !== undefined || result.sftpPassword !== undefined ||
+            result.sftpSshKey !== undefined || result.sftpFolder !== undefined ||
+            result.sftpFileMask !== undefined || result.sftpMaxConnectionPoolSize !== undefined ||
+            result.sftpFileBufferSize !== undefined;
+          
+          if (sftpChanged) {
+            // Note: SFTP properties update endpoint may need to be created
+            // For now, reload configurations after other updates complete
+            this.loadInterfaceConfigurations();
+          }
+        }
+
+        // Update SQL Server transaction properties if changed (only for SqlServer adapters)
+        if (this.sourceAdapterName === 'SqlServer' && 
+            (result.sqlUseTransaction !== undefined || result.sqlBatchSize !== undefined)) {
+          const useTransactionChanged = result.sqlUseTransaction !== undefined && 
+            result.sqlUseTransaction !== this.sqlUseTransaction;
+          const batchSizeChanged = result.sqlBatchSize !== undefined && 
+            result.sqlBatchSize !== this.sqlBatchSize;
+          
+          if (useTransactionChanged || batchSizeChanged) {
+            this.sqlUseTransaction = result.sqlUseTransaction !== undefined ? result.sqlUseTransaction : this.sqlUseTransaction;
+            this.sqlBatchSize = result.sqlBatchSize !== undefined ? result.sqlBatchSize : this.sqlBatchSize;
+            this.transportService.updateSqlTransactionProperties(
+              this.getActiveInterfaceName(),
+              result.sqlUseTransaction,
+              result.sqlBatchSize
+            ).subscribe({
+              next: () => {
+                this.loadInterfaceConfigurations();
+                this.snackBar.open('SQL Transaction Properties aktualisiert', 'OK', { duration: 3000 });
+              },
+              error: (error) => {
+                console.error('Error updating SQL transaction properties:', error);
+                const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Transaction Properties');
+                this.snackBar.open(detailedMessage, 'Schließen', {
+                  duration: 10000,
+                  panelClass: ['error-snackbar'],
+                  verticalPosition: 'top',
+                  horizontalPosition: 'center'
+                });
+                // Restore previous values
+                this.loadInterfaceConfigurations();
+              }
+            });
+          }
         }
       }
     });
@@ -1953,6 +2082,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.destinationFileMask = config.destinationFileMask || this.destinationFileMask;
     this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
     this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
+    
+    // If source adapter is enabled but GUID is missing, reload configuration from API
+    // The backend generates GUIDs automatically when loading configurations
+    if (this.sourceIsEnabled && !this.sourceAdapterInstanceGuid) {
+      this.transportService.getInterfaceConfiguration(this.currentInterfaceName).subscribe({
+        next: (freshConfig) => {
+          if (freshConfig && freshConfig.sourceAdapterInstanceGuid) {
+            // Update local cache and reload interface data
+            const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === this.currentInterfaceName);
+            if (index >= 0) {
+              this.interfaceConfigurations[index] = freshConfig;
+            }
+            this.loadInterfaceData(); // Recursively reload to pick up the GUID
+          }
+        },
+        error: (error) => {
+          console.warn('Error reloading interface configuration to get GUID:', error);
+        }
+      });
+      return; // Exit early, will reload after API call completes
+    }
     
     // Load SQL Server properties
     this.sqlServerName = config.sqlServerName || this.sqlServerName;

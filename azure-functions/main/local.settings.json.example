@@ -1,0 +1,20 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+    "AZURE_FUNCTIONS_ENVIRONMENT": "Development",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    
+    "MainStorageConnection": "DefaultEndpointsProtocol=https;AccountName=YOUR_STORAGE_ACCOUNT_NAME;AccountKey=YOUR_STORAGE_ACCOUNT_KEY;EndpointSuffix=core.windows.net",
+    
+    "AZURE_SQL_SERVER": "YOUR_SQL_SERVER.database.windows.net",
+    "AZURE_SQL_DATABASE": "AppDatabase",
+    "AZURE_SQL_USER": "YOUR_SQL_USERNAME",
+    "AZURE_SQL_PASSWORD": "YOUR_SQL_PASSWORD",
+    
+    "CsvFieldSeparator": "║"
+  }
+}
+

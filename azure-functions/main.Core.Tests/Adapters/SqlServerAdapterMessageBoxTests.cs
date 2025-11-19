@@ -86,12 +86,14 @@ public class SqlServerAdapterMessageBoxTests : IDisposable
             null, // connectionString
             null, // pollingStatement
             null, // pollingInterval
+            null, // tableName
             null, // useTransaction
             null, // batchSize
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
-            _mockLogger.Object);
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Act
         var (readHeaders, readRecords) = await adapter.ReadAsync("TransportData");
@@ -154,12 +156,14 @@ public class SqlServerAdapterMessageBoxTests : IDisposable
             null, // connectionString
             null, // pollingStatement
             null, // pollingInterval
+            null, // tableName
             null, // useTransaction
             null, // batchSize
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
-            _mockLogger.Object);
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Act
         await adapter.WriteAsync("TransportData", headers, records);
@@ -213,12 +217,14 @@ public class SqlServerAdapterMessageBoxTests : IDisposable
             null, // connectionString
             null, // pollingStatement
             null, // pollingInterval
+            null, // tableName
             null, // useTransaction
             null, // batchSize
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
-            _mockLogger.Object);
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Act - No messages in MessageBox
         await adapter.WriteAsync("TransportData", headers, records);
@@ -275,12 +281,14 @@ public class SqlServerAdapterMessageBoxTests : IDisposable
             null, // connectionString
             null, // pollingStatement
             null, // pollingInterval
+            null, // tableName
             null, // useTransaction
             null, // batchSize
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
-            _mockLogger.Object);
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Act
         await adapter.WriteAsync("TransportData", headers, new List<Dictionary<string, string>>());
@@ -372,12 +380,14 @@ public class SqlServerAdapterMessageBoxTests : IDisposable
             null, // connectionString
             null, // pollingStatement
             null, // pollingInterval
+            null, // tableName
             null, // useTransaction
             null, // batchSize
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
-            _mockLogger.Object);
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Verify messages exist before processing
         var messagesBefore = await _messageBoxService.ReadMessagesAsync(InterfaceName, "Pending");

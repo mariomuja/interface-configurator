@@ -53,7 +53,7 @@ public class MultipleDestinationAdaptersTests : IDisposable
         _messageBoxService = new MessageBoxService(_messageBoxContext, mockEventQueue.Object, mockSubscriptionService.Object, new Mock<ILogger<MessageBoxService>>().Object);
 
         _dynamicTableService = new DynamicTableService(_applicationContext, new Mock<ILogger<DynamicTableService>>().Object);
-        _dataService = new DataServiceAdapter(_applicationContext, new Mock<ILogger<DataServiceAdapter>>().Object);
+        _dataService = new DataServiceAdapter(_applicationContext, new Mock<ILoggingService>().Object, new Mock<ILogger<DataServiceAdapter>>().Object);
 
         _messageBoxContext.Database.EnsureCreated();
         _applicationContext.Database.EnsureCreated();
@@ -85,26 +85,44 @@ public class MultipleDestinationAdaptersTests : IDisposable
         var dest2Guid = Guid.NewGuid();
 
         var adapter1 = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            connectionString: null,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: dest1Guid,
-            logger: _mockSqlLogger.Object);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            dest1Guid,
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         var adapter2 = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            connectionString: null,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: dest2Guid,
-            logger: _mockSqlLogger.Object);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            dest2Guid,
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Write to both destinations
         await adapter1.WriteAsync("TransportData1", headers, new List<Dictionary<string, string>>(), CancellationToken.None);
@@ -149,15 +167,24 @@ public class MultipleDestinationAdaptersTests : IDisposable
         // Create SQL Server destination adapter
         var sqlDestGuid = Guid.NewGuid();
         var sqlAdapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            connectionString: null,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: sqlDestGuid,
-            logger: _mockSqlLogger.Object);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            sqlDestGuid,
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Note: CSV adapter requires blob storage setup which is complex for integration tests
         // The test verifies that SQL adapter processes messages correctly
@@ -197,15 +224,24 @@ public class MultipleDestinationAdaptersTests : IDisposable
         var disabledGuid = Guid.NewGuid();
 
         var enabledAdapter = new SqlServerAdapter(
-            defaultContext: _applicationContext,
-            connectionString: null,
-            dynamicTableService: _dynamicTableService,
-            dataService: _dataService,
-            messageBoxService: _messageBoxService,
-            subscriptionService: null,
-            interfaceName: InterfaceName,
-            adapterInstanceGuid: enabledGuid,
-            logger: _mockSqlLogger.Object);
+            _applicationContext,
+            _dynamicTableService,
+            _dataService,
+            _messageBoxService,
+            null,
+            InterfaceName,
+            enabledGuid,
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockSqlLogger.Object,
+            null); // statisticsService
 
         // Act - Only write to enabled adapter
         await enabledAdapter.WriteAsync("EnabledTable", headers, new List<Dictionary<string, string>>(), CancellationToken.None);

@@ -79,8 +79,19 @@ var host = new HostBuilder()
                 var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
                 var logger = sp.GetService<ILogger<AdapterConfigurationService>>();
                 var service = new AdapterConfigurationService(blobServiceClient, logger);
-                // Initialize on startup (fire and forget)
-                _ = Task.Run(async () => await service.InitializeAsync(), CancellationToken.None);
+                // Initialize on startup (fire and forget) with timeout
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        await service.InitializeAsync(cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Failed to initialize adapter configuration service on startup. Will retry on first use.");
+                    }
+                }, CancellationToken.None);
                 return service;
             });
             
@@ -90,8 +101,19 @@ var host = new HostBuilder()
                 var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
                 var logger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationService>>();
                 var service = new InterfaceConfigurator.Main.Services.InterfaceConfigurationService(blobServiceClient, logger);
-                // Initialize on startup (fire and forget)
-                _ = Task.Run(async () => await service.InitializeAsync(), CancellationToken.None);
+                // Initialize on startup (fire and forget) with timeout
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        await service.InitializeAsync(cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Failed to initialize interface configuration service on startup. Will retry on first use.");
+                    }
+                }, CancellationToken.None);
                 return service;
             });
             
@@ -170,23 +192,31 @@ var host = new HostBuilder()
                 return new MetricsService(telemetryClient, logger);
             });
             
-            // Register Dead Letter Monitor
+            // Register Dead Letter Monitor (only if MessageBox is available)
             services.AddScoped<DeadLetterMonitor>(sp =>
             {
-                var messageBoxService = sp.GetRequiredService<IMessageBoxService>();
+                var messageBoxService = sp.GetService<IMessageBoxService>();
                 var logger = sp.GetService<ILogger<DeadLetterMonitor>>();
+                if (messageBoxService == null)
+                {
+                    // Return a no-op implementation if MessageBox is not available
+                    return new DeadLetterMonitor(null!, logger);
+                }
                 return new DeadLetterMonitor(messageBoxService, logger);
             });
             
-            // Register Processing Statistics Service
+            // Register Processing Statistics Service (only if MessageBox is available)
             services.AddScoped<ProcessingStatisticsService>(sp =>
             {
                 var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var logger = sp.GetService<ILogger<ProcessingStatisticsService>>();
                 if (messageBoxContext == null)
                 {
-                    throw new InvalidOperationException("MessageBoxDbContext is required for ProcessingStatisticsService");
+                    // Return a no-op implementation if MessageBox is not available
+                    // Note: This might cause issues if the service is actually used, but allows startup
+                    logger?.LogWarning("MessageBoxDbContext is not available. ProcessingStatisticsService may not work correctly.");
+                    return null!; // Will need to handle null checks where this is used
                 }
-                var logger = sp.GetService<ILogger<ProcessingStatisticsService>>();
                 return new ProcessingStatisticsService(messageBoxContext, logger);
             });
             
@@ -216,8 +246,9 @@ var host = new HostBuilder()
                 Console.WriteLine("WARNING: Storage connection string not set. Error row service may not work.");
             }
             
-            // Register Adapters
+            // Register Adapters (only if required dependencies are available)
             // CSV Adapter (for source) - register as named service
+            // Note: This will only be instantiated when actually used, not on startup
             services.AddScoped<CsvAdapter>(sp =>
             {
                 var csvProcessingService = sp.GetRequiredService<ICsvProcessingService>();
@@ -225,14 +256,16 @@ var host = new HostBuilder()
                 var messageBoxService = sp.GetService<IMessageBoxService>();
                 var subscriptionService = sp.GetService<IMessageSubscriptionService>();
                 var logger = sp.GetService<ILogger<CsvAdapter>>();
-                if (blobServiceClient == null)
+                var blobClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
+                if (blobClient == null)
                 {
-                    throw new InvalidOperationException("BlobServiceClient is required for CsvAdapter");
+                    logger?.LogError("BlobServiceClient is required for CsvAdapter but is not available. Please configure MainStorageConnection or AzureWebJobsStorage.");
+                    throw new InvalidOperationException("BlobServiceClient is required for CsvAdapter. Please configure MainStorageConnection or AzureWebJobsStorage in local.settings.json");
                 }
                 return new CsvAdapter(
                     csvProcessingService: csvProcessingService, 
                     adapterConfig: adapterConfig, 
-                    blobServiceClient: blobServiceClient, 
+                    blobServiceClient: blobClient, 
                     messageBoxService: messageBoxService, 
                     subscriptionService: subscriptionService, 
                     interfaceName: "FromCsvToSqlServerExample", 
@@ -267,6 +300,8 @@ var host = new HostBuilder()
                 var logger = sp.GetService<ILogger<SqlServerAdapter>>();
                 if (context == null)
                 {
+                    logger?.LogWarning("ApplicationDbContext is not available. SqlServerAdapter may not work correctly.");
+                    // Still allow registration - will fail when actually used
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
                 return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, logger);

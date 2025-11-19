@@ -43,19 +43,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => adapter.ReadAsync("", CancellationToken.None));
@@ -70,19 +72,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         var headers = new List<string> { "Name", "Age" };
         var records = new List<Dictionary<string, string>>();
@@ -104,19 +108,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         var headers = new List<string>();
         var records = new List<Dictionary<string, string>>();
@@ -137,19 +143,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         var records = new List<Dictionary<string, string>>();
 
@@ -165,19 +173,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object));
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null)); // statisticsService
     }
 
     [Fact]
@@ -188,19 +198,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             null!,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object));
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null)); // statisticsService
     }
 
     [Fact]
@@ -211,19 +223,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             null!,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object));
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null)); // statisticsService
     }
 
     [Fact]
@@ -237,19 +251,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
             connectionString,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);
@@ -264,19 +280,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
             60, // commandTimeout
-            null,
-            null,
-            null,
-            _mockLogger.Object);
+            null, // failOnBadStatement
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);
@@ -290,18 +308,21 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
+            null, // messageBoxService
+            null, // subscriptionService
+            null, // interfaceName
+            null, // adapterInstanceGuid
+            null, // connectionString
+            null, // pollingStatement
+            null, // pollingInterval
+            null, // tableName
+            null, // useTransaction
+            null, // batchSize
+            null, // commandTimeout
             true, // failOnBadStatement
-            null,
-            _mockLogger.Object);
+            null, // configService
+            _mockLogger.Object,
+            null); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);

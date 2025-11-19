@@ -106,8 +106,11 @@ public class CreateInterfaceConfiguration
                 DestinationIsEnabled = request.DestinationIsEnabled ?? true,
                 SourceInstanceName = request.SourceInstanceName ?? "Source",
                 DestinationInstanceName = request.DestinationInstanceName ?? "Destination",
+                SourceAdapterInstanceGuid = Guid.NewGuid(), // Generate GUID for source adapter instance
+                DestinationAdapterInstanceGuid = Guid.NewGuid(), // Generate GUID for destination adapter instance
                 Description = request.Description,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             await _configService.SaveConfigurationAsync(config, executionContext.CancellationToken);

@@ -66,13 +66,43 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                         if (!string.IsNullOrWhiteSpace(jsonContent))
                         {
                             var configs = JsonSerializer.Deserialize<List<InterfaceConfiguration>>(jsonContent);
+                            bool needsSave = false;
                             if (configs != null)
                             {
                                 foreach (var config in configs)
                                 {
+                                    // Ensure adapter instance GUIDs are set (for backward compatibility)
+                                    if (config.SourceAdapterInstanceGuid == null || config.SourceAdapterInstanceGuid == Guid.Empty)
+                                    {
+                                        config.SourceAdapterInstanceGuid = Guid.NewGuid();
+                                        needsSave = true;
+                                        _logger?.LogInformation("Generated SourceAdapterInstanceGuid for interface {InterfaceName}", config.InterfaceName);
+                                    }
+                                    if (config.DestinationAdapterInstanceGuid == null || config.DestinationAdapterInstanceGuid == Guid.Empty)
+                                    {
+                                        config.DestinationAdapterInstanceGuid = Guid.NewGuid();
+                                        needsSave = true;
+                                        _logger?.LogInformation("Generated DestinationAdapterInstanceGuid for interface {InterfaceName}", config.InterfaceName);
+                                    }
+                                    
                                     _configurations[config.InterfaceName] = config;
                                 }
                                 _logger?.LogInformation("Loaded {Count} interface configurations from storage", configs.Count);
+                            }
+                            
+                            // Save updated configurations if GUIDs were generated (after releasing lock)
+                            if (needsSave)
+                            {
+                                _lock.Release();
+                                try
+                                {
+                                    _logger?.LogInformation("Saving configurations with generated adapter instance GUIDs");
+                                    await SaveConfigurationsAsync(cancellationToken);
+                                }
+                                finally
+                                {
+                                    await _lock.WaitAsync(cancellationToken);
+                                }
                             }
                         }
                     }
@@ -89,16 +119,30 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             }
 
             // Create default configuration if none exists
+            bool needsDefaultSave = false;
             if (!_configurations.ContainsKey(DefaultInterfaceName))
             {
                 var defaultConfiguration = CreateDefaultInterfaceConfiguration();
                 _configurations[DefaultInterfaceName] = defaultConfiguration;
                 _logger?.LogInformation("Created default interface configuration '{InterfaceName}'", DefaultInterfaceName);
-                
-                await SaveConfigurationsAsync(cancellationToken);
+                needsDefaultSave = true;
             }
-
+            
             _initialized = true;
+            
+            // Save default configuration after releasing lock to avoid deadlock
+            if (needsDefaultSave)
+            {
+                _lock.Release();
+                try
+                {
+                    await SaveConfigurationsAsync(cancellationToken);
+                }
+                finally
+                {
+                    await _lock.WaitAsync(cancellationToken);
+                }
+            }
         }
         finally
         {

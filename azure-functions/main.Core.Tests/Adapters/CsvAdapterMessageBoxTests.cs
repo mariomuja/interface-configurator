@@ -106,10 +106,20 @@ public class CsvAdapterMessageBoxTests : IDisposable
             adapterInstanceGuid,
             null, // receiveFolder
             null, // fileMask (defaults to "*.txt")
-            null, // batchSize (defaults to 100)
+            null, // batchSize (defaults to 1000)
             null, // fieldSeparator (defaults to "║")
             null, // destinationReceiveFolder
             null, // destinationFileMask (defaults to "*.txt")
+            null, // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockLogger.Object);
 
         // Act
@@ -171,10 +181,20 @@ public class CsvAdapterMessageBoxTests : IDisposable
             adapterInstanceGuid,
             null, // receiveFolder
             null, // fileMask (defaults to "*.txt")
-            null, // batchSize (defaults to 100)
+            null, // batchSize (defaults to 1000)
             null, // fieldSeparator (defaults to "║")
             null, // destinationReceiveFolder
             null, // destinationFileMask (defaults to "*.txt")
+            null, // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockLogger.Object);
 
         // Act
@@ -215,10 +235,20 @@ public class CsvAdapterMessageBoxTests : IDisposable
             adapterInstanceGuid,
             null, // receiveFolder
             null, // fileMask (defaults to "*.txt")
-            null, // batchSize (defaults to 100)
+            null, // batchSize (defaults to 1000)
             null, // fieldSeparator (defaults to "║")
             null, // destinationReceiveFolder
             null, // destinationFileMask (defaults to "*.txt")
+            null, // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockLogger.Object);
 
         // Act - No messages in MessageBox
@@ -260,10 +290,20 @@ public class CsvAdapterMessageBoxTests : IDisposable
             adapterInstanceGuid1,
             null, // receiveFolder
             null, // fileMask (defaults to "*.txt")
-            null, // batchSize (defaults to 100)
+            null, // batchSize (defaults to 1000)
             null, // fieldSeparator (defaults to "║")
             null, // destinationReceiveFolder
             null, // destinationFileMask (defaults to "*.txt")
+            null, // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockLogger.Object);
 
         var mockSubscriptionService2 = new Mock<IMessageSubscriptionService>();
@@ -277,10 +317,20 @@ public class CsvAdapterMessageBoxTests : IDisposable
             adapterInstanceGuid2,
             null, // receiveFolder
             null, // fileMask (defaults to "*.txt")
-            null, // batchSize (defaults to 100)
+            null, // batchSize (defaults to 1000)
             null, // fieldSeparator (defaults to "║")
             null, // destinationReceiveFolder
             null, // destinationFileMask (defaults to "*.txt")
+            null, // adapterType
+            null, // sftpHost
+            null, // sftpPort
+            null, // sftpUsername
+            null, // sftpPassword
+            null, // sftpSshKey
+            null, // sftpFolder
+            null, // sftpFileMask
+            null, // sftpMaxConnectionPoolSize
+            null, // sftpFileBufferSize
             _mockLogger.Object);
 
         // Act

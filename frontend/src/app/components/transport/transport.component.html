@@ -101,11 +101,14 @@
         </tr>
       </table>
     </div>
-    <div class="table-empty-message" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
+    <div class="table-empty-message" *ngIf="sourceIsEnabled && sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
       <p>No MessageBox messages yet. The CSV source pushes data automatically when it is enabled.</p>
     </div>
-    <div class="table-empty-message" *ngIf="!sourceAdapterInstanceGuid">
-      <p>The source adapter instance is not initialized yet. Enable the source adapter to start generating messages.</p>
+    <div class="table-empty-message" *ngIf="!sourceIsEnabled">
+      <p>The source adapter is disabled. Enable the source adapter to start generating messages.</p>
+    </div>
+    <div class="table-empty-message" *ngIf="sourceIsEnabled && !sourceAdapterInstanceGuid">
+      <p>The source adapter instance is not initialized yet. Please wait while the adapter instance is being initialized.</p>
     </div>
   </mat-card-content>
 </mat-card>

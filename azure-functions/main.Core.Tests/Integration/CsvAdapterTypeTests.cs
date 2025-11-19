@@ -52,7 +52,7 @@ public class CsvAdapterTypeTests : IDisposable
         _messageBoxService = new MessageBoxService(_messageBoxContext, mockEventQueue.Object, mockSubscriptionService.Object, messageBoxLogger.Object);
         
         _dynamicTableService = new DynamicTableService(_applicationContext, new Mock<ILogger<DynamicTableService>>().Object);
-        _dataService = new DataService(_applicationContext, new Mock<ILogger<DataService>>().Object);
+        _dataService = new DataServiceAdapter(_applicationContext, new Mock<ILoggingService>().Object, new Mock<ILogger<DataServiceAdapter>>().Object);
         _mockCsvLogger = new Mock<ILogger<CsvAdapter>>();
         _mockCsvProcessingService = new Mock<ICsvProcessingService>();
         _mockAdapterConfig = new Mock<IAdapterConfigurationService>();
@@ -147,7 +147,7 @@ public class CsvAdapterTypeTests : IDisposable
         var containerClient = _blobServiceClient.GetBlobContainerClient(ContainerName);
         await containerClient.CreateIfNotExistsAsync();
         var sourceBlobPath = $"{sourceFolder}/test-file.csv";
-        var sourceBlobClient = containerClient.GetBlockBlobClient(sourceBlobPath);
+        var sourceBlobClient = containerClient.GetBlobClient(sourceBlobPath);
         await sourceBlobClient.UploadAsync(new BinaryData(Encoding.UTF8.GetBytes(csvContent)));
 
         var adapter = new CsvAdapter(

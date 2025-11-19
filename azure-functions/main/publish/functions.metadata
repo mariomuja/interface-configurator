@@ -28,6 +28,34 @@
     ]
   },
   {
+    "name": "CheckMessageBox",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.CheckMessageBox.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "CheckMessageBox",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "ClearProcessLogs",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.ClearProcessLogsFunction.Run",
