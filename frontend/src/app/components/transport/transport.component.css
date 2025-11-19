@@ -359,6 +359,13 @@
   line-height: 16px !important;
 }
 
+.csv-text-container {
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+}
+
 .csv-text-container textarea.csv-text {
   flex: 1;
   overflow: auto; /* Horizontal and vertical scrollbar for CSV text */
@@ -379,8 +386,8 @@
 
 .csv-editable {
   width: 100%;
-  height: 100%;
-  min-height: 200px;
+  min-height: 140px;
+  max-height: 300px;
   border: none;
   outline: none;
   resize: none;

@@ -56,7 +56,7 @@
     </app-adapter-card>
 
 <!-- MessageBox Data Card -->
-<mat-card class="message-box-card" *ngIf="sourceAdapterInstanceGuid">
+<mat-card class="message-box-card">
   <mat-card-header>
     <div class="message-box-header">
       <mat-icon>inbox</mat-icon>
@@ -64,19 +64,19 @@
         <h3>MessageBox (Source Output)</h3>
         <p>Records written by this adapter instance</p>
       </div>
-      <span class="message-count" *ngIf="!isLoadingMessageBox">
+      <span class="message-count" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox">
         {{ messageBoxTableData.length }} messages
       </span>
     </div>
-    <button mat-icon-button (click)="loadMessageBoxData()" [disabled]="isLoadingMessageBox" matTooltip="Refresh MessageBox data">
+    <button mat-icon-button (click)="loadMessageBoxData()" [disabled]="isLoadingMessageBox || !sourceAdapterInstanceGuid" matTooltip="Refresh MessageBox data">
       <mat-icon>{{ isLoadingMessageBox ? 'hourglass_empty' : 'refresh' }}</mat-icon>
     </button>
   </mat-card-header>
   <mat-card-content>
-    <div *ngIf="isLoadingMessageBox" class="spinner-container">
+    <div *ngIf="sourceAdapterInstanceGuid && isLoadingMessageBox" class="spinner-container">
       <mat-spinner></mat-spinner>
     </div>
-    <div class="message-box-table" *ngIf="!isLoadingMessageBox && messageBoxTableData.length > 0">
+    <div class="message-box-table" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length > 0">
       <table mat-table [dataSource]="messageBoxTableData" class="data-table">
         <ng-container matColumnDef="datetimeCreated">
           <th mat-header-cell *matHeaderCellDef>Timestamp</th>
@@ -102,8 +102,11 @@
         </tr>
       </table>
     </div>
-    <div class="table-empty-message" *ngIf="!isLoadingMessageBox && messageBoxTableData.length === 0">
+    <div class="table-empty-message" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
       <p>No MessageBox messages yet. Start the transport to write data.</p>
+    </div>
+    <div class="table-empty-message" *ngIf="!sourceAdapterInstanceGuid">
+      <p>The source adapter instance is not initialized yet. Open the source settings or start the transport to generate messages.</p>
     </div>
   </mat-card-content>
 </mat-card>
