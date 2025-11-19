@@ -235,6 +235,15 @@ export class TransportService {
     });
   }
 
+  getMessageBoxMessages(interfaceName: string, adapterInstanceGuid: string, adapterType: string = 'Source'): Observable<any[]> {
+    const params = new URLSearchParams({
+      interfaceName,
+      adapterInstanceGuid,
+      adapterType
+    });
+    return this.http.get<any[]>(`${this.apiUrl}/GetMessageBoxMessages?${params.toString()}`);
+  }
+
   getDestinationAdapterInstances(interfaceName: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/GetDestinationAdapterInstances?interfaceName=${encodeURIComponent(interfaceName)}`);
   }

@@ -55,6 +55,59 @@
       </div>
     </app-adapter-card>
 
+<!-- MessageBox Data Card -->
+<mat-card class="message-box-card" *ngIf="sourceAdapterInstanceGuid">
+  <mat-card-header>
+    <div class="message-box-header">
+      <mat-icon>inbox</mat-icon>
+      <div class="message-box-header-text">
+        <h3>MessageBox (Source Output)</h3>
+        <p>Records written by this adapter instance</p>
+      </div>
+      <span class="message-count" *ngIf="!isLoadingMessageBox">
+        {{ messageBoxTableData.length }} messages
+      </span>
+    </div>
+    <button mat-icon-button (click)="loadMessageBoxData()" [disabled]="isLoadingMessageBox" matTooltip="Refresh MessageBox data">
+      <mat-icon>{{ isLoadingMessageBox ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+    </button>
+  </mat-card-header>
+  <mat-card-content>
+    <div *ngIf="isLoadingMessageBox" class="spinner-container">
+      <mat-spinner></mat-spinner>
+    </div>
+    <div class="message-box-table" *ngIf="!isLoadingMessageBox && messageBoxTableData.length > 0">
+      <table mat-table [dataSource]="messageBoxTableData" class="data-table">
+        <ng-container matColumnDef="datetimeCreated">
+          <th mat-header-cell *matHeaderCellDef>Timestamp</th>
+          <td mat-cell *matCellDef="let row">{{ row.datetimeCreated | date:'short' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let row">{{ row.status }}</td>
+        </ng-container>
+
+        <ng-container *ngFor="let column of messageBoxRecordColumns" [matColumnDef]="column">
+          <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+          <td mat-cell *matCellDef="let row">{{ getMessageBoxRecordValue(row, column) }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="messageBoxDisplayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: messageBoxDisplayedColumns"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="messageBoxDisplayedColumns.length">
+            No data
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div class="table-empty-message" *ngIf="!isLoadingMessageBox && messageBoxTableData.length === 0">
+      <p>No MessageBox messages yet. Start the transport to write data.</p>
+    </div>
+  </mat-card-content>
+</mat-card>
+
     <!-- Destination Adapter Instances -->
     <mat-card class="destinations-container-card">
       <mat-card-header class="destinations-header">

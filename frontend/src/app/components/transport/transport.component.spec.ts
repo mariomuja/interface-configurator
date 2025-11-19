@@ -46,7 +46,8 @@ describe('TransportComponent', () => {
       'getInterfaceConfiguration',
       'updateCsvData',
       'updateCsvPollingInterval',
-      'addDestinationAdapterInstance'
+      'addDestinationAdapterInstance',
+      'getMessageBoxMessages'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -74,6 +75,7 @@ describe('TransportComponent', () => {
     transportService.updateCsvData.and.returnValue(of({}));
     transportService.updateCsvPollingInterval.and.returnValue(of({}));
     transportService.addDestinationAdapterInstance.and.returnValue(of({}));
+    transportService.getMessageBoxMessages.and.returnValue(of([]));
 
     component['refreshSubscription']?.unsubscribe();
   });

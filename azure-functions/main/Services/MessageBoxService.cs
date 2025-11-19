@@ -229,6 +229,46 @@ public class MessageBoxService : IMessageBoxService
         }
     }
 
+    public async Task<List<MessageBoxMessage>> ReadMessagesByAdapterAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string? adapterType = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(interfaceName))
+            throw new ArgumentException("Interface name cannot be empty", nameof(interfaceName));
+        if (adapterInstanceGuid == Guid.Empty)
+            throw new ArgumentException("AdapterInstanceGuid cannot be empty", nameof(adapterInstanceGuid));
+
+        try
+        {
+            _logger?.LogInformation(
+                "Reading messages for adapter instance: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, AdapterType={AdapterType}",
+                interfaceName, adapterInstanceGuid, adapterType ?? "Any");
+
+            var query = _context.Messages
+                .Where(m => m.InterfaceName == interfaceName)
+                .Where(m => m.AdapterInstanceGuid == adapterInstanceGuid)
+                .Where(m => !m.DeadLetter);
+
+            if (!string.IsNullOrWhiteSpace(adapterType))
+            {
+                query = query.Where(m => m.AdapterType == adapterType);
+            }
+
+            return await query
+                .OrderByDescending(m => m.datetime_created)
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex,
+                "Error reading messages by adapter instance: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}",
+                interfaceName, adapterInstanceGuid);
+            throw;
+        }
+    }
+
     public async Task<MessageBoxMessage?> ReadMessageAsync(
         Guid messageId,
         CancellationToken cancellationToken = default)

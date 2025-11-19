@@ -437,6 +437,47 @@
   width: 100%;
 }
 
+.message-box-card {
+  margin-top: 16px;
+}
+
+.message-box-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.message-box-header-text h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.message-box-header-text p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.message-box-header mat-icon {
+  color: #3f51b5;
+}
+
+.message-count {
+  margin-left: auto;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.message-box-table {
+  overflow: auto;
+}
+
+.message-box-card .spinner-container {
+  min-height: 120px;
+}
+
 /* Override Material Card Header default styles */
 .log-card ::ng-deep .mat-mdc-card-header {
   padding: 8px 16px !important;

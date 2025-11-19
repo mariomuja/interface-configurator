@@ -81,6 +81,15 @@ public interface IMessageBoxService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads messages produced by a specific adapter instance.
+    /// </summary>
+    Task<List<MessageBoxMessage>> ReadMessagesByAdapterAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string? adapterType = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reads a single message by MessageId
     /// </summary>
     /// <param name="messageId">MessageId</param>

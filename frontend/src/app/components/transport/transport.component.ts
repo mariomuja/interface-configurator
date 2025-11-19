@@ -26,6 +26,14 @@ import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription, firstValueFrom } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
+interface MessageBoxTableRow {
+  messageId: string;
+  datetimeCreated: string;
+  status: string;
+  record: Record<string, string>;
+  headers: string[];
+}
+
 @Component({
   selector: 'app-transport',
   standalone: true,
@@ -107,6 +115,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
   private demoSampleCsvCache: { text: string; records: CsvRecord[] } | null = null;
+  messageBoxTableData: MessageBoxTableRow[] = [];
+  messageBoxRecordColumns: string[] = [];
+  messageBoxDisplayedColumns: string[] = ['datetimeCreated', 'status'];
+  isLoadingMessageBox = false;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
@@ -589,6 +601,42 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  loadMessageBoxData(): void {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName || !this.sourceAdapterInstanceGuid) {
+      this.messageBoxTableData = [];
+      this.messageBoxRecordColumns = [];
+      this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
+      this.isLoadingMessageBox = false;
+      return;
+    }
+
+    this.isLoadingMessageBox = true;
+
+    this.transportService.getMessageBoxMessages(interfaceName, this.sourceAdapterInstanceGuid, 'Source').subscribe({
+      next: (messages) => {
+        const rows = (messages || []).map((msg: any) => ({
+          messageId: msg.messageId,
+          datetimeCreated: msg.datetimeCreated,
+          status: msg.status,
+          record: msg.record || {},
+          headers: msg.headers || []
+        })) as MessageBoxTableRow[];
+
+        this.messageBoxTableData = rows.slice().reverse(); // oldest first
+        this.messageBoxRecordColumns = this.extractMessageBoxColumns(this.messageBoxTableData);
+        this.messageBoxDisplayedColumns = ['datetimeCreated', 'status', ...this.messageBoxRecordColumns];
+        this.isLoadingMessageBox = false;
+      },
+      error: (error) => {
+        console.error('Error loading MessageBox data:', error);
+        this.isLoadingMessageBox = false;
+        this.messageBoxTableData = [];
+        this.messageBoxRecordColumns = [];
+      }
+    });
+  }
+
   /**
    * Extracts detailed error information from HTTP error responses
    * Returns a formatted error message with all available details
@@ -840,6 +888,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // But we refresh immediately to show any existing data and start monitoring
         this.loadSqlData();
         this.loadProcessLogs();
+        this.loadMessageBoxData();
         this.loadInterfaceConfigurations();
       },
       error: (error) => {
@@ -962,6 +1011,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadSqlData();
       this.loadProcessLogs();
       this.refreshCurrentInterfaceCsvData();
+      this.loadMessageBoxData();
     });
   }
 
@@ -1879,6 +1929,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Reload adapter instances and data
     this.loadDestinationAdapterInstances();
     this.loadSqlData();
+    this.loadMessageBoxData();
   }
 
   openAddInterfaceDialog(): void {
@@ -2021,6 +2072,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.lastSyncedCsvData = '';
     this.isCsvDataUpdateInFlight = false;
     this.tableExists = false;
+    this.messageBoxTableData = [];
+    this.messageBoxRecordColumns = [];
+    this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
+    this.isLoadingMessageBox = false;
 
     this.sqlServerName = '';
     this.sqlDatabaseName = '';
@@ -3249,6 +3304,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
 
     return Array.from(allKeys);
+  }
+
+  private extractMessageBoxColumns(rows: MessageBoxTableRow[]): string[] {
+    const columns = new Set<string>();
+    rows.forEach(row => {
+      if (row?.record) {
+        Object.keys(row.record).forEach(key => columns.add(key));
+      }
+    });
+    return Array.from(columns);
+  }
+
+  getMessageBoxRecordValue(row: MessageBoxTableRow, column: string): string {
+    return row?.record?.[column] ?? '';
   }
 
   /**
