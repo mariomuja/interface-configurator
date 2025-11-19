@@ -943,7 +943,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.refreshSubscription = interval(3000).subscribe(() => {
       this.loadSqlData();
       this.loadProcessLogs();
-      this.loadInterfaceConfigurations();
     });
   }
   
