@@ -27,6 +27,22 @@ Each adapter can be used as **both source and destination**:
 - Automatic error handling (moves malformed files to error folder)
 - File system monitoring for `ReceiveFolder`
 
+**Adapter Types (Source Only):**
+The CSV adapter supports three types when used as a source:
+- **RAW**: Creates CSV file from `CsvData` property content and moves to `csv-incoming` folder
+- **FILE**: Polls Azure Blob Storage folder (`ReceiveFolder`) and copies files to `csv-incoming`
+- **SFTP**: Receives files via SFTP server and moves to `csv-incoming` folder
+
+**Adapter Properties:**
+- **ReceiveFolder**: Blob storage folder path for monitoring (FILE type)
+- **FileMask**: File pattern filter (supports variables like `$datetime` and wildcards)
+- **BatchSize**: Number of records to process per batch
+- **FieldSeparator**: Character used to separate CSV fields (default: `║`)
+- **PollingInterval**: Interval in seconds for polling operations
+- **SFTP Properties** (SFTP type only): Host, Port, Username, Password, SSH Key, Folder, FileMask, Connection Pool Size, File Buffer Size
+- **DestinationReceiveFolder**: Output folder for destination adapters
+- **DestinationFileMask**: Output file pattern for destination adapters
+
 ### SqlServerAdapter
 
 **As Source:**
@@ -45,6 +61,21 @@ Each adapter can be used as **both source and destination**:
 - Type inference and conversion
 - Transaction support for data integrity
 - Connection pooling for performance
+
+**Adapter Properties:**
+- **Connection Properties** (Source & Destination):
+  - **ServerName**: SQL Server instance name
+  - **DatabaseName**: Target database name
+  - **UserName**: Database username (if not using Integrated Security)
+  - **Password**: Database password (if not using Integrated Security)
+  - **IntegratedSecurity**: Use Windows Authentication (true/false)
+  - **ResourceGroup**: Azure resource group (for Azure SQL)
+- **Source-Specific Properties**:
+  - **PollingStatement**: SQL query to poll for new data
+  - **PollingInterval**: Interval in seconds between polling operations
+- **Destination-Specific Properties**:
+  - **UseTransaction**: Enable transaction support for batch writes
+  - **BatchSize**: Number of records to write per batch
 
 ## IAdapter Interface
 
@@ -84,6 +115,41 @@ Each adapter instance has:
 - **InstanceName**: User-editable name for UI display
 - **IsEnabled**: Enable/disable flag for process control
 - **InterfaceName**: Links adapter to interface configuration
+
+## Adapter Properties System
+
+Adapters support **configurable properties** that allow fine-tuning behavior without code changes:
+
+### Property Categories
+
+1. **Common Properties** (All Adapters):
+   - Instance name (user-friendly display name)
+   - Enable/disable flag
+   - Adapter instance GUID
+
+2. **Adapter-Specific Properties**:
+   - **CSV Adapter**: Receive folder, file mask, field separator, batch size, adapter type (RAW/FILE/SFTP), SFTP connection settings
+   - **SQL Server Adapter**: Connection string properties, polling configuration, transaction settings
+
+3. **Source vs Destination Properties**:
+   - Some properties are only available for source adapters (e.g., polling interval, receive folder)
+   - Some properties are only available for destination adapters (e.g., destination receive folder, destination file mask)
+
+### Property Storage
+
+- Properties are stored in `InterfaceConfiguration` model
+- Persisted to JSON configuration file in Azure Blob Storage
+- Loaded into memory cache for fast access
+- Updated via API endpoints without redeployment
+
+### Property Configuration UI
+
+- Properties are configured via the **Adapter Properties Dialog**
+- UI fields dynamically show/hide based on:
+  - Adapter type (CSV vs SQL Server)
+  - Adapter role (Source vs Destination)
+  - Selected adapter type (for CSV: RAW/FILE/SFTP)
+- Changes are immediately persisted and take effect on next processing cycle
 
 ## Implementation Details
 

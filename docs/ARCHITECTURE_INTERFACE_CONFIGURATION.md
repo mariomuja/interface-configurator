@@ -8,6 +8,7 @@ The Interface Configuration system enables **configuration-based integration** b
 - Enable/disable flags for independent control
 - Instance names for UI display
 - Adapter instance GUIDs for tracking
+- **Adapter properties**: Fine-grained configuration for each adapter (connection strings, polling intervals, file masks, etc.)
 
 ## Configuration Model
 
@@ -30,8 +31,35 @@ public class InterfaceConfiguration
     public bool SourceIsEnabled { get; set; }
     public bool DestinationIsEnabled { get; set; }
     
-    // CSV-Specific
+    // CSV-Specific Properties
     public string? SourceReceiveFolder { get; set; }
+    public string? SourceFileMask { get; set; }
+    public int? SourceBatchSize { get; set; }
+    public string? SourceFieldSeparator { get; set; }
+    public string? CsvAdapterType { get; set; } // "RAW", "FILE", "SFTP"
+    public string? CsvData { get; set; } // For RAW adapter type
+    public string? SftpHost { get; set; }
+    public int? SftpPort { get; set; }
+    public string? SftpUsername { get; set; }
+    public string? SftpPassword { get; set; }
+    public string? SftpSshKey { get; set; }
+    public string? SftpFolder { get; set; }
+    public string? SftpFileMask { get; set; }
+    public int? CsvPollingInterval { get; set; }
+    public string? DestinationReceiveFolder { get; set; }
+    public string? DestinationFileMask { get; set; }
+    
+    // SQL Server-Specific Properties
+    public string? SqlServerName { get; set; }
+    public string? SqlDatabaseName { get; set; }
+    public string? SqlUserName { get; set; }
+    public string? SqlPassword { get; set; }
+    public bool SqlIntegratedSecurity { get; set; }
+    public string? SqlResourceGroup { get; set; }
+    public string? SqlPollingStatement { get; set; }
+    public int SqlPollingInterval { get; set; }
+    public bool SqlUseTransaction { get; set; }
+    public int? SqlBatchSize { get; set; }
     
     // Metadata
     public string? Description { get; set; }
