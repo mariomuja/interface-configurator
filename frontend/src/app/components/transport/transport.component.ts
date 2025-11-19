@@ -141,19 +141,32 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   loadInterfaceConfigurations(): void {
     this.transportService.getInterfaceConfigurations().subscribe({
       next: (configs) => {
-        this.interfaceConfigurations = configs || [];
+        // Filter out any entries with empty/null interface names
+        let allConfigs = (configs || []).filter(config => 
+          config && config.interfaceName && config.interfaceName.trim().length > 0
+        );
         
-        // Remove any placeholder entries that now have real interfaces
-        this.interfaceConfigurations = this.interfaceConfigurations.filter(config => {
-          // If this is a placeholder but a real interface with the same name exists, remove the placeholder
-          if (config._isPlaceholder) {
-            const realExists = this.interfaceConfigurations.some(c => 
-              c.interfaceName === config.interfaceName && !c._isPlaceholder
-            );
-            return !realExists; // Keep placeholder only if real doesn't exist
+        // Remove duplicates: if both placeholder and real exist for same name, keep only the real one
+        const seenNames = new Set<string>();
+        const uniqueConfigs: any[] = [];
+        
+        // First pass: add all real (non-placeholder) interfaces
+        for (const config of allConfigs) {
+          if (!config._isPlaceholder && !seenNames.has(config.interfaceName)) {
+            uniqueConfigs.push(config);
+            seenNames.add(config.interfaceName);
           }
-          return true; // Keep all real interfaces
-        });
+        }
+        
+        // Second pass: add placeholders only if no real interface with same name exists
+        for (const config of allConfigs) {
+          if (config._isPlaceholder && !seenNames.has(config.interfaceName)) {
+            uniqueConfigs.push(config);
+            seenNames.add(config.interfaceName);
+          }
+        }
+        
+        this.interfaceConfigurations = uniqueConfigs;
         
         // Ensure default interface exists - create it if it doesn't
         const defaultExists = this.interfaceConfigurations.some(c => 
@@ -195,7 +208,32 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               // Continue with normal flow below
             }
           });
+        } else if (defaultPlaceholderExists && !defaultExists) {
+          // If only placeholder exists, try to create the real interface
+          this.transportService.createInterfaceConfiguration({
+            interfaceName: this.DEFAULT_INTERFACE_NAME,
+            sourceAdapterName: 'CSV',
+            sourceConfiguration: JSON.stringify({ source: 'csv-files/csv-incoming' }),
+            destinationAdapterName: 'SqlServer',
+            destinationConfiguration: JSON.stringify({ destination: 'TransportData' }),
+            description: 'Default CSV to SQL Server interface'
+          }).subscribe({
+            next: (createdConfig) => {
+              // Reload configurations to get the real one (will replace placeholder)
+              this.loadInterfaceConfigurations();
+            },
+            error: (error) => {
+              console.error('Error creating default interface:', error);
+              // Keep placeholder for now
+            }
+          });
         }
+        
+        // Ensure we only have the default interface - remove any other interfaces
+        // This ensures only one interface is configured when the application starts
+        this.interfaceConfigurations = this.interfaceConfigurations.filter(config => 
+          config.interfaceName === this.DEFAULT_INTERFACE_NAME
+        );
         
         // If no current interface is set, select the first available or default
         if (!this.currentInterfaceName) {
