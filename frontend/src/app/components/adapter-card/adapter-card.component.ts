@@ -57,6 +57,14 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   @Output() primaryAction = new EventEmitter<void>(); // For "Start Transport" or "Drop Table" buttons
   @Output() settingsClick = new EventEmitter<void>(); // For opening settings dialog
 
+  private readonly FIELD_SEPARATOR = '║';
+  private readonly COLUMN_COLORS = [
+    '#1a237e', '#b71c1c', '#004d40', '#e65100', '#4a148c',
+    '#006064', '#3e2723', '#1b5e20', '#880e4f', '#212121',
+    '#0d47a1', '#c62828', '#00695c', '#e64a19', '#6a1b9a'
+  ];
+  private hasViewInitialized = false;
+
   onInstanceNameBlur(): void {
     this.instanceNameChange.emit(this.instanceName);
   }
@@ -105,24 +113,20 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   }
 
   onCsvDataBlur(): void {
+    this.csvData = this.csvEditor?.nativeElement.textContent || this.csvData || '';
     this.csvDataChange.emit(this.csvData);
+    setTimeout(() => this.renderCsvData(), 0);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['csvData'] && !changes['csvData'].firstChange && this.csvEditor) {
-      // Update the contenteditable div when csvData input changes
-      const currentText = this.csvEditor.nativeElement.textContent || '';
-      if (currentText !== this.csvData) {
-        this.csvEditor.nativeElement.textContent = this.csvData;
-      }
+    if (changes['csvData'] && this.hasViewInitialized) {
+      this.renderCsvData();
     }
   }
 
   ngAfterViewInit(): void {
-    // Initialize CSV editor content
-    if (this.csvEditor && this.csvData) {
-      this.csvEditor.nativeElement.textContent = this.csvData;
-    }
+    this.hasViewInitialized = true;
+    this.renderCsvData();
   }
 
   getPrimaryActionLabel(): string {
@@ -147,6 +151,79 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
     } else {
       return 'accent';
     }
+  }
+
+  private renderCsvData(): void {
+    if (!this.csvEditor) {
+      return;
+    }
+
+    if (!this.csvData) {
+      this.csvEditor.nativeElement.innerHTML = '';
+      return;
+    }
+
+    this.csvEditor.nativeElement.innerHTML = this.formatCsvAsHtml(this.csvData);
+  }
+
+  private formatCsvAsHtml(csvText: string): string {
+    const lines = csvText.split(/\r?\n/);
+    if (!lines.length) {
+      return '';
+    }
+
+    const htmlLines = lines.map((line) => {
+      if (line.trim() === '') {
+        return '<div><br></div>';
+      }
+      const values = this.parseCsvLine(line);
+      const cells = values.map((value, index) => {
+        const color = this.COLUMN_COLORS[index % this.COLUMN_COLORS.length];
+        const sanitized = this.escapeHtml(value.trim().replace(/^"|"$/g, ''));
+        return `<span style="color:${color};">${sanitized}</span>`;
+      });
+      const separator = `<span style="color:#999;">${this.FIELD_SEPARATOR}</span>`;
+      return `<div>${cells.join(separator)}</div>`;
+    });
+
+    return htmlLines.join('');
+  }
+
+  private parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === this.FIELD_SEPARATOR && !inQuotes) {
+        values.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    values.push(current);
+    return values;
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }
 
