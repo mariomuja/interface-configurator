@@ -52,6 +52,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.setHeader(key, value);
     });
     
+    // If we get a 404, provide more details
+    if (response.status === 404) {
+      console.error(`Function App returned 404 for: ${targetUrl}`);
+      res.status(404).json({ 
+        error: 'Function App returned status 404', 
+        message: `The function endpoint was not found: ${targetUrl}`,
+        targetUrl: targetUrl
+      });
+      return;
+    }
+    
     res.status(response.status).send(data);
   } catch (error: any) {
     console.error('Proxy error:', error);
