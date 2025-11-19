@@ -58,10 +58,8 @@ public class UpdateInstanceName
                 return badRequestResponse;
             }
 
-            var sessionId = request.SessionId;
-
             // Get existing configuration
-            var config = await _configService.GetConfigurationAsync(request.InterfaceName, sessionId, executionContext.CancellationToken);
+            var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
             if (config == null)
             {
                 var notFoundResponse = req.CreateResponse(System.Net.HttpStatusCode.NotFound);
@@ -72,10 +70,10 @@ public class UpdateInstanceName
             }
 
             // Update instance name using service method
-            await _configService.UpdateInstanceNameAsync(request.InterfaceName, request.InstanceType, request.InstanceName ?? (request.InstanceType == "Source" ? "Source" : "Destination"), sessionId, executionContext.CancellationToken);
+            await _configService.UpdateInstanceNameAsync(request.InterfaceName, request.InstanceType, request.InstanceName ?? (request.InstanceType == "Source" ? "Source" : "Destination"), executionContext.CancellationToken);
 
             // Get updated configuration
-            config = await _configService.GetConfigurationAsync(request.InterfaceName, sessionId, executionContext.CancellationToken);
+            config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
 
             _logger.LogInformation("Updated {InstanceType} instance name for interface '{InterfaceName}' to '{InstanceName}'", 
                 request.InstanceType, request.InterfaceName, request.InstanceName);
@@ -102,7 +100,6 @@ public class UpdateInstanceName
         public string InterfaceName { get; set; } = string.Empty;
         public string InstanceType { get; set; } = string.Empty; // "Source" or "Destination"
         public string? InstanceName { get; set; }
-        public string? SessionId { get; set; }
     }
 }
 

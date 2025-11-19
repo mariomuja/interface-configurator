@@ -37,10 +37,7 @@ public class GetInterfaceConfigurations
 
         try
         {
-            var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-            var sessionId = queryParams["sessionId"];
-
-            var configurations = await _configService.GetAllConfigurationsAsync(sessionId, executionContext.CancellationToken);
+            var configurations = await _configService.GetAllConfigurationsAsync(executionContext.CancellationToken);
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

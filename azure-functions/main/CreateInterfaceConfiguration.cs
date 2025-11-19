@@ -82,13 +82,11 @@ public class CreateInterfaceConfiguration
                 }
             }
 
-            var sessionId = request.SessionId;
-
             // Check if configuration already exists
-            var existing = await _configService.GetConfigurationAsync(interfaceName, sessionId, executionContext.CancellationToken);
+            var existing = await _configService.GetConfigurationAsync(interfaceName, executionContext.CancellationToken);
             if (existing != null)
             {
-                _logger.LogInformation("Interface configuration '{InterfaceName}' already exists, returning existing configuration (session: {SessionId})", request.InterfaceName, sessionId);
+                _logger.LogInformation("Interface configuration '{InterfaceName}' already exists, returning existing configuration", request.InterfaceName);
                 var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 CorsHelper.AddCorsHeaders(response);
@@ -112,7 +110,7 @@ public class CreateInterfaceConfiguration
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _configService.SaveConfigurationAsync(config, sessionId, executionContext.CancellationToken);
+            await _configService.SaveConfigurationAsync(config, executionContext.CancellationToken);
 
             _logger.LogInformation("Created interface configuration: {InterfaceName}", request.InterfaceName);
 
@@ -145,7 +143,6 @@ public class CreateInterfaceConfiguration
         public string? SourceInstanceName { get; set; }
         public string? DestinationInstanceName { get; set; }
         public string? Description { get; set; }
-        public string? SessionId { get; set; }
     }
 }
 

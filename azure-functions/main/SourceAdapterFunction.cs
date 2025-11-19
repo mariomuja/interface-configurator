@@ -42,8 +42,8 @@ public class SourceAdapterFunction
 
         try
         {
-            // Get all enabled interface configurations across ALL sessions (for background processing)
-            var configurations = await _configService.GetAllEnabledSourceConfigurationsAcrossSessionsAsync(context.CancellationToken);
+            // Get all enabled interface configurations (for background processing)
+            var configurations = await _configService.GetEnabledSourceConfigurationsAsync(context.CancellationToken);
 
             if (!configurations.Any())
             {

@@ -39,7 +39,6 @@ public class DeleteInterfaceConfiguration
         {
             var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             var interfaceName = queryParams["interfaceName"];
-            var sessionId = queryParams["sessionId"];
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {
@@ -50,7 +49,7 @@ public class DeleteInterfaceConfiguration
                 return badRequestResponse;
             }
 
-            var existing = await _configService.GetConfigurationAsync(interfaceName, sessionId, executionContext.CancellationToken);
+            var existing = await _configService.GetConfigurationAsync(interfaceName, executionContext.CancellationToken);
             if (existing == null)
             {
                 var notFoundResponse = req.CreateResponse(System.Net.HttpStatusCode.NotFound);
@@ -60,7 +59,7 @@ public class DeleteInterfaceConfiguration
                 return notFoundResponse;
             }
 
-            await _configService.DeleteConfigurationAsync(interfaceName, sessionId, executionContext.CancellationToken);
+            await _configService.DeleteConfigurationAsync(interfaceName, executionContext.CancellationToken);
 
             _logger.LogInformation("Deleted interface configuration: {InterfaceName}", interfaceName);
 

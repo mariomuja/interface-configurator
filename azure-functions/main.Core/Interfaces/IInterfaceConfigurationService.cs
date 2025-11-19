@@ -163,20 +163,5 @@ public interface IInterfaceConfigurationService
         bool? useTransaction = null,
         int? batchSize = null,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get all enabled source configurations across ALL sessions (for background processing)
-    /// </summary>
-    Task<List<InterfaceConfiguration>> GetAllEnabledSourceConfigurationsAcrossSessionsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get all enabled destination configurations across ALL sessions (for background processing)
-    /// </summary>
-    Task<List<InterfaceConfiguration>> GetAllEnabledDestinationConfigurationsAcrossSessionsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get list of all active session IDs that have configurations
-    /// </summary>
-    Task<List<string>> GetAllActiveSessionIdsAsync(CancellationToken cancellationToken = default);
 }
 
