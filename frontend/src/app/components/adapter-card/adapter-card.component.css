@@ -189,3 +189,33 @@ mat-slide-toggle {
   margin-left: 8px;
 }
 
+/* CSV text container - restrict to 10 rows with vertical scrollbar */
+.csv-text-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fafafa;
+  max-height: 212px; /* 10 rows (180px) + padding (32px) = 212px */
+  overflow: hidden;
+}
+
+.csv-text-container .csv-text,
+.csv-text-container .csv-editable {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 16px;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-wrap: normal;
+  color: #333;
+  min-width: max-content;
+  flex: 1;
+  overflow-y: auto; /* Vertical scrollbar */
+  overflow-x: auto; /* Horizontal scrollbar for wide content */
+  max-height: 100%; /* Fill container height */
+}
+
