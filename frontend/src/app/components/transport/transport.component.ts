@@ -1413,9 +1413,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Always save the enabled state - don't check if it changed because the dialog already updated local state
     this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', enabledValueToSave).subscribe({
       next: () => {
-        // Update local cache immediately
+        // Update local cache immediately so dialog reads correct value if reopened
         if (activeConfig) {
           activeConfig.sourceIsEnabled = enabledValueToSave;
+        }
+        // Also update the interfaceConfigurations array cache
+        const configIndex = this.interfaceConfigurations.findIndex(c => c.interfaceName === activeInterfaceName);
+        if (configIndex >= 0) {
+          this.interfaceConfigurations[configIndex].sourceIsEnabled = enabledValueToSave;
         }
         // Ensure local state matches what we just saved
         this.sourceIsEnabled = enabledValueToSave;
@@ -1869,16 +1874,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
       adapterName: this.sourceAdapterName,
-      instanceName: this.sourceInstanceName,
-      // Read isEnabled from config (backend) instead of local state
-      isEnabled: activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled,
-      receiveFolder: this.sourceReceiveFolder,
-      fileMask: this.sourceFileMask,
-      batchSize: this.sourceBatchSize,
-      fieldSeparator: this.sourceFieldSeparator,
+      // Always read from config (backend) - never use local state as fallback
+      instanceName: activeConfig?.sourceInstanceName || this.sourceInstanceName,
+      // Read isEnabled from config (backend) - use explicit boolean check
+      // If config exists, use its value (even if false). Only fallback to local state if config is null/undefined
+      isEnabled: activeConfig !== null && activeConfig !== undefined 
+        ? (activeConfig.sourceIsEnabled !== undefined ? activeConfig.sourceIsEnabled : true)
+        : this.sourceIsEnabled,
+      receiveFolder: activeConfig?.sourceReceiveFolder || this.sourceReceiveFolder,
+      fileMask: activeConfig?.sourceFileMask || this.sourceFileMask,
+      batchSize: activeConfig?.sourceBatchSize ?? this.sourceBatchSize,
+      fieldSeparator: activeConfig?.sourceFieldSeparator || this.sourceFieldSeparator,
       csvAdapterType: activeConfig?.csvAdapterType,
       csvData: this.csvDataText || activeConfig?.csvData || '',
-      csvPollingInterval: this.csvPollingInterval,
+      csvPollingInterval: activeConfig?.csvPollingInterval ?? this.csvPollingInterval,
       // SFTP properties
       sftpHost: activeConfig?.sftpHost || '',
       sftpPort: activeConfig?.sftpPort ?? 22,
