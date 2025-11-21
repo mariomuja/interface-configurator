@@ -398,19 +398,28 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // If backend already has CSV data, use it and sync locally
     if (existingCsvData && existingCsvData.trim().length > 0) {
       this.csvDataInitialization.delete(interfaceName);
+      // Sync local data with backend
+      if (existingCsvData !== this.lastSyncedCsvData) {
+        this.lastSyncedCsvData = existingCsvData;
+        this.applyCsvDataLocally(existingCsvData);
+      }
       return;
     }
 
+    // Prevent multiple initializations for the same interface
     if (this.csvDataInitialization.has(interfaceName)) {
       return;
     }
 
+    // Backend has no CSV data - generate sample data and write to backend
     this.csvDataInitialization.add(interfaceName);
     const sample = this.getDemoSampleCsv();
     this.applyCsvDataLocally(sample.text, sample.records);
     this.lastSyncedCsvData = sample.text;
+    // Always write sample data to backend when initializing
     this.updateCsvDataProperty(sample.text, { force: true });
   }
 
@@ -1377,9 +1386,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         const incomingCsvData = config.csvData || '';
-        if (incomingCsvData !== this.lastSyncedCsvData) {
-          this.lastSyncedCsvData = incomingCsvData;
-          this.applyCsvDataLocally(incomingCsvData);
+        if (incomingCsvData && incomingCsvData.trim().length > 0) {
+          // Backend has CSV data - always sync local data with backend (backend is source of truth)
+          if (incomingCsvData !== this.lastSyncedCsvData) {
+            this.lastSyncedCsvData = incomingCsvData;
+            this.applyCsvDataLocally(incomingCsvData);
+          }
+        } else {
+          // Backend has no CSV data - generate sample data and write to backend
+          this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
         }
       },
       error: (error) => {
@@ -2243,6 +2258,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
                 this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
                 this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+                
+                // Always sync CSV data with backend (backend is source of truth)
+                const incomingCsvData = freshConfig.csvData || '';
+                if (incomingCsvData && incomingCsvData.trim().length > 0) {
+                  // Backend has CSV data - sync local data with backend
+                  if (incomingCsvData !== this.lastSyncedCsvData) {
+                    this.lastSyncedCsvData = incomingCsvData;
+                    this.applyCsvDataLocally(incomingCsvData);
+                  }
+                } else {
+                  // Backend has no CSV data - generate sample data and write to backend
+                  this.ensureCsvDataInitialized(interfaceName, incomingCsvData);
+                }
               }
             },
             error: (error) => {
@@ -2668,12 +2696,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sqlUseTransaction = config.sqlUseTransaction ?? this.sqlUseTransaction;
     this.sqlBatchSize = config.sqlBatchSize ?? this.sqlBatchSize;
     
-    // Load CsvData property
+    // Load CsvData property - always sync with backend
     const incomingCsvData = config.csvData || '';
-    this.applyCsvDataLocally(incomingCsvData);
-    this.lastSyncedCsvData = incomingCsvData;
+    if (incomingCsvData && incomingCsvData.trim().length > 0) {
+      // Backend has CSV data - always use it (backend is source of truth)
+      if (incomingCsvData !== this.lastSyncedCsvData) {
+        this.lastSyncedCsvData = incomingCsvData;
+        this.applyCsvDataLocally(incomingCsvData);
+      }
+    } else {
+      // Backend has no CSV data - generate sample data and write to backend
+      this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
+    }
     this.isCsvDataUpdateInFlight = false;
-    this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
     
     // Reload adapter instances and data
     this.loadDestinationAdapterInstances();
