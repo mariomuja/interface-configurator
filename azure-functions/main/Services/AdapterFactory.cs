@@ -89,9 +89,17 @@ public class AdapterFactory : IAdapterFactory
         var logger = _serviceProvider.GetService<ILogger<CsvAdapter>>();
 
         // Get adapter instance GUID, receive folder, file mask, batch size, field separator, and destination properties
+        // Handle both null and Guid.Empty cases - if GUID is null or Empty, generate a new one
         Guid adapterInstanceGuid = isSource 
-            ? (config.SourceAdapterInstanceGuid ?? Guid.NewGuid())
-            : (config.DestinationAdapterInstanceGuid ?? Guid.NewGuid());
+            ? (config.SourceAdapterInstanceGuid.HasValue && config.SourceAdapterInstanceGuid.Value != Guid.Empty 
+                ? config.SourceAdapterInstanceGuid.Value 
+                : Guid.NewGuid())
+            : (config.DestinationAdapterInstanceGuid.HasValue && config.DestinationAdapterInstanceGuid.Value != Guid.Empty
+                ? config.DestinationAdapterInstanceGuid.Value
+                : Guid.NewGuid());
+        
+        _logger?.LogInformation("DEBUG AdapterFactory: Creating CsvAdapter with InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, IsSource={IsSource}",
+            config.InterfaceName, adapterInstanceGuid, isSource);
         string? receiveFolder = isSource ? config.SourceReceiveFolder : null; // Only Source adapters have receive folder
         string? fileMask = isSource ? config.SourceFileMask : null; // Only Source adapters have file mask
         int? batchSize = isSource ? config.SourceBatchSize : null; // Only Source adapters have batch size

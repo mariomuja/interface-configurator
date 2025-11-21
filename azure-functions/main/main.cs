@@ -184,11 +184,15 @@ public class MainFunction
                             // The adapter factory expects InterfaceConfiguration, so we create a temporary one
                             var tempConfig = CreateTempConfigForSource(config, sourceInstance);
                             
+                            _logger.LogInformation("DEBUG: Created tempConfig with InterfaceName={InterfaceName}, SourceAdapterInstanceGuid={AdapterInstanceGuid}",
+                                tempConfig.InterfaceName, tempConfig.SourceAdapterInstanceGuid);
+                            
                             // Create adapter with correct interface name and adapter instance GUID
                             var csvAdapter = await _adapterFactory.CreateSourceAdapterAsync(tempConfig, context.CancellationToken);
                         if (csvAdapter is CsvAdapter csv)
                         {
-                            _logger.LogInformation("CsvAdapter created successfully. Calling ReadAsync to process blob and write to MessageBox...");
+                            _logger.LogInformation("CsvAdapter created successfully. InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}. Calling ReadAsync to process blob and write to MessageBox...",
+                                config.InterfaceName, sourceInstance.AdapterInstanceGuid);
                             var (headers, records) = await csv.ReadAsync(sourcePath, context.CancellationToken);
                             
                             _logger.LogInformation("Successfully processed CSV blob {BlobName} for interface {InterfaceName}: {HeaderCount} headers, {RecordCount} records. " +

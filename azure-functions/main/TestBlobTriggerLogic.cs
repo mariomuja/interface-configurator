@@ -60,36 +60,75 @@ public class TestBlobTriggerLogic
                     cfg.InterfaceName, cfg.SourceIsEnabled, cfg.SourceAdapterName);
             }
             
-            var csvConfigs = enabledConfigs.Where(c => c.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase)).ToList();
+            // Filter configurations that have CSV source adapters (using new Sources structure)
+            var csvConfigs = enabledConfigs
+                .Where(c => c.Sources.Values.Any(s => s.AdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase) && s.IsEnabled))
+                .ToList();
             
             _logger.LogInformation("Found {TotalConfigs} enabled configurations, {CsvConfigs} CSV configurations",
                 enabledConfigs.Count, csvConfigs.Count);
+
+            // Get CSV source instances for each config
+            var csvSourceInstances = new List<object>();
+            foreach (var config in csvConfigs)
+            {
+                var csvSources = config.Sources.Values
+                    .Where(s => s.AdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase) && s.IsEnabled)
+                    .ToList();
+                
+                foreach (var sourceInstance in csvSources)
+                {
+                    csvSourceInstances.Add(new
+                    {
+                        interfaceName = config.InterfaceName,
+                        instanceName = sourceInstance.InstanceName,
+                        adapterName = sourceInstance.AdapterName,
+                        isEnabled = sourceInstance.IsEnabled,
+                        adapterInstanceGuid = sourceInstance.AdapterInstanceGuid,
+                        sourceReceiveFolder = sourceInstance.SourceReceiveFolder,
+                        sourceFileMask = sourceInstance.SourceFileMask
+                    });
+                }
+            }
 
             var result = new
             {
                 totalConfigurations = allConfigs.Count,
                 enabledConfigurationsCount = enabledConfigs.Count,
                 csvConfigurationsCount = csvConfigs.Count,
+                csvSourceInstancesCount = csvSourceInstances.Count,
                 allConfigurations = allConfigs.Select(c => new
                 {
                     interfaceName = c.InterfaceName,
                     sourceAdapterName = c.SourceAdapterName,
                     sourceIsEnabled = c.SourceIsEnabled,
-                    sourceAdapterInstanceGuid = c.SourceAdapterInstanceGuid
+                    sourceAdapterInstanceGuid = c.SourceAdapterInstanceGuid,
+                    sourcesCount = c.Sources.Count,
+                    sources = c.Sources.Values.Select(s => new
+                    {
+                        instanceName = s.InstanceName,
+                        adapterName = s.AdapterName,
+                        isEnabled = s.IsEnabled,
+                        adapterInstanceGuid = s.AdapterInstanceGuid
+                    }).ToList()
                 }).ToList(),
                 enabledConfigurationsList = enabledConfigs.Select(c => new
                 {
                     interfaceName = c.InterfaceName,
                     sourceAdapterName = c.SourceAdapterName,
-                    sourceIsEnabled = c.SourceIsEnabled
+                    sourceIsEnabled = c.SourceIsEnabled,
+                    sourcesCount = c.Sources.Count,
+                    enabledSourcesCount = c.Sources.Values.Count(s => s.IsEnabled)
                 }).ToList(),
                 csvConfigurationsList = csvConfigs.Select(c => new
                 {
                     interfaceName = c.InterfaceName,
                     sourceAdapterName = c.SourceAdapterName,
                     sourceIsEnabled = c.SourceIsEnabled,
-                    sourceAdapterInstanceGuid = c.SourceAdapterInstanceGuid
-                }).ToList()
+                    sourceAdapterInstanceGuid = c.SourceAdapterInstanceGuid,
+                    sourcesCount = c.Sources.Count
+                }).ToList(),
+                csvSourceInstances = csvSourceInstances
             };
 
             var response = req.CreateResponse(HttpStatusCode.OK);

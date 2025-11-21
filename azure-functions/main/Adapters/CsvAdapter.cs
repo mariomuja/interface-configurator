@@ -91,6 +91,9 @@ public class CsvAdapter : IAdapter
         _subscriptionService = subscriptionService;
         _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
         _adapterInstanceGuid = adapterInstanceGuid;
+        
+        _logger?.LogInformation("DEBUG CsvAdapter constructor: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}",
+            _messageBoxService != null, _interfaceName, _adapterInstanceGuid.HasValue ? _adapterInstanceGuid.Value.ToString() : "NULL");
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
         _batchSize = batchSize ?? 1000; // Increased default batch size from 100 to 1000 for better performance
