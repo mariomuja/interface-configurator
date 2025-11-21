@@ -22,6 +22,7 @@ import { AdapterPropertiesDialogComponent, AdapterPropertiesData } from '../adap
 import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from '../destination-instances-dialog/destination-instances-dialog.component';
 import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
 import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData } from '../blob-container-explorer-dialog/blob-container-explorer-dialog.component';
+import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
@@ -183,6 +184,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.translationService.getCurrentLanguage().subscribe(() => {
       // Trigger change detection - translations will be updated via getTranslation calls
     });
+    
+    // Show welcome dialog on first visit
+    this.showWelcomeDialogIfNeeded();
+  }
+
+  showWelcomeDialogIfNeeded(): void {
+    const welcomeDialogShown = localStorage.getItem('welcomeDialogShown');
+    if (!welcomeDialogShown) {
+      setTimeout(() => {
+        this.dialog.open(WelcomeDialogComponent, {
+          width: '900px',
+          maxWidth: '95vw',
+          maxHeight: '90vh',
+          disableClose: false,
+          autoFocus: false
+        });
+      }, 500); // Small delay to ensure UI is loaded
+    }
   }
   
   loadInterfaceConfigurations(): void {
@@ -618,66 +637,30 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.isLoadingMessageBox = false;
       return;
     }
-    
-    // If source adapter is not enabled, don't try to load MessageBox data
-    if (!this.sourceIsEnabled) {
-      this.messageBoxTableData = [];
-      this.messageBoxRecordColumns = [];
-      this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-      this.isLoadingMessageBox = false;
-      return;
-    }
-    
-    // If enabled but GUID is missing, try to reload configuration to get it
-    if (!this.sourceAdapterInstanceGuid) {
-      // Try to reload configuration to get the GUID
-      this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
-        next: (config) => {
-          if (config && config.sourceAdapterInstanceGuid) {
-            this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid;
-            // Retry loading MessageBox data with the GUID
-            this.loadMessageBoxData();
-          } else {
-            // Still no GUID, show empty state
-            this.messageBoxTableData = [];
-            this.messageBoxRecordColumns = [];
-            this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-            this.isLoadingMessageBox = false;
-          }
-        },
-        error: () => {
-          this.messageBoxTableData = [];
-          this.messageBoxRecordColumns = [];
-          this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-          this.isLoadingMessageBox = false;
-        }
-      });
-      return;
-    }
 
     this.isLoadingMessageBox = true;
 
-    // Ensure GUID is a string (handle null/undefined)
-    const guidString = this.sourceAdapterInstanceGuid ? String(this.sourceAdapterInstanceGuid) : '';
+    // Try to load all messages for the interface first (without adapterInstanceGuid filter)
+    // This shows all messages regardless of adapter instance, which is useful for debugging
+    // If adapterInstanceGuid is available, we can optionally filter by it
+    const guidString = this.sourceAdapterInstanceGuid ? String(this.sourceAdapterInstanceGuid) : null;
 
     console.log('Loading MessageBox data:', {
       interfaceName,
-      sourceAdapterInstanceGuid: guidString,
-      adapterType: 'Source',
-      guidType: typeof this.sourceAdapterInstanceGuid
+      sourceAdapterInstanceGuid: guidString || 'none (loading all)',
+      adapterType: 'Source'
     });
 
-    if (!guidString) {
-      console.warn('sourceAdapterInstanceGuid is empty, cannot load MessageBox data');
-      this.isLoadingMessageBox = false;
-      this.messageBoxTableData = [];
-      this.messageBoxRecordColumns = [];
-      return;
-    }
-
-    this.transportService.getMessageBoxMessages(interfaceName, guidString, 'Source').subscribe({
+    // Load messages - if GUID is available, use it; otherwise load all messages for interface
+    // Pass null for status to get all messages (Pending, Processed, Error, etc.)
+    this.transportService.getMessageBoxMessages(interfaceName, guidString || '', 'Source', null).subscribe({
       next: (messages) => {
         console.log('MessageBox messages received:', messages?.length || 0, messages);
+        
+        if (messages && messages.length > 0) {
+          console.log('Sample message:', messages[0]);
+        }
+        
         const rows = (messages || []).map((msg: any) => ({
           messageId: msg.messageId,
           datetimeCreated: msg.datetimeCreated,
@@ -686,22 +669,34 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           headers: msg.headers || []
         })) as MessageBoxTableRow[];
 
-        this.messageBoxTableData = rows.slice().reverse(); // oldest first
+        // Sort by datetimeCreated descending (newest first)
+        rows.sort((a, b) => {
+          const dateA = new Date(a.datetimeCreated).getTime();
+          const dateB = new Date(b.datetimeCreated).getTime();
+          return dateB - dateA;
+        });
+
+        this.messageBoxTableData = rows;
         this.messageBoxRecordColumns = this.extractMessageBoxColumns(this.messageBoxTableData);
         this.messageBoxDisplayedColumns = ['datetimeCreated', 'status', ...this.messageBoxRecordColumns];
         this.isLoadingMessageBox = false;
+        
+        console.log('MessageBox table data set:', this.messageBoxTableData.length, 'rows');
       },
       error: (error) => {
         console.error('Error loading MessageBox data:', error);
         console.error('Request details:', {
           interfaceName,
-          sourceAdapterInstanceGuid: this.sourceAdapterInstanceGuid,
+          sourceAdapterInstanceGuid: guidString,
           adapterType: 'Source',
-          error: error
+          error: error,
+          errorMessage: error?.message,
+          errorStatus: error?.status
         });
         this.isLoadingMessageBox = false;
         this.messageBoxTableData = [];
         this.messageBoxRecordColumns = [];
+        this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
       }
     });
   }

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
@@ -39,22 +40,39 @@ public class GetMessageBoxMessages
             var interfaceName = queryParams["interfaceName"];
             var adapterInstanceGuidValue = queryParams["adapterInstanceGuid"];
             var adapterType = queryParams["adapterType"];
+            var status = queryParams["status"]; // Optional status filter
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {
                 return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "interfaceName query parameter is required");
             }
 
-            if (string.IsNullOrWhiteSpace(adapterInstanceGuidValue) || !Guid.TryParse(adapterInstanceGuidValue, out var adapterInstanceGuid))
+            List<MessageBoxMessage> messages;
+            
+            // If adapterInstanceGuid is provided, filter by adapter instance
+            // Otherwise, load all messages for the interface
+            if (!string.IsNullOrWhiteSpace(adapterInstanceGuidValue) && Guid.TryParse(adapterInstanceGuidValue, out var adapterInstanceGuid))
             {
-                return await CreateErrorResponse(req, HttpStatusCode.BadRequest, "adapterInstanceGuid query parameter is required and must be a valid GUID");
+                messages = await _messageBoxService.ReadMessagesByAdapterAsync(
+                    interfaceName,
+                    adapterInstanceGuid,
+                    adapterType,
+                    executionContext.CancellationToken);
             }
-
-            var messages = await _messageBoxService.ReadMessagesByAdapterAsync(
-                interfaceName,
-                adapterInstanceGuid,
-                adapterType,
-                executionContext.CancellationToken);
+            else
+            {
+                // Load all messages for the interface (useful for UI display)
+                messages = await _messageBoxService.ReadMessagesAsync(
+                    interfaceName,
+                    status,
+                    executionContext.CancellationToken);
+            }
+            
+            // Apply status filter if provided and not already filtered by adapter
+            if (!string.IsNullOrWhiteSpace(status) && string.IsNullOrWhiteSpace(adapterInstanceGuidValue))
+            {
+                messages = messages.Where(m => m.Status == status).ToList();
+            }
 
             var results = messages.Select(m =>
             {

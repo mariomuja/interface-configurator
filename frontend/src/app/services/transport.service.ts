@@ -281,12 +281,26 @@ export class TransportService {
     });
   }
 
-  getMessageBoxMessages(interfaceName: string, adapterInstanceGuid: string, adapterType: string = 'Source'): Observable<any[]> {
+  getMessageBoxMessages(interfaceName: string, adapterInstanceGuid: string = '', adapterType: string = 'Source', status: string | null = null): Observable<any[]> {
     const params = new URLSearchParams({
-      interfaceName,
-      adapterInstanceGuid,
-      adapterType
+      interfaceName
     });
+    
+    // Only add adapterInstanceGuid if provided (non-empty)
+    if (adapterInstanceGuid && adapterInstanceGuid.trim() !== '') {
+      params.append('adapterInstanceGuid', adapterInstanceGuid);
+    }
+    
+    // Only add adapterType if provided
+    if (adapterType && adapterType.trim() !== '') {
+      params.append('adapterType', adapterType);
+    }
+    
+    // Add status filter if provided
+    if (status && status.trim() !== '') {
+      params.append('status', status);
+    }
+    
     return this.http.get<any[]>(`${this.apiUrl}/GetMessageBoxMessages?${params.toString()}`);
   }
 

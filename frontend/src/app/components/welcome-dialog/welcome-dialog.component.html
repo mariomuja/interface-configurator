@@ -1,0 +1,201 @@
+<div class="welcome-dialog">
+  <h1 mat-dialog-title class="welcome-title">
+    <mat-icon class="title-icon">integration_instructions</mat-icon>
+    Welcome to Interface Configurator
+  </h1>
+  
+  <mat-dialog-content class="welcome-content">
+    <div class="intro-section">
+      <h2>What is Interface Configurator?</h2>
+      <p>
+        Interface Configurator is a <strong>configuration-based integration platform</strong> that allows you to 
+        create data interfaces through a simple administration interface. Instead of writing custom code for each 
+        integration, you configure source and destination adapters that independently transport data with 
+        <strong>guaranteed delivery</strong> through a message box.
+      </p>
+    </div>
+
+    <div class="architecture-section">
+      <h2>Architecture & Data Flow</h2>
+      <div class="diagram-container">
+        <div class="data-flow-diagram">
+          <!-- Source Adapters -->
+          <div class="flow-box source-box">
+            <div class="box-header">Source Adapters</div>
+            <div class="box-content">
+              <div class="adapter-item">
+                <mat-icon>description</mat-icon>
+                <span>CSV</span>
+              </div>
+              <div class="adapter-item">
+                <mat-icon>storage</mat-icon>
+                <span>SQL Server</span>
+              </div>
+              <div class="adapter-item">
+                <mat-icon>cloud_upload</mat-icon>
+                <span>SFTP</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Arrow to MessageBox -->
+          <div class="arrow-container">
+            <div class="arrow-line"></div>
+            <div class="arrow-head"></div>
+            <div class="arrow-label">Debatch & Write</div>
+          </div>
+
+          <!-- MessageBox -->
+          <div class="flow-box messagebox-box">
+            <div class="box-header">Message Box</div>
+            <div class="box-content">
+              <div class="messagebox-features">
+                <div class="feature-item">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>Guaranteed Delivery</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>sync</mat-icon>
+                  <span>Retry Logic</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>history</mat-icon>
+                  <span>Message History</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>track_changes</mat-icon>
+                  <span>Status Tracking</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Arrow to Destinations -->
+          <div class="arrow-container">
+            <div class="arrow-line"></div>
+            <div class="arrow-head"></div>
+            <div class="arrow-label">Read & Process</div>
+          </div>
+
+          <!-- Destination Adapters -->
+          <div class="flow-box destination-box">
+            <div class="box-header">Destination Adapters</div>
+            <div class="box-content">
+              <div class="adapter-item">
+                <mat-icon>description</mat-icon>
+                <span>CSV</span>
+              </div>
+              <div class="adapter-item">
+                <mat-icon>storage</mat-icon>
+                <span>SQL Server</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="features-section">
+      <h2>Integration Features</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <mat-icon class="feature-icon">settings</mat-icon>
+          <h3>Configuration-Based</h3>
+          <p>Create interfaces through UI configuration - no coding required</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">swap_horiz</mat-icon>
+          <h3>Universal Adapters</h3>
+          <p>Each adapter works as both source and destination</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">verified</mat-icon>
+          <h3>Guaranteed Delivery</h3>
+          <p>Message Box ensures reliable data transport with retry logic</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">scatter_plot</mat-icon>
+          <h3>Debatching</h3>
+          <p>Automatically splits records into individual messages</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">schedule</mat-icon>
+          <h3>Timer-Based Processing</h3>
+          <p>Source and destination adapters run independently on schedules</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">monitoring</mat-icon>
+          <h3>Monitoring & Logging</h3>
+          <p>Track message status, processing logs, and statistics</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">schema</mat-icon>
+          <h3>Schema Validation</h3>
+          <p>Automatic CSV validation and SQL schema comparison</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">cloud_sync</mat-icon>
+          <h3>Blob Storage Integration</h3>
+          <p>Automatic file management with cleanup and error handling</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="benefits-section">
+      <h2>Key Benefits</h2>
+      <div class="benefits-list">
+        <div class="benefit-item">
+          <mat-icon class="benefit-icon">code</mat-icon>
+          <div class="benefit-content">
+            <h3>Single Codebase</h3>
+            <p>
+              Instead of creating separate implementations for each transport, maintain and improve 
+              one unified codebase. Advanced features become available to all integrations automatically.
+            </p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <mat-icon class="benefit-icon">speed</mat-icon>
+          <div class="benefit-content">
+            <h3>Rapid Development</h3>
+            <p>
+              Save significant development time by configuring interfaces instead of coding them. 
+              New integrations can be set up in minutes rather than days or weeks.
+            </p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <mat-icon class="benefit-icon">trending_up</mat-icon>
+          <div class="benefit-content">
+            <h3>Continuous Improvement</h3>
+            <p>
+              Enhancements to adapters, error handling, monitoring, and reliability features benefit 
+              all integrations immediately without requiring changes to individual implementations.
+            </p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <mat-icon class="benefit-icon">security</mat-icon>
+          <div class="benefit-content">
+            <h3>Enterprise-Grade Features</h3>
+            <p>
+              Built-in features like guaranteed delivery, retry logic, message tracking, and error 
+              handling go far beyond simple data transport, providing enterprise-level reliability.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="welcome-actions">
+    <button mat-button (click)="onDontShowAgain()" class="dont-show-button">
+      <mat-icon>visibility_off</mat-icon>
+      Don't show again
+    </button>
+    <button mat-raised-button color="primary" (click)="onClose()" class="close-button">
+      <mat-icon>check</mat-icon>
+      Got it!
+    </button>
+  </mat-dialog-actions>
+</div>
