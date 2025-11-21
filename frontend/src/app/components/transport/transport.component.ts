@@ -1397,11 +1397,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // Get the current config to restore on error
+    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
+    const previousEnabledValue = activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled;
+
     // Always save the enabled state - don't check if it changed because the dialog already updated local state
     this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', this.sourceIsEnabled).subscribe({
       next: () => {
         // Update local cache
-        const activeConfig = this.getInterfaceConfig(activeInterfaceName);
         if (activeConfig) {
           activeConfig.sourceIsEnabled = this.sourceIsEnabled;
         }
@@ -1423,7 +1426,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren/Deaktivieren des Source-Adapters');
         this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
-        this.sourceIsEnabled = activeConfig.sourceIsEnabled ?? true;
+        this.sourceIsEnabled = previousEnabledValue;
       }
     });
   }
