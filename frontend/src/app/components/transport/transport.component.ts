@@ -1816,13 +1816,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           if (refreshedGuid) {
             this.openBlobContainerExplorer(adapterType, adapterName, instanceName, refreshedGuid);
           } else {
-            this.snackBar.open('Für diesen Adapter konnte kein GUID ermittelt werden.', 'OK', { duration: 5000 });
+            this.showErrorMessageWithCopy('Für diesen Adapter konnte kein GUID ermittelt werden. Bitte prüfen Sie die Adapterkonfiguration.');
           }
         },
         error: (error) => {
           console.error('Error refreshing adapter instance GUID:', error);
           const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Konfiguration.');
-          this.snackBar.open(detailedMessage, 'Schließen', { duration: 6000 });
+          this.showErrorMessageWithCopy(detailedMessage);
         }
       });
       return;
@@ -1845,6 +1845,53 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     dialogRef.afterClosed().subscribe(result => {
       // Handle any result if needed
     });
+  }
+
+  private showErrorMessageWithCopy(message: string): void {
+    const snackRef = this.snackBar.open(message, 'Kopieren', {
+      duration: 8000,
+      panelClass: ['error-snackbar'],
+      verticalPosition: 'top'
+    });
+
+    snackRef.onAction().subscribe(() => {
+      this.copyTextToClipboard(message);
+    });
+  }
+
+  private copyTextToClipboard(text: string): void {
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.showCopySuccess();
+      }).catch(() => {
+        this.fallbackCopyText(text);
+      });
+    } else {
+      this.fallbackCopyText(text);
+    }
+  }
+
+  private fallbackCopyText(text: string): void {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      this.showCopySuccess();
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+      this.snackBar.open('Konnte Text nicht in die Zwischenablage kopieren.', 'OK', { duration: 4000, panelClass: ['error-snackbar'] });
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+
+  private showCopySuccess(): void {
+    this.snackBar.open('Fehlermeldung in die Zwischenablage kopiert.', 'OK', { duration: 3000, panelClass: ['success-snackbar'] });
   }
 
   openSourceAdapterSettings(): void {

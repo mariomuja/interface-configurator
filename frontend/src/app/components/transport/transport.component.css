@@ -449,6 +449,16 @@
   font-size: 14px;
 }
 
+.message-box-spinner-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.message-box-spinner {
+  --mdc-circular-progress-active-indicator-color: #fff;
+}
+
 .log-card {
   width: 100%;
 }
@@ -1136,6 +1146,16 @@
   max-height: 70vh !important;
   font-family: 'Courier New', monospace !important;
   font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+::ng-deep .success-snackbar {
+  background-color: #2e7d32 !important;
+  color: #fff !important;
+}
+
+::ng-deep .success-snackbar .mat-mdc-snack-bar-label {
+  font-size: 13px !important;
   line-height: 1.4 !important;
 }
 

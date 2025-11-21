@@ -117,6 +117,13 @@
       <p>The source adapter is disabled. Enable the source adapter to start generating messages.</p>
     </div>
     <div class="table-empty-message" *ngIf="sourceIsEnabled && !sourceAdapterInstanceGuid">
+      <div class="message-box-spinner-container">
+        <mat-progress-spinner
+          class="message-box-spinner"
+          diameter="36"
+          mode="indeterminate">
+        </mat-progress-spinner>
+      </div>
       <p>Source adapter instances are writing data to the MessageBox. Please wait for the data to arrive.</p>
     </div>
   </div>
