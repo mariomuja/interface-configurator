@@ -1896,33 +1896,40 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private openSourceAdapterSettingsDialog(activeConfig: any): void {
+    // Always prioritize config values over local state
+    // Use explicit checks for undefined/null to handle empty strings, 0, and false correctly
+    console.log('openSourceAdapterSettingsDialog - activeConfig:', activeConfig);
+    console.log('openSourceAdapterSettingsDialog - sourceIsEnabled from config:', activeConfig?.sourceIsEnabled);
+    console.log('openSourceAdapterSettingsDialog - sourceIsEnabled local:', this.sourceIsEnabled);
+    
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
       adapterName: this.sourceAdapterName,
-      // Always read from config (backend) - never use local state as fallback
-      instanceName: activeConfig?.sourceInstanceName || this.sourceInstanceName,
+      // Always read from config (backend) - use explicit undefined check
+      instanceName: activeConfig?.sourceInstanceName !== undefined ? activeConfig.sourceInstanceName : this.sourceInstanceName,
       // Read isEnabled from config (backend) - use explicit boolean check
       // If config exists, use its value (even if false). Only fallback to local state if config is null/undefined
       isEnabled: activeConfig !== null && activeConfig !== undefined 
         ? (activeConfig.sourceIsEnabled !== undefined ? activeConfig.sourceIsEnabled : true)
         : this.sourceIsEnabled,
-      receiveFolder: activeConfig?.sourceReceiveFolder || this.sourceReceiveFolder,
-      fileMask: activeConfig?.sourceFileMask || this.sourceFileMask,
-      batchSize: activeConfig?.sourceBatchSize ?? this.sourceBatchSize,
-      fieldSeparator: activeConfig?.sourceFieldSeparator || this.sourceFieldSeparator,
+      // Use explicit undefined checks - empty string is a valid value!
+      receiveFolder: activeConfig?.sourceReceiveFolder !== undefined ? activeConfig.sourceReceiveFolder : this.sourceReceiveFolder,
+      fileMask: activeConfig?.sourceFileMask !== undefined ? activeConfig.sourceFileMask : this.sourceFileMask,
+      batchSize: activeConfig?.sourceBatchSize !== undefined ? activeConfig.sourceBatchSize : this.sourceBatchSize,
+      fieldSeparator: activeConfig?.sourceFieldSeparator !== undefined ? activeConfig.sourceFieldSeparator : this.sourceFieldSeparator,
       csvAdapterType: activeConfig?.csvAdapterType,
       csvData: this.csvDataText || activeConfig?.csvData || '',
-      csvPollingInterval: activeConfig?.csvPollingInterval ?? this.csvPollingInterval,
-      // SFTP properties
-      sftpHost: activeConfig?.sftpHost || '',
-      sftpPort: activeConfig?.sftpPort ?? 22,
-      sftpUsername: activeConfig?.sftpUsername || '',
-      sftpPassword: activeConfig?.sftpPassword || '',
-      sftpSshKey: activeConfig?.sftpSshKey || '',
-      sftpFolder: activeConfig?.sftpFolder || '',
-      sftpFileMask: activeConfig?.sftpFileMask || '*.txt',
-      sftpMaxConnectionPoolSize: activeConfig?.sftpMaxConnectionPoolSize ?? 5,
-      sftpFileBufferSize: activeConfig?.sftpFileBufferSize ?? 8192,
+      csvPollingInterval: activeConfig?.csvPollingInterval !== undefined ? activeConfig.csvPollingInterval : this.csvPollingInterval,
+      // SFTP properties - use explicit undefined checks
+      sftpHost: activeConfig?.sftpHost !== undefined ? activeConfig.sftpHost : '',
+      sftpPort: activeConfig?.sftpPort !== undefined ? activeConfig.sftpPort : 22,
+      sftpUsername: activeConfig?.sftpUsername !== undefined ? activeConfig.sftpUsername : '',
+      sftpPassword: activeConfig?.sftpPassword !== undefined ? activeConfig.sftpPassword : '',
+      sftpSshKey: activeConfig?.sftpSshKey !== undefined ? activeConfig.sftpSshKey : '',
+      sftpFolder: activeConfig?.sftpFolder !== undefined ? activeConfig.sftpFolder : '',
+      sftpFileMask: activeConfig?.sftpFileMask !== undefined ? activeConfig.sftpFileMask : '*.txt',
+      sftpMaxConnectionPoolSize: activeConfig?.sftpMaxConnectionPoolSize !== undefined ? activeConfig.sftpMaxConnectionPoolSize : 5,
+      sftpFileBufferSize: activeConfig?.sftpFileBufferSize !== undefined ? activeConfig.sftpFileBufferSize : 8192,
       // SQL Server properties
       sqlServerName: this.sqlServerName,
       sqlDatabaseName: this.sqlDatabaseName,
@@ -1934,8 +1941,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       sqlPollingInterval: this.sqlPollingInterval,
       sqlUseTransaction: this.sqlUseTransaction,
       sqlBatchSize: this.sqlBatchSize,
-      adapterInstanceGuid: this.sourceAdapterInstanceGuid
+      adapterInstanceGuid: activeConfig?.sourceAdapterInstanceGuid !== undefined ? activeConfig.sourceAdapterInstanceGuid : this.sourceAdapterInstanceGuid
     };
+
+    console.log('openSourceAdapterSettingsDialog - dialogData.isEnabled:', dialogData.isEnabled);
+    console.log('openSourceAdapterSettingsDialog - dialogData.receiveFolder:', dialogData.receiveFolder);
+    console.log('openSourceAdapterSettingsDialog - dialogData.fileMask:', dialogData.fileMask);
 
     const dialogRef = this.dialog.open(AdapterPropertiesDialogComponent, {
       width: '600px',

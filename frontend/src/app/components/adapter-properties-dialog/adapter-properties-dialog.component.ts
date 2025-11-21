@@ -111,7 +111,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.instanceName = this.data.instanceName || '';
-    this.isEnabled = this.data.isEnabled ?? true;
+    // Use explicit check for undefined - false is a valid value!
+    this.isEnabled = this.data.isEnabled !== undefined ? this.data.isEnabled : true;
     this.receiveFolder = this.data.receiveFolder || '';
     this.fileMask = this.data.fileMask || '*.txt';
     this.batchSize = this.data.batchSize ?? 100;
