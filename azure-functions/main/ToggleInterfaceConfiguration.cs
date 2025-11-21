@@ -32,7 +32,11 @@ public class ToggleInterfaceConfiguration
         if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
         {
             var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            CorsHelper.AddCorsHeaders(optionsResponse);
+            // Set CORS headers explicitly
+            optionsResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+            optionsResponse.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+            optionsResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+            optionsResponse.Headers.Add("Access-Control-Max-Age", "3600");
             return optionsResponse;
         }
 
