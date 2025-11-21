@@ -2242,6 +2242,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // But skip if we just saved enabled status (onSourceEnabledChange already reloads)
         const interfaceName = this.getActiveInterfaceName();
         if (interfaceName && !enabledWasChanged) {
+          // Save the current enabled state before reload to preserve it
+          const savedEnabledState = this.sourceIsEnabled;
+          
           this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
             next: (freshConfig) => {
               if (freshConfig) {
@@ -2250,8 +2253,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 if (index >= 0) {
                   this.interfaceConfigurations[index] = freshConfig;
                 }
-                // Sync local state from fresh config (but don't overwrite enabled if we just saved it)
-                // this.sourceIsEnabled is already set correctly from the save, so we skip it here
+                // Sync local state from fresh config (but preserve enabled state we just saved)
+                // Don't overwrite enabled if we just saved it - use the saved value instead
+                this.sourceIsEnabled = savedEnabledState; // Preserve the saved enabled state
                 this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
                 this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
                 this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
@@ -2278,6 +2282,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               console.error('Error reloading configuration after save:', error);
             }
           });
+        } else if (interfaceName && enabledWasChanged) {
+          // If enabled status was changed, ensure the saved value is preserved in cache
+          const savedEnabledState = this.sourceIsEnabled;
+          const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
+          if (index >= 0) {
+            this.interfaceConfigurations[index].sourceIsEnabled = savedEnabledState;
+          }
         }
       }
     });
@@ -2651,7 +2662,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Load all data for the selected interface
     this.sourceInstanceName = config.sourceInstanceName || this.sourceInstanceName;
     this.destinationInstanceName = config.destinationInstanceName || this.destinationInstanceName;
-    this.sourceIsEnabled = config.sourceIsEnabled ?? this.sourceIsEnabled;
+    
+    // Preserve enabled state if we just saved it (within last 5 seconds)
+    const wasRecentlySaved = this.lastEnabledSaveTime[config.interfaceName] && 
+      (Date.now() - this.lastEnabledSaveTime[config.interfaceName]) < 5000;
+    if (!wasRecentlySaved) {
+      this.sourceIsEnabled = config.sourceIsEnabled ?? this.sourceIsEnabled;
+    }
     this.destinationIsEnabled = config.destinationIsEnabled ?? this.destinationIsEnabled;
     this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
     this.sourceReceiveFolder = config.sourceReceiveFolder || this.sourceReceiveFolder;
@@ -2715,7 +2732,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadDestinationAdapterInstances();
     this.loadSqlData();
     this.loadMessageBoxData();
-    this.autoStartCsvSourceIfEnabled(config.interfaceName);
+    
+    // Only auto-start CSV source if enabled AND not currently saving enabled status
+    // This prevents auto-starting after saving disabled state
+    const recentlySavedEnabled = this.lastEnabledSaveTime[config.interfaceName] && 
+      (Date.now() - this.lastEnabledSaveTime[config.interfaceName]) < 5000; // Within last 5 seconds
+    if (!recentlySavedEnabled) {
+      this.autoStartCsvSourceIfEnabled(config.interfaceName);
+    }
   }
 
   openAddInterfaceDialog(): void {
