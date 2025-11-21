@@ -485,7 +485,11 @@ public class SqlServerAdapter : IAdapter
                         var allProcessed = await _subscriptionService.AreAllSubscriptionsProcessedAsync(message.MessageId, cancellationToken);
                         if (allProcessed)
                         {
-                            await _messageBoxService.RemoveMessageAsync(message.MessageId, cancellationToken);
+                            _logger?.LogInformation("All subscriptions processed for message {MessageId}. Retaining record for auditing.", message.MessageId);
+                        }
+                        else
+                        {
+                            _logger?.LogDebug("Message {MessageId} still has pending subscribers.", message.MessageId);
                         }
                     }
                     catch (Exception ex)

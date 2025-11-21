@@ -7,9 +7,8 @@ import { CsvRecord, SqlRecord, ProcessLog } from '../models/data.model';
   providedIn: 'root'
 })
 export class TransportService {
-  // Use Azure Function App URL from environment or fall back to relative /api
-  // In production (Vercel), this will use the Azure Function App URL directly
-  // In development, it will use /api which can be proxied via Angular proxy config
+  // Resolve the API base URL dynamically so production calls the Azure Function App directly
+  // while still supporting local development and optional overrides.
   private apiUrl = this.getApiUrl();
 
   constructor(
@@ -17,11 +16,57 @@ export class TransportService {
   ) {}
 
   private getApiUrl(): string {
-    // Always use relative /api path
-    // This will be handled by Vercel serverless functions (api/*.js) in production
-    // or Angular proxy config in development
-    // The Vercel serverless functions handle CORS and proxy to Azure Functions
-    return '/api';
+    const configured = this.normalizeBaseUrl(this.readGlobalApiBaseUrl());
+    if (configured) {
+      return configured;
+    }
+
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname.toLowerCase();
+
+      // Allow manual override for debugging sessions
+      const localOverride = this.normalizeBaseUrl(
+        window.localStorage?.getItem('interfaceConfigurator.apiBaseUrl') ?? undefined
+      );
+      if (localOverride) {
+        return localOverride;
+      }
+
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:7071/api';
+      }
+    }
+
+    // Hosted default: call the Azure Function App directly (CORS already allows *)
+    return 'https://func-integration-main.azurewebsites.net/api';
+  }
+
+  private readGlobalApiBaseUrl(): string | undefined {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const globalWindow = window as any;
+    return (
+      globalWindow.INTERFACE_CONFIGURATOR_API_BASE_URL ??
+      globalWindow.__interfaceConfiguratorApiBaseUrl ??
+      globalWindow.__interfaceConfigurator?.apiBaseUrl ??
+      globalWindow.__env?.API_BASE_URL ??
+      globalWindow.__env?.apiBaseUrl
+    );
+  }
+
+  private normalizeBaseUrl(url?: string): string | undefined {
+    if (!url) {
+      return undefined;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    return trimmed.replace(/\/+$/, '');
   }
 
   getSampleCsvData(): Observable<CsvRecord[]> {

@@ -352,13 +352,16 @@ public class MessageBoxService : IMessageBoxService
                 _logger?.LogInformation("Successfully marked message as processed: MessageId={MessageId}", messageId);
             }
 
-            // Check if all subscriptions are processed, then remove message
             if (_subscriptionService != null)
             {
                 var allProcessed = await _subscriptionService.AreAllSubscriptionsProcessedAsync(messageId, cancellationToken);
                 if (allProcessed)
                 {
-                    await RemoveMessageAsync(messageId, cancellationToken);
+                    _logger?.LogInformation("All subscriptions processed for message {MessageId}. Message remains stored for auditing.", messageId);
+                }
+                else
+                {
+                    _logger?.LogDebug("Message {MessageId} still has pending subscriptions; keeping status as Processed.", messageId);
                 }
             }
         }
