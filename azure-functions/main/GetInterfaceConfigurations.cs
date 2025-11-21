@@ -43,7 +43,16 @@ public class GetInterfaceConfigurations
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
 
-            var jsonResponse = JsonSerializer.Serialize(configurations);
+            // Use camelCase naming policy to match frontend expectations
+            var camelCaseOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
+
+            var jsonResponse = JsonSerializer.Serialize(configurations, camelCaseOptions);
             await response.WriteStringAsync(jsonResponse);
 
             return response;
