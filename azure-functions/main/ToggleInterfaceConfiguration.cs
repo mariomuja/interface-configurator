@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -38,7 +39,11 @@ public class ToggleInterfaceConfiguration
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<ToggleInterfaceConfigRequest>(requestBody);
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            var request = JsonSerializer.Deserialize<ToggleInterfaceConfigRequest>(requestBody, options);
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {
@@ -93,8 +98,13 @@ public class ToggleInterfaceConfiguration
 
     private class ToggleInterfaceConfigRequest
     {
+        [JsonPropertyName("interfaceName")]
         public string InterfaceName { get; set; } = string.Empty;
+        
+        [JsonPropertyName("adapterType")]
         public string AdapterType { get; set; } = string.Empty; // "Source" or "Destination"
+        
+        [JsonPropertyName("enabled")]
         public bool Enabled { get; set; }
     }
 }
