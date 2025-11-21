@@ -164,7 +164,7 @@ public class AdapterFactory : IAdapterFactory
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
-            var isEnabled = isSource ? (config.SourceIsEnabled ?? true) : (config.DestinationIsEnabled ?? true);
+            var isEnabled = isSource ? (config.SourceIsEnabled ?? false) : (config.DestinationIsEnabled ?? false);
             
             // Fire and forget - don't block adapter creation
             _ = Task.Run(async () =>
@@ -333,7 +333,7 @@ public class AdapterFactory : IAdapterFactory
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
-            var isEnabled = isSource ? (config.SourceIsEnabled ?? true) : (config.DestinationIsEnabled ?? true);
+            var isEnabled = isSource ? (config.SourceIsEnabled ?? false) : (config.DestinationIsEnabled ?? false);
             
             // Fire and forget - don't block adapter creation
             _ = Task.Run(async () =>

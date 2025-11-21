@@ -129,7 +129,7 @@ public class CreateInterfaceConfiguration
             {
                 InstanceName = sourceInstanceName,
                 AdapterName = request.SourceAdapterName ?? "CSV",
-                IsEnabled = request.SourceIsEnabled ?? true,
+                IsEnabled = request.SourceIsEnabled ?? false,
                 AdapterInstanceGuid = Guid.NewGuid(),
                 Configuration = request.SourceConfiguration ?? JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
                 SourceFieldSeparator = "║",

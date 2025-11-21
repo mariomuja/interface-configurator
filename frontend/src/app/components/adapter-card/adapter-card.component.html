@@ -41,13 +41,13 @@
           </mat-icon>
         </div>
         
-        <!-- Enabled toggle for destination adapters -->
-        <mat-slide-toggle *ngIf="adapterType === 'Destination'" 
+        <!-- Enabled toggle for all adapters (Source and Destination) -->
+        <mat-slide-toggle 
                           [(ngModel)]="isEnabled" 
                           (ngModelChange)="onEnabledChange()"
                           color="primary"
                           [disabled]="isDisabled"
-                          matTooltip="Enable or disable this destination adapter instance">
+                          [matTooltip]="adapterType === 'Source' ? 'Enable or disable this source adapter instance' : 'Enable or disable this destination adapter instance'">
         </mat-slide-toggle>
         
         <div class="guid-display" *ngIf="adapterInstanceGuid" matTooltip="Adapter Instance GUID: {{ adapterInstanceGuid }}">
