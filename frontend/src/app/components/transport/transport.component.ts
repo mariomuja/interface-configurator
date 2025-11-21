@@ -1136,9 +1136,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const csvContent = this.editableCsvText || this.formatCsvAsText();
     this.transportService.startTransport(interfaceName, csvContent).subscribe({
       next: (response) => {
-        // Show a more user-friendly message about the MessageBox architecture
-        const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
-        this.snackBar.open(userMessage, 'Schließen', { duration: 7000 });
+        // Only show message if source adapter is enabled
+        const activeConfig = this.getInterfaceConfig(interfaceName);
+        if (activeConfig?.sourceIsEnabled) {
+          // Show a more user-friendly message about the MessageBox architecture
+          const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
+          this.snackBar.open(userMessage, 'Schließen', { duration: 7000 });
+        }
         this.isTransporting = false;
         // Refresh immediately - auto-refresh (every 5 seconds) will pick up changes as they happen
         // The timer functions run every minute, so data will appear within 1-2 minutes
@@ -1389,23 +1393,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onSourceEnabledChange(): void {
     const activeInterfaceName = this.getActiveInterfaceName();
-    const activeConfig = this.getInterfaceConfig(activeInterfaceName);
-    
-    if (!activeConfig) {
-      // Restore previous value
-      this.sourceIsEnabled = true;
+    if (!activeInterfaceName) {
       return;
     }
 
-    if (this.sourceIsEnabled === (activeConfig.sourceIsEnabled ?? true)) {
-      return;
-    }
-
+    // Always save the enabled state - don't check if it changed because the dialog already updated local state
     this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', this.sourceIsEnabled).subscribe({
       next: () => {
+        // Update local cache
+        const activeConfig = this.getInterfaceConfig(activeInterfaceName);
         if (activeConfig) {
           activeConfig.sourceIsEnabled = this.sourceIsEnabled;
         }
+        // Reload configurations to ensure we have the latest state from backend
         this.loadInterfaceConfigurations();
         this.snackBar.open(
           `Source adapter ${this.sourceIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.sourceIsEnabled ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
@@ -1895,9 +1895,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.updateSourceInstanceName();
         }
 
-        // Update enabled status if changed
-        if (result.isEnabled !== undefined && result.isEnabled !== this.sourceIsEnabled) {
+        // Update enabled status if provided (always save to ensure backend is updated)
+        if (result.isEnabled !== undefined) {
+          const previousValue = this.sourceIsEnabled;
           this.sourceIsEnabled = result.isEnabled;
+          // Always call onSourceEnabledChange to save, even if value appears unchanged
+          // This ensures the backend is updated with the exact value from the dialog
           this.onSourceEnabledChange();
         }
 
