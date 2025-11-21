@@ -187,6 +187,29 @@ public class AdapterFactory : IAdapterFactory
             });
         }
 
+        // Create SftpAdapter if adapter type is SFTP
+        SftpAdapter? sftpAdapter = null;
+        if (adapterType != null && adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(sftpHost) || string.IsNullOrWhiteSpace(sftpUsername))
+            {
+                throw new InvalidOperationException("SFTP Host and Username must be configured for SFTP adapter type.");
+            }
+
+            var sftpLogger = _serviceProvider.GetService<ILogger<SftpAdapter>>();
+            sftpAdapter = new SftpAdapter(
+                sftpHost!,
+                sftpPort ?? 22,
+                sftpUsername!,
+                sftpPassword,
+                sftpSshKey,
+                sftpFolder,
+                sftpFileMask,
+                sftpMaxConnectionPoolSize,
+                sftpFileBufferSize,
+                sftpLogger);
+        }
+
         return new CsvAdapter(
             csvProcessingService,
             adapterConfig,
@@ -202,15 +225,7 @@ public class AdapterFactory : IAdapterFactory
             destinationReceiveFolder,
             destinationFileMask,
             adapterType,
-            sftpHost,
-            sftpPort,
-            sftpUsername,
-            sftpPassword,
-            sftpSshKey,
-            sftpFolder,
-            sftpFileMask,
-            sftpMaxConnectionPoolSize,
-            sftpFileBufferSize,
+            sftpAdapter,
             logger);
     }
 

@@ -5,8 +5,6 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
-using Renci.SshNet;
-using Renci.SshNet.Sftp;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -44,19 +42,11 @@ public class CsvAdapter : IAdapter
     private static bool _csvFoldersInitialized = false;
     private static readonly object _csvFoldersLock = new object();
     
-    // SFTP properties
+    // Adapter type (FILE, RAW, SFTP)
     private readonly string _adapterType;
-    private readonly string? _sftpHost;
-    private readonly int _sftpPort;
-    private readonly string? _sftpUsername;
-    private readonly string? _sftpPassword;
-    private readonly string? _sftpSshKey;
-    private readonly string? _sftpFolder;
-    private readonly string _sftpFileMask;
-    private readonly int _sftpMaxConnectionPoolSize;
-    private readonly int _sftpFileBufferSize;
-    private readonly SemaphoreSlim? _sftpConnectionSemaphore;
-    private readonly Queue<SftpClient>? _sftpConnectionPool;
+    
+    // SFTP adapter instance (used when adapterType is SFTP)
+    private readonly SftpAdapter? _sftpAdapter;
 
     public CsvAdapter(
         ICsvProcessingService csvProcessingService,
@@ -73,15 +63,7 @@ public class CsvAdapter : IAdapter
         string? destinationReceiveFolder = null,
         string? destinationFileMask = null,
         string? adapterType = null,
-        string? sftpHost = null,
-        int? sftpPort = null,
-        string? sftpUsername = null,
-        string? sftpPassword = null,
-        string? sftpSshKey = null,
-        string? sftpFolder = null,
-        string? sftpFileMask = null,
-        int? sftpMaxConnectionPoolSize = null,
-        int? sftpFileBufferSize = null,
+        SftpAdapter? sftpAdapter = null,
         ILogger<CsvAdapter>? logger = null)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
@@ -102,23 +84,14 @@ public class CsvAdapter : IAdapter
         _destinationFileMask = destinationFileMask ?? "*.txt";
         _logger = logger;
         
-        // SFTP properties
+        // Adapter type and SFTP adapter
         _adapterType = adapterType ?? "FILE";
-        _sftpHost = sftpHost;
-        _sftpPort = sftpPort ?? 22;
-        _sftpUsername = sftpUsername;
-        _sftpPassword = sftpPassword;
-        _sftpSshKey = sftpSshKey;
-        _sftpFolder = sftpFolder;
-        _sftpFileMask = sftpFileMask ?? "*.txt";
-        _sftpMaxConnectionPoolSize = sftpMaxConnectionPoolSize ?? 5;
-        _sftpFileBufferSize = sftpFileBufferSize ?? 8192;
+        _sftpAdapter = sftpAdapter;
         
-        // Initialize SFTP connection pool if SFTP adapter type
-        if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+        // Validate SFTP adapter is provided when adapter type is SFTP
+        if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase) && _sftpAdapter == null)
         {
-            _sftpConnectionSemaphore = new SemaphoreSlim(_sftpMaxConnectionPoolSize, _sftpMaxConnectionPoolSize);
-            _sftpConnectionPool = new Queue<SftpClient>();
+            throw new ArgumentException("SftpAdapter instance is required when adapterType is SFTP", nameof(sftpAdapter));
         }
     }
 
@@ -392,7 +365,24 @@ public class CsvAdapter : IAdapter
 
             if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
             {
-                return await ReadFromSftpAsync(source, cancellationToken);
+                // Use SftpAdapter to read CSV files from SFTP server
+                if (_sftpAdapter == null)
+                {
+                    throw new InvalidOperationException("SFTP adapter is not configured. SftpAdapter instance is required for SFTP adapter type.");
+                }
+                
+                // Use source parameter as folder, or let SftpAdapter use its configured folder
+                var folder = !string.IsNullOrWhiteSpace(source) ? source : null;
+                var (headers, records) = await _sftpAdapter.ReadCsvFilesAsync(_csvProcessingService, _fieldSeparator, folder, cancellationToken);
+                
+                // Upload files to csv-incoming folder for blob trigger processing
+                var files = await _sftpAdapter.ReadAllFilesAsync(folder, cancellationToken);
+                foreach (var (fileName, content) in files)
+                {
+                    await UploadFileToIncomingAsync(content, fileName, cancellationToken);
+                }
+                
+                return (headers, records);
             }
 
             var effectiveSource = hasExplicitSource
@@ -611,202 +601,6 @@ public class CsvAdapter : IAdapter
         return (allHeaders, allRecords);
     }
 
-    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadFromSftpAsync(string source, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(_sftpHost) || string.IsNullOrWhiteSpace(_sftpUsername))
-        {
-            throw new InvalidOperationException("SFTP Host and Username must be configured for SFTP adapter type.");
-        }
-
-        var allHeaders = new List<string>();
-        var allRecords = new List<Dictionary<string, string>>();
-
-        // Use SFTP folder from configuration or source parameter
-        var remoteFolder = !string.IsNullOrWhiteSpace(_sftpFolder) ? _sftpFolder : source;
-        
-        // Ensure folder path ends with /
-        if (!remoteFolder.EndsWith("/"))
-            remoteFolder += "/";
-
-        _logger?.LogInformation("Reading CSV files from SFTP server {Host}:{Port}, folder: {Folder}, file mask: {FileMask}", 
-            _sftpHost, _sftpPort, remoteFolder, _sftpFileMask);
-
-        SftpClient? sftpClient = null;
-        try
-        {
-            // Get SFTP client from pool or create new one
-            sftpClient = await GetSftpClientAsync(cancellationToken);
-            
-            if (sftpClient == null || !sftpClient.IsConnected)
-            {
-                throw new InvalidOperationException("Failed to establish SFTP connection.");
-            }
-
-            // List files in remote folder
-            var files = sftpClient.ListDirectory(remoteFolder);
-            var csvFiles = files
-                .Where(f => !f.IsDirectory && MatchesFileMask(f.Name, _sftpFileMask))
-                .ToList();
-
-            _logger?.LogInformation("Found {FileCount} files matching mask '{FileMask}' in SFTP folder {Folder}", 
-                csvFiles.Count, _sftpFileMask, remoteFolder);
-
-            // Process each CSV file
-            foreach (var file in csvFiles)
-            {
-                try
-                {
-                    var remoteFilePath = remoteFolder + file.Name;
-                    _logger?.LogInformation("Reading CSV file from SFTP: {RemoteFilePath}", remoteFilePath);
-
-                    // Download file content using buffer
-                    using var memoryStream = new MemoryStream();
-                    sftpClient.DownloadFile(remoteFilePath, memoryStream);
-                    memoryStream.Position = 0;
-                    
-                    var csvContent = Encoding.UTF8.GetString(memoryStream.ToArray());
-
-                    // Parse CSV using CsvProcessingService
-                    var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, _fieldSeparator, cancellationToken);
-
-                    _logger?.LogInformation("Successfully read CSV from SFTP {RemoteFilePath}: {HeaderCount} headers, {RecordCount} records", 
-                        remoteFilePath, headers.Count, records.Count);
-
-                    // Use headers from first file, or merge if different
-                    if (allHeaders.Count == 0)
-                    {
-                        allHeaders = headers;
-                    }
-                    else if (!headers.SequenceEqual(allHeaders))
-                    {
-                        _logger?.LogWarning("Headers differ between files. Using headers from first file.");
-                    }
-
-                    allRecords.AddRange(records);
-
-                    // For SFTP adapter type: Upload file to csv-incoming folder
-                    // This will trigger the blob trigger which processes the file
-                    await UploadFileToIncomingAsync(csvContent, file.Name, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Error processing CSV file {FileName} from SFTP folder {Folder}", file.Name, remoteFolder);
-                    // Continue with next file
-                }
-            }
-        }
-        finally
-        {
-            // Return SFTP client to pool
-            if (sftpClient != null)
-            {
-                await ReturnSftpClientAsync(sftpClient);
-            }
-        }
-
-        return (allHeaders, allRecords);
-    }
-
-    private async Task<SftpClient> GetSftpClientAsync(CancellationToken cancellationToken)
-    {
-        if (_sftpConnectionSemaphore == null || _sftpConnectionPool == null)
-        {
-            return CreateSftpClient();
-        }
-
-        await _sftpConnectionSemaphore.WaitAsync(cancellationToken);
-        
-        lock (_sftpConnectionPool)
-        {
-            if (_sftpConnectionPool.Count > 0)
-            {
-                var client = _sftpConnectionPool.Dequeue();
-                if (client.IsConnected)
-                {
-                    return client;
-                }
-                else
-                {
-                    // Client disconnected, dispose and create new one
-                    try 
-                    { 
-                        client.Dispose(); 
-                    } 
-                    catch (Exception disposeEx)
-                    {
-                        _logger?.LogWarning(disposeEx, "Error disposing disconnected SFTP client: {ErrorMessage}", disposeEx.Message);
-                    }
-                }
-            }
-        }
-
-        // Create new client if pool is empty
-        return CreateSftpClient();
-    }
-
-    private async Task ReturnSftpClientAsync(SftpClient client)
-    {
-        if (_sftpConnectionSemaphore == null || _sftpConnectionPool == null)
-        {
-            client?.Dispose();
-            return;
-        }
-
-        lock (_sftpConnectionPool)
-        {
-            if (client.IsConnected && _sftpConnectionPool.Count < _sftpMaxConnectionPoolSize)
-            {
-                _sftpConnectionPool.Enqueue(client);
-                _sftpConnectionSemaphore.Release();
-                return;
-            }
-        }
-
-        // Pool is full or client disconnected, dispose it
-        try 
-        { 
-            client?.Dispose(); 
-        } 
-        catch (Exception disposeEx)
-        {
-            _logger?.LogWarning(disposeEx, "Error disposing SFTP client: {ErrorMessage}", disposeEx.Message);
-        }
-        _sftpConnectionSemaphore.Release();
-    }
-
-    private SftpClient CreateSftpClient()
-    {
-        ConnectionInfo connectionInfo;
-        
-        if (!string.IsNullOrWhiteSpace(_sftpSshKey))
-        {
-            // Use SSH key authentication
-            var keyBytes = Convert.FromBase64String(_sftpSshKey);
-            using var keyStream = new MemoryStream(keyBytes);
-            var privateKeyFile = new PrivateKeyFile(keyStream);
-            connectionInfo = new ConnectionInfo(_sftpHost, _sftpPort, _sftpUsername, new PrivateKeyAuthenticationMethod(_sftpUsername, privateKeyFile));
-        }
-        else if (!string.IsNullOrWhiteSpace(_sftpPassword))
-        {
-            // Use password authentication
-            connectionInfo = new ConnectionInfo(_sftpHost, _sftpPort, _sftpUsername, new PasswordAuthenticationMethod(_sftpUsername, _sftpPassword));
-        }
-        else
-        {
-            throw new InvalidOperationException("Either SFTP Password or SSH Key must be provided.");
-        }
-
-        var client = new SftpClient(connectionInfo);
-        client.Connect();
-        
-        if (!client.IsConnected)
-        {
-            throw new InvalidOperationException($"Failed to connect to SFTP server {_sftpHost}:{_sftpPort}");
-        }
-
-        _logger?.LogInformation("Successfully connected to SFTP server {Host}:{Port}", _sftpHost, _sftpPort);
-        return client;
-    }
 
     public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {

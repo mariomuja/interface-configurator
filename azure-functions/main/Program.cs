@@ -277,15 +277,7 @@ var host = new HostBuilder()
                     destinationReceiveFolder: null,
                     destinationFileMask: null,
                     adapterType: null,
-                    sftpHost: null,
-                    sftpPort: null,
-                    sftpUsername: null,
-                    sftpPassword: null,
-                    sftpSshKey: null,
-                    sftpFolder: null,
-                    sftpFileMask: null,
-                    sftpMaxConnectionPoolSize: null,
-                    sftpFileBufferSize: null,
+                    sftpAdapter: null, // SftpAdapter will be created by AdapterFactory when needed
                     logger: logger);
             });
             
