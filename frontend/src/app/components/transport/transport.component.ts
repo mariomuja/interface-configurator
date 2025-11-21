@@ -88,8 +88,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   sourceInstanceName: string = 'Source';
   destinationInstanceName: string = 'Destination';
   destinationAdapterInstances: DestinationAdapterInstance[] = [];
-  sourceIsEnabled: boolean = true;
-  destinationIsEnabled: boolean = true;
+  sourceIsEnabled: boolean = false;
+  destinationIsEnabled: boolean = false;
   sourceReceiveFolder: string = '';
   sourceFileMask: string = '*.txt';
   sourceBatchSize: number = 100;
@@ -254,8 +254,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             destinationAdapterName: 'SqlServer',
             sourceInstanceName: 'Source',
             destinationInstanceName: 'Destination',
-            sourceIsEnabled: true,
-            destinationIsEnabled: true,
+            sourceIsEnabled: false,
+            destinationIsEnabled: false,
             csvPollingInterval: 10,
             _isPlaceholder: true
           });
@@ -1144,8 +1144,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       }).subscribe({
         next: () => {
           this.loadInterfaceConfigurations();
-          // New config defaults to enabled, so show message
-          this.uploadAndStartTransport(interfaceName, true);
+          // New config defaults to disabled - user must enable adapters manually
+          this.snackBar.open(
+            'Interface-Konfiguration erstellt. Bitte aktivieren Sie Source- und Destination-Adapter in den Einstellungen, um den Transport zu starten.',
+            'OK',
+            { duration: 5000 }
+          );
+          this.isTransporting = false;
         },
         error: (error) => {
           console.error('Error creating interface configuration:', error);
@@ -1153,56 +1158,46 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
             duration: 12000
           });
-          // Assume enabled for new config
-          this.uploadAndStartTransport(interfaceName, true);
+          // New config defaults to disabled - user must enable adapters manually
+          this.snackBar.open(
+            'Interface-Konfiguration erstellt. Bitte aktivieren Sie Source- und Destination-Adapter in den Einstellungen, um den Transport zu starten.',
+            'OK',
+            { duration: 5000 }
+          );
+          this.isTransporting = false;
         }
       });
       return;
     }
 
-    // Remember if source was enabled BEFORE we potentially enable it
-    const sourceWasEnabledBeforeStart = activeConfig.sourceIsEnabled ?? true;
+    // Check if adapters are enabled - do NOT automatically enable them
+    // User must explicitly enable adapters via settings dialog
+    const sourceWasEnabledBeforeStart = activeConfig.sourceIsEnabled ?? false;
+    const destinationWasEnabledBeforeStart = activeConfig.destinationIsEnabled ?? false;
 
-    const ensureDestination = () => {
-      if (!activeConfig.destinationIsEnabled) {
-        this.transportService.toggleInterfaceConfiguration(interfaceName, 'Destination', true).subscribe({
-          next: () => {
-            this.loadInterfaceConfigurations();
-            this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
-          },
-          error: (error) => {
-            const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
-            this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
-              duration: 12000
-            });
-            this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
-          }
-        });
-      } else {
-        this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
-      }
-    };
-
-    if (!activeConfig.sourceIsEnabled) {
-      // Source was disabled - enable it but don't show the message
-      this.transportService.toggleInterfaceConfiguration(interfaceName, 'Source', true).subscribe({
-        next: () => {
-          this.loadInterfaceConfigurations();
-          ensureDestination();
-        },
-        error: (error) => {
-          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Source-Adapters');
-          this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
-            duration: 12000
-          });
-          // Source was disabled, so don't show message
-          this.uploadAndStartTransport(interfaceName, false);
-        }
-      });
-    } else {
-      // Source was already enabled - show message
-      ensureDestination();
+    // Only start transport if both source and destination are enabled
+    if (!sourceWasEnabledBeforeStart) {
+      this.snackBar.open(
+        'Source-Adapter ist deaktiviert. Bitte aktivieren Sie den Source-Adapter in den Einstellungen, um den Transport zu starten.',
+        'OK',
+        { duration: 5000 }
+      );
+      this.isTransporting = false;
+      return;
     }
+
+    if (!destinationWasEnabledBeforeStart) {
+      this.snackBar.open(
+        'Destination-Adapter ist deaktiviert. Bitte aktivieren Sie den Destination-Adapter in den Einstellungen, um den Transport zu starten.',
+        'OK',
+        { duration: 5000 }
+      );
+      this.isTransporting = false;
+      return;
+    }
+
+    // Both adapters are enabled - proceed with transport
+    this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
   }
   
   private autoStartCsvSourceIfEnabled(interfaceName?: string, options: { force?: boolean } = {}): void {
@@ -1570,13 +1565,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }, 2000);
         
         this.snackBar.open(
-          `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
+          `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden verarbeitet, wenn auch der Destination-Adapter aktiviert ist.' : 'Der Prozess stoppt sofort.'}`,
           'OK',
           { duration: 5000 }
         );
-        if (enabledValueToSave) {
-          this.autoStartCsvSourceIfEnabled(activeInterfaceName, { force: true });
-        } else {
+        // Do NOT automatically start transport - user must explicitly start it via Start Transport button
+        // Only remove from auto-started list if disabled
+        if (!enabledValueToSave) {
           this.autoStartedInterfaces.delete(activeInterfaceName);
         }
       },
@@ -1599,11 +1594,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     if (!activeConfig) {
       // Restore previous value
-      this.destinationIsEnabled = true;
+      this.destinationIsEnabled = false;
       return;
     }
 
-    if (this.destinationIsEnabled === (activeConfig.destinationIsEnabled ?? true)) {
+    if (this.destinationIsEnabled === (activeConfig.destinationIsEnabled ?? false)) {
       return;
     }
 
@@ -1611,7 +1606,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       next: () => {
         this.loadInterfaceConfigurations();
         this.snackBar.open(
-          `Destination adapter ${this.destinationIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.destinationIsEnabled ? 'Der Prozess wird beim nächsten Timer-Trigger gestartet.' : 'Der Prozess stoppt sofort.'}`,
+          `Destination adapter ${this.destinationIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.destinationIsEnabled ? 'Der Prozess wird gestartet, wenn auch der Source-Adapter aktiviert ist.' : 'Der Prozess stoppt sofort.'}`,
           'OK',
           { duration: 5000 }
         );
@@ -1621,7 +1616,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren/Deaktivieren des Destination-Adapters');
         this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
-        this.destinationIsEnabled = activeConfig.destinationIsEnabled ?? true;
+        this.destinationIsEnabled = activeConfig.destinationIsEnabled ?? false;
       }
     });
   }
@@ -2256,6 +2251,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 // Sync local state from fresh config (but preserve enabled state we just saved)
                 // Don't overwrite enabled if we just saved it - use the saved value instead
                 this.sourceIsEnabled = savedEnabledState; // Preserve the saved enabled state
+                // Also update the cache to reflect the saved enabled state
+                if (index >= 0) {
+                  this.interfaceConfigurations[index].sourceIsEnabled = savedEnabledState;
+                }
                 this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
                 this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
                 this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
@@ -2733,13 +2732,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadSqlData();
     this.loadMessageBoxData();
     
-    // Only auto-start CSV source if enabled AND not currently saving enabled status
-    // This prevents auto-starting after saving disabled state
-    const recentlySavedEnabled = this.lastEnabledSaveTime[config.interfaceName] && 
-      (Date.now() - this.lastEnabledSaveTime[config.interfaceName]) < 5000; // Within last 5 seconds
-    if (!recentlySavedEnabled) {
-      this.autoStartCsvSourceIfEnabled(config.interfaceName);
-    }
+    // Do NOT automatically start transport - user must explicitly start it via Start Transport button
+    // Transport is only started when user clicks the "Start Transport" button
   }
 
   openAddInterfaceDialog(): void {
@@ -2782,8 +2776,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           destinationAdapterName: 'SqlServer',
           sourceInstanceName: 'Source',
           destinationInstanceName: 'Destination',
-          sourceIsEnabled: true,
-          destinationIsEnabled: true,
+          sourceIsEnabled: false,
+          destinationIsEnabled: false,
           _isPlaceholder: true
         };
         this.interfaceConfigurations = [
@@ -2850,7 +2844,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   private applyDefaultInterfaceState(): void {
     this.sourceAdapterName = 'CSV';
     this.sourceInstanceName = 'Source';
-    this.sourceIsEnabled = true;
+    this.sourceIsEnabled = false;
     this.sourceReceiveFolder = '';
     this.sourceFileMask = '*.txt';
     this.sourceBatchSize = 1000;
@@ -3187,7 +3181,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           structuredConfig.Sources[sourceInstanceName] = {
             InstanceName: sourceInstanceName,
             AdapterName: config.sourceAdapterName || 'CSV',
-            IsEnabled: config.sourceIsEnabled !== undefined ? config.sourceIsEnabled : true,
+            IsEnabled: config.sourceIsEnabled !== undefined ? config.sourceIsEnabled : false,
             AdapterInstanceGuid: config.sourceAdapterInstanceGuid || '',
             Configuration: config.sourceConfiguration || '',
             // Copy all source properties
@@ -3247,7 +3241,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               AdapterInstanceGuid: instance.adapterInstanceGuid || '',
               InstanceName: instanceName,
               AdapterName: instance.adapterName || 'SqlServer',
-              IsEnabled: instance.isEnabled !== undefined ? instance.isEnabled : true,
+              IsEnabled: instance.isEnabled !== undefined ? instance.isEnabled : false,
               Configuration: instance.configuration || '',
               // Copy all destination properties
               DestinationReceiveFolder: instance.destinationReceiveFolder || null,
@@ -3274,7 +3268,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             AdapterInstanceGuid: config.destinationAdapterInstanceGuid || '',
             InstanceName: destInstanceName,
             AdapterName: config.destinationAdapterName || 'SqlServer',
-            IsEnabled: config.destinationIsEnabled !== undefined ? config.destinationIsEnabled : true,
+            IsEnabled: config.destinationIsEnabled !== undefined ? config.destinationIsEnabled : false,
             Configuration: config.destinationConfiguration || '',
             DestinationReceiveFolder: config.destinationReceiveFolder || null,
             DestinationFileMask: config.destinationFileMask || '*.txt',
@@ -3380,7 +3374,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             adapterInstanceGuid: adapterInstanceGuid,
             instanceName: 'Destination 1',
             adapterName: 'SqlServer',
-            isEnabled: true,
+            isEnabled: false,
             configuration: {
               destination: 'TransportData',
               tableName: 'TransportData',
@@ -3433,7 +3427,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           adapterInstanceGuid: adapterInstanceGuid,
           instanceName: 'Destination 1',
           adapterName: 'SqlServer',
-          isEnabled: true,
+          isEnabled: false,
           configuration: {
             destination: 'TransportData',
             tableName: 'TransportData',
@@ -3491,7 +3485,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       adapterInstanceGuid: adapterInstanceGuid,
       instanceName: instanceName,
       adapterName: adapterName,
-      isEnabled: true,
+      isEnabled: false,
       configuration: defaultConfiguration
     };
     
@@ -3761,7 +3755,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       adapterType: 'Destination',
       adapterName: instance.adapterName,
       instanceName: instance.instanceName,
-      isEnabled: instance.isEnabled ?? true,
+      isEnabled: instance.isEnabled ?? false,
       adapterInstanceGuid: instance.adapterInstanceGuid,
       receiveFolder: instance.adapterName === 'CSV' ? destinationReceiveFolder : undefined,
       fileMask: instance.adapterName === 'CSV' ? destinationFileMask : undefined,
