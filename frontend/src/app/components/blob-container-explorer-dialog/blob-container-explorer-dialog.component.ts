@@ -56,13 +56,8 @@ export class BlobContainerExplorerDialogComponent implements OnInit {
   loadBlobContainerFolders(): void {
     this.isLoadingBlobContainer = true;
     
-    // Determine folder prefix based on adapter type
-    // Source adapters write to csv-incoming, destination adapters write to csv-processed or csv-outgoing
-    const folderPrefix = this.data.adapterType === 'Source' 
-      ? 'csv-incoming/' 
-      : 'csv-processed/';
-
-    this.transportService.getBlobContainerFolders('csv-files', folderPrefix).pipe(
+    // Load all three CSV folders: csv-incoming, csv-processed, csv-error
+    this.transportService.getBlobContainerFolders('csv-files', '', 10).pipe(
       catchError(error => {
         console.error('Error loading blob container folders:', error);
         this.snackBar.open('Error loading blob container: ' + (error.error?.message || error.message), 'OK', {
@@ -73,9 +68,42 @@ export class BlobContainerExplorerDialogComponent implements OnInit {
       })
     ).subscribe({
       next: (folders) => {
-        // Filter folders to only show relevant ones for this adapter type
-        this.blobContainerFolders = this.filterFoldersByAdapterType(folders || []);
-        this.blobContainerFolders = this.sortBlobContainerFolders(this.blobContainerFolders);
+        // Filter to show only the 3 CSV folders
+        const requiredFolders = ['/csv-incoming', '/csv-processed', '/csv-error'];
+        const folderMap = new Map<string, any>();
+        
+        // Add existing folders from API response
+        (folders || []).forEach((folder: any) => {
+          folderMap.set(folder.path, folder);
+        });
+        
+        // Ensure all required folders exist (create empty ones if missing)
+        requiredFolders.forEach(folderPath => {
+          if (!folderMap.has(folderPath)) {
+            folderMap.set(folderPath, {
+              path: folderPath,
+              files: [],
+              totalFileCount: 0,
+              hasMoreFiles: false
+            });
+          }
+        });
+        
+        // Convert map back to array and sort
+        const allFolders = Array.from(folderMap.values());
+        
+        // Sort folders: csv-incoming first, then csv-processed, then csv-error
+        const sortedFolders = allFolders.sort((a, b) => {
+          const order = ['/csv-incoming', '/csv-processed', '/csv-error'];
+          const aIndex = order.indexOf(a.path);
+          const bIndex = order.indexOf(b.path);
+          if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+          if (aIndex !== -1) return -1;
+          if (bIndex !== -1) return 1;
+          return a.path.localeCompare(b.path);
+        });
+        
+        this.blobContainerFolders = this.sortBlobContainerFolders(sortedFolders);
         this.isLoadingBlobContainer = false;
       },
       error: (error) => {
@@ -83,20 +111,6 @@ export class BlobContainerExplorerDialogComponent implements OnInit {
         this.isLoadingBlobContainer = false;
         this.blobContainerFolders = [];
       }
-    });
-  }
-
-  private filterFoldersByAdapterType(folders: any[]): any[] {
-    // Filter to only show folders relevant to this adapter type
-    // Source: csv-incoming
-    // Destination: csv-processed, csv-outgoing
-    const relevantPrefixes = this.data.adapterType === 'Source' 
-      ? ['csv-incoming'] 
-      : ['csv-processed', 'csv-outgoing'];
-    
-    return folders.filter(folder => {
-      const folderPath = folder.path || '';
-      return relevantPrefixes.some(prefix => folderPath.startsWith(prefix) || folderPath === '/' + prefix);
     });
   }
 

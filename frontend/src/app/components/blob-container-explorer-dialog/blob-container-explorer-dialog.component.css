@@ -2,32 +2,42 @@ h2[mat-dialog-title] {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.dialog-title-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.header-reload-button {
+  margin-left: auto;
 }
 
 mat-dialog-content {
   max-height: 70vh;
   overflow: auto;
-  padding: 16px;
-}
-
-.dialog-header-info {
-  background-color: #f5f5f5;
   padding: 12px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  font-size: 12px;
 }
 
-.dialog-header-info p {
-  margin: 4px 0;
-}
-
-.blob-container-actions {
+.blob-container-actions-compact {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 12px;
   align-items: center;
+}
+
+.delete-button-compact,
+.deselect-button-compact {
+  font-size: 12px;
+  padding: 4px 8px;
+  min-width: auto;
+  height: 32px;
 }
 
 .blob-container-explorer {
@@ -35,24 +45,28 @@ mat-dialog-content {
 }
 
 .folder-section {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
-  padding: 12px;
+  padding: 8px;
   background-color: #fafafa;
 }
 
 .folder-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 6px;
   font-weight: bold;
   color: #1976d2;
+  font-size: 12px;
 }
 
 .folder-icon {
   color: #ff9800;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .folder-path {
@@ -62,24 +76,25 @@ mat-dialog-content {
 .folder-file-count {
   color: #666;
   font-weight: normal;
+  font-size: 11px;
 }
 
 .file-list {
-  margin-left: 24px;
+  margin-left: 20px;
 }
 
 .file-list-header {
   display: flex;
   align-items: center;
-  padding: 8px;
+  padding: 4px 6px;
   background-color: #e3f2fd;
-  border-bottom: 2px solid #1976d2;
+  border-bottom: 1px solid #1976d2;
   font-weight: bold;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .file-header-checkbox {
-  width: 40px;
+  width: 32px;
   display: flex;
   justify-content: center;
 }
@@ -87,10 +102,10 @@ mat-dialog-content {
 .file-header-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
   transition: background-color 0.2s;
 }
 
@@ -104,30 +119,32 @@ mat-dialog-content {
 
 .file-header-name {
   flex: 2;
-  min-width: 200px;
+  min-width: 180px;
 }
 
 .file-header-size {
-  width: 100px;
+  width: 80px;
   text-align: right;
 }
 
 .file-header-date {
-  width: 150px;
+  width: 120px;
 }
 
 .sort-icon {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .file-item {
   display: flex;
   align-items: center;
-  padding: 8px;
+  padding: 3px 6px;
   border-bottom: 1px solid #e0e0e0;
   transition: background-color 0.2s;
+  min-height: 28px;
+  line-height: 1.2;
 }
 
 .file-item:hover {
@@ -139,55 +156,63 @@ mat-dialog-content {
 }
 
 .file-checkbox {
-  width: 40px;
+  width: 32px;
 }
 
 .file-icon {
   color: #666;
-  margin-right: 8px;
+  margin-right: 6px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .file-name {
   flex: 2;
-  min-width: 200px;
+  min-width: 180px;
   font-family: 'Courier New', monospace;
+  font-size: 11px;
 }
 
 .file-size {
-  width: 100px;
+  width: 80px;
   text-align: right;
   color: #666;
+  font-size: 11px;
 }
 
 .file-date {
-  width: 150px;
+  width: 120px;
   color: #666;
+  font-size: 11px;
 }
 
 .folder-empty {
-  margin-left: 24px;
-  padding: 16px;
+  margin-left: 20px;
+  padding: 8px;
   text-align: center;
   color: #999;
+  font-size: 11px;
 }
 
 .table-empty-message {
   text-align: center;
-  padding: 32px;
+  padding: 24px;
   color: #999;
+  font-size: 12px;
 }
 
 .spinner-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 32px;
+  padding: 24px;
 }
 
 .file-count-info {
-  margin-right: 16px;
+  margin-right: 12px;
   color: #666;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .selected-count {
@@ -196,8 +221,8 @@ mat-dialog-content {
 }
 
 mat-dialog-actions {
-  padding: 8px 16px;
-  margin-top: 16px;
+  padding: 6px 12px;
+  margin-top: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;

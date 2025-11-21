@@ -1,22 +1,24 @@
-<h2 mat-dialog-title>
+<h2 mat-dialog-title class="dialog-title-compact">
   <mat-icon>folder</mat-icon>
-  Blob Container Explorer - {{ data.instanceName }}
+  Blob Container Explorer
+  <button mat-icon-button 
+          (click)="loadBlobContainerFolders()" 
+          [disabled]="isLoadingBlobContainer" 
+          matTooltip="Refresh blob container"
+          class="header-reload-button">
+    <mat-icon>{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+  </button>
 </h2>
 
 <mat-dialog-content>
-  <div class="dialog-header-info">
-    <p><strong>Adapter:</strong> {{ data.adapterName }} ({{ data.adapterType }})</p>
-    <p><strong>Instance:</strong> {{ data.instanceName }}</p>
-    <p><strong>GUID:</strong> {{ data.adapterInstanceGuid.substring(0, 8) }}...</p>
-  </div>
-
-  <div class="blob-container-actions">
+  <div class="blob-container-actions-compact">
     <button mat-raised-button 
             color="warn" 
             (click)="deleteSelectedBlobFiles()" 
             [disabled]="getSelectedBlobFilesCount() === 0 || isDeletingBlobFiles || isLoadingBlobContainer"
             matTooltip="Delete selected files"
-            *ngIf="getSelectedBlobFilesCount() > 0">
+            *ngIf="getSelectedBlobFilesCount() > 0"
+            class="delete-button-compact">
       <mat-icon>delete</mat-icon>
       Delete ({{ getSelectedBlobFilesCount() }})
     </button>
@@ -24,11 +26,9 @@
             (click)="deselectAllBlobFiles()" 
             [disabled]="getSelectedBlobFilesCount() === 0"
             matTooltip="Deselect all"
-            *ngIf="getSelectedBlobFilesCount() > 0">
+            *ngIf="getSelectedBlobFilesCount() > 0"
+            class="deselect-button-compact">
       <mat-icon>clear</mat-icon>
-    </button>
-    <button mat-icon-button (click)="loadBlobContainerFolders()" [disabled]="isLoadingBlobContainer" matTooltip="Refresh blob container">
-      <mat-icon>{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
     </button>
   </div>
 
