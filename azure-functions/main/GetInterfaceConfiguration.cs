@@ -62,19 +62,37 @@ public class GetInterfaceConfiguration
                 return notFoundResponse;
             }
 
-            // Build hierarchical structure
+            // Build hierarchical + legacy structure
+            var camelCaseOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
+
+            var baseConfigNode = JsonNode.Parse(JsonSerializer.Serialize(configuration, camelCaseOptions))?.AsObject()
+                ?? new JsonObject();
             var hierarchicalConfig = BuildHierarchicalConfiguration(configuration);
+
+            if (hierarchicalConfig.TryGetPropertyValue("sources", out JsonNode? sourcesNode))
+            {
+                baseConfigNode["sources"] = sourcesNode;
+            }
+
+            if (hierarchicalConfig.TryGetPropertyValue("destinations", out JsonNode? destinationsNode))
+            {
+                baseConfigNode["destinations"] = destinationsNode;
+            }
+
+            // Provide the full hierarchical view as well (useful for visual inspectors)
+            baseConfigNode["hierarchy"] = hierarchicalConfig;
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
 
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true
-            };
-
-            var jsonResponse = JsonSerializer.Serialize(hierarchicalConfig, options);
+            var jsonResponse = baseConfigNode.ToJsonString(camelCaseOptions);
             await response.WriteStringAsync(jsonResponse);
 
             return response;

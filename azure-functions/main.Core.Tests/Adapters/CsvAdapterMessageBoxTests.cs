@@ -10,6 +10,8 @@ using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
 using Xunit;
+using System.Linq;
+using System.Reflection;
 
 namespace InterfaceConfigurator.Main.Core.Tests.Adapters;
 
@@ -74,9 +76,7 @@ public class CsvAdapterMessageBoxTests : IDisposable
         var csvContent = "Name║Age║City\nJohn║30║New York\nJane║25║London";
         var binaryData = BinaryData.FromString(csvContent);
         // Create real BlobDownloadResult using reflection since constructor might be internal
-        var blobDownloadResultType = typeof(Azure.Storage.Blobs.Models.BlobDownloadResult);
-        var blobDownloadResult = Activator.CreateInstance(blobDownloadResultType, binaryData) 
-            ?? throw new InvalidOperationException("Failed to create BlobDownloadResult");
+        var blobDownloadResult = CreateBlobDownloadResult(binaryData);
         
         var mockDownloadResponse = new Mock<Azure.Response<Azure.Storage.Blobs.Models.BlobDownloadResult>>();
         mockDownloadResponse.Setup(r => r.Value).Returns((Azure.Storage.Blobs.Models.BlobDownloadResult)blobDownloadResult);
@@ -347,9 +347,53 @@ public class CsvAdapterMessageBoxTests : IDisposable
         Assert.Equal("Interface2", interface2Messages[0].InterfaceName);
     }
 
+    private static Azure.Storage.Blobs.Models.BlobDownloadResult CreateBlobDownloadResult(BinaryData content)
+    {
+        var resultType = typeof(Azure.Storage.Blobs.Models.BlobDownloadResult);
+        var constructors = resultType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance);
+        var targetConstructor = constructors.FirstOrDefault(c => c.GetParameters().Any(p => p.ParameterType == typeof(BinaryData)))
+            ?? constructors.FirstOrDefault()
+            ?? throw new InvalidOperationException("BlobDownloadResult constructor not found.");
+
+        var parameters = targetConstructor.GetParameters();
+        var args = new object?[parameters.Length];
+
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            var parameter = parameters[i];
+
+            if (parameter.ParameterType == typeof(BinaryData))
+            {
+                args[i] = content;
+            }
+            else if (parameter.ParameterType.IsValueType)
+            {
+                args[i] = Activator.CreateInstance(parameter.ParameterType);
+            }
+            else
+            {
+                args[i] = null;
+            }
+        }
+
+        var instance = (Azure.Storage.Blobs.Models.BlobDownloadResult)targetConstructor.Invoke(args);
+
+        var contentProperty = resultType.GetProperty("Content", BindingFlags.Instance | BindingFlags.Public);
+        if (contentProperty != null && contentProperty.CanWrite)
+        {
+            contentProperty.SetValue(instance, content);
+        }
+        else
+        {
+            var backingField = resultType.GetField("<Content>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+            backingField?.SetValue(instance, content);
+        }
+
+        return instance;
+    }
+
     public void Dispose()
     {
         _context?.Dispose();
     }
 }
-

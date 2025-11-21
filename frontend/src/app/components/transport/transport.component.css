@@ -330,15 +330,33 @@
   height: 100%;
 }
 
-.csv-text-container {
-  width: 100%;
-  height: auto;
+.csv-card {
+  max-height: calc(33vh + 140px);
+}
+
+.csv-card ::ng-deep .mat-expansion-panel-body {
+  padding: 0 12px 12px 12px;
   display: flex;
   flex-direction: column;
-  max-height: calc(33vh);
+  min-height: 0;
+}
+
+.csv-text-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   background-color: #fafafa;
+  height: min(33vh, 240px);
+  max-height: min(33vh, 240px);
+  min-height: 180px;
+  overflow: hidden;
+}
+
+.csv-text-container::after {
+  content: '';
+  pointer-events: none;
 }
 
 .csv-file-actions {
@@ -366,13 +384,6 @@
   line-height: 16px !important;
 }
 
-.csv-text-container {
-  max-height: calc(33vh);
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-}
-
 .csv-text-container textarea.csv-text {
   flex: 1;
   overflow: auto; /* Horizontal and vertical scrollbar for CSV text */
@@ -393,9 +404,9 @@
 
 .csv-editable {
   width: 100%;
-  min-height: 90px;
-  /* Show approximately 10 rows: (12px font-size * 1.5 line-height * 10 rows) + 32px padding (16px top + 16px bottom) = 212px */
-  max-height: 212px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   border: none;
   outline: none;
   resize: none;
@@ -405,13 +416,13 @@
   line-height: 1.5;
   padding: 16px;
   box-sizing: border-box;
-  flex: 1;
-  overflow-y: auto; /* Vertical scrollbar to see the rest */
-  overflow-x: auto; /* Horizontal scrollbar for long lines */
-  white-space: pre-wrap; /* Changed from pre to pre-wrap to preserve line breaks */
-  word-wrap: break-word; /* Allow wrapping of long lines */
-  overflow-wrap: break-word; /* Allow wrapping of long words */
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   color: #333;
+  scrollbar-width: thin;
 }
 
 .csv-editable:focus {

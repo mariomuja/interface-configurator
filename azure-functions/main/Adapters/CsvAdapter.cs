@@ -355,35 +355,77 @@ public class CsvAdapter : IAdapter
 
     public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(source) && !_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+        var hasExplicitSource = !string.IsNullOrWhiteSpace(source);
+        var isRawAdapter = _adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase);
+
+        if (!hasExplicitSource && !isRawAdapter)
             throw new ArgumentException("Source path cannot be empty", nameof(source));
 
         try
         {
             _logger?.LogInformation("Reading CSV from source: {Source}, AdapterType: {AdapterType}", source ?? "RAW", _adapterType);
 
-            // Check adapter type: RAW, SFTP, or FILE (Azure Blob Storage)
-            if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+            // RAW adapters without an explicit source rely on CsvData and blob upload
+            if (isRawAdapter && !hasExplicitSource)
             {
-                // For RAW type, process CsvData and upload to csv-incoming
-                // The blob trigger will then process the file
                 await ProcessCsvDataAsync(cancellationToken);
-                return (new List<string>(), new List<Dictionary<string, string>>()); // Empty result, file processing happens via blob trigger
+                return (new List<string>(), new List<Dictionary<string, string>>()); // Blob trigger will process uploaded file
             }
-            else if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+
+            // Treat RAW adapters with an explicit source path like FILE adapters (blob content already exists)
+            if (isRawAdapter && hasExplicitSource)
+            {
+                _logger?.LogInformation("RAW adapter invoked with explicit source path {Source}. Processing as FILE adapter.", source);
+            }
+
+            if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
             {
                 return await ReadFromSftpAsync(source, cancellationToken);
             }
-            else // FILE type
-            {
-                return await ReadFromBlobStorageAsync(source, cancellationToken);
-            }
+
+            var effectiveSource = hasExplicitSource
+                ? source
+                : BuildDefaultBlobSourcePath();
+
+            return await ReadFromBlobStorageAsync(effectiveSource!, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error reading CSV from source: {Source}", source ?? "RAW");
             throw;
         }
+    }
+
+    private string BuildDefaultBlobSourcePath()
+    {
+        var folder = _receiveFolder?.Trim();
+
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            folder = "csv-files/csv-incoming";
+        }
+        else
+        {
+            folder = folder.Replace("\\", "/").Trim('/');
+
+            // If folder already includes a container name (e.g., csv-files/csv-incoming), keep it.
+            // Otherwise, assume csv-files as the default container.
+            if (!folder.Contains("/"))
+            {
+                folder = $"csv-files/{folder}";
+            }
+            else if (!folder.Contains(":") && !folder.StartsWith("csv-files/", StringComparison.OrdinalIgnoreCase))
+            {
+                folder = $"csv-files/{folder}";
+            }
+        }
+
+        if (!folder.EndsWith("/"))
+        {
+            folder += "/";
+        }
+
+        return folder;
     }
 
     private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadFromBlobStorageAsync(string source, CancellationToken cancellationToken)
