@@ -650,8 +650,27 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.isLoadingMessageBox = true;
 
-    this.transportService.getMessageBoxMessages(interfaceName, this.sourceAdapterInstanceGuid, 'Source').subscribe({
+    // Ensure GUID is a string (handle null/undefined)
+    const guidString = this.sourceAdapterInstanceGuid ? String(this.sourceAdapterInstanceGuid) : '';
+
+    console.log('Loading MessageBox data:', {
+      interfaceName,
+      sourceAdapterInstanceGuid: guidString,
+      adapterType: 'Source',
+      guidType: typeof this.sourceAdapterInstanceGuid
+    });
+
+    if (!guidString) {
+      console.warn('sourceAdapterInstanceGuid is empty, cannot load MessageBox data');
+      this.isLoadingMessageBox = false;
+      this.messageBoxTableData = [];
+      this.messageBoxRecordColumns = [];
+      return;
+    }
+
+    this.transportService.getMessageBoxMessages(interfaceName, guidString, 'Source').subscribe({
       next: (messages) => {
+        console.log('MessageBox messages received:', messages?.length || 0, messages);
         const rows = (messages || []).map((msg: any) => ({
           messageId: msg.messageId,
           datetimeCreated: msg.datetimeCreated,
@@ -667,6 +686,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (error) => {
         console.error('Error loading MessageBox data:', error);
+        console.error('Request details:', {
+          interfaceName,
+          sourceAdapterInstanceGuid: this.sourceAdapterInstanceGuid,
+          adapterType: 'Source',
+          error: error
+        });
         this.isLoadingMessageBox = false;
         this.messageBoxTableData = [];
         this.messageBoxRecordColumns = [];
@@ -1530,9 +1555,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     pollingStatement?: string,
     pollingInterval?: number
   ): void {
-    const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
+    const interfaceName = this.getActiveInterfaceName();
+    const activeConfig = this.getInterfaceConfig(interfaceName);
     
-    if (!defaultConfig) {
+    if (!activeConfig) {
       return;
     }
 
@@ -1541,7 +1567,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     if (pollingInterval !== undefined) this.sqlPollingInterval = pollingInterval;
 
     this.transportService.updateSqlPollingProperties(
-      this.DEFAULT_INTERFACE_NAME,
+      interfaceName,
       pollingStatement,
       pollingInterval
     ).subscribe({
