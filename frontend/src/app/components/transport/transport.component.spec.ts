@@ -47,7 +47,9 @@ describe('TransportComponent', () => {
       'updateCsvData',
       'updateCsvPollingInterval',
       'addDestinationAdapterInstance',
-      'getMessageBoxMessages'
+      'getMessageBoxMessages',
+      'getBlobContainerFolders',
+      'deleteBlobFile'
     ]);
     const snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -77,6 +79,8 @@ describe('TransportComponent', () => {
     transportService.addDestinationAdapterInstance.and.returnValue(of({}));
     transportService.getMessageBoxMessages.and.returnValue(of([]));
     transportService.startTransport.and.returnValue(of({ message: 'Auto start', fileId: 'auto' }));
+    transportService.getBlobContainerFolders.and.returnValue(of([]));
+    transportService.deleteBlobFile.and.returnValue(of({ success: true, message: 'Deleted' }));
 
     component['refreshSubscription']?.unsubscribe();
   });
@@ -162,6 +166,165 @@ describe('TransportComponent', () => {
     component.selectedComponent = 'Azure Function';
     component.onComponentFilterChange();
     expect(component.logDataSource.data).toBeDefined();
+  });
+
+  describe('Blob Container Explorer', () => {
+    const mockBlobFolders = [
+      {
+        path: '/csv-incoming',
+        files: [
+          {
+            name: 'transport-2025_11_21_14_30_45_123.csv',
+            fullPath: 'csv-incoming/transport-2025_11_21_14_30_45_123.csv',
+            size: 1000,
+            lastModified: '2025-11-21T14:30:45Z',
+            contentType: 'text/csv'
+          },
+          {
+            name: 'transport-2025_11_21_14_31_00_456.csv',
+            fullPath: 'csv-incoming/transport-2025_11_21_14_31_00_456.csv',
+            size: 2000,
+            lastModified: '2025-11-21T14:31:00Z',
+            contentType: 'text/csv'
+          }
+        ]
+      }
+    ];
+
+    beforeEach(() => {
+      transportService.getBlobContainerFolders.and.returnValue(of(mockBlobFolders));
+      transportService.deleteBlobFile.and.returnValue(of({ success: true, message: 'Deleted' }));
+    });
+
+    it('should load blob container folders on init', () => {
+      fixture.detectChanges();
+      expect(transportService.getBlobContainerFolders).toHaveBeenCalledWith('csv-files', '');
+    });
+
+    it('should format file size correctly', () => {
+      expect(component.formatFileSize(0)).toBe('0 B');
+      expect(component.formatFileSize(1024)).toBe('1 KB');
+      expect(component.formatFileSize(1048576)).toBe('1 MB');
+      expect(component.formatFileSize(1536)).toContain('KB');
+    });
+
+    it('should get total file count', () => {
+      component.blobContainerFolders = mockBlobFolders;
+      expect(component.getTotalFileCount()).toBe(2);
+    });
+
+    it('should toggle file selection', () => {
+      const filePath = 'csv-incoming/test.csv';
+      expect(component.isBlobFileSelected(filePath)).toBe(false);
+      component.toggleBlobFileSelection(filePath);
+      expect(component.isBlobFileSelected(filePath)).toBe(true);
+      component.toggleBlobFileSelection(filePath);
+      expect(component.isBlobFileSelected(filePath)).toBe(false);
+    });
+
+    it('should get selected files count', () => {
+      component.selectedBlobFiles.clear();
+      expect(component.getSelectedBlobFilesCount()).toBe(0);
+      component.selectedBlobFiles.add('file1.csv');
+      component.selectedBlobFiles.add('file2.csv');
+      expect(component.getSelectedBlobFilesCount()).toBe(2);
+    });
+
+    it('should check if all files in folder are selected', () => {
+      component.blobContainerFolders = mockBlobFolders;
+      const folder = mockBlobFolders[0];
+      
+      component.selectedBlobFiles.clear();
+      expect(component.areAllFilesInFolderSelected(folder)).toBe(false);
+      
+      folder.files.forEach((file: any) => {
+        component.selectedBlobFiles.add(file.fullPath);
+      });
+      expect(component.areAllFilesInFolderSelected(folder)).toBe(true);
+    });
+
+    it('should check if some files in folder are selected', () => {
+      component.blobContainerFolders = mockBlobFolders;
+      const folder = mockBlobFolders[0];
+      
+      component.selectedBlobFiles.clear();
+      expect(component.areSomeFilesInFolderSelected(folder)).toBe(false);
+      
+      component.selectedBlobFiles.add(folder.files[0].fullPath);
+      expect(component.areSomeFilesInFolderSelected(folder)).toBe(true);
+    });
+
+    it('should toggle folder selection', () => {
+      component.blobContainerFolders = mockBlobFolders;
+      const folder = mockBlobFolders[0];
+      
+      component.selectedBlobFiles.clear();
+      component.toggleFolderSelection(folder);
+      expect(component.selectedBlobFiles.size).toBe(folder.files.length);
+      
+      component.toggleFolderSelection(folder);
+      expect(component.selectedBlobFiles.size).toBe(0);
+    });
+
+    it('should delete selected files', fakeAsync(() => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.selectedBlobFiles.add('csv-incoming/file1.csv');
+      component.selectedBlobFiles.add('csv-incoming/file2.csv');
+      
+      component.deleteSelectedBlobFiles();
+      tick();
+      
+      expect(transportService.deleteBlobFile).toHaveBeenCalledTimes(2);
+      expect(component.selectedBlobFiles.size).toBe(0);
+    }));
+
+    it('should not delete files if confirmation is cancelled', () => {
+      spyOn(window, 'confirm').and.returnValue(false);
+      component.selectedBlobFiles.add('csv-incoming/file1.csv');
+      
+      component.deleteSelectedBlobFiles();
+      
+      expect(transportService.deleteBlobFile).not.toHaveBeenCalled();
+      expect(component.selectedBlobFiles.size).toBe(1);
+    });
+
+    it('should sort blob container folders by date descending by default', () => {
+      const folders = [
+        {
+          path: '/csv-incoming',
+          files: [
+            { name: 'old.csv', fullPath: 'csv-incoming/old.csv', size: 100, lastModified: '2025-11-21T10:00:00Z' },
+            { name: 'new.csv', fullPath: 'csv-incoming/new.csv', size: 200, lastModified: '2025-11-21T14:00:00Z' }
+          ]
+        }
+      ];
+      
+      component.blobContainerSortBy = 'date';
+      component.blobContainerSortOrder = 'desc';
+      const sorted = component.sortBlobContainerFolders(folders);
+      
+      expect(sorted[0].files[0].name).toBe('new.csv');
+      expect(sorted[0].files[1].name).toBe('old.csv');
+    });
+
+    it('should sort blob container folders by name', () => {
+      const folders = [
+        {
+          path: '/csv-incoming',
+          files: [
+            { name: 'zebra.csv', fullPath: 'csv-incoming/zebra.csv', size: 100, lastModified: '2025-11-21T14:00:00Z' },
+            { name: 'alpha.csv', fullPath: 'csv-incoming/alpha.csv', size: 200, lastModified: '2025-11-21T10:00:00Z' }
+          ]
+        }
+      ];
+      
+      component.blobContainerSortBy = 'name';
+      component.blobContainerSortOrder = 'asc';
+      const sorted = component.sortBlobContainerFolders(folders);
+      
+      expect(sorted[0].files[0].name).toBe('alpha.csv');
+      expect(sorted[0].files[1].name).toBe('zebra.csv');
+    });
   });
 });
 

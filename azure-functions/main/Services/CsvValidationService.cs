@@ -136,7 +136,10 @@ public class CsvValidationService
                 return "UTF-8";
             }
         }
-        catch { }
+        catch (Exception utf8Ex)
+        {
+            _logger?.LogDebug(utf8Ex, "UTF-8 encoding detection failed: {ErrorMessage}", utf8Ex.Message);
+        }
 
         // Try to detect UTF-16
         try
@@ -148,7 +151,10 @@ public class CsvValidationService
                 return "UTF-16";
             }
         }
-        catch { }
+        catch (Exception utf16Ex)
+        {
+            _logger?.LogDebug(utf16Ex, "UTF-16 encoding detection failed: {ErrorMessage}", utf16Ex.Message);
+        }
 
         // Default to UTF-8 if we can't detect
         return "UTF-8";

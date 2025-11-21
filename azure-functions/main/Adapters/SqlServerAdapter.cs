@@ -496,7 +496,10 @@ public class SqlServerAdapter : IAdapter
                         {
                             await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
                         }
-                        catch { }
+                        catch (Exception releaseEx)
+                        {
+                            _logger?.LogWarning(releaseEx, "Error releasing message lock for message {MessageId}: {ErrorMessage}", message.MessageId, releaseEx.Message);
+                        }
                     }
                 }
             }

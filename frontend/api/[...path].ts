@@ -43,6 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
+    // If we get a 404, provide more helpful error message
+    if (response.status === 404) {
+      console.error(`Function not found: ${targetUrl}. This usually means the function hasn't been deployed or triggers haven't synced.`);
+    }
+    
     res.status(response.status).send(data);
   } catch (error: any) {
     console.error('Proxy error:', error);

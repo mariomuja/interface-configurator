@@ -56,6 +56,7 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   @Output() expandedChange = new EventEmitter<boolean>();
   @Output() primaryAction = new EventEmitter<void>(); // For "Start Transport" or "Drop Table" buttons
   @Output() settingsClick = new EventEmitter<void>(); // For opening settings dialog
+  @Output() explorerClick = new EventEmitter<void>(); // For opening blob container explorer dialog
 
   private readonly FIELD_SEPARATOR = '║';
   private readonly COLUMN_COLORS = [
@@ -103,6 +104,10 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
 
   onSettings(): void {
     this.settingsClick.emit();
+  }
+
+  onExplorer(): void {
+    this.explorerClick.emit();
   }
 
   onCsvDataInput(event: Event): void {

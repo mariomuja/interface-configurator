@@ -1,22 +1,1087 @@
 [
   {
-    "name": "ProcessCsvBlobTrigger",
-    "scriptFile": "ProcessCsvBlobTrigger.dll",
-    "entryPoint": "ProcessCsvBlobTrigger.ProcessCsvBlobTriggerFunction.Run",
+    "name": "AddDestinationAdapterInstance",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.AddDestinationAdapterInstance.Run",
     "language": "dotnet-isolated",
     "properties": {
       "IsCodeless": false
     },
     "bindings": [
       {
-        "name": "blobContent",
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "AddDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "CheckMessageBox",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.CheckMessageBox.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "CheckMessageBox",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "ClearProcessLogs",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.ClearProcessLogsFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post"
+        ],
+        "route": "ClearProcessLogs",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "CompareCsvSqlSchema",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.CompareCsvSqlSchemaFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "CompareCsvSqlSchema",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "CreateInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.CreateInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "CreateInterfaceConfiguration",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "DeleteBlobFile",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.DeleteBlobFile.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "delete",
+          "options"
+        ],
+        "route": "DeleteBlobFile",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "DeleteInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.DeleteInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "delete",
+          "options"
+        ],
+        "route": "DeleteInterfaceConfiguration",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "DestinationAdapterFunction",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.DestinationAdapterFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "timerInfo",
+        "direction": "In",
+        "type": "timerTrigger",
+        "schedule": "0 */1 * * * *",
+        "properties": {}
+      }
+    ]
+  },
+  {
+    "name": "Diagnose",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.Diagnose.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "diagnose",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetBlobContainerFolders",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetBlobContainerFolders.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetBlobContainerFolders",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetDestinationAdapterInstances",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetDestinationAdapterInstances.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetDestinationAdapterInstances",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetInterfaceConfiguration",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetInterfaceConfigurations",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetInterfaceConfigurations.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetInterfaceConfigurations",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetMessageBoxMessages",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetMessageBoxMessages.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetMessageBoxMessages",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetProcessingStatistics",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetProcessingStatisticsFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "GetProcessingStatistics",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetProcessLogs",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetProcessLogsFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetProcessLogs",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetSqlTableSchema",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetSqlTableSchemaFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "GetSqlTableSchema",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "HealthCheck",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.HealthCheck.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "health",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "InitializeMessageBox",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.InitializeMessageBoxFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post"
+        ],
+        "route": "InitializeMessageBox",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "Main",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.MainFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "blobStream",
         "direction": "In",
         "type": "blobTrigger",
-        "path": "csv-uploads/{name}",
-        "connection": "AzureWebJobsStorage",
+        "path": "csv-files/csv-incoming/{name}",
+        "connection": "MainStorageConnection",
         "properties": {
           "supportsDeferredBinding": "True"
         }
+      }
+    ]
+  },
+  {
+    "name": "RemoveDestinationAdapterInstance",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.RemoveDestinationAdapterInstance.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "delete",
+          "options"
+        ],
+        "route": "RemoveDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "RestartAdapter",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.RestartAdapter.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "RestartAdapter",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "RunTransportPipeline",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.RunTransportPipeline.RunAsync",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "RunTransportPipeline",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "SourceAdapterFunction",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.SourceAdapterFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "timerInfo",
+        "direction": "In",
+        "type": "timerTrigger",
+        "schedule": "0 */1 * * * *",
+        "properties": {}
+      }
+    ]
+  },
+  {
+    "name": "ToggleInterfaceConfiguration",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.ToggleInterfaceConfiguration.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "ToggleInterfaceConfiguration",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateBatchSize",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateBatchSize.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateBatchSize",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateCsvData",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateCsvData.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateCsvData",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateCsvPollingInterval",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateCsvPollingInterval.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateCsvPollingInterval",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationAdapterInstance",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateDestinationAdapterInstance.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateDestinationAdapterInstance",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationFileMask",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateDestinationFileMask.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateDestinationFileMask",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateDestinationReceiveFolder",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateDestinationReceiveFolder.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateDestinationReceiveFolder",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateFieldSeparator",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateFieldSeparator.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateFieldSeparator",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateFileMask",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateFileMask.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateFileMask",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateInstanceName",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateInstanceName.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "UpdateInstanceName",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateInterfaceName",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateInterfaceName.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "UpdateInterfaceName",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateReceiveFolder",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateReceiveFolder.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "UpdateReceiveFolder",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlConnectionProperties",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateSqlConnectionProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateSqlConnectionProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlPollingProperties",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateSqlPollingProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateSqlPollingProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UpdateSqlTransactionProperties",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UpdateSqlTransactionProperties.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "put",
+          "options"
+        ],
+        "route": "UpdateSqlTransactionProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "ValidateCsvFile",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.ValidateCsvFileFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get"
+        ],
+        "route": "ValidateCsvFile",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
       }
     ]
   }

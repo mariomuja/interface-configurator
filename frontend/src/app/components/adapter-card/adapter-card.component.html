@@ -16,6 +16,14 @@
           <mat-icon>settings</mat-icon>
         </button>
         
+        <button mat-icon-button (click)="onExplorer(); $event.stopPropagation()" 
+                *ngIf="adapterName === 'CSV'"
+                class="explorer-button" 
+                [disabled]="isDisabled"
+                matTooltip="Blob Container Explorer öffnen">
+          <mat-icon>folder</mat-icon>
+        </button>
+        
         <button mat-icon-button (click)="onRestart(); $event.stopPropagation()" 
                 [disabled]="isRestarting || isDisabled" 
                 class="restart-button" 

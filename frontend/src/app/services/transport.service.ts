@@ -245,6 +245,21 @@ export class TransportService {
     return this.http.get<any[]>(`${this.apiUrl}/GetMessageBoxMessages?${params.toString()}`);
   }
 
+  getBlobContainerFolders(containerName: string = 'csv-files', folderPrefix: string = ''): Observable<any[]> {
+    const params = new HttpParams()
+      .set('containerName', containerName)
+      .set('folderPrefix', folderPrefix);
+    return this.http.get<any[]>(`${this.apiUrl}/GetBlobContainerFolders`, { params });
+  }
+
+  deleteBlobFile(containerName: string, blobPath: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/DeleteBlobFile`, {
+      params: new HttpParams()
+        .set('containerName', containerName)
+        .set('blobPath', blobPath)
+    });
+  }
+
   getDestinationAdapterInstances(interfaceName: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/GetDestinationAdapterInstances?interfaceName=${encodeURIComponent(interfaceName)}`);
   }

@@ -154,7 +154,16 @@ module.exports = async (req, res) => {
     }
     
     // Upload to blob storage in csv-incoming folder
-    const fileName = `transport-${uuidv4()}.csv`;
+    // Format: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    const hour = String(now.getUTCHours()).padStart(2, '0');
+    const minute = String(now.getUTCMinutes()).padStart(2, '0');
+    const second = String(now.getUTCSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getUTCMilliseconds()).padStart(3, '0');
+    const fileName = `transport-${year}_${month}_${day}_${hour}_${minute}_${second}_${milliseconds}.csv`;
     const blobPath = `csv-incoming/${fileName}`; // Upload to csv-incoming folder
     const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
     

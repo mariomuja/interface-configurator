@@ -1,0 +1,5 @@
+[33mdad5f26[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Add UpdateInstanceName.js proxy and improve catch-all proxy error handling
+[33mecebe9b[m Fix restart adapter and save properties dialog issues
+[33m239f04a[m Fix adapter instance dialog save/load: ensure all properties are saved and reloaded correctly
+[33m1e1d041[m docs: update architecture documentation with adapter properties and add comprehensive dataflow diagram
+[33m0ee4b37[m Rollback session management - interfaces run independently without sessions - Remove all sessionId parameters from IInterfaceConfigurationService and implementations - Revert InterfaceConfigurationService to single shared configuration store - Remove sessionId from all Azure Function endpoints - Remove sessionId from frontend TransportService - Update SourceAdapterFunction and DestinationAdapterFunction to use regular enabled config methods - Interfaces now run in background independently without web app - Web app is administration tool only

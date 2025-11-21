@@ -20,6 +20,37 @@ describe('TransportService', () => {
     httpMock.verify();
   });
 
+  it('should get blob container folders', () => {
+    const mockFolders = [
+      {
+        path: '/csv-incoming',
+        files: [
+          { name: 'transport-2025_11_21_14_30_45_123.csv', fullPath: 'csv-incoming/transport-2025_11_21_14_30_45_123.csv', size: 1000, lastModified: '2025-11-21T14:30:45Z', contentType: 'text/csv' }
+        ]
+      }
+    ];
+
+    service.getBlobContainerFolders('csv-files', '').subscribe(data => {
+      expect(data).toEqual(mockFolders);
+    });
+
+    const req = httpMock.expectOne('/api/GetBlobContainerFolders?containerName=csv-files&folderPrefix=');
+    expect(req.request.method).toBe('GET');
+    req.flush(mockFolders);
+  });
+
+  it('should delete blob file', () => {
+    const mockResponse = { success: true, message: 'Blob deleted successfully' };
+
+    service.deleteBlobFile('csv-files', 'csv-incoming/test.csv').subscribe(data => {
+      expect(data).toEqual(mockResponse);
+    });
+
+    const req = httpMock.expectOne('/api/DeleteBlobFile?containerName=csv-files&blobPath=csv-incoming%2Ftest.csv');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(mockResponse);
+  });
+
   it('should be created', () => {
     expect(service).toBeTruthy();
   });

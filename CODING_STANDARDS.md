@@ -1,5 +1,7 @@
 # Coding Standards - Error Handling
 
+> **⚠️ MEMORY**: Empty catch blocks are FORBIDDEN. See `MEMORY_EMPTY_CATCH_BLOCKS_FORBIDDEN.md` for details.
+
 ## ⚠️ CRITICAL: Never Use Empty Catch Blocks
 
 ### The Problem

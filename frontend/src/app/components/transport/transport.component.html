@@ -19,8 +19,8 @@
       <mat-icon>delete</mat-icon>
     </button>
     
-    <button mat-icon-button (click)="showInterfaceJson()" [disabled]="!currentInterfaceName" matTooltip="View interface JSON" class="interface-action-button">
-      <mat-icon>code</mat-icon>
+    <button mat-raised-button (click)="showInterfaceJson()" [disabled]="!currentInterfaceName" matTooltip="View interface JSON" class="interface-action-button json-button">
+      JSON
     </button>
   </div>
   
@@ -42,7 +42,8 @@
       (restart)="restartSourceAdapter()"
       (expandedChange)="sourceCardExpanded = $event"
       (csvDataChange)="onCsvDataChange($event)"
-      (settingsClick)="openSourceAdapterSettings()">
+      (settingsClick)="openSourceAdapterSettings()"
+      (explorerClick)="openBlobContainerExplorer('Source', sourceAdapterName, sourceInstanceName, sourceAdapterInstanceGuid)">
       <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
         <p>SQL Server Source Adapter</p>
         <p *ngIf="sqlPollingStatement" class="polling-statement">
@@ -55,23 +56,31 @@
     </app-adapter-card>
 
 <!-- MessageBox Data Card -->
-<mat-card class="message-box-card">
-  <mat-card-header>
-    <div class="message-box-header">
-      <mat-icon>inbox</mat-icon>
-      <div class="message-box-header-text">
-        <h3>MessageBox (Source Output)</h3>
-        <p>Records written by this adapter instance</p>
+<mat-expansion-panel [(expanded)]="messageBoxExpanded" class="message-box-card">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <div class="message-box-header">
+        <mat-icon class="expand-icon">
+          {{ messageBoxExpanded ? 'expand_less' : 'expand_more' }}
+        </mat-icon>
+        <mat-icon>inbox</mat-icon>
+        <div class="message-box-header-text">
+          <h3>MessageBox (Source Output)</h3>
+          <p>Records written by this adapter instance</p>
+        </div>
+        <span class="message-count" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox">
+          {{ messageBoxTableData.length }} messages
+        </span>
       </div>
-      <span class="message-count" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox">
-        {{ messageBoxTableData.length }} messages
-      </span>
-    </div>
-    <button mat-icon-button (click)="loadMessageBoxData()" [disabled]="isLoadingMessageBox || !sourceAdapterInstanceGuid" matTooltip="Refresh MessageBox data">
-      <mat-icon>{{ isLoadingMessageBox ? 'hourglass_empty' : 'refresh' }}</mat-icon>
-    </button>
-  </mat-card-header>
-  <mat-card-content>
+    </mat-panel-title>
+    <mat-panel-description>
+      <button mat-icon-button (click)="loadMessageBoxData(); $event.stopPropagation()" [disabled]="isLoadingMessageBox || !sourceAdapterInstanceGuid" matTooltip="Refresh MessageBox data">
+        <mat-icon>{{ isLoadingMessageBox ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+      </button>
+    </mat-panel-description>
+  </mat-expansion-panel-header>
+  
+  <div class="message-box-content">
     <div *ngIf="sourceAdapterInstanceGuid && isLoadingMessageBox" class="spinner-container">
       <mat-spinner></mat-spinner>
     </div>
@@ -108,7 +117,110 @@
       <p>The source adapter is disabled. Enable the source adapter to start generating messages.</p>
     </div>
     <div class="table-empty-message" *ngIf="sourceIsEnabled && !sourceAdapterInstanceGuid">
-      <p>The source adapter instance is not initialized yet. Please wait while the adapter instance is being initialized.</p>
+      <p>Source adapter instances are writing data to the MessageBox. Please wait for the data to arrive.</p>
+    </div>
+  </div>
+</mat-expansion-panel>
+
+<!-- Blob Container Explorer Card - REMOVED: Now shown in modal dialog per adapter instance -->
+<!--
+<mat-card class="blob-container-card">
+  <mat-card-header>
+    <div class="blob-container-header">
+      <mat-icon>folder</mat-icon>
+      <div class="blob-container-header-text">
+        <h3>Blob Container Explorer</h3>
+        <p>Folder structure of csv-files container</p>
+      </div>
+      <span class="file-count" *ngIf="!isLoadingBlobContainer">
+        {{ getTotalFileCount() }} files
+        <span *ngIf="getSelectedBlobFilesCount() > 0" class="selected-count">
+          ({{ getSelectedBlobFilesCount() }} selected)
+        </span>
+      </span>
+    </div>
+    <div class="blob-container-actions">
+      <button mat-raised-button 
+              color="warn" 
+              (click)="deleteSelectedBlobFiles()" 
+              [disabled]="getSelectedBlobFilesCount() === 0 || isDeletingBlobFiles || isLoadingBlobContainer"
+              matTooltip="Delete selected files"
+              *ngIf="getSelectedBlobFilesCount() > 0">
+        <mat-icon>delete</mat-icon>
+        Delete ({{ getSelectedBlobFilesCount() }})
+      </button>
+      <button mat-icon-button 
+              (click)="deselectAllBlobFiles()" 
+              [disabled]="getSelectedBlobFilesCount() === 0"
+              matTooltip="Deselect all"
+              *ngIf="getSelectedBlobFilesCount() > 0">
+        <mat-icon>clear</mat-icon>
+      </button>
+      <button mat-icon-button (click)="loadBlobContainerFolders()" [disabled]="isLoadingBlobContainer" matTooltip="Refresh blob container">
+        <mat-icon>{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+      </button>
+    </div>
+  </mat-card-header>
+  <mat-card-content>
+    <div *ngIf="isLoadingBlobContainer" class="spinner-container">
+      <mat-spinner></mat-spinner>
+    </div>
+    <div class="blob-container-explorer" *ngIf="!isLoadingBlobContainer">
+      <div *ngIf="blobContainerFolders.length === 0" class="table-empty-message">
+        <p>No folders found in blob container.</p>
+      </div>
+      <div *ngFor="let folder of blobContainerFolders" class="folder-section">
+        <div class="folder-header">
+          <mat-icon class="folder-icon">folder</mat-icon>
+          <span class="folder-path">{{ folder.path === '/' ? '/ (root)' : folder.path }}</span>
+          <span class="folder-file-count">({{ folder.files.length }} files)</span>
+        </div>
+        <div class="file-list" *ngIf="folder.files.length > 0">
+          <div class="file-list-header">
+            <div class="file-header-checkbox">
+              <mat-checkbox 
+                [checked]="areAllFilesInFolderSelected(folder)"
+                [indeterminate]="areSomeFilesInFolderSelected(folder)"
+                (change)="toggleFolderSelection(folder)"
+                (click)="$event.stopPropagation()">
+              </mat-checkbox>
+            </div>
+            <div class="file-header-item file-header-name" (click)="onBlobContainerSortChange('name')" [class.sorted]="blobContainerSortBy === 'name'">
+              <span>Filename</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'name'" class="sort-icon">
+                {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+              </mat-icon>
+            </div>
+            <div class="file-header-item file-header-size" (click)="onBlobContainerSortChange('size')" [class.sorted]="blobContainerSortBy === 'size'">
+              <span>Size</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'size'" class="sort-icon">
+                {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+              </mat-icon>
+            </div>
+            <div class="file-header-item file-header-date" (click)="onBlobContainerSortChange('date')" [class.sorted]="blobContainerSortBy === 'date'">
+              <span>Date</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'date'" class="sort-icon">
+                {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+              </mat-icon>
+            </div>
+          </div>
+          <div *ngFor="let file of folder.files" class="file-item" [class.selected]="isBlobFileSelected(file.fullPath)">
+            <mat-checkbox 
+              [checked]="isBlobFileSelected(file.fullPath)"
+              (change)="toggleBlobFileSelection(file.fullPath)"
+              (click)="$event.stopPropagation()"
+              class="file-checkbox">
+            </mat-checkbox>
+            <mat-icon class="file-icon">description</mat-icon>
+            <span class="file-name">{{ file.name }}</span>
+            <span class="file-size">{{ formatFileSize(file.size) }}</span>
+            <span class="file-date">{{ file.lastModified | date:'short' }}</span>
+          </div>
+        </div>
+        <div class="folder-empty" *ngIf="folder.files.length === 0">
+          <p>No files in this folder</p>
+        </div>
+      </div>
     </div>
   </mat-card-content>
 </mat-card>
@@ -159,7 +271,8 @@
               (expandedChange)="setDestinationCardExpanded(instance.adapterInstanceGuid, $event)"
               (enabledChange)="onDestinationInstanceEnabledChange(instance.adapterInstanceGuid, $event)"
               (primaryAction)="dropTable()"
-              (settingsClick)="openDestinationInstanceSettings(instance)">
+              (settingsClick)="openDestinationInstanceSettings(instance)"
+              (explorerClick)="openBlobContainerExplorer('Destination', instance.adapterName, instance.instanceName, instance.adapterInstanceGuid)">
               <div class="destination-card-actions">
                 <button mat-icon-button 
                         (click)="removeDestinationAdapter(instance.adapterInstanceGuid, instance.instanceName)"

@@ -1,0 +1,122 @@
+<h2 mat-dialog-title>
+  <mat-icon>folder</mat-icon>
+  Blob Container Explorer - {{ data.instanceName }}
+</h2>
+
+<mat-dialog-content>
+  <div class="dialog-header-info">
+    <p><strong>Adapter:</strong> {{ data.adapterName }} ({{ data.adapterType }})</p>
+    <p><strong>Instance:</strong> {{ data.instanceName }}</p>
+    <p><strong>GUID:</strong> {{ data.adapterInstanceGuid.substring(0, 8) }}...</p>
+  </div>
+
+  <div class="blob-container-actions">
+    <button mat-raised-button 
+            color="warn" 
+            (click)="deleteSelectedBlobFiles()" 
+            [disabled]="getSelectedBlobFilesCount() === 0 || isDeletingBlobFiles || isLoadingBlobContainer"
+            matTooltip="Delete selected files"
+            *ngIf="getSelectedBlobFilesCount() > 0">
+      <mat-icon>delete</mat-icon>
+      Delete ({{ getSelectedBlobFilesCount() }})
+    </button>
+    <button mat-icon-button 
+            (click)="deselectAllBlobFiles()" 
+            [disabled]="getSelectedBlobFilesCount() === 0"
+            matTooltip="Deselect all"
+            *ngIf="getSelectedBlobFilesCount() > 0">
+      <mat-icon>clear</mat-icon>
+    </button>
+    <button mat-icon-button (click)="loadBlobContainerFolders()" [disabled]="isLoadingBlobContainer" matTooltip="Refresh blob container">
+      <mat-icon>{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+    </button>
+  </div>
+
+  <div *ngIf="isLoadingBlobContainer" class="spinner-container">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <div class="blob-container-explorer" *ngIf="!isLoadingBlobContainer">
+    <div *ngIf="blobContainerFolders.length === 0" class="table-empty-message">
+      <p>No files found for this adapter instance.</p>
+    </div>
+    <div *ngFor="let folder of blobContainerFolders" class="folder-section">
+      <div class="folder-header">
+        <mat-icon class="folder-icon">folder</mat-icon>
+        <span class="folder-path">{{ folder.path === '/' ? '/ (root)' : folder.path }}</span>
+        <span class="folder-file-count">({{ folder.files.length }} files)</span>
+      </div>
+      <div class="file-list" *ngIf="folder.files.length > 0">
+        <div class="file-list-header">
+          <div class="file-header-checkbox">
+            <mat-checkbox 
+              [checked]="areAllFilesInFolderSelected(folder)"
+              [indeterminate]="areSomeFilesInFolderSelected(folder)"
+              (change)="toggleFolderSelection(folder)"
+              (click)="$event.stopPropagation()">
+            </mat-checkbox>
+          </div>
+          <div class="file-header-item file-header-name" (click)="onSortChange('name')" [class.sorted]="sortBy === 'name'">
+            <span>Filename</span>
+            <mat-icon *ngIf="sortBy === 'name'" class="sort-icon">
+              {{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+            </mat-icon>
+          </div>
+          <div class="file-header-item file-header-size" (click)="onSortChange('size')" [class.sorted]="sortBy === 'size'">
+            <span>Size</span>
+            <mat-icon *ngIf="sortBy === 'size'" class="sort-icon">
+              {{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+            </mat-icon>
+          </div>
+          <div class="file-header-item file-header-date" (click)="onSortChange('date')" [class.sorted]="sortBy === 'date'">
+            <span>Date</span>
+            <mat-icon *ngIf="sortBy === 'date'" class="sort-icon">
+              {{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+            </mat-icon>
+          </div>
+        </div>
+        <div *ngFor="let file of folder.files" class="file-item" [class.selected]="isBlobFileSelected(file.fullPath)">
+          <mat-checkbox 
+            [checked]="isBlobFileSelected(file.fullPath)"
+            (change)="toggleBlobFileSelection(file.fullPath)"
+            (click)="$event.stopPropagation()"
+            class="file-checkbox">
+          </mat-checkbox>
+          <mat-icon class="file-icon">description</mat-icon>
+          <span class="file-name">{{ file.name }}</span>
+          <span class="file-size">{{ formatFileSize(file.size) }}</span>
+          <span class="file-date">{{ file.lastModified | date:'short' }}</span>
+        </div>
+      </div>
+      <div class="folder-empty" *ngIf="folder.files.length === 0">
+        <p>No files in this folder</p>
+      </div>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <span class="file-count-info" *ngIf="!isLoadingBlobContainer">
+    {{ getTotalFileCount() }} files total
+    <span *ngIf="getSelectedBlobFilesCount() > 0" class="selected-count">
+      ({{ getSelectedBlobFilesCount() }} selected)
+    </span>
+  </span>
+  <button mat-button (click)="onClose()" color="primary">Close</button>
+</mat-dialog-actions>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

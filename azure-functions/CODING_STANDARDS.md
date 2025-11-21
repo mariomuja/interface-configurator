@@ -2,6 +2,8 @@
 
 ## Error Handling
 
+> **⚠️ MEMORY**: Empty catch blocks are FORBIDDEN. See `../MEMORY_EMPTY_CATCH_BLOCKS_FORBIDDEN.md` for details.
+
 ### ⚠️ NEVER Use Empty Catch Blocks
 
 **CRITICAL RULE**: All catch blocks must log exceptions. Empty catch blocks (`catch { }`) are forbidden.

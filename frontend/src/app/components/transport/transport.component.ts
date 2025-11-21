@@ -15,11 +15,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { AdapterCardComponent } from '../adapter-card/adapter-card.component';
 import { AdapterPropertiesDialogComponent, AdapterPropertiesData } from '../adapter-properties-dialog/adapter-properties-dialog.component';
 import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from '../destination-instances-dialog/destination-instances-dialog.component';
 import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
+import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData } from '../blob-container-explorer-dialog/blob-container-explorer-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
@@ -56,8 +58,10 @@ interface MessageBoxTableRow {
     MatTooltipModule,
     MatTableModule,
     MatDialogModule,
+    MatCheckboxModule,
     AdapterCardComponent,
-    DestinationInstancesDialogComponent
+    DestinationInstancesDialogComponent,
+    BlobContainerExplorerDialogComponent
   ],
   templateUrl: './transport.component.html',
   styleUrl: './transport.component.css'
@@ -121,6 +125,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   messageBoxDisplayedColumns: string[] = ['datetimeCreated', 'status'];
   isLoadingMessageBox = false;
   
+  // Blob Container Explorer
+  blobContainerFolders: any[] = [];
+  isLoadingBlobContainer = false;
+  blobContainerExpanded: boolean = true;
+  blobContainerSortBy: 'name' | 'date' | 'size' = 'date';
+  blobContainerSortOrder: 'asc' | 'desc' = 'desc'; // desc = newest first
+  selectedBlobFiles: Set<string> = new Set(); // Set of full paths of selected files
+  isDeletingBlobFiles = false;
+  messageBoxExpanded: boolean = true;
+  
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
   
@@ -160,6 +174,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
     this.loadDestinationAdapterInstances();
+    this.loadBlobContainerFolders();
     this.startAutoRefresh();
     
     // Subscribe to language changes to update UI
@@ -699,6 +714,173 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  loadBlobContainerFolders(): void {
+    this.isLoadingBlobContainer = true;
+    this.transportService.getBlobContainerFolders('csv-files', '').subscribe({
+      next: (folders) => {
+        this.blobContainerFolders = this.sortBlobContainerFolders(folders || []);
+        this.isLoadingBlobContainer = false;
+      },
+      error: (error) => {
+        console.error('Error loading blob container folders:', error);
+        this.isLoadingBlobContainer = false;
+        this.blobContainerFolders = [];
+      }
+    });
+  }
+
+  sortBlobContainerFolders(folders: any[]): any[] {
+    return folders.map(folder => ({
+      ...folder,
+      files: [...folder.files].sort((a, b) => {
+        let comparison = 0;
+        
+        switch (this.blobContainerSortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name);
+            break;
+          case 'date':
+            comparison = new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime();
+            break;
+          case 'size':
+            comparison = a.size - b.size;
+            break;
+        }
+        
+        return this.blobContainerSortOrder === 'asc' ? comparison : -comparison;
+      })
+    }));
+  }
+
+  onBlobContainerSortChange(sortBy: 'name' | 'date' | 'size'): void {
+    if (this.blobContainerSortBy === sortBy) {
+      // Toggle sort order if clicking same column
+      this.blobContainerSortOrder = this.blobContainerSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      // Set new sort column, default to desc for date (newest first), asc for others
+      this.blobContainerSortBy = sortBy;
+      this.blobContainerSortOrder = sortBy === 'date' ? 'desc' : 'asc';
+    }
+    
+    // Re-sort existing data
+    this.blobContainerFolders = this.sortBlobContainerFolders(this.blobContainerFolders);
+  }
+
+  toggleBlobFileSelection(fullPath: string): void {
+    if (this.selectedBlobFiles.has(fullPath)) {
+      this.selectedBlobFiles.delete(fullPath);
+    } else {
+      this.selectedBlobFiles.add(fullPath);
+    }
+  }
+
+  isBlobFileSelected(fullPath: string): boolean {
+    return this.selectedBlobFiles.has(fullPath);
+  }
+
+  selectAllBlobFiles(): void {
+    this.selectedBlobFiles.clear();
+    this.blobContainerFolders.forEach(folder => {
+      folder.files.forEach((file: any) => {
+        this.selectedBlobFiles.add(file.fullPath);
+      });
+    });
+  }
+
+  deselectAllBlobFiles(): void {
+    this.selectedBlobFiles.clear();
+  }
+
+  getSelectedBlobFilesCount(): number {
+    return this.selectedBlobFiles.size;
+  }
+
+  areAllFilesInFolderSelected(folder: any): boolean {
+    if (!folder.files || folder.files.length === 0) return false;
+    return folder.files.every((file: any) => this.selectedBlobFiles.has(file.fullPath));
+  }
+
+  areSomeFilesInFolderSelected(folder: any): boolean {
+    if (!folder.files || folder.files.length === 0) return false;
+    const selectedCount = folder.files.filter((file: any) => this.selectedBlobFiles.has(file.fullPath)).length;
+    return selectedCount > 0 && selectedCount < folder.files.length;
+  }
+
+  toggleFolderSelection(folder: any): void {
+    const allSelected = this.areAllFilesInFolderSelected(folder);
+    
+    if (allSelected) {
+      // Deselect all files in folder
+      folder.files.forEach((file: any) => {
+        this.selectedBlobFiles.delete(file.fullPath);
+      });
+    } else {
+      // Select all files in folder
+      folder.files.forEach((file: any) => {
+        this.selectedBlobFiles.add(file.fullPath);
+      });
+    }
+  }
+
+  deleteSelectedBlobFiles(): void {
+    const selectedFiles = Array.from(this.selectedBlobFiles);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to delete ${selectedFiles.length} file(s)? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    this.isDeletingBlobFiles = true;
+    
+    // Delete files in parallel
+    const deletePromises = selectedFiles.map(fullPath => 
+      this.transportService.deleteBlobFile('csv-files', fullPath).toPromise()
+        .catch(error => {
+          console.error(`Error deleting file ${fullPath}:`, error);
+          return { success: false, path: fullPath, error };
+        })
+    );
+
+    Promise.all(deletePromises).then(results => {
+      const successCount = results.filter(r => r === null || (r as any).success !== false).length;
+      const failCount = results.length - successCount;
+
+      if (failCount > 0) {
+        this.snackBar.open(
+          `Deleted ${successCount} file(s). ${failCount} file(s) failed to delete.`,
+          'Schließen',
+          { duration: 5000, panelClass: ['warning-snackbar'] }
+        );
+      } else {
+        this.snackBar.open(
+          `Successfully deleted ${successCount} file(s).`,
+          'OK',
+          { duration: 3000 }
+        );
+      }
+
+      // Clear selection and refresh
+      this.selectedBlobFiles.clear();
+      this.isDeletingBlobFiles = false;
+      this.loadBlobContainerFolders();
+    });
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  getTotalFileCount(): number {
+    return this.blobContainerFolders.reduce((total, folder) => total + (folder.files?.length || 0), 0);
+  }
+
   /**
    * Extracts detailed error information from HTTP error responses
    * Returns a formatted error message with all available details
@@ -1112,6 +1294,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadProcessLogs();
       this.refreshCurrentInterfaceCsvData();
       this.loadMessageBoxData();
+      this.loadBlobContainerFolders();
     });
   }
 
@@ -1587,6 +1770,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Restore previous values
         this.loadInterfaceConfigurations();
       }
+    });
+  }
+
+  openBlobContainerExplorer(adapterType: 'Source' | 'Destination', adapterName: string, instanceName: string, adapterInstanceGuid: string): void {
+    if (!adapterInstanceGuid) {
+      this.snackBar.open('Adapter instance GUID is required to explore blob containers', 'OK', { duration: 3000 });
+      return;
+    }
+
+    const dialogData: BlobContainerExplorerDialogData = {
+      adapterType: adapterType,
+      adapterName: adapterName,
+      instanceName: instanceName,
+      adapterInstanceGuid: adapterInstanceGuid
+    };
+
+    const dialogRef = this.dialog.open(BlobContainerExplorerDialogComponent, {
+      width: '90%',
+      maxWidth: '1200px',
+      maxHeight: '90vh',
+      data: dialogData
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      // Handle any result if needed
     });
   }
 
@@ -2440,6 +2648,56 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  private formatHierarchicalJson(obj: any, indent: string = '', parentKey: string = ''): string {
+    if (obj === null) return 'null';
+    if (typeof obj === 'string') return JSON.stringify(obj);
+    if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+    
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) return '[]';
+      const items = obj.map(item => `${indent}  ${this.formatHierarchicalJson(item, indent + '  ', parentKey)}`).join(',\n');
+      return `[\n${items}\n${indent}]`;
+    }
+    
+    if (typeof obj === 'object') {
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return '{}';
+      
+      const items = keys.map((key, index) => {
+        const value = obj[key];
+        const isLast = index === keys.length - 1;
+        const valueStr = this.formatHierarchicalJson(value, indent + '  ', key);
+        
+        // Add folder-like structure for sources and destinations
+        if (key === 'sources' || key === 'destinations') {
+          return `${indent}  "${key}": {\n${valueStr}\n${indent}  }${isLast ? '' : ','}`;
+        }
+        
+        // Add folder-like structure for adapter types (CSV, SqlServer) within sources/destinations
+        if (parentKey === 'sources' || parentKey === 'destinations') {
+          return `${indent}    "${key}": {\n${valueStr}\n${indent}    }${isLast ? '' : ','}`;
+        }
+        
+        // Add folder-like structure for instance names within adapter types
+        if ((parentKey === 'CSV' || parentKey === 'SqlServer') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          return `${indent}      "${key}": {\n${valueStr}\n${indent}      }${isLast ? '' : ','}`;
+        }
+        
+        // Properties within instances
+        if (key === 'properties' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          return `${indent}        "${key}": {\n${valueStr}\n${indent}        }${isLast ? '' : ','}`;
+        }
+        
+        // Regular properties
+        return `${indent}  "${key}": ${valueStr}${isLast ? '' : ','}`;
+      }).join('\n');
+      
+      return `{\n${items}\n${indent}}`;
+    }
+    
+    return JSON.stringify(obj);
+  }
+
   private formatJsonWithComments(obj: any, indent: string = '', parentKey: string = ''): string {
     // Helper function to format JSON with comments
     const comments: { [key: string]: string } = {
@@ -2543,101 +2801,145 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private openJsonViewDialog(config: any): void {
     try {
-      // Build structured JSON with source and destination adapter instances
+      // Build hierarchical JSON structure with sources and destinations sections
       const structuredConfig: any = {
         interfaceName: this.currentInterfaceName || config.interfaceName || 'Unknown Interface',
-        sourceAdapterName: config.sourceAdapterName || this.sourceAdapterName || 'CSV',
-        destinationAdapterName: config.destinationAdapterName || 'SqlServer',
         description: config.description || '',
-        sourceAdapterInstance: {
-          adapterInstanceGuid: this.sourceAdapterInstanceGuid || config.sourceAdapterInstanceGuid || '',
-          instanceName: this.sourceInstanceName || config.sourceInstanceName || 'Source',
-          adapterName: this.sourceAdapterName || config.sourceAdapterName || 'CSV',
-          isEnabled: this.sourceIsEnabled !== undefined ? this.sourceIsEnabled : (config.sourceIsEnabled ?? true),
-          receiveFolder: this.sourceReceiveFolder || config.sourceReceiveFolder || '',
-          fileMask: this.sourceFileMask || config.sourceFileMask || '*.txt',
-          batchSize: this.sourceBatchSize !== undefined ? this.sourceBatchSize : (config.sourceBatchSize ?? 100),
-          fieldSeparator: this.sourceFieldSeparator || config.sourceFieldSeparator || '║',
-          // Include SQL Server properties if source is SqlServer
-          ...(this.sourceAdapterName === 'SqlServer' ? {
-            sqlServerName: this.sqlServerName || config.sqlServerName || '',
-            sqlDatabaseName: this.sqlDatabaseName || config.sqlDatabaseName || '',
-            sqlUserName: this.sqlUserName || config.sqlUserName || '',
-            sqlPassword: this.sqlPassword ? '***' : '', // Don't expose password
-            sqlIntegratedSecurity: this.sqlIntegratedSecurity !== undefined ? this.sqlIntegratedSecurity : (config.sqlIntegratedSecurity ?? false),
-            sqlResourceGroup: this.sqlResourceGroup || config.sqlResourceGroup || '',
-            sqlPollingStatement: this.sqlPollingStatement || config.sqlPollingStatement || '',
-            sqlPollingInterval: this.sqlPollingInterval !== undefined ? this.sqlPollingInterval : (config.sqlPollingInterval ?? 60),
-            sqlUseTransaction: this.sqlUseTransaction !== undefined ? this.sqlUseTransaction : (config.sqlUseTransaction ?? false),
-            sqlBatchSize: this.sqlBatchSize !== undefined ? this.sqlBatchSize : (config.sqlBatchSize ?? 1000)
-          } : {})
+        sources: {
+          [this.sourceAdapterName || config.sourceAdapterName || 'CSV']: {
+            adapterInstanceGuid: this.sourceAdapterInstanceGuid || config.sourceAdapterInstanceGuid || '',
+            instanceName: this.sourceInstanceName || config.sourceInstanceName || 'Source',
+            adapterName: this.sourceAdapterName || config.sourceAdapterName || 'CSV',
+            isEnabled: this.sourceIsEnabled !== undefined ? this.sourceIsEnabled : (config.sourceIsEnabled ?? true),
+            properties: {
+              // CSV properties
+              ...(this.sourceAdapterName === 'CSV' ? {
+                receiveFolder: this.sourceReceiveFolder || config.sourceReceiveFolder || '',
+                fileMask: this.sourceFileMask || config.sourceFileMask || '*.txt',
+                batchSize: this.sourceBatchSize !== undefined ? this.sourceBatchSize : (config.sourceBatchSize ?? 100),
+                fieldSeparator: this.sourceFieldSeparator || config.sourceFieldSeparator || '║',
+                csvAdapterType: config.csvAdapterType || 'RAW',
+                csvData: config.csvData || '',
+                csvPollingInterval: config.csvPollingInterval || 10,
+                // SFTP properties if applicable
+                ...(config.csvAdapterType === 'SFTP' ? {
+                  sftpHost: config.sftpHost || '',
+                  sftpPort: config.sftpPort || 22,
+                  sftpUsername: config.sftpUsername || '',
+                  sftpPassword: config.sftpPassword ? '***' : '',
+                  sftpSshKey: config.sftpSshKey ? '***' : '',
+                  sftpFolder: config.sftpFolder || '',
+                  sftpFileMask: config.sftpFileMask || '*.txt',
+                  sftpMaxConnectionPoolSize: config.sftpMaxConnectionPoolSize || 5,
+                  sftpFileBufferSize: config.sftpFileBufferSize || 8192
+                } : {})
+              } : {}),
+              // SQL Server properties if source is SqlServer
+              ...(this.sourceAdapterName === 'SqlServer' ? {
+                sqlServerName: this.sqlServerName || config.sqlServerName || '',
+                sqlDatabaseName: this.sqlDatabaseName || config.sqlDatabaseName || '',
+                sqlUserName: this.sqlUserName || config.sqlUserName || '',
+                sqlPassword: this.sqlPassword ? '***' : (config.sqlPassword ? '***' : ''),
+                sqlIntegratedSecurity: this.sqlIntegratedSecurity !== undefined ? this.sqlIntegratedSecurity : (config.sqlIntegratedSecurity ?? false),
+                sqlResourceGroup: this.sqlResourceGroup || config.sqlResourceGroup || '',
+                sqlPollingStatement: this.sqlPollingStatement || config.sqlPollingStatement || '',
+                sqlPollingInterval: this.sqlPollingInterval !== undefined ? this.sqlPollingInterval : (config.sqlPollingInterval ?? 60),
+                sqlUseTransaction: this.sqlUseTransaction !== undefined ? this.sqlUseTransaction : (config.sqlUseTransaction ?? false),
+                sqlBatchSize: this.sqlBatchSize !== undefined ? this.sqlBatchSize : (config.sqlBatchSize ?? 1000),
+                sqlCommandTimeout: config.sqlCommandTimeout || 30,
+                sqlFailOnBadStatement: config.sqlFailOnBadStatement || false
+              } : {})
+            }
+          }
         },
-        destinationAdapterInstances: (this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0) 
-          ? this.destinationAdapterInstances.map(instance => {
-              // Parse configuration if it's a string
-              let instanceConfig = instance.configuration || {};
-              if (typeof instanceConfig === 'string') {
-                try {
-                  instanceConfig = JSON.parse(instanceConfig);
-                } catch (e) {
-                  instanceConfig = {};
-                }
-              }
-              
-              // Build full destination instance object with all properties
-              const fullInstance: any = {
-                adapterInstanceGuid: instance.adapterInstanceGuid || '',
-                instanceName: instance.instanceName || '',
-                adapterName: instance.adapterName || 'SqlServer',
-                isEnabled: instance.isEnabled !== undefined ? instance.isEnabled : true,
-                configuration: instanceConfig
-              };
-              
-              // If it's a CSV adapter, include CSV-specific properties
-              if (instance.adapterName === 'CSV') {
-                fullInstance.receiveFolder = instance.receiveFolder || instanceConfig.receiveFolder || instanceConfig.destination || '';
-                fullInstance.fileMask = instance.fileMask || instanceConfig.fileMask || '*.txt';
-                fullInstance.batchSize = instance.batchSize !== undefined ? instance.batchSize : (instanceConfig.batchSize ?? 100);
-                fullInstance.fieldSeparator = instance.fieldSeparator || instanceConfig.fieldSeparator || '║';
-                fullInstance.destinationReceiveFolder = instanceConfig.destinationReceiveFolder || instance.receiveFolder || instanceConfig.receiveFolder || '';
-                fullInstance.destinationFileMask = instanceConfig.destinationFileMask || instance.fileMask || instanceConfig.fileMask || '*.txt';
-              }
-              
-              // If it's a SqlServer adapter, include SQL-specific properties from instance config first, then interface config
-              if (instance.adapterName === 'SqlServer') {
-                fullInstance.destination = instanceConfig.destination || instanceConfig.tableName || 'TransportData';
-                fullInstance.tableName = instanceConfig.tableName || instanceConfig.destination || 'TransportData';
-                // Load from instance config first, fall back to interface config
-                fullInstance.sqlServerName = instanceConfig.sqlServerName || this.sqlServerName || '';
-                fullInstance.sqlDatabaseName = instanceConfig.sqlDatabaseName || this.sqlDatabaseName || '';
-                fullInstance.sqlUserName = instanceConfig.sqlUserName || this.sqlUserName || '';
-                fullInstance.sqlPassword = instanceConfig.sqlPassword ? '***' : (this.sqlPassword ? '***' : ''); // Don't expose password
-                fullInstance.sqlIntegratedSecurity = instanceConfig.sqlIntegratedSecurity !== undefined 
-                  ? instanceConfig.sqlIntegratedSecurity 
-                  : (this.sqlIntegratedSecurity ?? false);
-                fullInstance.sqlResourceGroup = instanceConfig.sqlResourceGroup || this.sqlResourceGroup || '';
-                fullInstance.sqlPollingStatement = instanceConfig.sqlPollingStatement || this.sqlPollingStatement || '';
-                fullInstance.sqlPollingInterval = instanceConfig.sqlPollingInterval !== undefined 
-                  ? instanceConfig.sqlPollingInterval 
-                  : (this.sqlPollingInterval ?? 60);
-                fullInstance.sqlUseTransaction = instanceConfig.sqlUseTransaction !== undefined 
-                  ? instanceConfig.sqlUseTransaction 
-                  : (this.sqlUseTransaction ?? false);
-                fullInstance.sqlBatchSize = instanceConfig.sqlBatchSize !== undefined 
-                  ? instanceConfig.sqlBatchSize 
-                  : (this.sqlBatchSize ?? 1000);
-              }
-              
-              return fullInstance;
-            })
-          : (config.destinationAdapterInstances || [])
+        destinations: {}
       };
+
+      // Build destinations section
+      const destinationInstances = (this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0) 
+        ? this.destinationAdapterInstances 
+        : (config.destinationAdapterInstances || []);
+
+      destinationInstances.forEach((instance: any) => {
+        // Parse configuration if it's a string
+        let instanceConfig = instance.configuration || {};
+        if (typeof instanceConfig === 'string') {
+          try {
+            instanceConfig = JSON.parse(instanceConfig);
+          } catch (e) {
+            instanceConfig = {};
+          }
+        }
+
+        const adapterName = instance.adapterName || 'SqlServer';
+        const instanceName = instance.instanceName || 'Destination';
+
+        // Initialize adapter type in destinations if not exists
+        if (!structuredConfig.destinations[adapterName]) {
+          structuredConfig.destinations[adapterName] = {};
+        }
+
+        // Build full destination instance object with all properties
+        const fullInstance: any = {
+          adapterInstanceGuid: instance.adapterInstanceGuid || '',
+          instanceName: instanceName,
+          adapterName: adapterName,
+          isEnabled: instance.isEnabled !== undefined ? instance.isEnabled : true,
+          properties: {}
+        };
+
+        // If it's a CSV adapter, include CSV-specific properties
+        if (adapterName === 'CSV') {
+          fullInstance.properties = {
+            receiveFolder: instance.receiveFolder || instanceConfig.receiveFolder || instanceConfig.destination || '',
+            fileMask: instance.fileMask || instanceConfig.fileMask || '*.txt',
+            batchSize: instance.batchSize !== undefined ? instance.batchSize : (instanceConfig.batchSize ?? 100),
+            fieldSeparator: instance.fieldSeparator || instanceConfig.fieldSeparator || '║',
+            destinationReceiveFolder: instanceConfig.destinationReceiveFolder || instance.receiveFolder || instanceConfig.receiveFolder || '',
+            destinationFileMask: instanceConfig.destinationFileMask || instance.fileMask || instanceConfig.fileMask || '*.txt'
+          };
+        }
+
+        // If it's a SqlServer adapter, include SQL-specific properties
+        if (adapterName === 'SqlServer') {
+          fullInstance.properties = {
+            destination: instanceConfig.destination || instanceConfig.tableName || 'TransportData',
+            tableName: instanceConfig.tableName || instanceConfig.destination || 'TransportData',
+            sqlServerName: instanceConfig.sqlServerName || this.sqlServerName || config.sqlServerName || '',
+            sqlDatabaseName: instanceConfig.sqlDatabaseName || this.sqlDatabaseName || config.sqlDatabaseName || '',
+            sqlUserName: instanceConfig.sqlUserName || this.sqlUserName || config.sqlUserName || '',
+            sqlPassword: instanceConfig.sqlPassword ? '***' : (this.sqlPassword ? '***' : (config.sqlPassword ? '***' : '')),
+            sqlIntegratedSecurity: instanceConfig.sqlIntegratedSecurity !== undefined 
+              ? instanceConfig.sqlIntegratedSecurity 
+              : (this.sqlIntegratedSecurity !== undefined ? this.sqlIntegratedSecurity : (config.sqlIntegratedSecurity ?? false)),
+            sqlResourceGroup: instanceConfig.sqlResourceGroup || this.sqlResourceGroup || config.sqlResourceGroup || '',
+            sqlPollingStatement: instanceConfig.sqlPollingStatement || this.sqlPollingStatement || config.sqlPollingStatement || '',
+            sqlPollingInterval: instanceConfig.sqlPollingInterval !== undefined 
+              ? instanceConfig.sqlPollingInterval 
+              : (this.sqlPollingInterval !== undefined ? this.sqlPollingInterval : (config.sqlPollingInterval ?? 60)),
+            sqlUseTransaction: instanceConfig.sqlUseTransaction !== undefined 
+              ? instanceConfig.sqlUseTransaction 
+              : (this.sqlUseTransaction !== undefined ? this.sqlUseTransaction : (config.sqlUseTransaction ?? false)),
+            sqlBatchSize: instanceConfig.sqlBatchSize !== undefined 
+              ? instanceConfig.sqlBatchSize 
+              : (this.sqlBatchSize !== undefined ? this.sqlBatchSize : (config.sqlBatchSize ?? 1000)),
+            sqlCommandTimeout: instanceConfig.sqlCommandTimeout || config.sqlCommandTimeout || 30,
+            sqlFailOnBadStatement: instanceConfig.sqlFailOnBadStatement !== undefined 
+              ? instanceConfig.sqlFailOnBadStatement 
+              : (config.sqlFailOnBadStatement ?? false)
+          };
+        }
+
+        // Add instance to destinations (use instanceName as key)
+        structuredConfig.destinations[adapterName][instanceName] = fullInstance;
+      });
       
-      // Format JSON with comments
-      const jsonString = this.formatJsonWithComments(structuredConfig);
+      // Format JSON with hierarchical structure
+      const jsonString = this.formatHierarchicalJson(structuredConfig, '', '');
       const dialogRef = this.dialog.open(InterfaceJsonViewDialogComponent, {
-        width: '800px',
-        maxWidth: '90vw',
+        width: '900px',
+        maxWidth: '95vw',
+        maxHeight: '90vh',
         data: { 
           interfaceName: this.currentInterfaceName || 'Unknown Interface', 
           jsonString: jsonString 

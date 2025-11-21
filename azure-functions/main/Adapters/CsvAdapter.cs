@@ -316,8 +316,9 @@ public class CsvAdapter : IAdapter
             // Ensure CSV folders exist before uploading
             await EnsureCsvFoldersExistAsync(cancellationToken);
 
-            // Generate unique filename
-            var fileName = $"raw-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
+            var now = DateTime.UtcNow;
+            var fileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
             var blobPath = $"csv-incoming/{fileName}";
             
             // Get container client (default: csv-files)
@@ -664,7 +665,14 @@ public class CsvAdapter : IAdapter
                 else
                 {
                     // Client disconnected, dispose and create new one
-                    try { client.Dispose(); } catch { }
+                    try 
+                    { 
+                        client.Dispose(); 
+                    } 
+                    catch (Exception disposeEx)
+                    {
+                        _logger?.LogWarning(disposeEx, "Error disposing disconnected SFTP client: {ErrorMessage}", disposeEx.Message);
+                    }
                 }
             }
         }
@@ -692,7 +700,14 @@ public class CsvAdapter : IAdapter
         }
 
         // Pool is full or client disconnected, dispose it
-        try { client?.Dispose(); } catch { }
+        try 
+        { 
+            client?.Dispose(); 
+        } 
+        catch (Exception disposeEx)
+        {
+            _logger?.LogWarning(disposeEx, "Error disposing SFTP client: {ErrorMessage}", disposeEx.Message);
+        }
         _sftpConnectionSemaphore.Release();
     }
 
@@ -942,7 +957,10 @@ public class CsvAdapter : IAdapter
                         {
                             await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
                         }
-                        catch { }
+                        catch (Exception releaseEx)
+                        {
+                            _logger?.LogWarning(releaseEx, "Error releasing message lock for message {MessageId}: {ErrorMessage}", message.MessageId, releaseEx.Message);
+                        }
                     }
                 }
             }
@@ -1080,8 +1098,9 @@ public class CsvAdapter : IAdapter
             // Ensure CSV folders exist before uploading
             await EnsureCsvFoldersExistAsync(cancellationToken);
 
-            // Generate unique filename preserving original name
-            var fileName = $"{Path.GetFileNameWithoutExtension(originalFileName)}-{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
+            // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
+            var now = DateTime.UtcNow;
+            var fileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
             var blobPath = $"csv-incoming/{fileName}";
             
             // Get container client (default: csv-files)
@@ -1127,13 +1146,9 @@ public class CsvAdapter : IAdapter
             // Ensure CSV folders exist before copying
             await EnsureCsvFoldersExistAsync(cancellationToken);
 
-            // Extract filename from source path
-            var fileName = sourceBlobPath.Contains('/') 
-                ? sourceBlobPath.Substring(sourceBlobPath.LastIndexOf('/') + 1)
-                : sourceBlobPath;
-            
-            // Generate unique filename
-            var uniqueFileName = $"{Path.GetFileNameWithoutExtension(fileName)}-{Guid.NewGuid()}{Path.GetExtension(fileName)}";
+            // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
+            var now = DateTime.UtcNow;
+            var uniqueFileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
             var blobPath = $"csv-incoming/{uniqueFileName}";
             
             // Get container client (default: csv-files)
