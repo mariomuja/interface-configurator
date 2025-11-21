@@ -19,6 +19,7 @@ public class CsvAdapter : IAdapter
     public string AdapterAlias => "CSV";
     public bool SupportsRead => true;
     public bool SupportsWrite => true;
+    public string AdapterRole { get; }
 
     private readonly ICsvProcessingService _csvProcessingService;
     private readonly IAdapterConfigurationService _adapterConfig;
@@ -68,6 +69,7 @@ public class CsvAdapter : IAdapter
         string? adapterType = null,
         SftpAdapter? sftpAdapter = null,
         FileAdapter? fileAdapter = null,
+        string adapterRole = "Source",
         ILogger<CsvAdapter>? logger = null)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
@@ -77,6 +79,7 @@ public class CsvAdapter : IAdapter
         _subscriptionService = subscriptionService;
         _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
         _adapterInstanceGuid = adapterInstanceGuid;
+        AdapterRole = adapterRole ?? "Source";
         
         _logger?.LogInformation("DEBUG CsvAdapter constructor: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}",
             _messageBoxService != null, _interfaceName, _adapterInstanceGuid.HasValue ? _adapterInstanceGuid.Value.ToString() : "NULL");
@@ -160,13 +163,13 @@ public class CsvAdapter : IAdapter
             }
 
             // For RAW adapter type: Also upload to csv-incoming for blob trigger processing
-            // But still process directly to MessageBox first
+            // But still process directly to MessageBox first (if AdapterRole is Source)
             if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
             {
                 _logger?.LogInformation("RAW adapter type detected. Uploading to csv-incoming AND processing directly to MessageBox.");
                 // Upload to csv-incoming (will trigger blob trigger as backup)
                 _ = Task.Run(async () => await UploadCsvDataToIncomingAsync(cancellationToken));
-                // Continue with direct MessageBox processing below
+                // Continue with direct MessageBox processing below (if Source role)
             }
 
             // Parse CSV using CsvProcessingService with configured field separator
@@ -175,36 +178,45 @@ public class CsvAdapter : IAdapter
             _logger?.LogInformation("Successfully parsed CsvData: {HeaderCount} headers, {RecordCount} records",
                 headers.Count, records.Count);
 
-            // Process records in batches of _batchSize, then debatch each batch into single rows
-            _logger?.LogInformation("Processing CsvData in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
-                _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
-
-            // Process records in batches
-            for (int i = 0; i < records.Count; i += _batchSize)
+            // Write to MessageBox if AdapterRole is "Source"
+            if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
+                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
             {
-                var batch = records.Skip(i).Take(_batchSize).ToList();
-                var batchNumber = (i / _batchSize) + 1;
-                var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+                // Process records in batches of _batchSize, then debatch each batch into single rows
+                _logger?.LogInformation("Processing CsvData in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
+                    _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
 
-                _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
-                    batchNumber, totalBatches, batch.Count);
+                // Process records in batches
+                for (int i = 0; i < records.Count; i += _batchSize)
+                {
+                    var batch = records.Skip(i).Take(_batchSize).ToList();
+                    var batchNumber = (i / _batchSize) + 1;
+                    var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
 
-                // Debatch batch into single rows and write to MessageBox
-                var messageIds = await _messageBoxService.WriteMessagesAsync(
-                    _interfaceName,
-                    AdapterName,
-                    "Source",
-                    _adapterInstanceGuid.Value,
-                    headers,
-                    batch,
-                    cancellationToken);
+                    _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
+                        batchNumber, totalBatches, batch.Count);
 
-                _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
-                    messageIds.Count, batchNumber, totalBatches);
+                    // Debatch batch into single rows and write to MessageBox
+                    var messageIds = await _messageBoxService.WriteMessagesAsync(
+                        _interfaceName,
+                        AdapterName,
+                        "Source",
+                        _adapterInstanceGuid.Value,
+                        headers,
+                        batch,
+                        cancellationToken);
+
+                    _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
+                        messageIds.Count, batchNumber, totalBatches);
+                }
+
+                _logger?.LogInformation("Completed processing CsvData: {TotalRecords} records debatched into {TotalMessages} messages",
+                    records.Count, records.Count);
             }
-
-            _logger?.LogInformation("Completed processing CsvData: {TotalRecords} records debatched into {TotalMessages} messages",
-                records.Count, records.Count);
+            else if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogDebug("AdapterRole is '{AdapterRole}', skipping MessageBox write in ProcessCsvDataAsync", AdapterRole);
+            }
         }
         catch (Exception ex)
         {
@@ -479,175 +491,6 @@ public class CsvAdapter : IAdapter
 
     // BuildDefaultBlobSourcePath removed - now handled by FileAdapter.BuildDefaultBlobSourcePath
     // ReadFromBlobStorageAsync removed - now handled by FileAdapter.ReadCsvFilesAsync
-    {
-        // Parse source path: "container-name/blob-path" or "container-name/folder/blob-name" or "container-name/folder/" (folder)
-        var pathParts = source.Split('/', 2);
-        if (pathParts.Length != 2)
-            throw new ArgumentException($"Invalid source path format. Expected 'container/path', got: {source}", nameof(source));
-
-        var containerName = pathParts[0];
-        var blobPath = pathParts[1];
-
-        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-        
-        // Check if source is a folder (ends with '/' or doesn't contain a file extension)
-        bool isFolder = blobPath.EndsWith("/") || (!blobPath.Contains(".") && !string.IsNullOrWhiteSpace(blobPath));
-        
-        var allHeaders = new List<string>();
-        var allRecords = new List<Dictionary<string, string>>();
-
-        if (isFolder || !string.IsNullOrWhiteSpace(_receiveFolder))
-            {
-            // Process all CSV files in the folder
-            _logger?.LogInformation("Processing folder: {BlobPath} in container {ContainerName}", blobPath, containerName);
-            
-            // Ensure folder path ends with /
-            if (!blobPath.EndsWith("/"))
-                blobPath += "/";
-
-            // List all blobs in the folder
-            var blobs = containerClient.GetBlobsAsync(prefix: blobPath, cancellationToken: cancellationToken);
-            var csvFiles = new List<string>();
-            
-            await foreach (var blobItem in blobs)
-            {
-                // Extract filename from blob path (e.g., "folder/subfolder/file.txt" -> "file.txt")
-                var fileName = blobItem.Name.Contains('/') 
-                    ? blobItem.Name.Substring(blobItem.Name.LastIndexOf('/') + 1)
-                    : blobItem.Name;
-                
-                // Filter files by file mask pattern (e.g., "*.txt", "*.csv", "data_*.txt")
-                if (MatchesFileMask(fileName, _fileMask))
-                {
-                    csvFiles.Add(blobItem.Name);
-                }
-            }
-
-            _logger?.LogInformation("Found {FileCount} files matching mask '{FileMask}' in folder {BlobPath}", csvFiles.Count, _fileMask, blobPath);
-
-            // Process each CSV file
-            foreach (var csvFile in csvFiles)
-            {
-                try
-                {
-                    var blobClient = containerClient.GetBlobClient(csvFile);
-                    
-                    if (!await blobClient.ExistsAsync(cancellationToken))
-                    {
-                        _logger?.LogWarning("CSV file not found: {CsvFile}", csvFile);
-                        continue;
-                    }
-
-                    // Download blob content
-                    var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
-                    var csvContent = downloadResult.Value.Content.ToString();
-
-                    // Parse CSV using CsvProcessingService with configured field separator
-                    var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, _fieldSeparator, cancellationToken);
-
-                    _logger?.LogInformation("Successfully read CSV from {CsvFile}: {HeaderCount} headers, {RecordCount} records", 
-                        csvFile, headers.Count, records.Count);
-
-                    // Use headers from first file, or merge if different
-                    if (allHeaders.Count == 0)
-                    {
-                        allHeaders = headers;
-                    }
-                    else if (!headers.SequenceEqual(allHeaders))
-                    {
-                        _logger?.LogWarning("Headers differ between files. Using headers from first file.");
-                    }
-
-                    allRecords.AddRange(records);
-
-                    // For FILE adapter type: Copy file to csv-incoming folder if reading from a different folder
-                    // This will trigger the blob trigger which processes the file
-                    // Only copy if source folder is not already csv-incoming
-                    if (!csvFile.Contains("csv-incoming/"))
-                    {
-                        await CopyFileToIncomingAsync(csvContent, csvFile, cancellationToken);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Error processing CSV file {CsvFile} from folder {BlobPath}", csvFile, blobPath);
-                    // Continue with next file
-                }
-            }
-        }
-        else
-        {
-            // Process single file
-            var blobClient = containerClient.GetBlobClient(blobPath);
-
-            if (!await blobClient.ExistsAsync(cancellationToken))
-                throw new FileNotFoundException($"CSV file not found: {source}");
-
-            // Download blob content
-            var downloadResult = await blobClient.DownloadContentAsync(cancellationToken);
-            var csvContent = downloadResult.Value.Content.ToString();
-
-            // Parse CSV using CsvProcessingService
-            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, fieldSeparator: _fieldSeparator, cancellationToken);
-
-            _logger?.LogInformation("Successfully read CSV from {Source}: {HeaderCount} headers, {RecordCount} records", 
-                source, headers.Count, records.Count);
-
-            allHeaders = headers;
-            allRecords = records;
-
-            // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
-            // Process records in batches of _batchSize, then debatch each batch into single rows
-            _logger?.LogInformation("Checking MessageBox conditions: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
-                _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
-            
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
-            {
-                _logger?.LogInformation("Processing CSV data in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}", 
-                    _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
-                
-                // Process records in batches
-                for (int i = 0; i < records.Count; i += _batchSize)
-                {
-                    var batch = records.Skip(i).Take(_batchSize).ToList();
-                    var batchNumber = (i / _batchSize) + 1;
-                    var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
-                    
-                    _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records", 
-                        batchNumber, totalBatches, batch.Count);
-                    
-                    // Debatch batch into single rows and write to MessageBox
-                    var messageIds = await _messageBoxService.WriteMessagesAsync(
-                        _interfaceName,
-                        AdapterName,
-                        "Source",
-                        _adapterInstanceGuid.Value,
-                        headers,
-                        batch,
-                        cancellationToken);
-                    
-                    _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}", 
-                        messageIds.Count, batchNumber, totalBatches);
-                }
-                
-                _logger?.LogInformation("Completed processing all batches: {TotalRecords} records debatched into {TotalMessages} messages", 
-                    records.Count, records.Count);
-            }
-            else
-            {
-                _logger?.LogWarning("Skipping MessageBox write: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}. " +
-                    "Messages will NOT be written to MessageBox.",
-                    _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
-            }
-        }
-
-        if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && !_adapterInstanceGuid.HasValue)
-        {
-            _logger?.LogWarning("AdapterInstanceGuid is missing. Messages will not be written to MessageBox.");
-        }
-
-        return (allHeaders, allRecords);
-    }
 
 
     public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
@@ -657,11 +500,13 @@ public class CsvAdapter : IAdapter
 
         try
         {
-            _logger?.LogInformation("Writing CSV to destination: {Destination}, {RecordCount} records", destination, records?.Count ?? 0);
+            _logger?.LogInformation("Writing CSV to destination: {Destination}, {RecordCount} records, AdapterRole: {AdapterRole}", 
+                destination, records?.Count ?? 0, AdapterRole);
 
-            // If MessageBoxService is available, subscribe and process messages from event queue (as Destination adapter)
+            // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
             List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
+                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
             {
                 _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
                 
@@ -1041,43 +886,31 @@ public class CsvAdapter : IAdapter
     /// </summary>
     private async Task CopyFileToIncomingAsync(string csvContent, string sourceBlobPath, CancellationToken cancellationToken)
     {
+        if (_fileAdapter == null)
+        {
+            throw new InvalidOperationException("FileAdapter is required for copying files to csv-incoming");
+        }
+
         try
         {
             // Ensure CSV folders exist before copying
-            await EnsureCsvFoldersExistAsync(cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-incoming", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-processed", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-error", cancellationToken);
 
             // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
             var now = DateTime.UtcNow;
             var uniqueFileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
-            var blobPath = $"csv-incoming/{uniqueFileName}";
-            
-            // Get container client (default: csv-files)
-            var containerName = "csv-files";
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            
-            // Ensure container exists
-            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            var blobPath = $"csv-files/csv-incoming/{uniqueFileName}";
             
             // Upload CSV content to csv-incoming folder
-            var blobClient = containerClient.GetBlobClient(blobPath);
-            var content = Encoding.UTF8.GetBytes(csvContent);
-            
-            await blobClient.UploadAsync(
-                new BinaryData(content),
-                new Azure.Storage.Blobs.Models.BlobUploadOptions
-                {
-                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
-                    {
-                        ContentType = "text/csv"
-                    }
-                },
-                cancellationToken);
+            await _fileAdapter.WriteFileAsync(blobPath, csvContent, cancellationToken);
 
             _logger?.LogInformation("Successfully copied file to csv-incoming folder: {FileName} (from {SourcePath}), DataLength={DataLength}",
                 uniqueFileName, sourceBlobPath, csvContent.Length);
             
             // Clean up old files in csv-incoming folder (keep only 10 most recent)
-            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
+            await _fileAdapter.CleanupOldFilesAsync("csv-files", "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {

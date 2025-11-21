@@ -197,17 +197,23 @@ public class AdapterFactory : IAdapterFactory
             }
 
             var sftpLogger = _serviceProvider.GetService<ILogger<SftpAdapter>>();
+            var sftpAdapterRole = isSource ? "Source" : "Destination";
             sftpAdapter = new SftpAdapter(
                 sftpHost!,
                 sftpPort ?? 22,
                 sftpUsername!,
-                sftpPassword,
-                sftpSshKey,
-                sftpFolder,
-                sftpFileMask,
-                sftpMaxConnectionPoolSize,
-                sftpFileBufferSize,
-                sftpLogger);
+                adapterRole: sftpAdapterRole,
+                messageBoxService: messageBoxService,
+                interfaceName: config.InterfaceName,
+                adapterInstanceGuid: adapterInstanceGuid,
+                password: sftpPassword,
+                sshKey: sftpSshKey,
+                folder: sftpFolder,
+                fileMask: sftpFileMask,
+                maxConnectionPoolSize: sftpMaxConnectionPoolSize,
+                fileBufferSize: sftpFileBufferSize,
+                batchSize: batchSize ?? 1000,
+                logger: sftpLogger);
         }
 
         // Create FileAdapter if adapter type is FILE (or default)
@@ -215,15 +221,48 @@ public class AdapterFactory : IAdapterFactory
         if (adapterType == null || adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase))
         {
             var fileLogger = _serviceProvider.GetService<ILogger<FileAdapter>>();
+            var fileAdapterRole = isSource ? "Source" : "Destination";
             fileAdapter = new FileAdapter(
                 blobServiceClient,
-                receiveFolder,
-                fileMask,
-                destinationReceiveFolder,
-                destinationFileMask,
-                fileLogger);
+                adapterRole: fileAdapterRole,
+                messageBoxService: messageBoxService,
+                subscriptionService: subscriptionService,
+                interfaceName: config.InterfaceName,
+                adapterInstanceGuid: adapterInstanceGuid,
+                receiveFolder: receiveFolder,
+                fileMask: fileMask,
+                destinationReceiveFolder: destinationReceiveFolder,
+                destinationFileMask: destinationFileMask,
+                batchSize: batchSize,
+                logger: fileLogger);
         }
 
+        // Update SftpAdapter with role and MessageBox service if needed
+        if (sftpAdapter != null && isSource)
+        {
+            // SftpAdapter is read-only, so it can only be used as Source
+            // Note: SftpAdapter constructor was already updated to accept these parameters
+            // We need to recreate it with the proper parameters
+            var sftpLogger = _serviceProvider.GetService<ILogger<SftpAdapter>>();
+            sftpAdapter = new SftpAdapter(
+                sftpHost!,
+                sftpPort ?? 22,
+                sftpUsername!,
+                adapterRole: "Source",
+                messageBoxService: messageBoxService,
+                interfaceName: config.InterfaceName,
+                adapterInstanceGuid: adapterInstanceGuid,
+                password: sftpPassword,
+                sshKey: sftpSshKey,
+                folder: sftpFolder,
+                fileMask: sftpFileMask,
+                maxConnectionPoolSize: sftpMaxConnectionPoolSize,
+                fileBufferSize: sftpFileBufferSize,
+                batchSize: batchSize,
+                logger: sftpLogger);
+        }
+
+        var adapterRole = isSource ? "Source" : "Destination";
         return new CsvAdapter(
             csvProcessingService,
             adapterConfig,
@@ -241,6 +280,7 @@ public class AdapterFactory : IAdapterFactory
             adapterType,
             sftpAdapter,
             fileAdapter,
+            adapterRole,
             logger);
     }
 
@@ -317,6 +357,7 @@ public class AdapterFactory : IAdapterFactory
         }
 
         var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
+        var adapterRole = isSource ? "Source" : "Destination";
         
         return new SqlServerAdapter(
             defaultContext,
@@ -335,6 +376,7 @@ public class AdapterFactory : IAdapterFactory
             commandTimeout,
             failOnBadStatement,
             configService,
+            adapterRole,
             logger,
             statisticsService);
     }

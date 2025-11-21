@@ -29,7 +29,14 @@ public interface IAdapter
     bool SupportsWrite { get; }
 
     /// <summary>
+    /// Current role of the adapter: "Source" or "Destination"
+    /// Determines whether ReadAsync writes to MessageBox (Source) or WriteAsync reads from MessageBox (Destination)
+    /// </summary>
+    string AdapterRole { get; }
+
+    /// <summary>
     /// Reads data from the source and returns headers and records
+    /// When AdapterRole is "Source", should write data to MessageBox after reading
     /// </summary>
     /// <param name="source">Source identifier (e.g., blob path, table name, file path)</param>
     /// <param name="cancellationToken">Cancellation token</param>

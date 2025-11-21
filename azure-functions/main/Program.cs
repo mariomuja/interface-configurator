@@ -266,10 +266,16 @@ var host = new HostBuilder()
                 var fileLogger = sp.GetService<ILogger<FileAdapter>>();
                 var fileAdapter = new FileAdapter(
                     blobServiceClient,
+                    adapterRole: "Source",
+                    messageBoxService: messageBoxService,
+                    subscriptionService: subscriptionService,
+                    interfaceName: "FromCsvToSqlServerExample",
+                    adapterInstanceGuid: null,
                     receiveFolder: null,
                     fileMask: null,
                     destinationReceiveFolder: null,
                     destinationFileMask: null,
+                    batchSize: null,
                     logger: fileLogger);
 
                 return new CsvAdapter(
@@ -289,6 +295,7 @@ var host = new HostBuilder()
                     adapterType: null,
                     sftpAdapter: null, // SftpAdapter will be created by AdapterFactory when needed
                     fileAdapter: fileAdapter,
+                    adapterRole: "Source",
                     logger: logger);
             });
             
@@ -307,7 +314,7 @@ var host = new HostBuilder()
                     // Still allow registration - will fail when actually used
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, logger);
+                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
             });
             
         }

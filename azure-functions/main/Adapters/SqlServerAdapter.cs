@@ -20,6 +20,7 @@ public class SqlServerAdapter : IAdapter
     public string AdapterAlias => "SQL Server";
     public bool SupportsRead => true;
     public bool SupportsWrite => true;
+    public string AdapterRole { get; }
 
     /// <summary>
     /// ApplicationDbContext connects to the configured SQL Server database
@@ -67,6 +68,7 @@ public class SqlServerAdapter : IAdapter
         int? commandTimeout = null,
         bool? failOnBadStatement = null,
         IInterfaceConfigurationService? configService = null,
+        string adapterRole = "Source",
         ILogger<SqlServerAdapter>? logger = null,
         ProcessingStatisticsService? statisticsService = null)
     {
@@ -89,6 +91,7 @@ public class SqlServerAdapter : IAdapter
         _commandTimeout = commandTimeout ?? 30;
         _failOnBadStatement = failOnBadStatement ?? false;
         _configService = configService;
+        AdapterRole = adapterRole ?? "Source";
         _logger = logger;
         _statisticsService = statisticsService;
         _columnAnalyzer = new CsvColumnAnalyzer();
@@ -217,9 +220,10 @@ public class SqlServerAdapter : IAdapter
 
             _logger?.LogInformation("Successfully read {RecordCount} records from SQL Server table: {Source}", records.Count, source);
 
-            // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
+            // If AdapterRole is "Source" and MessageBoxService is available, debatch and write to MessageBox
             // Each record is written as a separate message, triggering events
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
+            if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
+                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
             {
                 _logger?.LogInformation("Debatching SQL Server data and writing to MessageBox as Source adapter: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, Records={RecordCount}", 
                     _interfaceName, _adapterInstanceGuid.Value, records.Count);
@@ -233,9 +237,14 @@ public class SqlServerAdapter : IAdapter
                     cancellationToken);
                 _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox", messageIds.Count);
             }
-            else if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            else if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
+                     _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
             {
                 _logger?.LogWarning("AdapterInstanceGuid is missing. Messages will not be written to MessageBox.");
+            }
+            else if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogDebug("AdapterRole is '{AdapterRole}', skipping MessageBox write in ReadAsync", AdapterRole);
             }
 
             return (headers, records);
@@ -254,11 +263,13 @@ public class SqlServerAdapter : IAdapter
 
         try
         {
-            _logger?.LogInformation("Writing {RecordCount} records to SQL Server table: {Destination}", records?.Count ?? 0, destination);
+            _logger?.LogInformation("Writing {RecordCount} records to SQL Server table: {Destination}, AdapterRole: {AdapterRole}", 
+                records?.Count ?? 0, destination, AdapterRole);
 
-            // If MessageBoxService is available, subscribe and process messages from event queue (as Destination adapter)
+            // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
             List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
+                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
             {
                 _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
                 
