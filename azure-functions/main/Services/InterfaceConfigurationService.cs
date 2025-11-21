@@ -283,7 +283,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             {
                 InstanceName = config.SourceInstanceName ?? "Source",
                 AdapterName = config.SourceAdapterName,
-                IsEnabled = config.SourceIsEnabled ?? true,
+                IsEnabled = config.SourceIsEnabled ?? false,
                 AdapterInstanceGuid = config.SourceAdapterInstanceGuid ?? Guid.NewGuid(),
                 Configuration = config.SourceConfiguration ?? string.Empty,
                 // CSV Properties
@@ -585,6 +585,8 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     source.IsEnabled = enabled;
                     source.UpdatedAt = DateTime.UtcNow;
                 }
+                // Also update legacy SourceIsEnabled property for backward compatibility
+                config.SourceIsEnabled = enabled;
                 config.UpdatedAt = DateTime.UtcNow;
             }
         }

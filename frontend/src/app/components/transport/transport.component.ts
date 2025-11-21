@@ -2061,7 +2061,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             ? activeConfig.sourceIsEnabled 
             : (activeConfig.sources?.[this.sourceAdapterName]?.isEnabled !== undefined
                 ? activeConfig.sources[this.sourceAdapterName].isEnabled
-                : true))
+                : false))
         : this.sourceIsEnabled,
       // Use explicit undefined checks - empty string is a valid value!
       receiveFolder: activeConfig?.sourceReceiveFolder !== undefined ? activeConfig.sourceReceiveFolder : this.sourceReceiveFolder,
@@ -2673,7 +2673,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const wasRecentlySaved = this.lastEnabledSaveTime[config.interfaceName] && 
       (Date.now() - this.lastEnabledSaveTime[config.interfaceName]) < 5000;
     if (!wasRecentlySaved) {
-      this.sourceIsEnabled = config.sourceIsEnabled ?? this.sourceIsEnabled;
+      // Check both sourceIsEnabled directly and in Sources hierarchy
+      let enabledFromConfig = false;
+      if (config.sourceIsEnabled !== undefined) {
+        enabledFromConfig = config.sourceIsEnabled;
+      } else if (config.sources?.[this.sourceInstanceName]?.isEnabled !== undefined) {
+        enabledFromConfig = config.sources[this.sourceInstanceName].isEnabled;
+      } else if (config.sources && Object.keys(config.sources).length > 0) {
+        const firstSource = Object.values(config.sources)[0] as any;
+        enabledFromConfig = firstSource?.isEnabled ?? false;
+      }
+      this.sourceIsEnabled = enabledFromConfig;
     }
     this.destinationIsEnabled = config.destinationIsEnabled ?? this.destinationIsEnabled;
     this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
