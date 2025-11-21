@@ -1399,6 +1399,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  // Track when we last saved enabled status to avoid race conditions
+  private lastEnabledSaveTime: { [interfaceName: string]: number } = {};
+
   onSourceEnabledChange(): void {
     const activeInterfaceName = this.getActiveInterfaceName();
     if (!activeInterfaceName) {
@@ -1409,6 +1412,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     const previousEnabledValue = activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled;
     const enabledValueToSave = this.sourceIsEnabled;
+    
+    // Record when we're saving
+    this.lastEnabledSaveTime[activeInterfaceName] = Date.now();
 
     // Always save the enabled state - don't check if it changed because the dialog already updated local state
     this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', enabledValueToSave).subscribe({
@@ -1425,10 +1431,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Ensure local state matches what we just saved
         this.sourceIsEnabled = enabledValueToSave;
         
-        // Reload configurations AFTER a short delay to ensure backend has processed the change
+        // Reload configurations AFTER a delay to ensure backend has processed and persisted the change
+        // This ensures that when the dialog is reopened, it reads the correct value from backend
         setTimeout(() => {
           this.loadInterfaceConfigurations();
-        }, 500);
+        }, 1000);
         
         this.snackBar.open(
           `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
@@ -1831,6 +1838,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // Check if we recently saved enabled status (within last 2 seconds)
+    // If so, use cached config to avoid race condition with backend
+    const lastSaveTime = this.lastEnabledSaveTime[interfaceName];
+    const timeSinceSave = lastSaveTime ? Date.now() - lastSaveTime : Infinity;
+    const cachedConfig = this.getInterfaceConfig(interfaceName);
+    
+    if (timeSinceSave < 2000 && cachedConfig) {
+      // Use cached config if we just saved (within last 2 seconds)
+      // This avoids race condition where backend hasn't updated yet
+      console.log('Using cached config (recent save detected)');
+      this.openSourceAdapterSettingsDialog(cachedConfig);
+      return;
+    }
+
     // Fetch fresh configuration from backend before opening dialog
     this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
       next: (freshConfig) => {
@@ -1844,7 +1865,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           }
           
           // Sync local state from fresh config
-          this.sourceIsEnabled = freshConfig.sourceIsEnabled ?? this.sourceIsEnabled;
+          // Use explicit check for undefined - false is a valid value!
+          // IMPORTANT: Always use the value from backend, even if it's false
+          if (freshConfig.sourceIsEnabled !== undefined) {
+            this.sourceIsEnabled = freshConfig.sourceIsEnabled;
+          }
           this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
           this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
           this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
