@@ -383,11 +383,14 @@ public class CsvAdapter : IAdapter
                 
                 // Use source parameter as folder, or let SftpAdapter use its configured folder
                 var folder = !string.IsNullOrWhiteSpace(source) ? source : null;
-                var (headers, records) = await _sftpAdapter.ReadCsvFilesAsync(_csvProcessingService, _fieldSeparator, folder, cancellationToken);
                 
-                // Upload files to csv-incoming folder for blob trigger processing
-                var files = await _sftpAdapter.ReadAllFilesAsync(folder, cancellationToken);
-                foreach (var (fileName, content) in files)
+                // Read CSV files and get successfully parsed files in one call to avoid reading files twice
+                var (headers, records, successfullyParsedFiles) = await _sftpAdapter.ReadCsvFilesWithContentAsync(
+                    _csvProcessingService, _fieldSeparator, folder, cancellationToken);
+                
+                // Upload only successfully parsed files to csv-incoming folder for blob trigger processing
+                // This ensures consistency: only files that were successfully parsed are uploaded
+                foreach (var (fileName, content) in successfullyParsedFiles)
                 {
                     await UploadFileToIncomingAsync(content, fileName, cancellationToken);
                 }

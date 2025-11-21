@@ -246,6 +246,54 @@ public class SftpAdapter : IAdapter
     }
 
     /// <summary>
+    /// Reads CSV files from SFTP and returns headers, records, and successfully parsed files
+    /// This method avoids reading files twice by returning the files that were successfully parsed
+    /// </summary>
+    public async Task<(List<string> headers, List<Dictionary<string, string>> records, List<(string fileName, string content)> successfullyParsedFiles)> ReadCsvFilesWithContentAsync(
+        ICsvProcessingService csvProcessingService,
+        string fieldSeparator,
+        string? folder = null,
+        CancellationToken cancellationToken = default)
+    {
+        var files = await ReadAllFilesAsync(folder, cancellationToken);
+        var allHeaders = new List<string>();
+        var allRecords = new List<Dictionary<string, string>>();
+        var successfullyParsedFiles = new List<(string fileName, string content)>();
+
+        foreach (var (fileName, content) in files)
+        {
+            try
+            {
+                var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, cancellationToken);
+
+                _logger?.LogInformation("Successfully parsed CSV from SFTP file {FileName}: {HeaderCount} headers, {RecordCount} records",
+                    fileName, headers.Count, records.Count);
+
+                // Use headers from first file, or merge if different
+                if (allHeaders.Count == 0)
+                {
+                    allHeaders = headers;
+                }
+                else if (!headers.SequenceEqual(allHeaders))
+                {
+                    _logger?.LogWarning("Headers differ between files. Using headers from first file.");
+                }
+
+                allRecords.AddRange(records);
+                // Only include files that were successfully parsed
+                successfullyParsedFiles.Add((fileName, content));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error parsing CSV file {FileName} from SFTP. File will not be uploaded to blob storage.", fileName);
+                // Continue with next file - do not add to successfullyParsedFiles
+            }
+        }
+
+        return (allHeaders, allRecords, successfullyParsedFiles);
+    }
+
+    /// <summary>
     /// IAdapter.ReadAsync implementation - reads files from SFTP server
     /// Returns headers and records for compatibility with other adapters
     /// </summary>
