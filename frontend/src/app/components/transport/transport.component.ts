@@ -1048,7 +1048,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       }).subscribe({
         next: () => {
           this.loadInterfaceConfigurations();
-          this.uploadAndStartTransport(interfaceName);
+          // New config defaults to enabled, so show message
+          this.uploadAndStartTransport(interfaceName, true);
         },
         error: (error) => {
           console.error('Error creating interface configuration:', error);
@@ -1056,33 +1057,38 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
             duration: 12000
           });
-          this.uploadAndStartTransport(interfaceName);
+          // Assume enabled for new config
+          this.uploadAndStartTransport(interfaceName, true);
         }
       });
       return;
     }
+
+    // Remember if source was enabled BEFORE we potentially enable it
+    const sourceWasEnabledBeforeStart = activeConfig.sourceIsEnabled ?? true;
 
     const ensureDestination = () => {
       if (!activeConfig.destinationIsEnabled) {
         this.transportService.toggleInterfaceConfiguration(interfaceName, 'Destination', true).subscribe({
           next: () => {
             this.loadInterfaceConfigurations();
-            this.uploadAndStartTransport(interfaceName);
+            this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
           },
           error: (error) => {
             const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
             this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
               duration: 12000
             });
-            this.uploadAndStartTransport(interfaceName);
+            this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
           }
         });
       } else {
-        this.uploadAndStartTransport(interfaceName);
+        this.uploadAndStartTransport(interfaceName, sourceWasEnabledBeforeStart);
       }
     };
 
     if (!activeConfig.sourceIsEnabled) {
+      // Source was disabled - enable it but don't show the message
       this.transportService.toggleInterfaceConfiguration(interfaceName, 'Source', true).subscribe({
         next: () => {
           this.loadInterfaceConfigurations();
@@ -1093,10 +1099,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
             duration: 12000
           });
-          this.uploadAndStartTransport(interfaceName);
+          // Source was disabled, so don't show message
+          this.uploadAndStartTransport(interfaceName, false);
         }
       });
     } else {
+      // Source was already enabled - show message
       ensureDestination();
     }
   }
@@ -1131,14 +1139,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.startTransportForInterface(targetInterface);
   }
 
-  private uploadAndStartTransport(interfaceName: string): void {
+  private uploadAndStartTransport(interfaceName: string, sourceWasEnabledBeforeStart: boolean = true): void {
     // Use edited CSV text if available, otherwise use formatted CSV from csvData
     const csvContent = this.editableCsvText || this.formatCsvAsText();
     this.transportService.startTransport(interfaceName, csvContent).subscribe({
       next: (response) => {
-        // Only show message if source adapter is enabled
-        const activeConfig = this.getInterfaceConfig(interfaceName);
-        if (activeConfig?.sourceIsEnabled) {
+        // Only show message if source adapter was enabled BEFORE we started transport
+        // (not if we enabled it just to start transport)
+        if (sourceWasEnabledBeforeStart) {
           // Show a more user-friendly message about the MessageBox architecture
           const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
           this.snackBar.open(userMessage, 'Schließen', { duration: 7000 });
@@ -1400,22 +1408,29 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Get the current config to restore on error
     const activeConfig = this.getInterfaceConfig(activeInterfaceName);
     const previousEnabledValue = activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled;
+    const enabledValueToSave = this.sourceIsEnabled;
 
     // Always save the enabled state - don't check if it changed because the dialog already updated local state
-    this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', this.sourceIsEnabled).subscribe({
+    this.transportService.toggleInterfaceConfiguration(activeInterfaceName, 'Source', enabledValueToSave).subscribe({
       next: () => {
-        // Update local cache
+        // Update local cache immediately
         if (activeConfig) {
-          activeConfig.sourceIsEnabled = this.sourceIsEnabled;
+          activeConfig.sourceIsEnabled = enabledValueToSave;
         }
-        // Reload configurations to ensure we have the latest state from backend
-        this.loadInterfaceConfigurations();
+        // Ensure local state matches what we just saved
+        this.sourceIsEnabled = enabledValueToSave;
+        
+        // Reload configurations AFTER a short delay to ensure backend has processed the change
+        setTimeout(() => {
+          this.loadInterfaceConfigurations();
+        }, 500);
+        
         this.snackBar.open(
-          `Source adapter ${this.sourceIsEnabled ? 'aktiviert' : 'deaktiviert'}. ${this.sourceIsEnabled ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
+          `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
           'OK',
           { duration: 5000 }
         );
-        if (this.sourceIsEnabled) {
+        if (enabledValueToSave) {
           this.autoStartCsvSourceIfEnabled(activeInterfaceName, { force: true });
         } else {
           this.autoStartedInterfaces.delete(activeInterfaceName);
@@ -1427,6 +1442,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceIsEnabled = previousEnabledValue;
+        if (activeConfig) {
+          activeConfig.sourceIsEnabled = previousEnabledValue;
+        }
       }
     });
   }
@@ -1899,9 +1917,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         // Update enabled status if provided (always save to ensure backend is updated)
+        let enabledWasChanged = false;
         if (result.isEnabled !== undefined) {
           const previousValue = this.sourceIsEnabled;
           this.sourceIsEnabled = result.isEnabled;
+          enabledWasChanged = true;
           // Always call onSourceEnabledChange to save, even if value appears unchanged
           // This ensures the backend is updated with the exact value from the dialog
           this.onSourceEnabledChange();
@@ -2025,8 +2045,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         // Reload configuration after all saves to ensure local state is synced with backend
+        // But skip if we just saved enabled status (onSourceEnabledChange already reloads)
         const interfaceName = this.getActiveInterfaceName();
-        if (interfaceName) {
+        if (interfaceName && !enabledWasChanged) {
           this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
             next: (freshConfig) => {
               if (freshConfig) {
@@ -2035,8 +2056,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 if (index >= 0) {
                   this.interfaceConfigurations[index] = freshConfig;
                 }
-                // Sync local state from fresh config
-                this.sourceIsEnabled = freshConfig.sourceIsEnabled ?? this.sourceIsEnabled;
+                // Sync local state from fresh config (but don't overwrite enabled if we just saved it)
+                // this.sourceIsEnabled is already set correctly from the save, so we skip it here
                 this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
                 this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
                 this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
