@@ -1431,6 +1431,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Ensure local state matches what we just saved
         this.sourceIsEnabled = enabledValueToSave;
         
+        // Record when we saved - this helps avoid race conditions when reopening dialog
+        this.lastEnabledSaveTime[activeInterfaceName] = Date.now();
+        
         // Reload configurations AFTER a delay to ensure backend has processed and persisted the change
         // This ensures that when the dialog is reopened, it reads the correct value from backend
         setTimeout(() => {
@@ -1855,6 +1858,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Fetch fresh configuration from backend before opening dialog
     this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
       next: (freshConfig) => {
+        console.log('getInterfaceConfiguration response:', freshConfig);
+        console.log('freshConfig.sourceIsEnabled:', freshConfig?.sourceIsEnabled);
         if (freshConfig) {
           // Update local cache
           const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
@@ -1877,6 +1882,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
           this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
           this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+          
+          console.log('After sync - this.sourceIsEnabled:', this.sourceIsEnabled);
+          console.log('Opening dialog with freshConfig:', freshConfig);
           
           // Now open the dialog with fresh data
           this.openSourceAdapterSettingsDialog(freshConfig);
