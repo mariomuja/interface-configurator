@@ -86,7 +86,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedInterfaceConfig: any = null;
   sourceInstanceName: string = 'Source';
   destinationInstanceName: string = 'Destination';
-  destinationAdapterInstances: any[] = [];
+  destinationAdapterInstances: DestinationAdapterInstance[] = [];
   sourceIsEnabled: boolean = true;
   destinationIsEnabled: boolean = true;
   sourceReceiveFolder: string = '';
@@ -1774,8 +1774,57 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openBlobContainerExplorer(adapterType: 'Source' | 'Destination', adapterName: string, instanceName: string, adapterInstanceGuid: string): void {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      this.snackBar.open('Bitte zuerst eine Schnittstelle auswählen.', 'OK', { duration: 4000 });
+      return;
+    }
+
     if (!adapterInstanceGuid) {
-      this.snackBar.open('Adapter instance GUID is required to explore blob containers', 'OK', { duration: 3000 });
+      this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+        next: (config) => {
+          if (!config) {
+            this.snackBar.open('Konnte Konfiguration nicht laden, bitte erneut versuchen.', 'OK', { duration: 4000 });
+            return;
+          }
+
+          let refreshedGuid: string | undefined;
+
+          if (adapterType === 'Source') {
+            refreshedGuid = config.sourceAdapterInstanceGuid;
+            if (refreshedGuid) {
+              this.sourceAdapterInstanceGuid = refreshedGuid;
+            }
+          } else {
+            const destinationInstances = config.destinationAdapterInstances || [];
+            const matchingInstance = destinationInstances.find((inst: DestinationAdapterInstance) =>
+              (inst.instanceName && inst.instanceName === instanceName) ||
+              (inst.adapterInstanceGuid && inst.adapterInstanceGuid === adapterInstanceGuid) ||
+              (inst.adapterName && inst.adapterName === adapterName)
+            );
+
+            if (matchingInstance?.adapterInstanceGuid) {
+              const matchedGuid = matchingInstance.adapterInstanceGuid;
+              refreshedGuid = matchedGuid;
+              const localIndex = this.destinationAdapterInstances.findIndex((inst: DestinationAdapterInstance) => inst.instanceName === instanceName);
+              if (localIndex >= 0) {
+                this.destinationAdapterInstances[localIndex].adapterInstanceGuid = matchedGuid;
+              }
+            }
+          }
+
+          if (refreshedGuid) {
+            this.openBlobContainerExplorer(adapterType, adapterName, instanceName, refreshedGuid);
+          } else {
+            this.snackBar.open('Für diesen Adapter konnte kein GUID ermittelt werden.', 'OK', { duration: 5000 });
+          }
+        },
+        error: (error) => {
+          console.error('Error refreshing adapter instance GUID:', error);
+          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Konfiguration.');
+          this.snackBar.open(detailedMessage, 'Schließen', { duration: 6000 });
+        }
+      });
       return;
     }
 
@@ -3014,7 +3063,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           
           // Create default SqlServerAdapter destination instance pointing to TransportData table in app database
           const adapterInstanceGuid = this.generateGuid();
-          const defaultSqlServerInstance = {
+          const defaultSqlServerInstance: DestinationAdapterInstance = {
             adapterInstanceGuid: adapterInstanceGuid,
             instanceName: 'Destination 1',
             adapterName: 'SqlServer',
@@ -3067,7 +3116,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // If API fails, create default instance locally
         const adapterInstanceGuid = this.generateGuid();
         const configForDefaults = activeConfig;
-        const defaultSqlServerInstance = {
+        const defaultSqlServerInstance: DestinationAdapterInstance = {
           adapterInstanceGuid: adapterInstanceGuid,
           instanceName: 'Destination 1',
           adapterName: 'SqlServer',
