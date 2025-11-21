@@ -2003,6 +2003,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
+        // IMPORTANT: This Save handler ONLY updates adapter instance properties persistently.
+        // It does NOT start transport or trigger any processing.
+        // Processing happens automatically when adapters run on their timer schedules.
+        
         // Update instance name if changed
         if (result.instanceName !== this.destinationInstanceName) {
           this.destinationInstanceName = result.instanceName;

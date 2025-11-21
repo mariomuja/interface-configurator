@@ -53,36 +53,13 @@ public class UpdateCsvData
             }
 
             // Update CsvData in configuration
+            // Note: This only saves the data persistently. Processing will happen automatically
+            // when the SourceAdapterFunction timer runs (every minute) and reads the CsvData property.
+            // We do NOT trigger processing here to ensure Save button only saves properties.
             await _configService.UpdateCsvDataAsync(
                 request.InterfaceName,
                 request.CsvData,
                 executionContext.CancellationToken);
-
-            // If CsvData is provided, process it by creating adapter instance and triggering debatching
-            if (!string.IsNullOrWhiteSpace(request.CsvData))
-            {
-                try
-                {
-                    var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
-                    if (config != null && config.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Create adapter instance to process CsvData
-                        var adapter = await _adapterFactory.CreateSourceAdapterAsync(config, executionContext.CancellationToken);
-
-                        if (adapter is Adapters.CsvAdapter csvAdapter)
-                        {
-                            // Set CsvData property which will trigger processing
-                            csvAdapter.CsvData = request.CsvData;
-                            _logger.LogInformation("CsvData set on adapter instance, processing triggered");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not process CsvData immediately, but it has been saved to configuration");
-                    // Don't fail the request - CsvData is saved and can be processed later
-                }
-            }
 
             _logger.LogInformation("CsvData for interface '{InterfaceName}' updated. DataLength={DataLength}", 
                 request.InterfaceName, request.CsvData?.Length ?? 0);
