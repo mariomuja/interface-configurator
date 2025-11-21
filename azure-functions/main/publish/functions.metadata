@@ -723,6 +723,90 @@
     ]
   },
   {
+    "name": "TestCsvAdapterMessageBox",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestCsvAdapterMessageBox.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-csv-adapter-messagebox",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "TestCsvProcessing",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestCsvProcessing.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-csv-processing",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "TestMessageBoxService",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestMessageBoxService.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-messagebox-service",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "TestMessageBoxWrite",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.TestMessageBoxWrite.Run",
@@ -742,6 +826,34 @@
           "options"
         ],
         "route": "test-messagebox-write",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "TestSourceAdapterProcess",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestSourceAdapterProcess.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-source-adapter-process",
         "properties": {}
       },
       {
@@ -1162,6 +1274,35 @@
           "options"
         ],
         "route": "UpdateSqlTransactionProperties",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "UploadTestCsv",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.UploadTestCsv.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "post",
+          "options"
+        ],
+        "route": "upload-test-csv",
         "properties": {}
       },
       {

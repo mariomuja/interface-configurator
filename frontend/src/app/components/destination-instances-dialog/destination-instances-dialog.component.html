@@ -29,7 +29,10 @@
     <div class="instances-section">
       <h3>Configured Instances ({{ instances.length }})</h3>
       <div class="instances-list" *ngIf="instances.length > 0">
-        <mat-card *ngFor="let instance of instances" class="instance-card">
+        <mat-card *ngFor="let instance of instances" 
+                  class="instance-card"
+                  [class.instance-disabled]="!instance.isEnabled"
+                  [class.instance-enabled]="instance.isEnabled">
           <mat-card-header>
             <div class="card-header-content">
               <mat-icon class="adapter-icon">{{ getAdapterIcon(instance.adapterName) }}</mat-icon>

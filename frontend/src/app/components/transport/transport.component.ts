@@ -178,7 +178,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadInterfaceConfigurations();
     this.loadDestinationAdapterInstances();
     this.loadBlobContainerFolders();
-    this.startAutoRefresh();
+    // TEMPORARILY DISABLED: Auto-refresh disabled - only manual refresh via reload button
+    // this.startAutoRefresh();
     
     // Subscribe to language changes to update UI
     this.translationService.getCurrentLanguage().subscribe(() => {

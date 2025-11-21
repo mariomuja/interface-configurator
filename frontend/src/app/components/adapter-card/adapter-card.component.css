@@ -189,6 +189,98 @@ mat-slide-toggle {
   margin-left: 8px;
 }
 
+/* Disabled adapter styling - grey appearance */
+.data-card.adapter-disabled {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  background-color: #f5f5f5 !important;
+}
+
+.data-card.adapter-disabled ::ng-deep .mat-expansion-panel-header {
+  background-color: #e0e0e0 !important;
+  color: #757575 !important;
+}
+
+.data-card.adapter-disabled ::ng-deep .mat-expansion-panel-body {
+  background-color: #fafafa !important;
+}
+
+.data-card.adapter-disabled .instance-name-display {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #757575 !important;
+}
+
+.data-card.adapter-disabled .instance-name-text {
+  color: #757575 !important;
+}
+
+.data-card.adapter-disabled .guid-display {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.data-card.adapter-disabled .guid-text {
+  color: #757575 !important;
+}
+
+.data-card.adapter-disabled mat-icon {
+  color: #757575 !important;
+}
+
+.data-card.adapter-disabled .settings-button,
+.data-card.adapter-disabled .restart-button,
+.data-card.adapter-disabled .explorer-button {
+  color: #757575 !important;
+}
+
+/* Enabled adapter styling - normal, clearly visible */
+.data-card.adapter-enabled {
+  opacity: 1;
+  filter: grayscale(0);
+}
+
+.data-card.adapter-enabled ::ng-deep .mat-expansion-panel-header {
+  background-color: inherit;
+  transition: background-color 0.2s ease;
+}
+
+.data-card.adapter-enabled ::ng-deep .mat-expansion-panel-header:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.data-card.adapter-enabled .instance-name-display {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.data-card.adapter-enabled .instance-name-text {
+  color: inherit;
+  font-weight: 500;
+}
+
+.data-card.adapter-enabled .guid-display {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.data-card.adapter-enabled .guid-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.data-card.adapter-enabled mat-icon {
+  color: inherit;
+}
+
+.data-card.adapter-enabled .settings-button,
+.data-card.adapter-enabled .restart-button,
+.data-card.adapter-enabled .explorer-button {
+  color: rgba(0, 0, 0, 0.6);
+  transition: color 0.2s ease;
+}
+
+.data-card.adapter-enabled .settings-button:hover,
+.data-card.adapter-enabled .restart-button:hover,
+.data-card.adapter-enabled .explorer-button:hover {
+  color: rgba(0, 0, 0, 0.87);
+}
+
 /* CSV text container - restrict to 10 rows with vertical scrollbar */
 .csv-text-container {
   width: 100%;

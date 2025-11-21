@@ -1,6 +1,8 @@
 <mat-expansion-panel [(expanded)]="expanded" (opened)="onExpandedChange(true)" (closed)="onExpandedChange(false)" 
                      [class]="'data-card ' + (adapterName === 'CSV' ? 'csv-card' : 'sql-card')"
                      [class.disabled-card]="isDisabled"
+                     [class.adapter-disabled]="!isEnabled"
+                     [class.adapter-enabled]="isEnabled"
                      [disabled]="isDisabled">
   <mat-expansion-panel-header>
     <mat-panel-title>
