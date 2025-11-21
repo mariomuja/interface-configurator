@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
@@ -117,6 +118,25 @@ public class Diagnose
             }
             else
             {
+                // Get connection string details (without password)
+                var connectionString = _messageBoxContext.Database.GetConnectionString();
+                var connectionDetails = "Unknown";
+                if (!string.IsNullOrEmpty(connectionString))
+                {
+                    try
+                    {
+                        var parts = connectionString.Split(';');
+                        var server = parts.FirstOrDefault(p => p.StartsWith("Server=", StringComparison.OrdinalIgnoreCase))?.Substring(7) ?? "Unknown";
+                        var database = parts.FirstOrDefault(p => p.StartsWith("Initial Catalog=", StringComparison.OrdinalIgnoreCase))?.Substring(16) ?? "Unknown";
+                        var user = parts.FirstOrDefault(p => p.StartsWith("User ID=", StringComparison.OrdinalIgnoreCase))?.Substring(8) ?? "Unknown";
+                        connectionDetails = $"Server: {server}, Database: {database}, User: {user}";
+                    }
+                    catch
+                    {
+                        connectionDetails = "Could not parse connection string";
+                    }
+                }
+                
                 var canConnect = await _messageBoxContext.Database.CanConnectAsync(context.CancellationToken);
                 if (canConnect)
                 {
@@ -124,7 +144,7 @@ public class Diagnose
                     {
                         Name = "MessageBox Database Connection",
                         Status = "OK",
-                        Details = "Successfully connected to MessageBox database"
+                        Details = $"Successfully connected to MessageBox database. {connectionDetails}"
                     });
                     passedChecks++;
                 }
@@ -134,7 +154,7 @@ public class Diagnose
                     {
                         Name = "MessageBox Database Connection",
                         Status = "FAILED",
-                        Details = "Cannot connect to MessageBox database"
+                        Details = $"Cannot connect to MessageBox database. {connectionDetails}"
                     });
                     overallStatus = "FAILED";
                 }
@@ -219,34 +239,65 @@ public class Diagnose
         // Check 4: Environment Variables
         totalChecks++;
         var missingEnvVars = new List<string>();
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_SQL_SERVER")))
+        var envVarDetails = new List<string>();
+        
+        var sqlServer = Environment.GetEnvironmentVariable("AZURE_SQL_SERVER");
+        var sqlDatabase = Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE");
+        var sqlUser = Environment.GetEnvironmentVariable("AZURE_SQL_USER");
+        var sqlPassword = Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD");
+        
+        if (string.IsNullOrEmpty(sqlServer))
             missingEnvVars.Add("AZURE_SQL_SERVER");
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE")))
+        else
+            envVarDetails.Add($"AZURE_SQL_SERVER: {sqlServer}");
+            
+        if (string.IsNullOrEmpty(sqlDatabase))
             missingEnvVars.Add("AZURE_SQL_DATABASE");
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_SQL_USER")))
+        else
+            envVarDetails.Add($"AZURE_SQL_DATABASE: {sqlDatabase}");
+            
+        if (string.IsNullOrEmpty(sqlUser))
             missingEnvVars.Add("AZURE_SQL_USER");
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD")))
+        else
+            envVarDetails.Add($"AZURE_SQL_USER: {sqlUser}");
+            
+        if (string.IsNullOrEmpty(sqlPassword))
             missingEnvVars.Add("AZURE_SQL_PASSWORD");
+        else
+            envVarDetails.Add("AZURE_SQL_PASSWORD: *** (set)");
+            
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AzureWebJobsStorage")))
             missingEnvVars.Add("AzureWebJobsStorage");
+            
+        // Check if MessageBox database name is correct
+        if (!string.IsNullOrEmpty(sqlDatabase) && !sqlDatabase.Equals("MessageBox", StringComparison.OrdinalIgnoreCase))
+        {
+            envVarDetails.Add($"WARNING: AZURE_SQL_DATABASE is '{sqlDatabase}' but MessageBox uses 'MessageBox' database");
+        }
 
         if (missingEnvVars.Count == 0)
         {
+            var details = "All required environment variables are set. " + string.Join("; ", envVarDetails);
+            if (!string.IsNullOrEmpty(sqlDatabase) && !sqlDatabase.Equals("MessageBox", StringComparison.OrdinalIgnoreCase))
+            {
+                details += $". NOTE: MessageBox uses hardcoded database name 'MessageBox' (not '{sqlDatabase}')";
+            }
             checks.Add(new DiagnosticCheck
             {
                 Name = "Environment Variables",
                 Status = "OK",
-                Details = "All required environment variables are set"
+                Details = details
             });
             passedChecks++;
         }
         else
         {
+            var details = $"Missing: {string.Join(", ", missingEnvVars)}. " + string.Join("; ", envVarDetails);
             checks.Add(new DiagnosticCheck
             {
                 Name = "Environment Variables",
                 Status = "FAILED",
-                Details = $"Missing environment variables: {string.Join(", ", missingEnvVars)}"
+                Details = details
             });
             if (overallStatus == "OK")
                 overallStatus = "FAILED";
@@ -304,7 +355,7 @@ public class Diagnose
             });
         }
 
-        // Check 6: MessageBox Database Tables
+        // Check 6: MessageBox Database Tables and Data
         totalChecks++;
         try
         {
@@ -313,18 +364,74 @@ public class Diagnose
                 var canConnect = await _messageBoxContext.Database.CanConnectAsync(context.CancellationToken);
                 if (canConnect)
                 {
-                    // Try to query Messages table
-                    var tableExists = await _messageBoxContext.Database.ExecuteSqlRawAsync(
-                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Messages'",
-                        context.CancellationToken);
-                    
-                    checks.Add(new DiagnosticCheck
+                    // Check if Messages table exists and get row count
+                    try
                     {
-                        Name = "MessageBox Database Tables",
-                        Status = "OK",
-                        Details = "MessageBox tables exist or can be created"
-                    });
-                    passedChecks++;
+                        var messageCount = await _messageBoxContext.Messages.CountAsync(context.CancellationToken);
+                        
+                        // Check if AdapterInstances table exists (may not exist in older databases)
+                        var adapterInstanceCount = 0;
+                        var adapterInstancesTableExists = false;
+                        try
+                        {
+                            adapterInstanceCount = await _messageBoxContext.AdapterInstances.CountAsync(context.CancellationToken);
+                            adapterInstancesTableExists = true;
+                        }
+                        catch (Exception adapterEx)
+                        {
+                            // AdapterInstances table might not exist - that's OK, it will be created when needed
+                            adapterInstancesTableExists = false;
+                        }
+                        
+                        // Check if AdapterInstanceGuid column exists in Messages table
+                        var hasAdapterInstanceGuidColumn = false;
+                        try
+                        {
+                            var columnCheck = await _messageBoxContext.Database.ExecuteSqlRawAsync(
+                                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Messages' AND COLUMN_NAME = 'AdapterInstanceGuid'",
+                                context.CancellationToken);
+                            hasAdapterInstanceGuidColumn = true;
+                        }
+                        catch
+                        {
+                            hasAdapterInstanceGuidColumn = false;
+                        }
+                        
+                        var details = $"MessageBox tables exist. Messages: {messageCount}";
+                        if (adapterInstancesTableExists)
+                        {
+                            details += $", AdapterInstances: {adapterInstanceCount}";
+                        }
+                        else
+                        {
+                            details += " (AdapterInstances table will be created automatically when needed)";
+                        }
+                        
+                        if (!hasAdapterInstanceGuidColumn)
+                        {
+                            details += " | WARNING: AdapterInstanceGuid column missing in Messages table!";
+                        }
+                        
+                        var status = hasAdapterInstanceGuidColumn ? "OK" : "WARNING";
+                        checks.Add(new DiagnosticCheck
+                        {
+                            Name = "MessageBox Database Tables",
+                            Status = status,
+                            Details = details
+                        });
+                        if (status == "OK")
+                            passedChecks++;
+                    }
+                    catch (Exception tableEx)
+                    {
+                        // Table might not exist yet or have wrong structure
+                        checks.Add(new DiagnosticCheck
+                        {
+                            Name = "MessageBox Database Tables",
+                            Status = "WARNING",
+                            Details = $"Tables may need initialization. Error: {tableEx.Message}"
+                        });
+                    }
                 }
                 else
                 {

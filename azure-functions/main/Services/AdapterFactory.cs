@@ -89,7 +89,9 @@ public class AdapterFactory : IAdapterFactory
         var logger = _serviceProvider.GetService<ILogger<CsvAdapter>>();
 
         // Get adapter instance GUID, receive folder, file mask, batch size, field separator, and destination properties
-        Guid adapterInstanceGuid = isSource ? config.SourceAdapterInstanceGuid : config.DestinationAdapterInstanceGuid;
+        Guid adapterInstanceGuid = isSource 
+            ? (config.SourceAdapterInstanceGuid ?? Guid.NewGuid())
+            : (config.DestinationAdapterInstanceGuid ?? Guid.NewGuid());
         string? receiveFolder = isSource ? config.SourceReceiveFolder : null; // Only Source adapters have receive folder
         string? fileMask = isSource ? config.SourceFileMask : null; // Only Source adapters have file mask
         int? batchSize = isSource ? config.SourceBatchSize : null; // Only Source adapters have batch size
@@ -154,7 +156,7 @@ public class AdapterFactory : IAdapterFactory
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
-            var isEnabled = isSource ? config.SourceIsEnabled : config.DestinationIsEnabled;
+            var isEnabled = isSource ? (config.SourceIsEnabled ?? true) : (config.DestinationIsEnabled ?? true);
             
             // Fire and forget - don't block adapter creation
             _ = Task.Run(async () =>
@@ -164,8 +166,8 @@ public class AdapterFactory : IAdapterFactory
                     await messageBoxService.EnsureAdapterInstanceAsync(
                         adapterInstanceGuid,
                         config.InterfaceName,
-                        instanceName,
-                        adapterName,
+                        instanceName ?? (isSource ? "Source" : "Destination"),
+                        adapterName ?? (isSource ? "CSV" : "SqlServer"),
                         isSource ? "Source" : "Destination",
                         isEnabled,
                         CancellationToken.None);
@@ -214,7 +216,9 @@ public class AdapterFactory : IAdapterFactory
         var logger = _serviceProvider.GetService<ILogger<SqlServerAdapter>>();
 
         // Get adapter instance GUID
-        Guid adapterInstanceGuid = isSource ? config.SourceAdapterInstanceGuid : config.DestinationAdapterInstanceGuid;
+        Guid adapterInstanceGuid = isSource 
+            ? (config.SourceAdapterInstanceGuid ?? Guid.NewGuid())
+            : (config.DestinationAdapterInstanceGuid ?? Guid.NewGuid());
 
         // Build connection string from configuration if SQL Server properties are provided
         string? connectionString = null;
@@ -251,7 +255,7 @@ public class AdapterFactory : IAdapterFactory
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
-            var isEnabled = isSource ? config.SourceIsEnabled : config.DestinationIsEnabled;
+            var isEnabled = isSource ? (config.SourceIsEnabled ?? true) : (config.DestinationIsEnabled ?? true);
             
             // Fire and forget - don't block adapter creation
             _ = Task.Run(async () =>
@@ -261,8 +265,8 @@ public class AdapterFactory : IAdapterFactory
                     await messageBoxService.EnsureAdapterInstanceAsync(
                         adapterInstanceGuid,
                         config.InterfaceName,
-                        instanceName,
-                        adapterName,
+                        instanceName ?? (isSource ? "Source" : "Destination"),
+                        adapterName ?? (isSource ? "CSV" : "SqlServer"),
                         isSource ? "Source" : "Destination",
                         isEnabled,
                         CancellationToken.None);

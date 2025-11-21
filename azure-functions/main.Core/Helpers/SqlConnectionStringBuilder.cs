@@ -101,7 +101,7 @@ public static class SqlConnectionStringBuilder
             config.SqlDatabaseName,
             config.SqlUserName,
             config.SqlPassword,
-            config.SqlIntegratedSecurity);
+            config.SqlIntegratedSecurity ?? false);
     }
 }
 

@@ -65,24 +65,40 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                         
                         if (!string.IsNullOrWhiteSpace(jsonContent))
                         {
-                            var configs = JsonSerializer.Deserialize<List<InterfaceConfiguration>>(jsonContent);
+                            var options = new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            };
+                            var configs = JsonSerializer.Deserialize<List<InterfaceConfiguration>>(jsonContent, options);
                             bool needsSave = false;
                             if (configs != null)
                             {
                                 foreach (var config in configs)
                                 {
-                                    // Ensure adapter instance GUIDs are set (for backward compatibility)
-                                    if (config.SourceAdapterInstanceGuid == null || config.SourceAdapterInstanceGuid == Guid.Empty)
+                                    // Migrate from old format to new format if needed
+                                    if (config.Sources.Count == 0 && !string.IsNullOrEmpty(config.SourceAdapterName))
                                     {
-                                        config.SourceAdapterInstanceGuid = Guid.NewGuid();
+                                        _logger?.LogInformation("Migrating interface {InterfaceName} from old format to new format", config.InterfaceName);
+                                        MigrateToNewFormat(config);
                                         needsSave = true;
-                                        _logger?.LogInformation("Generated SourceAdapterInstanceGuid for interface {InterfaceName}", config.InterfaceName);
                                     }
-                                    if (config.DestinationAdapterInstanceGuid == null || config.DestinationAdapterInstanceGuid == Guid.Empty)
+                                    
+                                    // Ensure Sources dictionary has at least one entry
+                                    if (config.Sources.Count == 0)
                                     {
-                                        config.DestinationAdapterInstanceGuid = Guid.NewGuid();
+                                        _logger?.LogWarning("Interface {InterfaceName} has no sources. Creating default source.", config.InterfaceName);
+                                        var defaultSource = CreateDefaultSourceInstance(config);
+                                        config.Sources[defaultSource.InstanceName] = defaultSource;
                                         needsSave = true;
-                                        _logger?.LogInformation("Generated DestinationAdapterInstanceGuid for interface {InterfaceName}", config.InterfaceName);
+                                    }
+                                    
+                                    // Ensure Destinations dictionary has at least one entry
+                                    if (config.Destinations.Count == 0)
+                                    {
+                                        _logger?.LogWarning("Interface {InterfaceName} has no destinations. Creating default destination.", config.InterfaceName);
+                                        var defaultDest = CreateDefaultDestinationInstance(config);
+                                        config.Destinations[defaultDest.InstanceName] = defaultDest;
+                                        needsSave = true;
                                     }
                                     
                                     _configurations[config.InterfaceName] = config;
@@ -206,46 +222,237 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             InterfaceName = DefaultInterfaceName,
             Description = "Default CSV to SQL Server interface created automatically.",
-            SourceAdapterName = "CSV",
-            SourceConfiguration = JsonSerializer.Serialize(new { source = "csv-incoming", enabled = true }),
-            DestinationAdapterName = "SqlServer",
-            DestinationConfiguration = JsonSerializer.Serialize(new { destination = "TransportData", enabled = true }),
-            SourceIsEnabled = true,
-            DestinationIsEnabled = true,
-            SourceInstanceName = "CSV Source",
-            DestinationInstanceName = "SQL Destination",
-            SourceAdapterInstanceGuid = Guid.NewGuid(),
-            DestinationAdapterInstanceGuid = Guid.NewGuid(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        // Create source adapter instance
+        var sourceInstance = new SourceAdapterInstance
+        {
+            InstanceName = "CSV Source",
+            AdapterName = "CSV",
+            IsEnabled = true,
+            AdapterInstanceGuid = Guid.NewGuid(),
+            Configuration = JsonSerializer.Serialize(new { source = "csv-incoming", enabled = true }),
             SourceReceiveFolder = "csv-incoming",
             SourceFileMask = "*.txt",
             SourceBatchSize = 100,
             SourceFieldSeparator = "║",
             CsvPollingInterval = 10,
-            CsvAdapterType = "RAW",
-            CsvData = "Id║FirstName║LastName║Email║City\n1║Max║Mustermann║max@example.com║Berlin\n2║Anna║Schmidt║anna@example.com║München",
-            DestinationFileMask = "*.txt",
+            CsvAdapterType = "FILE",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        configuration.Sources[sourceInstance.InstanceName] = sourceInstance;
+
+        // Create destination adapter instance
+        var destInstance = new DestinationAdapterInstance
+        {
+            InstanceName = "SQL Destination",
+            AdapterName = "SqlServer",
+            IsEnabled = true,
+            AdapterInstanceGuid = Guid.NewGuid(),
+            Configuration = destinationInstanceConfig,
             SqlServerName = sqlServer,
             SqlDatabaseName = sqlDatabase,
             SqlUserName = sqlUser,
             SqlPassword = sqlPassword,
             SqlIntegratedSecurity = false,
             SqlTableName = "TransportData",
+            SqlUseTransaction = false,
+            SqlBatchSize = 1000,
+            SqlCommandTimeout = 30,
+            SqlFailOnBadStatement = false,
             CreatedAt = now,
             UpdatedAt = now
         };
-
-        configuration.DestinationAdapterInstances.Add(new DestinationAdapterInstance
-        {
-            AdapterInstanceGuid = Guid.NewGuid(),
-            InstanceName = "SqlServer Adapter 1",
-            AdapterName = "SqlServer",
-            IsEnabled = true,
-            Configuration = destinationInstanceConfig,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
+        configuration.Destinations[destInstance.InstanceName] = destInstance;
+        
         return configuration;
+    }
+
+    /// <summary>
+    /// Migrates an InterfaceConfiguration from old format (flat properties) to new format (Sources/Destinations dictionaries)
+    /// </summary>
+    private void MigrateToNewFormat(InterfaceConfiguration config)
+    {
+        // Migrate source if old properties exist and Sources dictionary is empty
+        if (config.Sources.Count == 0 && !string.IsNullOrEmpty(config.SourceAdapterName))
+        {
+            var sourceInstance = new SourceAdapterInstance
+            {
+                InstanceName = config.SourceInstanceName ?? "Source",
+                AdapterName = config.SourceAdapterName,
+                IsEnabled = config.SourceIsEnabled ?? true,
+                AdapterInstanceGuid = config.SourceAdapterInstanceGuid ?? Guid.NewGuid(),
+                Configuration = config.SourceConfiguration ?? string.Empty,
+                // CSV Properties
+                SourceReceiveFolder = config.SourceReceiveFolder,
+                SourceFileMask = config.SourceFileMask ?? "*.txt",
+                SourceBatchSize = config.SourceBatchSize ?? 100,
+                SourceFieldSeparator = config.SourceFieldSeparator ?? "║",
+                CsvData = config.CsvData,
+                CsvAdapterType = config.CsvAdapterType ?? "FILE",
+                CsvPollingInterval = config.CsvPollingInterval ?? 10,
+                // SFTP Properties
+                SftpHost = config.SftpHost,
+                SftpPort = config.SftpPort ?? 22,
+                SftpUsername = config.SftpUsername,
+                SftpPassword = config.SftpPassword,
+                SftpSshKey = config.SftpSshKey,
+                SftpFolder = config.SftpFolder,
+                SftpFileMask = config.SftpFileMask ?? "*.txt",
+                SftpMaxConnectionPoolSize = config.SftpMaxConnectionPoolSize ?? 5,
+                SftpFileBufferSize = config.SftpFileBufferSize ?? 8192,
+                // SQL Properties (for SQL Source)
+                SqlServerName = config.SqlServerName,
+                SqlDatabaseName = config.SqlDatabaseName,
+                SqlUserName = config.SqlUserName,
+                SqlPassword = config.SqlPassword,
+                SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false,
+                SqlResourceGroup = config.SqlResourceGroup,
+                SqlPollingStatement = config.SqlPollingStatement,
+                SqlPollingInterval = config.SqlPollingInterval ?? 60,
+                SqlTableName = config.SqlTableName,
+                SqlUseTransaction = config.SqlUseTransaction ?? false,
+                SqlBatchSize = config.SqlBatchSize ?? 1000,
+                SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
+                SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
+                CreatedAt = config.CreatedAt,
+                UpdatedAt = config.UpdatedAt ?? DateTime.UtcNow
+            };
+            
+            config.Sources[sourceInstance.InstanceName] = sourceInstance;
+            _logger?.LogInformation("Migrated source adapter instance '{InstanceName}' for interface {InterfaceName}", 
+                sourceInstance.InstanceName, config.InterfaceName);
+        }
+
+        // Migrate destinations from old DestinationAdapterInstances list or old properties
+        if (config.Destinations.Count == 0)
+        {
+            // First, try to migrate from DestinationAdapterInstances list
+            if (config.DestinationAdapterInstances != null && config.DestinationAdapterInstances.Count > 0)
+            {
+                foreach (var oldDest in config.DestinationAdapterInstances)
+                {
+                    var destInstance = new DestinationAdapterInstance
+                    {
+                        InstanceName = oldDest.InstanceName,
+                        AdapterName = oldDest.AdapterName,
+                        IsEnabled = oldDest.IsEnabled,
+                        AdapterInstanceGuid = oldDest.AdapterInstanceGuid,
+                        Configuration = oldDest.Configuration,
+                        // Copy SQL properties from config if not already set in instance
+                        SqlServerName = config.SqlServerName ?? oldDest.SqlServerName,
+                        SqlDatabaseName = config.SqlDatabaseName ?? oldDest.SqlDatabaseName,
+                        SqlUserName = config.SqlUserName ?? oldDest.SqlUserName,
+                        SqlPassword = config.SqlPassword ?? oldDest.SqlPassword,
+                        SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? oldDest.SqlIntegratedSecurity,
+                        SqlResourceGroup = config.SqlResourceGroup ?? oldDest.SqlResourceGroup,
+                        SqlTableName = config.SqlTableName ?? oldDest.SqlTableName,
+                        SqlUseTransaction = config.SqlUseTransaction ?? oldDest.SqlUseTransaction,
+                        SqlBatchSize = config.SqlBatchSize ?? oldDest.SqlBatchSize,
+                        SqlCommandTimeout = config.SqlCommandTimeout ?? oldDest.SqlCommandTimeout,
+                        SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? oldDest.SqlFailOnBadStatement,
+                        // CSV Destination Properties
+                        DestinationReceiveFolder = config.DestinationReceiveFolder,
+                        DestinationFileMask = config.DestinationFileMask ?? "*.txt",
+                        CreatedAt = oldDest.CreatedAt,
+                        UpdatedAt = oldDest.UpdatedAt ?? DateTime.UtcNow
+                    };
+                    
+                    config.Destinations[destInstance.InstanceName] = destInstance;
+                    _logger?.LogInformation("Migrated destination adapter instance '{InstanceName}' for interface {InterfaceName}", 
+                        destInstance.InstanceName, config.InterfaceName);
+                }
+            }
+            // If no list exists, migrate from old flat properties
+            else if (!string.IsNullOrEmpty(config.DestinationAdapterName))
+            {
+                var destInstance = new DestinationAdapterInstance
+                {
+                    InstanceName = config.DestinationInstanceName ?? "Destination",
+                    AdapterName = config.DestinationAdapterName,
+                    IsEnabled = config.DestinationIsEnabled ?? true,
+                    AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
+                    Configuration = config.DestinationConfiguration ?? string.Empty,
+                    // SQL Properties
+                    SqlServerName = config.SqlServerName,
+                    SqlDatabaseName = config.SqlDatabaseName,
+                    SqlUserName = config.SqlUserName,
+                    SqlPassword = config.SqlPassword,
+                    SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false,
+                    SqlResourceGroup = config.SqlResourceGroup,
+                    SqlTableName = config.SqlTableName,
+                    SqlUseTransaction = config.SqlUseTransaction ?? false,
+                    SqlBatchSize = config.SqlBatchSize ?? 1000,
+                    SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
+                    SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
+                    // CSV Destination Properties
+                    DestinationReceiveFolder = config.DestinationReceiveFolder,
+                    DestinationFileMask = config.DestinationFileMask ?? "*.txt",
+                    CreatedAt = config.CreatedAt,
+                    UpdatedAt = config.UpdatedAt ?? DateTime.UtcNow
+                };
+                
+                config.Destinations[destInstance.InstanceName] = destInstance;
+                _logger?.LogInformation("Migrated destination adapter instance '{InstanceName}' for interface {InterfaceName}", 
+                    destInstance.InstanceName, config.InterfaceName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates a default source instance from old format properties (used during migration)
+    /// </summary>
+    private SourceAdapterInstance CreateDefaultSourceInstance(InterfaceConfiguration config)
+    {
+        return new SourceAdapterInstance
+        {
+            InstanceName = config.SourceInstanceName ?? "Source",
+            AdapterName = config.SourceAdapterName ?? "CSV",
+            IsEnabled = config.SourceIsEnabled ?? true,
+            AdapterInstanceGuid = config.SourceAdapterInstanceGuid ?? Guid.NewGuid(),
+            Configuration = config.SourceConfiguration ?? string.Empty,
+            SourceReceiveFolder = config.SourceReceiveFolder ?? "csv-incoming",
+            SourceFileMask = config.SourceFileMask ?? "*.txt",
+            SourceBatchSize = config.SourceBatchSize ?? 100,
+            SourceFieldSeparator = config.SourceFieldSeparator ?? "║",
+            CsvData = config.CsvData,
+            CsvAdapterType = config.CsvAdapterType ?? "FILE",
+            CsvPollingInterval = config.CsvPollingInterval ?? 10,
+            CreatedAt = config.CreatedAt,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Creates a default destination instance from old format properties (used during migration)
+    /// </summary>
+    private DestinationAdapterInstance CreateDefaultDestinationInstance(InterfaceConfiguration config)
+    {
+        return new DestinationAdapterInstance
+        {
+            InstanceName = config.DestinationInstanceName ?? "Destination",
+            AdapterName = config.DestinationAdapterName ?? "SqlServer",
+            IsEnabled = config.DestinationIsEnabled ?? true,
+            AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
+            Configuration = config.DestinationConfiguration ?? string.Empty,
+            SqlServerName = config.SqlServerName,
+            SqlDatabaseName = config.SqlDatabaseName,
+            SqlUserName = config.SqlUserName,
+            SqlPassword = config.SqlPassword,
+            SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false,
+            SqlTableName = config.SqlTableName,
+            SqlUseTransaction = config.SqlUseTransaction ?? false,
+            SqlBatchSize = config.SqlBatchSize ?? 1000,
+            SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
+            SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
+            DestinationReceiveFolder = config.DestinationReceiveFolder,
+            DestinationFileMask = config.DestinationFileMask ?? "*.txt",
+            CreatedAt = config.CreatedAt,
+            UpdatedAt = DateTime.UtcNow
+        };
     }
 
     public async Task<List<InterfaceConfiguration>> GetAllConfigurationsAsync(CancellationToken cancellationToken = default)
@@ -282,9 +489,31 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            return _configurations.Values
-                .Where(c => c.SourceIsEnabled)
+            var allConfigs = _configurations.Values.ToList();
+            _logger?.LogInformation("DEBUG GetEnabledSourceConfigurationsAsync: Total configs in memory: {Count}", allConfigs.Count);
+            
+            // Filter configurations that have at least one enabled source adapter instance
+            var enabledConfigs = _configurations.Values
+                .Where(c => c.Sources.Values.Any(s => s.IsEnabled))
                 .ToList();
+            
+            _logger?.LogInformation("DEBUG GetEnabledSourceConfigurationsAsync: Found {Count} enabled source configurations (filtered from {Total} total)", 
+                enabledConfigs.Count, allConfigs.Count);
+            
+            // Debug logging
+            foreach (var cfg in allConfigs)
+            {
+                var enabledSources = cfg.Sources.Values.Where(s => s.IsEnabled).ToList();
+                _logger?.LogInformation("DEBUG GetEnabledSourceConfigurationsAsync: Config {InterfaceName} - Enabled sources: {Count}",
+                    cfg.InterfaceName, enabledSources.Count);
+                foreach (var source in enabledSources)
+                {
+                    _logger?.LogInformation("DEBUG GetEnabledSourceConfigurationsAsync:   Source '{InstanceName}': Adapter={AdapterName}, IsEnabled={IsEnabled}",
+                        source.InstanceName, source.AdapterName, source.IsEnabled);
+                }
+            }
+            
+            return enabledConfigs;
         }
         finally
         {
@@ -298,8 +527,9 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         await _lock.WaitAsync(cancellationToken);
         try
         {
+            // Filter configurations that have at least one enabled destination adapter instance
             return _configurations.Values
-                .Where(c => c.DestinationIsEnabled)
+                .Where(c => c.Destinations.Values.Any(d => d.IsEnabled))
                 .ToList();
         }
         finally
@@ -349,7 +579,12 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             if (_configurations.TryGetValue(interfaceName, out var config))
             {
-                config.SourceIsEnabled = enabled;
+                // Enable/disable all source adapter instances
+                foreach (var source in config.Sources.Values)
+                {
+                    source.IsEnabled = enabled;
+                    source.UpdatedAt = DateTime.UtcNow;
+                }
                 config.UpdatedAt = DateTime.UtcNow;
             }
         }
@@ -369,7 +604,12 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             if (_configurations.TryGetValue(interfaceName, out var config))
             {
-                config.DestinationIsEnabled = enabled;
+                // Enable/disable all destination adapter instances
+                foreach (var dest in config.Destinations.Values)
+                {
+                    dest.IsEnabled = enabled;
+                    dest.UpdatedAt = DateTime.UtcNow;
+                }
                 config.UpdatedAt = DateTime.UtcNow;
             }
         }
@@ -735,11 +975,11 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     {
                         new DestinationAdapterInstance
                         {
-                            AdapterInstanceGuid = config.DestinationAdapterInstanceGuid,
-                            InstanceName = config.DestinationInstanceName,
-                            AdapterName = config.DestinationAdapterName,
-                            IsEnabled = config.DestinationIsEnabled,
-                            Configuration = config.DestinationConfiguration,
+                            AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
+                            InstanceName = config.DestinationInstanceName ?? "Destination",
+                            AdapterName = config.DestinationAdapterName ?? "SqlServer",
+                            IsEnabled = config.DestinationIsEnabled ?? true,
+                            Configuration = config.DestinationConfiguration ?? string.Empty,
                             CreatedAt = config.CreatedAt,
                             UpdatedAt = config.UpdatedAt
                         }

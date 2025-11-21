@@ -55,6 +55,30 @@ public class MessageBoxDatabaseInitializer : IHostedService
             {
                 _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics");
                 
+                // Check if Messages table has required columns (AdapterInstanceGuid, MessageHash, etc.)
+                try
+                {
+                    var hasAdapterInstanceGuid = await messageBoxContext.Database.ExecuteSqlRawAsync(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Messages' AND COLUMN_NAME = 'AdapterInstanceGuid'",
+                        cancellationToken);
+                    
+                    if (hasAdapterInstanceGuid == 0)
+                    {
+                        _logger.LogError("CRITICAL: Messages table is missing required column 'AdapterInstanceGuid'. " +
+                            "The table structure does not match the model. " +
+                            "Please run update-messagebox-database.sql to add missing columns. " +
+                            "Messages cannot be written until the table structure is fixed.");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Verified Messages table has required columns (AdapterInstanceGuid exists)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not verify Messages table structure. It may need to be updated manually.");
+                }
+                
                 // Ensure ProcessingStatistics table exists (in case it was added after initial creation)
                 try
                 {

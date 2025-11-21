@@ -64,11 +64,30 @@ public class CreateInterfaceConfiguration
                 // Get adapter aliases by creating temporary adapters
                 var tempConfig = new InterfaceConfiguration
                 {
-                    SourceAdapterName = sourceAdapterName,
-                    DestinationAdapterName = destinationAdapterName,
-                    SourceConfiguration = request.SourceConfiguration ?? JsonSerializer.Serialize(new { source = "" }),
-                    DestinationConfiguration = request.DestinationConfiguration ?? JsonSerializer.Serialize(new { destination = "" })
+                    InterfaceName = "temp"
                 };
+                
+                // Create temporary source instance
+                var tempSourceInstance = new SourceAdapterInstance
+                {
+                    InstanceName = "temp",
+                    AdapterName = sourceAdapterName,
+                    IsEnabled = true,
+                    AdapterInstanceGuid = Guid.NewGuid(),
+                    Configuration = request.SourceConfiguration ?? JsonSerializer.Serialize(new { source = "" })
+                };
+                tempConfig.Sources["temp"] = tempSourceInstance;
+                
+                // Create temporary destination instance
+                var tempDestInstance = new DestinationAdapterInstance
+                {
+                    InstanceName = "temp",
+                    AdapterName = destinationAdapterName,
+                    IsEnabled = true,
+                    AdapterInstanceGuid = Guid.NewGuid(),
+                    Configuration = request.DestinationConfiguration ?? JsonSerializer.Serialize(new { destination = "" })
+                };
+                tempConfig.Destinations["temp"] = tempDestInstance;
                 
                 try
                 {
@@ -95,24 +114,44 @@ public class CreateInterfaceConfiguration
                 return response;
             }
 
-            // Create new configuration
+            // Create new configuration with new structure
             var config = new InterfaceConfiguration
             {
                 InterfaceName = interfaceName,
-                SourceAdapterName = request.SourceAdapterName ?? "CSV",
-                SourceConfiguration = request.SourceConfiguration ?? JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
-                DestinationAdapterName = request.DestinationAdapterName ?? "SqlServer",
-                DestinationConfiguration = request.DestinationConfiguration ?? JsonSerializer.Serialize(new { destination = "TransportData" }),
-                SourceIsEnabled = request.SourceIsEnabled ?? true,
-                DestinationIsEnabled = request.DestinationIsEnabled ?? true,
-                SourceInstanceName = request.SourceInstanceName ?? "Source",
-                DestinationInstanceName = request.DestinationInstanceName ?? "Destination",
-                SourceAdapterInstanceGuid = Guid.NewGuid(), // Generate GUID for source adapter instance
-                DestinationAdapterInstanceGuid = Guid.NewGuid(), // Generate GUID for destination adapter instance
                 Description = request.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
+            // Create source instance
+            var sourceInstanceName = request.SourceInstanceName ?? "Source";
+            var sourceInstance = new SourceAdapterInstance
+            {
+                InstanceName = sourceInstanceName,
+                AdapterName = request.SourceAdapterName ?? "CSV",
+                IsEnabled = request.SourceIsEnabled ?? true,
+                AdapterInstanceGuid = Guid.NewGuid(),
+                Configuration = request.SourceConfiguration ?? JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
+                SourceFieldSeparator = "║",
+                CsvPollingInterval = 10,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            config.Sources[sourceInstanceName] = sourceInstance;
+
+            // Create destination instance
+            var destInstanceName = request.DestinationInstanceName ?? "Destination";
+            var destInstance = new DestinationAdapterInstance
+            {
+                InstanceName = destInstanceName,
+                AdapterName = request.DestinationAdapterName ?? "SqlServer",
+                IsEnabled = request.DestinationIsEnabled ?? true,
+                AdapterInstanceGuid = Guid.NewGuid(),
+                Configuration = request.DestinationConfiguration ?? JsonSerializer.Serialize(new { destination = "TransportData" }),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            config.Destinations[destInstanceName] = destInstance;
 
             await _configService.SaveConfigurationAsync(config, executionContext.CancellationToken);
 

@@ -14,12 +14,19 @@ BEGIN
         [InterfaceName] NVARCHAR(200) NOT NULL, -- e.g., "FromCsvToSqlServerExample"
         [AdapterName] NVARCHAR(100) NOT NULL, -- e.g., "CSV", "SqlServer", "JSON", "SAP"
         [AdapterType] NVARCHAR(50) NOT NULL, -- "Source" or "Destination"
+        [AdapterInstanceGuid] UNIQUEIDENTIFIER NOT NULL, -- GUID identifying the adapter instance that created this message
         [MessageData] NVARCHAR(MAX) NOT NULL, -- JSON format: {"headers": [...], "record": {...}} - single record per message (debatching)
-        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- "Pending", "Processed", "Error"
+        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- "Pending", "InProgress", "Processed", "Error", "DeadLetter"
         [datetime_created] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
         [datetime_processed] DATETIME2 NULL,
         [ErrorMessage] NVARCHAR(MAX) NULL,
-        [ProcessingDetails] NVARCHAR(MAX) NULL
+        [ProcessingDetails] NVARCHAR(MAX) NULL,
+        [MessageHash] NVARCHAR(64) NULL, -- SHA256 hash for idempotency checking
+        [RetryCount] INT NOT NULL DEFAULT 0, -- Number of retry attempts
+        [MaxRetries] INT NOT NULL DEFAULT 3, -- Maximum number of retries
+        [InProgressUntil] DATETIME2 NULL, -- Lock expiration time for in-progress messages
+        [LastRetryTime] DATETIME2 NULL, -- Last time a retry was attempted
+        [DeadLetter] BIT NOT NULL DEFAULT 0 -- Whether message is in dead letter queue
     );
     
     CREATE INDEX [IX_Messages_InterfaceName] ON [dbo].[Messages]([InterfaceName]);
@@ -28,6 +35,8 @@ BEGIN
     CREATE INDEX [IX_Messages_Status] ON [dbo].[Messages]([Status]);
     CREATE INDEX [IX_Messages_datetime_created] ON [dbo].[Messages]([datetime_created] DESC);
     CREATE INDEX [IX_Messages_Status_InterfaceName] ON [dbo].[Messages]([Status], [InterfaceName]);
+    CREATE INDEX [IX_Messages_AdapterInstanceGuid] ON [dbo].[Messages]([AdapterInstanceGuid]);
+    CREATE INDEX [IX_Messages_MessageHash] ON [dbo].[Messages]([MessageHash]);
     
     PRINT 'Messages table created successfully';
 END
@@ -88,6 +97,32 @@ END
 ELSE
 BEGIN
     PRINT 'ProcessLogs table already exists';
+END
+GO
+
+-- Create AdapterInstances table (tracks adapter instance metadata)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[AdapterInstances]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[AdapterInstances] (
+        [AdapterInstanceGuid] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        [InterfaceName] NVARCHAR(200) NOT NULL,
+        [InstanceName] NVARCHAR(200) NOT NULL,
+        [AdapterName] NVARCHAR(100) NOT NULL,
+        [AdapterType] NVARCHAR(50) NOT NULL,
+        [IsEnabled] BIT NOT NULL DEFAULT 1,
+        [datetime_created] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        [datetime_updated] DATETIME2 NULL
+    );
+    
+    CREATE INDEX [IX_AdapterInstances_InterfaceName] ON [dbo].[AdapterInstances]([InterfaceName]);
+    CREATE INDEX [IX_AdapterInstances_AdapterName] ON [dbo].[AdapterInstances]([AdapterName]);
+    CREATE INDEX [IX_AdapterInstances_AdapterType] ON [dbo].[AdapterInstances]([AdapterType]);
+    
+    PRINT 'AdapterInstances table created successfully';
+END
+ELSE
+BEGIN
+    PRINT 'AdapterInstances table already exists';
 END
 GO
 

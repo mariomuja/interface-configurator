@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Adapters;
 using InterfaceConfigurator.Main.Core.Helpers;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Services;
 
 namespace InterfaceConfigurator.Main;
@@ -51,7 +52,16 @@ public class MainFunction
         string? blobName = name;
         try
         {
+            _logger.LogInformation("=== BLOB TRIGGER ACTIVATED ===");
             _logger.LogInformation("Blob trigger received for blob: {BlobName}", blobName);
+            _logger.LogInformation("Blob stream length: {Length} bytes", blobStream?.Length ?? 0);
+            _logger.LogInformation("MainStorageConnection configured: {IsConfigured}", 
+                !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MainStorageConnection")));
+            
+            // Force initialization of configuration service before processing
+            _logger.LogInformation("DEBUG: Forcing configuration service initialization...");
+            await _configService.InitializeAsync(context.CancellationToken);
+            _logger.LogInformation("DEBUG: Configuration service initialization completed");
 
             // Use CsvAdapter to read CSV from blob storage and write to MessageBox
             // The CsvAdapter.ReadAsync will automatically:
@@ -103,8 +113,32 @@ public class MainFunction
                 
                 // Get all enabled CSV source configurations and process blob for each
                 // This ensures messages are written with the correct interface name and adapter instance GUID
+                
+                // Debug: Get all configurations first to ensure they're loaded
+                var allConfigs = await _configService.GetAllConfigurationsAsync(context.CancellationToken);
+                _logger.LogInformation("DEBUG: Total configurations loaded: {TotalCount}", allConfigs.Count);
+                foreach (var cfg in allConfigs)
+                {
+                    _logger.LogInformation("DEBUG: Config {InterfaceName}: SourceIsEnabled={SourceIsEnabled} (type: {Type}), SourceAdapterName={SourceAdapterName}, SourceAdapterInstanceGuid={Guid}",
+                        cfg.InterfaceName, cfg.SourceIsEnabled, cfg.SourceIsEnabled.GetType().Name, cfg.SourceAdapterName, cfg.SourceAdapterInstanceGuid);
+                }
+                
+                // Now get enabled configurations
                 var enabledConfigs = await _configService.GetEnabledSourceConfigurationsAsync(context.CancellationToken);
-                var csvConfigs = enabledConfigs.Where(c => c.SourceAdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase)).ToList();
+                _logger.LogInformation("DEBUG: GetEnabledSourceConfigurationsAsync returned {Count} configurations", enabledConfigs.Count);
+                foreach (var cfg in enabledConfigs)
+                {
+                    _logger.LogInformation("DEBUG: Enabled config {InterfaceName}: SourceIsEnabled={SourceIsEnabled}, SourceAdapterName={SourceAdapterName}",
+                        cfg.InterfaceName, cfg.SourceIsEnabled, cfg.SourceAdapterName);
+                }
+                
+                // Filter configurations that have CSV source adapters
+                var csvConfigs = enabledConfigs
+                    .Where(c => c.Sources.Values.Any(s => s.AdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase) && s.IsEnabled))
+                    .ToList();
+                
+                _logger.LogInformation("Found {TotalConfigs} enabled configurations, {CsvConfigs} CSV configurations for blob {BlobName}",
+                    enabledConfigs.Count, csvConfigs.Count, blobName);
                 
                 if (!csvConfigs.Any())
                 {
@@ -114,29 +148,71 @@ public class MainFunction
                 }
                 
                 // Process blob for each enabled CSV source configuration
+                var processedCount = 0;
+                var errorCount = 0;
                 foreach (var config in csvConfigs)
                 {
-                    try
+                    // Get all enabled CSV source instances for this interface
+                    var csvSources = config.Sources.Values
+                        .Where(s => s.AdapterName.Equals("CSV", StringComparison.OrdinalIgnoreCase) && s.IsEnabled)
+                        .ToList();
+                    
+                    foreach (var sourceInstance in csvSources)
                     {
-                        _logger.LogInformation("Processing CSV blob {BlobName} for interface {InterfaceName} with adapter instance GUID {AdapterInstanceGuid}",
-                            blobName, config.InterfaceName, config.SourceAdapterInstanceGuid);
-                        
-                        // Create adapter with correct interface name and adapter instance GUID
-                        var csvAdapter = await _adapterFactory.CreateSourceAdapterAsync(config, context.CancellationToken);
+                        try
+                        {
+                            _logger.LogInformation("Processing CSV blob {BlobName} for interface {InterfaceName} with source instance '{InstanceName}' (GUID: {AdapterInstanceGuid})",
+                                blobName, config.InterfaceName, sourceInstance.InstanceName, sourceInstance.AdapterInstanceGuid);
+                            
+                            // Verify configuration has required values
+                            if (sourceInstance.AdapterInstanceGuid == Guid.Empty)
+                            {
+                                _logger.LogError("AdapterInstanceGuid is empty for source instance '{InstanceName}' in interface {InterfaceName}. Skipping.", 
+                                    sourceInstance.InstanceName, config.InterfaceName);
+                                errorCount++;
+                                continue;
+                            }
+                            
+                            if (string.IsNullOrWhiteSpace(config.InterfaceName))
+                            {
+                                _logger.LogError("InterfaceName is empty for configuration. Skipping.");
+                                errorCount++;
+                                continue;
+                            }
+                            
+                            // Create a temporary config with this source instance for the adapter factory
+                            // The adapter factory expects InterfaceConfiguration, so we create a temporary one
+                            var tempConfig = CreateTempConfigForSource(config, sourceInstance);
+                            
+                            // Create adapter with correct interface name and adapter instance GUID
+                            var csvAdapter = await _adapterFactory.CreateSourceAdapterAsync(tempConfig, context.CancellationToken);
                         if (csvAdapter is CsvAdapter csv)
                         {
+                            _logger.LogInformation("CsvAdapter created successfully. Calling ReadAsync to process blob and write to MessageBox...");
                             var (headers, records) = await csv.ReadAsync(sourcePath, context.CancellationToken);
                             
-                            _logger.LogInformation("Successfully processed CSV blob {BlobName} for interface {InterfaceName}: {HeaderCount} headers, {RecordCount} records written to MessageBox.",
+                            _logger.LogInformation("Successfully processed CSV blob {BlobName} for interface {InterfaceName}: {HeaderCount} headers, {RecordCount} records. " +
+                                "Messages should have been written to MessageBox (check logs for 'Successfully debatched and wrote' messages).",
                                 blobName, config.InterfaceName, headers.Count, records.Count);
+                            processedCount++;
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Adapter is not CsvAdapter type: {AdapterType}", csvAdapter?.GetType().Name ?? "null");
+                            errorCount++;
+                        }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error processing CSV blob {BlobName} for interface {InterfaceName}, source instance '{InstanceName}': {ErrorMessage}",
+                                blobName, config.InterfaceName, sourceInstance.InstanceName, ex.Message);
+                            errorCount++;
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing CSV blob {BlobName} for interface {InterfaceName}", blobName, config.InterfaceName);
-                        // Continue with other configurations
-                    }
                 }
+                
+                _logger.LogInformation("Completed processing CSV blob {BlobName}: {ProcessedCount} succeeded, {ErrorCount} failed",
+                    blobName, processedCount, errorCount);
                 
                 _logger.LogInformation("Completed processing CSV blob {BlobName} for {ConfigCount} interface configuration(s). Destination adapter will process messages within 1 minute.",
                     blobName, csvConfigs.Count);
@@ -187,6 +263,65 @@ public class MainFunction
             
             throw;
         }
+    }
+
+    /// <summary>
+    /// Creates a temporary InterfaceConfiguration from a SourceAdapterInstance for use with AdapterFactory
+    /// This is a compatibility layer until AdapterFactory is updated to work directly with SourceAdapterInstance
+    /// </summary>
+    private InterfaceConfiguration CreateTempConfigForSource(InterfaceConfiguration originalConfig, SourceAdapterInstance sourceInstance)
+    {
+        // Create a temporary config with properties from the source instance
+        // This allows the AdapterFactory to work with the existing interface
+        var tempConfig = new InterfaceConfiguration
+        {
+            InterfaceName = originalConfig.InterfaceName,
+            Description = originalConfig.Description,
+            CreatedAt = originalConfig.CreatedAt,
+            UpdatedAt = originalConfig.UpdatedAt,
+            // Set deprecated properties from source instance for backward compatibility
+            SourceAdapterName = sourceInstance.AdapterName,
+            SourceConfiguration = sourceInstance.Configuration,
+            SourceIsEnabled = sourceInstance.IsEnabled,
+            SourceInstanceName = sourceInstance.InstanceName,
+            SourceAdapterInstanceGuid = sourceInstance.AdapterInstanceGuid,
+            // Copy all source properties
+            SourceReceiveFolder = sourceInstance.SourceReceiveFolder,
+            SourceFileMask = sourceInstance.SourceFileMask,
+            SourceBatchSize = sourceInstance.SourceBatchSize,
+            SourceFieldSeparator = sourceInstance.SourceFieldSeparator,
+            CsvData = sourceInstance.CsvData,
+            CsvAdapterType = sourceInstance.CsvAdapterType,
+            CsvPollingInterval = sourceInstance.CsvPollingInterval,
+            SftpHost = sourceInstance.SftpHost,
+            SftpPort = sourceInstance.SftpPort,
+            SftpUsername = sourceInstance.SftpUsername,
+            SftpPassword = sourceInstance.SftpPassword,
+            SftpSshKey = sourceInstance.SftpSshKey,
+            SftpFolder = sourceInstance.SftpFolder,
+            SftpFileMask = sourceInstance.SftpFileMask,
+            SftpMaxConnectionPoolSize = sourceInstance.SftpMaxConnectionPoolSize,
+            SftpFileBufferSize = sourceInstance.SftpFileBufferSize,
+            SqlServerName = sourceInstance.SqlServerName,
+            SqlDatabaseName = sourceInstance.SqlDatabaseName,
+            SqlUserName = sourceInstance.SqlUserName,
+            SqlPassword = sourceInstance.SqlPassword,
+            SqlIntegratedSecurity = sourceInstance.SqlIntegratedSecurity,
+            SqlResourceGroup = sourceInstance.SqlResourceGroup,
+            SqlPollingStatement = sourceInstance.SqlPollingStatement,
+            SqlPollingInterval = sourceInstance.SqlPollingInterval,
+            SqlTableName = sourceInstance.SqlTableName,
+            SqlUseTransaction = sourceInstance.SqlUseTransaction,
+            SqlBatchSize = sourceInstance.SqlBatchSize,
+            SqlCommandTimeout = sourceInstance.SqlCommandTimeout,
+            SqlFailOnBadStatement = sourceInstance.SqlFailOnBadStatement
+        };
+        
+        // Also copy Sources and Destinations dictionaries
+        tempConfig.Sources = originalConfig.Sources;
+        tempConfig.Destinations = originalConfig.Destinations;
+        
+        return tempConfig;
     }
 
     private async Task MoveBlobToFolderAsync(string containerName, string sourceFolder, string targetFolder, string blobName, string reason)

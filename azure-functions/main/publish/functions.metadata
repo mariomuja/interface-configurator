@@ -667,6 +667,91 @@
     ]
   },
   {
+    "name": "TestBlobTriggerLogic",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestBlobTriggerLogic.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-blob-trigger-logic",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "TestConfigLoading",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestConfigLoading.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "test-config-loading",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "TestMessageBoxWrite",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.TestMessageBoxWrite.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "post",
+          "options"
+        ],
+        "route": "test-messagebox-write",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "ToggleInterfaceConfiguration",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.ToggleInterfaceConfiguration.Run",

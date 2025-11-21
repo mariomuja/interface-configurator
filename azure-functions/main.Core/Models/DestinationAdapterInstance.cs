@@ -42,6 +42,42 @@ public class DestinationAdapterInstance
     [MaxLength(1000)]
     public string Configuration { get; set; } = string.Empty;
 
+    // CSV Adapter Destination Properties
+    [MaxLength(500)]
+    public string? DestinationReceiveFolder { get; set; }
+
+    [MaxLength(100)]
+    public string DestinationFileMask { get; set; } = "*.txt";
+
+    // SQL Server Adapter Properties
+    [MaxLength(500)]
+    public string? SqlServerName { get; set; }
+
+    [MaxLength(200)]
+    public string? SqlDatabaseName { get; set; }
+
+    [MaxLength(200)]
+    public string? SqlUserName { get; set; }
+
+    [MaxLength(500)]
+    public string? SqlPassword { get; set; }
+
+    public bool SqlIntegratedSecurity { get; set; } = false;
+
+    [MaxLength(200)]
+    public string? SqlResourceGroup { get; set; }
+
+    [MaxLength(200)]
+    public string? SqlTableName { get; set; }
+
+    public bool SqlUseTransaction { get; set; } = false;
+
+    public int SqlBatchSize { get; set; } = 1000;
+
+    public int SqlCommandTimeout { get; set; } = 30;
+
+    public bool SqlFailOnBadStatement { get; set; } = false;
+
     /// <summary>
     /// When this instance was created
     /// </summary>

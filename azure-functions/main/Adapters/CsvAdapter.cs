@@ -551,6 +551,9 @@ public class CsvAdapter : IAdapter
 
             // If MessageBoxService is available, debatch and write to MessageBox as Source adapter
             // Process records in batches of _batchSize, then debatch each batch into single rows
+            _logger?.LogInformation("Checking MessageBox conditions: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
+                _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
+            
             if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
             {
                 _logger?.LogInformation("Processing CSV data in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}", 
@@ -582,6 +585,12 @@ public class CsvAdapter : IAdapter
                 
                 _logger?.LogInformation("Completed processing all batches: {TotalRecords} records debatched into {TotalMessages} messages", 
                     records.Count, records.Count);
+            }
+            else
+            {
+                _logger?.LogWarning("Skipping MessageBox write: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}. " +
+                    "Messages will NOT be written to MessageBox.",
+                    _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
             }
         }
 

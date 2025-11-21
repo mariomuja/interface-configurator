@@ -62,37 +62,32 @@ public class GetInterfaceConfiguration
                 return notFoundResponse;
             }
 
-            // Build hierarchical + legacy structure
-            var camelCaseOptions = new JsonSerializerOptions
+            // Build the structure exactly as stored in the JSON file (with Sources and Destinations dictionaries)
+            // Use PascalCase to match the stored JSON format
+            var storedFormatOptions = new JsonSerializerOptions
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNamingPolicy = null, // Use PascalCase (no conversion)
+                DictionaryKeyPolicy = null, // Use PascalCase for dictionary keys
                 DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
                 WriteIndented = true
             };
 
-            var baseConfigNode = JsonNode.Parse(JsonSerializer.Serialize(configuration, camelCaseOptions))?.AsObject()
-                ?? new JsonObject();
-            var hierarchicalConfig = BuildHierarchicalConfiguration(configuration);
-
-            if (hierarchicalConfig.TryGetPropertyValue("sources", out JsonNode? sourcesNode))
+            // Build the structure matching the stored JSON format
+            var storedFormat = new JsonObject
             {
-                baseConfigNode["sources"] = sourcesNode;
-            }
-
-            if (hierarchicalConfig.TryGetPropertyValue("destinations", out JsonNode? destinationsNode))
-            {
-                baseConfigNode["destinations"] = destinationsNode;
-            }
-
-            // Provide the full hierarchical view as well (useful for visual inspectors)
-            baseConfigNode["hierarchy"] = hierarchicalConfig;
+                ["InterfaceName"] = configuration.InterfaceName ?? string.Empty,
+                ["Description"] = configuration.Description ?? null,
+                ["Sources"] = BuildSourcesDictionary(configuration),
+                ["Destinations"] = BuildDestinationsDictionary(configuration),
+                ["CreatedAt"] = configuration.CreatedAt != default ? JsonValue.Create(configuration.CreatedAt) : null,
+                ["UpdatedAt"] = configuration.UpdatedAt.HasValue ? JsonValue.Create(configuration.UpdatedAt.Value) : null
+            };
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
 
-            var jsonResponse = baseConfigNode.ToJsonString(camelCaseOptions);
+            var jsonResponse = storedFormat.ToJsonString(storedFormatOptions);
             await response.WriteStringAsync(jsonResponse);
 
             return response;
@@ -106,6 +101,199 @@ public class GetInterfaceConfiguration
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
+    }
+
+    private JsonObject BuildSourcesDictionary(InterfaceConfiguration config)
+    {
+        var sources = new JsonObject();
+        
+        // Use the new Sources dictionary if available
+        if (config.Sources != null && config.Sources.Count > 0)
+        {
+            foreach (var sourceEntry in config.Sources)
+            {
+                var sourceInstance = sourceEntry.Value;
+                var sourceObj = new JsonObject
+                {
+                    ["InstanceName"] = sourceInstance.InstanceName ?? string.Empty,
+                    ["AdapterName"] = sourceInstance.AdapterName ?? string.Empty,
+                    ["IsEnabled"] = sourceInstance.IsEnabled,
+                    ["AdapterInstanceGuid"] = sourceInstance.AdapterInstanceGuid.ToString(),
+                    ["Configuration"] = sourceInstance.Configuration ?? string.Empty,
+                    ["SourceReceiveFolder"] = sourceInstance.SourceReceiveFolder ?? null,
+                    ["SourceFileMask"] = sourceInstance.SourceFileMask ?? "*.txt",
+                    ["SourceBatchSize"] = sourceInstance.SourceBatchSize,
+                    ["SourceFieldSeparator"] = sourceInstance.SourceFieldSeparator ?? "║",
+                    ["CsvData"] = sourceInstance.CsvData ?? null,
+                    ["CsvAdapterType"] = sourceInstance.CsvAdapterType ?? "FILE",
+                    ["CsvPollingInterval"] = sourceInstance.CsvPollingInterval,
+                    ["SftpHost"] = sourceInstance.SftpHost ?? null,
+                    ["SftpPort"] = sourceInstance.SftpPort,
+                    ["SftpUsername"] = sourceInstance.SftpUsername ?? null,
+                    ["SftpPassword"] = sourceInstance.SftpPassword != null ? "***" : null,
+                    ["SftpSshKey"] = sourceInstance.SftpSshKey != null ? "***" : null,
+                    ["SftpFolder"] = sourceInstance.SftpFolder ?? null,
+                    ["SftpFileMask"] = sourceInstance.SftpFileMask ?? "*.txt",
+                    ["SftpMaxConnectionPoolSize"] = sourceInstance.SftpMaxConnectionPoolSize,
+                    ["SftpFileBufferSize"] = sourceInstance.SftpFileBufferSize,
+                    ["SqlServerName"] = sourceInstance.SqlServerName ?? null,
+                    ["SqlDatabaseName"] = sourceInstance.SqlDatabaseName ?? null,
+                    ["SqlUserName"] = sourceInstance.SqlUserName ?? null,
+                    ["SqlPassword"] = sourceInstance.SqlPassword != null ? "***" : null,
+                    ["SqlIntegratedSecurity"] = sourceInstance.SqlIntegratedSecurity,
+                    ["SqlResourceGroup"] = sourceInstance.SqlResourceGroup ?? null,
+                    ["SqlPollingStatement"] = sourceInstance.SqlPollingStatement ?? null,
+                    ["SqlPollingInterval"] = sourceInstance.SqlPollingInterval,
+                    ["SqlTableName"] = sourceInstance.SqlTableName ?? null,
+                    ["SqlUseTransaction"] = sourceInstance.SqlUseTransaction,
+                    ["SqlBatchSize"] = sourceInstance.SqlBatchSize,
+                    ["SqlCommandTimeout"] = sourceInstance.SqlCommandTimeout,
+                    ["SqlFailOnBadStatement"] = sourceInstance.SqlFailOnBadStatement,
+                    ["CreatedAt"] = sourceInstance.CreatedAt != default ? JsonValue.Create(sourceInstance.CreatedAt) : null,
+                    ["UpdatedAt"] = sourceInstance.UpdatedAt.HasValue ? JsonValue.Create(sourceInstance.UpdatedAt.Value) : null
+                };
+                sources[sourceEntry.Key] = sourceObj;
+            }
+        }
+        else
+        {
+            // Fallback to old structure for backward compatibility
+            var sourceInstanceName = config.SourceInstanceName ?? config.SourceAdapterName ?? "Source";
+            var sourceObj = new JsonObject
+            {
+                ["InstanceName"] = sourceInstanceName,
+                ["AdapterName"] = config.SourceAdapterName ?? "CSV",
+                ["IsEnabled"] = config.SourceIsEnabled ?? true,
+                ["AdapterInstanceGuid"] = (config.SourceAdapterInstanceGuid ?? Guid.Empty).ToString(),
+                ["Configuration"] = config.SourceConfiguration ?? string.Empty,
+                ["SourceReceiveFolder"] = config.SourceReceiveFolder ?? null,
+                ["SourceFileMask"] = config.SourceFileMask ?? "*.txt",
+                ["SourceBatchSize"] = config.SourceBatchSize ?? 100,
+                ["SourceFieldSeparator"] = config.SourceFieldSeparator ?? "║",
+                ["CsvData"] = config.CsvData ?? null,
+                ["CsvAdapterType"] = config.CsvAdapterType ?? "FILE",
+                ["CsvPollingInterval"] = config.CsvPollingInterval ?? 10,
+                ["SftpHost"] = config.SftpHost ?? null,
+                ["SftpPort"] = config.SftpPort ?? 22,
+                ["SftpUsername"] = config.SftpUsername ?? null,
+                ["SftpPassword"] = config.SftpPassword != null ? "***" : null,
+                ["SftpSshKey"] = config.SftpSshKey != null ? "***" : null,
+                ["SftpFolder"] = config.SftpFolder ?? null,
+                ["SftpFileMask"] = config.SftpFileMask ?? "*.txt",
+                ["SftpMaxConnectionPoolSize"] = config.SftpMaxConnectionPoolSize ?? 5,
+                ["SftpFileBufferSize"] = config.SftpFileBufferSize ?? 8192,
+                ["SqlServerName"] = config.SqlServerName ?? null,
+                ["SqlDatabaseName"] = config.SqlDatabaseName ?? null,
+                ["SqlUserName"] = config.SqlUserName ?? null,
+                ["SqlPassword"] = config.SqlPassword != null ? "***" : null,
+                ["SqlIntegratedSecurity"] = config.SqlIntegratedSecurity ?? false,
+                ["SqlResourceGroup"] = config.SqlResourceGroup ?? null,
+                ["SqlPollingStatement"] = config.SqlPollingStatement ?? null,
+                ["SqlPollingInterval"] = config.SqlPollingInterval ?? 60,
+                ["SqlTableName"] = config.SqlTableName ?? null,
+                ["SqlUseTransaction"] = config.SqlUseTransaction ?? false,
+                ["SqlBatchSize"] = config.SqlBatchSize ?? 1000,
+                ["SqlCommandTimeout"] = config.SqlCommandTimeout ?? 30,
+                ["SqlFailOnBadStatement"] = config.SqlFailOnBadStatement ?? false,
+                ["CreatedAt"] = config.CreatedAt != default ? JsonValue.Create(config.CreatedAt) : null,
+                ["UpdatedAt"] = config.UpdatedAt.HasValue ? JsonValue.Create(config.UpdatedAt.Value) : null
+            };
+            sources[sourceInstanceName] = sourceObj;
+        }
+        
+        return sources;
+    }
+
+    private JsonObject BuildDestinationsDictionary(InterfaceConfiguration config)
+    {
+        var destinations = new JsonObject();
+        
+        // Use the new Destinations dictionary if available
+        if (config.Destinations != null && config.Destinations.Count > 0)
+        {
+            foreach (var destEntry in config.Destinations)
+            {
+                var destInstance = destEntry.Value;
+                var destObj = new JsonObject
+                {
+                    ["AdapterInstanceGuid"] = destInstance.AdapterInstanceGuid.ToString(),
+                    ["InstanceName"] = destInstance.InstanceName ?? string.Empty,
+                    ["AdapterName"] = destInstance.AdapterName ?? string.Empty,
+                    ["IsEnabled"] = destInstance.IsEnabled,
+                    ["Configuration"] = destInstance.Configuration ?? string.Empty,
+                    ["DestinationReceiveFolder"] = destInstance.DestinationReceiveFolder ?? null,
+                    ["DestinationFileMask"] = destInstance.DestinationFileMask ?? "*.txt",
+                    ["SqlServerName"] = destInstance.SqlServerName ?? null,
+                    ["SqlDatabaseName"] = destInstance.SqlDatabaseName ?? null,
+                    ["SqlUserName"] = destInstance.SqlUserName ?? null,
+                    ["SqlPassword"] = destInstance.SqlPassword != null ? "***" : null,
+                    ["SqlIntegratedSecurity"] = destInstance.SqlIntegratedSecurity,
+                    ["SqlResourceGroup"] = destInstance.SqlResourceGroup ?? null,
+                    ["SqlTableName"] = destInstance.SqlTableName ?? null,
+                    ["SqlUseTransaction"] = destInstance.SqlUseTransaction,
+                    ["SqlBatchSize"] = destInstance.SqlBatchSize,
+                    ["SqlCommandTimeout"] = destInstance.SqlCommandTimeout,
+                    ["SqlFailOnBadStatement"] = destInstance.SqlFailOnBadStatement,
+                    ["CreatedAt"] = destInstance.CreatedAt != default ? JsonValue.Create(destInstance.CreatedAt) : null,
+                    ["UpdatedAt"] = destInstance.UpdatedAt.HasValue ? JsonValue.Create(destInstance.UpdatedAt.Value) : null
+                };
+                destinations[destEntry.Key] = destObj;
+            }
+        }
+        else
+        {
+            // Fallback to old structure for backward compatibility
+            // Try DestinationAdapterInstances list first
+            if (config.DestinationAdapterInstances != null && config.DestinationAdapterInstances.Count > 0)
+            {
+                foreach (var instance in config.DestinationAdapterInstances)
+                {
+                    var instanceName = instance.InstanceName ?? "Destination";
+                    var destObj = new JsonObject
+                    {
+                        ["AdapterInstanceGuid"] = instance.AdapterInstanceGuid.ToString(),
+                        ["InstanceName"] = instanceName,
+                        ["AdapterName"] = instance.AdapterName ?? string.Empty,
+                        ["IsEnabled"] = instance.IsEnabled,
+                        ["Configuration"] = instance.Configuration ?? string.Empty,
+                        ["CreatedAt"] = instance.CreatedAt != default ? JsonValue.Create(instance.CreatedAt) : null,
+                        ["UpdatedAt"] = instance.UpdatedAt.HasValue ? JsonValue.Create(instance.UpdatedAt.Value) : null
+                    };
+                    destinations[instanceName] = destObj;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(config.DestinationAdapterName))
+            {
+                // Fallback to old flat structure
+                var destInstanceName = config.DestinationInstanceName ?? config.DestinationAdapterName ?? "Destination";
+                var destObj = new JsonObject
+                {
+                    ["AdapterInstanceGuid"] = (config.DestinationAdapterInstanceGuid ?? Guid.Empty).ToString(),
+                    ["InstanceName"] = destInstanceName,
+                    ["AdapterName"] = config.DestinationAdapterName ?? "SqlServer",
+                    ["IsEnabled"] = config.DestinationIsEnabled ?? true,
+                    ["Configuration"] = config.DestinationConfiguration ?? string.Empty,
+                    ["DestinationReceiveFolder"] = config.DestinationReceiveFolder ?? null,
+                    ["DestinationFileMask"] = config.DestinationFileMask ?? "*.txt",
+                    ["SqlServerName"] = config.SqlServerName ?? null,
+                    ["SqlDatabaseName"] = config.SqlDatabaseName ?? null,
+                    ["SqlUserName"] = config.SqlUserName ?? null,
+                    ["SqlPassword"] = config.SqlPassword != null ? "***" : null,
+                    ["SqlIntegratedSecurity"] = config.SqlIntegratedSecurity ?? false,
+                    ["SqlResourceGroup"] = config.SqlResourceGroup ?? null,
+                    ["SqlTableName"] = config.SqlTableName ?? null,
+                    ["SqlUseTransaction"] = config.SqlUseTransaction ?? false,
+                    ["SqlBatchSize"] = config.SqlBatchSize ?? 1000,
+                    ["SqlCommandTimeout"] = config.SqlCommandTimeout ?? 30,
+                    ["SqlFailOnBadStatement"] = config.SqlFailOnBadStatement ?? false,
+                    ["CreatedAt"] = config.CreatedAt != default ? JsonValue.Create(config.CreatedAt) : null,
+                    ["UpdatedAt"] = config.UpdatedAt.HasValue ? JsonValue.Create(config.UpdatedAt.Value) : null
+                };
+                destinations[destInstanceName] = destObj;
+            }
+        }
+        
+        return destinations;
     }
 
     private JsonObject BuildHierarchicalConfiguration(InterfaceConfiguration config)

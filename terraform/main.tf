@@ -233,6 +233,8 @@ resource "azurerm_linux_function_app" "main" {
     "AZURE_SQL_USER" = var.sql_admin_login
     "AZURE_SQL_PASSWORD" = var.sql_admin_password
     "AzureWebJobsStorage" = azurerm_storage_account.functions.primary_connection_string
+    # MainStorageConnection for blob triggers (use same storage account as AzureWebJobsStorage)
+    "MainStorageConnection" = azurerm_storage_account.functions.primary_connection_string
     # Disable placeholder mode to ensure functions are loaded
     "WEBSITE_USE_PLACEHOLDER" = "0"
     # Application Insights integration

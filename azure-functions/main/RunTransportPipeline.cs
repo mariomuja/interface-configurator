@@ -60,19 +60,27 @@ public class RunTransportPipeline
             var config = await EnsureInterfaceConfigurationAsync(interfaceName, executionContext.CancellationToken);
 
             // Ensure adapters remain enabled
-            if (!config.SourceIsEnabled)
+            if (!config.Sources.Values.Any(s => s.IsEnabled))
             {
                 await _configService.SetSourceEnabledAsync(interfaceName, true, executionContext.CancellationToken);
-                config.SourceIsEnabled = true;
+                // Re-fetch config to get updated state
+                config = await _configService.GetConfigurationAsync(interfaceName, executionContext.CancellationToken) 
+                    ?? throw new InvalidOperationException($"Configuration '{interfaceName}' not found after enabling source");
             }
-            if (!config.DestinationIsEnabled)
+            if (!config.Destinations.Values.Any(d => d.IsEnabled))
             {
                 await _configService.SetDestinationEnabledAsync(interfaceName, true, executionContext.CancellationToken);
-                config.DestinationIsEnabled = true;
+                // Re-fetch config to get updated state
+                config = await _configService.GetConfigurationAsync(interfaceName, executionContext.CancellationToken) 
+                    ?? throw new InvalidOperationException($"Configuration '{interfaceName}' not found after enabling destination");
             }
 
+            // Get source field separator from first source instance
+            var firstSource = config.Sources.Values.FirstOrDefault();
+            var fieldSeparator = firstSource?.SourceFieldSeparator ?? "║";
+            
             var csvContent = string.IsNullOrWhiteSpace(request.CsvContent)
-                ? SampleCsvGenerator.GenerateSampleCsv(config.SourceFieldSeparator ?? "║")
+                ? SampleCsvGenerator.GenerateSampleCsv(fieldSeparator)
                 : request.CsvContent!;
 
             var sourceSummary = await WriteCsvToMessageBoxAsync(config, csvContent, executionContext.CancellationToken);
@@ -108,31 +116,77 @@ public class RunTransportPipeline
         var config = await _configService.GetConfigurationAsync(interfaceName, cancellationToken);
         if (config != null)
         {
-            if (config.SourceAdapterInstanceGuid == Guid.Empty)
+            // Ensure Sources dictionary has at least one entry
+            if (config.Sources.Count == 0)
             {
-                config.SourceAdapterInstanceGuid = Guid.NewGuid();
+                var newSourceInstance = new SourceAdapterInstance
+                {
+                    InstanceName = "Source",
+                    AdapterName = "CSV",
+                    IsEnabled = true,
+                    AdapterInstanceGuid = Guid.NewGuid(),
+                    Configuration = JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
+                    SourceFieldSeparator = "║",
+                    CsvPollingInterval = 10,
+                    CreatedAt = DateTime.UtcNow
+                };
+                config.Sources[newSourceInstance.InstanceName] = newSourceInstance;
                 await _configService.SaveConfigurationAsync(config, cancellationToken);
             }
+            
+            // Ensure Destinations dictionary has at least one entry
+            if (config.Destinations.Count == 0)
+            {
+                var newDestInstance = new DestinationAdapterInstance
+                {
+                    InstanceName = "Destination",
+                    AdapterName = "SqlServer",
+                    IsEnabled = true,
+                    AdapterInstanceGuid = Guid.NewGuid(),
+                    Configuration = JsonSerializer.Serialize(new { destination = "TransportData" }),
+                    SqlTableName = "TransportData",
+                    CreatedAt = DateTime.UtcNow
+                };
+                config.Destinations[newDestInstance.InstanceName] = newDestInstance;
+                await _configService.SaveConfigurationAsync(config, cancellationToken);
+            }
+            
             return config;
         }
 
+        // Create new configuration with new structure
         var newConfig = new InterfaceConfiguration
         {
             InterfaceName = interfaceName,
-            SourceAdapterName = "CSV",
-            SourceConfiguration = JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
-            DestinationAdapterName = "SqlServer",
-            DestinationConfiguration = JsonSerializer.Serialize(new { destination = "TransportData" }),
-            SourceIsEnabled = true,
-            DestinationIsEnabled = true,
-            SourceInstanceName = "Source",
-            DestinationInstanceName = "Destination",
-            SourceAdapterInstanceGuid = Guid.NewGuid(),
-            DestinationAdapterInstanceGuid = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Create source instance
+        var defaultSourceInstance = new SourceAdapterInstance
+        {
+            InstanceName = "Source",
+            AdapterName = "CSV",
+            IsEnabled = true,
+            AdapterInstanceGuid = Guid.NewGuid(),
+            Configuration = JsonSerializer.Serialize(new { source = "csv-files/csv-incoming" }),
+            SourceFieldSeparator = "║",
             CsvPollingInterval = 10,
+            CreatedAt = DateTime.UtcNow
+        };
+        newConfig.Sources[defaultSourceInstance.InstanceName] = defaultSourceInstance;
+
+        // Create destination instance
+        var defaultDestInstance = new DestinationAdapterInstance
+        {
+            InstanceName = "Destination",
+            AdapterName = "SqlServer",
+            IsEnabled = true,
+            AdapterInstanceGuid = Guid.NewGuid(),
+            Configuration = JsonSerializer.Serialize(new { destination = "TransportData" }),
             SqlTableName = "TransportData",
             CreatedAt = DateTime.UtcNow
         };
+        newConfig.Destinations[defaultDestInstance.InstanceName] = defaultDestInstance;
 
         await _configService.SaveConfigurationAsync(newConfig, cancellationToken);
         return newConfig;
@@ -145,7 +199,18 @@ public class RunTransportPipeline
     {
         _logger.LogInformation("Writing CSV content to MessageBox for interface {InterfaceName}", config.InterfaceName);
 
-        var adapter = await _adapterFactory.CreateSourceAdapterAsync(config, cancellationToken);
+        // Get first enabled source instance
+        var sourceInstance = config.Sources.Values.FirstOrDefault(s => s.IsEnabled);
+        if (sourceInstance == null)
+        {
+            _logger.LogWarning("No enabled source instance found for interface {InterfaceName}", config.InterfaceName);
+            return new SourceSummary(0);
+        }
+
+        // Create temporary config for adapter factory
+        var tempConfig = CreateTempConfigForSource(config, sourceInstance);
+
+        var adapter = await _adapterFactory.CreateSourceAdapterAsync(tempConfig, cancellationToken);
         int processedRecords = 0;
 
         if (adapter is CsvAdapter csvAdapter)
@@ -158,13 +223,69 @@ public class RunTransportPipeline
         }
         else
         {
-            var sourcePath = ExtractSourcePath(config.SourceConfiguration);
+            var sourcePath = ExtractSourcePath(sourceInstance.Configuration);
             var (_, records) = await adapter.ReadAsync(sourcePath, cancellationToken);
             processedRecords = records.Count;
         }
 
         _logger.LogInformation("CSV data processed and written to MessageBox: {RecordCount} records", processedRecords);
         return new SourceSummary(processedRecords);
+    }
+
+    /// <summary>
+    /// Creates a temporary InterfaceConfiguration from a SourceAdapterInstance for use with AdapterFactory
+    /// </summary>
+    private InterfaceConfiguration CreateTempConfigForSource(InterfaceConfiguration originalConfig, SourceAdapterInstance sourceInstance)
+    {
+        var tempConfig = new InterfaceConfiguration
+        {
+            InterfaceName = originalConfig.InterfaceName,
+            Description = originalConfig.Description,
+            CreatedAt = originalConfig.CreatedAt,
+            UpdatedAt = originalConfig.UpdatedAt,
+            // Set deprecated properties from source instance for backward compatibility
+            SourceAdapterName = sourceInstance.AdapterName,
+            SourceConfiguration = sourceInstance.Configuration,
+            SourceIsEnabled = sourceInstance.IsEnabled,
+            SourceInstanceName = sourceInstance.InstanceName,
+            SourceAdapterInstanceGuid = sourceInstance.AdapterInstanceGuid,
+            // Copy all source properties
+            SourceReceiveFolder = sourceInstance.SourceReceiveFolder,
+            SourceFileMask = sourceInstance.SourceFileMask,
+            SourceBatchSize = sourceInstance.SourceBatchSize,
+            SourceFieldSeparator = sourceInstance.SourceFieldSeparator,
+            CsvData = sourceInstance.CsvData,
+            CsvAdapterType = sourceInstance.CsvAdapterType,
+            CsvPollingInterval = sourceInstance.CsvPollingInterval,
+            SftpHost = sourceInstance.SftpHost,
+            SftpPort = sourceInstance.SftpPort,
+            SftpUsername = sourceInstance.SftpUsername,
+            SftpPassword = sourceInstance.SftpPassword,
+            SftpSshKey = sourceInstance.SftpSshKey,
+            SftpFolder = sourceInstance.SftpFolder,
+            SftpFileMask = sourceInstance.SftpFileMask,
+            SftpMaxConnectionPoolSize = sourceInstance.SftpMaxConnectionPoolSize,
+            SftpFileBufferSize = sourceInstance.SftpFileBufferSize,
+            SqlServerName = sourceInstance.SqlServerName,
+            SqlDatabaseName = sourceInstance.SqlDatabaseName,
+            SqlUserName = sourceInstance.SqlUserName,
+            SqlPassword = sourceInstance.SqlPassword,
+            SqlIntegratedSecurity = sourceInstance.SqlIntegratedSecurity,
+            SqlResourceGroup = sourceInstance.SqlResourceGroup,
+            SqlPollingStatement = sourceInstance.SqlPollingStatement,
+            SqlPollingInterval = sourceInstance.SqlPollingInterval,
+            SqlTableName = sourceInstance.SqlTableName,
+            SqlUseTransaction = sourceInstance.SqlUseTransaction,
+            SqlBatchSize = sourceInstance.SqlBatchSize,
+            SqlCommandTimeout = sourceInstance.SqlCommandTimeout,
+            SqlFailOnBadStatement = sourceInstance.SqlFailOnBadStatement
+        };
+        
+        // Also copy Sources and Destinations dictionaries
+        tempConfig.Sources = originalConfig.Sources;
+        tempConfig.Destinations = originalConfig.Destinations;
+        
+        return tempConfig;
     }
 
     private async Task<DestinationSummary> ProcessDestinationAdaptersAsync(
@@ -219,32 +340,55 @@ public class RunTransportPipeline
         DestinationAdapterInstance instance,
         string destinationTable)
     {
-        return new InterfaceConfiguration
+        // Get source field separator from first source instance
+        var firstSource = baseConfig.Sources.Values.FirstOrDefault();
+        var sourceFieldSeparator = firstSource?.SourceFieldSeparator ?? "║";
+        
+        var tempConfig = new InterfaceConfiguration
         {
             InterfaceName = baseConfig.InterfaceName,
+            Description = baseConfig.Description,
+            CreatedAt = baseConfig.CreatedAt,
+            UpdatedAt = baseConfig.UpdatedAt,
+            // Set deprecated properties from destination instance for backward compatibility
             DestinationAdapterName = instance.AdapterName,
             DestinationConfiguration = instance.Configuration ?? "{}",
             DestinationIsEnabled = instance.IsEnabled,
             DestinationInstanceName = instance.InstanceName,
             DestinationAdapterInstanceGuid = instance.AdapterInstanceGuid,
-            SourceFieldSeparator = baseConfig.SourceFieldSeparator,
-            SqlServerName = baseConfig.SqlServerName,
-            SqlDatabaseName = baseConfig.SqlDatabaseName,
-            SqlUserName = baseConfig.SqlUserName,
-            SqlPassword = baseConfig.SqlPassword,
-            SqlIntegratedSecurity = baseConfig.SqlIntegratedSecurity,
-            SqlResourceGroup = baseConfig.SqlResourceGroup,
+            // Copy destination properties
+            DestinationReceiveFolder = instance.DestinationReceiveFolder,
+            DestinationFileMask = instance.DestinationFileMask,
+            SqlServerName = instance.SqlServerName ?? baseConfig.SqlServerName,
+            SqlDatabaseName = instance.SqlDatabaseName ?? baseConfig.SqlDatabaseName,
+            SqlUserName = instance.SqlUserName ?? baseConfig.SqlUserName,
+            SqlPassword = instance.SqlPassword ?? baseConfig.SqlPassword,
+            SqlIntegratedSecurity = instance.SqlIntegratedSecurity,
+            SqlResourceGroup = instance.SqlResourceGroup ?? baseConfig.SqlResourceGroup,
             SqlTableName = destinationTable,
-            DestinationReceiveFolder = baseConfig.DestinationReceiveFolder,
-            DestinationFileMask = baseConfig.DestinationFileMask,
-            SqlUseTransaction = baseConfig.SqlUseTransaction,
-            SqlBatchSize = baseConfig.SqlBatchSize,
-            SourceAdapterInstanceGuid = baseConfig.SourceAdapterInstanceGuid,
-            SourceAdapterName = baseConfig.SourceAdapterName,
-            SourceConfiguration = baseConfig.SourceConfiguration,
-            SourceInstanceName = baseConfig.SourceInstanceName,
-            SourceIsEnabled = baseConfig.SourceIsEnabled
+            SqlUseTransaction = instance.SqlUseTransaction,
+            SqlBatchSize = instance.SqlBatchSize,
+            SqlCommandTimeout = instance.SqlCommandTimeout,
+            SqlFailOnBadStatement = instance.SqlFailOnBadStatement,
+            // Copy source properties from first source instance
+            SourceFieldSeparator = sourceFieldSeparator
         };
+        
+        // Copy source properties if available
+        if (firstSource != null)
+        {
+            tempConfig.SourceAdapterName = firstSource.AdapterName;
+            tempConfig.SourceConfiguration = firstSource.Configuration;
+            tempConfig.SourceIsEnabled = firstSource.IsEnabled;
+            tempConfig.SourceInstanceName = firstSource.InstanceName;
+            tempConfig.SourceAdapterInstanceGuid = firstSource.AdapterInstanceGuid;
+        }
+        
+        // Also copy Sources and Destinations dictionaries
+        tempConfig.Sources = baseConfig.Sources;
+        tempConfig.Destinations = baseConfig.Destinations;
+        
+        return tempConfig;
     }
 
     private static string ResolveDestinationTable(DestinationAdapterInstance instance, InterfaceConfiguration interfaceConfig)
@@ -272,7 +416,8 @@ public class RunTransportPipeline
             }
         }
 
-        return interfaceConfig.SqlTableName ?? "TransportData";
+        // Try to get SqlTableName from instance first, then from interface config
+        return instance.SqlTableName ?? interfaceConfig.Destinations.Values.FirstOrDefault()?.SqlTableName ?? "TransportData";
     }
 
     private static string ExtractSourcePath(string sourceConfiguration)

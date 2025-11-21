@@ -101,12 +101,31 @@ public class MessageBoxService : IMessageBoxService
                 MessageHash = messageHash
             };
 
-            _context.Messages.Add(message);
-            await _context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                _context.Messages.Add(message);
+                await _context.SaveChangesAsync(cancellationToken);
 
-            _logger?.LogInformation(
-                "Successfully wrote single record message to MessageBox: MessageId={MessageId}, Interface={InterfaceName}",
-                message.MessageId, interfaceName);
+                _logger?.LogInformation(
+                    "Successfully wrote single record message to MessageBox: MessageId={MessageId}, Interface={InterfaceName}",
+                    message.MessageId, interfaceName);
+            }
+            catch (Microsoft.Data.SqlClient.SqlException sqlEx)
+            {
+                // Check if error is due to missing column
+                if (sqlEx.Message.Contains("AdapterInstanceGuid") || sqlEx.Message.Contains("Invalid column name"))
+                {
+                    _logger?.LogError(sqlEx, 
+                        "CRITICAL: Messages table is missing required columns (AdapterInstanceGuid, etc.). " +
+                        "The table structure does not match the model. " +
+                        "Please run update-messagebox-database.sql to add missing columns. " +
+                        "Error: {ErrorMessage}", sqlEx.Message);
+                    throw new InvalidOperationException(
+                        "Messages table is missing required columns. Please run update-messagebox-database.sql to fix the database structure.", 
+                        sqlEx);
+                }
+                throw;
+            }
 
             // Trigger event for event-driven processing
             if (_eventQueue != null)
@@ -151,12 +170,30 @@ public class MessageBoxService : IMessageBoxService
             records.Count, interfaceName, adapterName, adapterInstanceGuid);
 
         // Debatch: create one message per record
+        var successCount = 0;
+        var errorCount = 0;
         foreach (var record in records)
         {
-            var messageId = await WriteSingleRecordMessageAsync(
-                interfaceName, adapterName, adapterType, adapterInstanceGuid, headers, record, cancellationToken);
-            messageIds.Add(messageId);
+            try
+            {
+                var messageId = await WriteSingleRecordMessageAsync(
+                    interfaceName, adapterName, adapterType, adapterInstanceGuid, headers, record, cancellationToken);
+                messageIds.Add(messageId);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                errorCount++;
+                _logger?.LogError(ex, 
+                    "Failed to write message to MessageBox: Interface={InterfaceName}, Adapter={AdapterName}, RecordIndex={RecordIndex}",
+                    interfaceName, adapterName, successCount + errorCount);
+                // Continue with next record instead of failing entire batch
+            }
         }
+        
+        _logger?.LogInformation(
+            "Completed debatching: {TotalRecords} records, {SuccessCount} succeeded, {ErrorCount} failed",
+            records.Count, successCount, errorCount);
 
         _logger?.LogInformation(
             "Successfully debatched {RecordCount} records into {MessageCount} messages: Interface={InterfaceName}",
