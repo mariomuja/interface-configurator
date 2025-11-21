@@ -138,6 +138,8 @@ public class CsvAdapter : IAdapter
                 {
                     try
                     {
+                        // Always process directly to MessageBox first, regardless of adapter type
+                        // For RAW adapter type, also upload to csv-incoming for blob trigger processing
                         await ProcessCsvDataAsync(CancellationToken.None);
                     }
                     catch (Exception ex)
@@ -166,18 +168,22 @@ public class CsvAdapter : IAdapter
             _logger?.LogInformation("Processing CsvData property: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, AdapterType={AdapterType}, DataLength={DataLength}",
                 _interfaceName, _adapterInstanceGuid, _adapterType, _csvData.Length);
 
-            // For RAW adapter type: Create file from CsvData and upload to csv-incoming
-            if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
-            {
-                await UploadCsvDataToIncomingAsync(cancellationToken);
-                return; // File upload will trigger blob trigger which processes the file
-            }
-
-            // For other adapter types, process directly to MessageBox (legacy behavior)
+            // Check MessageBox conditions first
             if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
             {
-                _logger?.LogWarning("Cannot process CsvData: MessageBoxService, InterfaceName, or AdapterInstanceGuid is missing");
+                _logger?.LogWarning("Cannot process CsvData: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
+                    _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
                 return;
+            }
+
+            // For RAW adapter type: Also upload to csv-incoming for blob trigger processing
+            // But still process directly to MessageBox first
+            if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogInformation("RAW adapter type detected. Uploading to csv-incoming AND processing directly to MessageBox.");
+                // Upload to csv-incoming (will trigger blob trigger as backup)
+                _ = Task.Run(async () => await UploadCsvDataToIncomingAsync(cancellationToken));
+                // Continue with direct MessageBox processing below
             }
 
             // Parse CSV using CsvProcessingService with configured field separator
