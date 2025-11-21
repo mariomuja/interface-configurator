@@ -3,6 +3,7 @@ using System.Linq;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 
 namespace InterfaceConfigurator.Main.Adapters;
@@ -12,25 +13,18 @@ namespace InterfaceConfigurator.Main.Adapters;
 /// Can be used standalone or by other adapters (e.g., CsvAdapter) to access blob storage
 /// Supports both reading and writing operations
 /// </summary>
-public class FileAdapter : IAdapter
+public class FileAdapter : AdapterBase
 {
-    public string AdapterName => "FILE";
-    public string AdapterAlias => "File";
-    public bool SupportsRead => true;
-    public bool SupportsWrite => true;
-    public string AdapterRole { get; }
+    public override string AdapterName => "FILE";
+    public override string AdapterAlias => "File";
+    public override bool SupportsRead => true;
+    public override bool SupportsWrite => true;
 
     private readonly BlobServiceClient _blobServiceClient;
     private readonly string? _receiveFolder;
     private readonly string _fileMask;
     private readonly string? _destinationReceiveFolder;
     private readonly string _destinationFileMask;
-    private readonly ILogger<FileAdapter>? _logger;
-    private readonly IMessageBoxService? _messageBoxService;
-    private readonly IMessageSubscriptionService? _subscriptionService;
-    private readonly string? _interfaceName;
-    private readonly Guid? _adapterInstanceGuid;
-    private readonly int _batchSize;
 
     public FileAdapter(
         BlobServiceClient blobServiceClient,
@@ -45,19 +39,20 @@ public class FileAdapter : IAdapter
         string? destinationFileMask = null,
         int? batchSize = null,
         ILogger<FileAdapter>? logger = null)
+        : base(
+            messageBoxService: messageBoxService,
+            subscriptionService: subscriptionService,
+            interfaceName: interfaceName,
+            adapterInstanceGuid: adapterInstanceGuid,
+            batchSize: batchSize ?? 1000,
+            adapterRole: adapterRole,
+            logger: logger)
     {
         _blobServiceClient = blobServiceClient ?? throw new ArgumentNullException(nameof(blobServiceClient));
-        AdapterRole = adapterRole ?? "Source";
-        _messageBoxService = messageBoxService;
-        _subscriptionService = subscriptionService;
-        _interfaceName = interfaceName;
-        _adapterInstanceGuid = adapterInstanceGuid;
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
         _destinationReceiveFolder = destinationReceiveFolder;
         _destinationFileMask = destinationFileMask ?? "*.txt";
-        _batchSize = batchSize ?? 1000;
-        _logger = logger;
     }
 
     /// <summary>
@@ -344,7 +339,7 @@ public class FileAdapter : IAdapter
     /// Note: This method requires ICsvProcessingService which is not available in IAdapter
     /// Use ReadFileAsync, ReadAllFilesAsync, or ReadCsvFilesAsync methods instead
     /// </summary>
-    public Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
+    public override async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
         string source,
         CancellationToken cancellationToken = default)
     {
@@ -423,33 +418,7 @@ public class FileAdapter : IAdapter
         }
 
         // Write to MessageBox if AdapterRole is "Source"
-        if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
-            _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue && allRecords.Count > 0)
-        {
-            _logger?.LogInformation("Writing records to MessageBox as Source adapter: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, Records={RecordCount}",
-                _interfaceName, _adapterInstanceGuid.Value, allRecords.Count);
-            
-            // Process records in batches
-            var batchSize = _batchSize;
-            for (int i = 0; i < allRecords.Count; i += batchSize)
-            {
-                var batch = allRecords.Skip(i).Take(batchSize).ToList();
-                var messageIds = await _messageBoxService.WriteMessagesAsync(
-                    _interfaceName,
-                    AdapterName,
-                    "Source",
-                    _adapterInstanceGuid.Value,
-                    allHeaders,
-                    batch,
-                    cancellationToken);
-                
-                _logger?.LogInformation("Successfully wrote {MessageCount} messages to MessageBox from batch", messageIds.Count);
-            }
-        }
-        else if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger?.LogDebug("AdapterRole is '{AdapterRole}', skipping MessageBox write in ReadCsvFilesAsync", AdapterRole);
-        }
+        await WriteRecordsToMessageBoxAsync(allHeaders, allRecords, cancellationToken);
 
         return (allHeaders, allRecords);
     }
@@ -458,7 +427,7 @@ public class FileAdapter : IAdapter
     /// IAdapter.WriteAsync implementation - writes data to blob storage as CSV
     /// When AdapterRole is "Destination", reads messages from MessageBox first
     /// </summary>
-    public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
+    public override async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(destination))
             throw new ArgumentException("Destination path cannot be empty", nameof(destination));
@@ -466,82 +435,20 @@ public class FileAdapter : IAdapter
         _logger?.LogInformation("Writing to file destination: {Destination}, {RecordCount} records, AdapterRole: {AdapterRole}", 
             destination, records?.Count ?? 0, AdapterRole);
 
-        // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
-        List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-        if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
-            _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+        // Read messages from MessageBox if AdapterRole is "Destination"
+        List<MessageBoxMessage>? processedMessages = null;
+        var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
+        if (messageBoxResult.HasValue)
         {
-            _logger?.LogInformation("Reading messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
-            
-            var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-            processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
-            
-            if (messages.Count > 0)
-            {
-                var processedRecords = new List<Dictionary<string, string>>();
-                var processedHeaders = new List<string>();
-                
-                foreach (var message in messages)
-                {
-                    var lockAcquired = await _messageBoxService.MarkMessageAsInProgressAsync(
-                        message.MessageId, lockTimeoutMinutes: 5, cancellationToken);
-                    
-                    if (!lockAcquired)
-                    {
-                        _logger?.LogWarning("Could not acquire lock on message {MessageId}, skipping", message.MessageId);
-                        continue;
-                    }
-
-                    try
-                    {
-                        if (_subscriptionService != null)
-                        {
-                            await _subscriptionService.CreateSubscriptionAsync(
-                                message.MessageId, _interfaceName, AdapterName, cancellationToken);
-                        }
-                        
-                        var (messageHeaders, singleRecord) = _messageBoxService.ExtractDataFromMessage(message);
-                        
-                        if (processedHeaders.Count == 0)
-                        {
-                            processedHeaders = messageHeaders;
-                        }
-                        
-                        processedRecords.Add(singleRecord);
-                        processedMessages.Add(message);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox", message.MessageId);
-                        await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                        await _messageBoxService.MarkMessageAsErrorAsync(message.MessageId, ex.Message, cancellationToken);
-                        
-                        if (_subscriptionService != null)
-                        {
-                            await _subscriptionService.MarkSubscriptionAsErrorAsync(
-                                message.MessageId, AdapterName, ex.Message, cancellationToken);
-                        }
-                    }
-                }
-                
-                if (processedRecords.Count > 0)
-                {
-                    headers = processedHeaders;
-                    records = processedRecords;
-                    _logger?.LogInformation("Read {RecordCount} records from {MessageCount} MessageBox messages", 
-                        processedRecords.Count, messages.Count);
-                }
-                else
-                {
-                    _logger?.LogInformation("No messages were successfully processed from MessageBox");
-                    return;
-                }
-            }
-            else
-            {
-                _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}", _interfaceName);
-                return;
-            }
+            var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+            headers = messageHeaders;
+            records = messageRecords;
+            processedMessages = messages;
+        }
+        else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
+        {
+            // No messages found, return early
+            return;
         }
 
         // Validate headers and records if not reading from MessageBox
@@ -609,7 +516,7 @@ public class FileAdapter : IAdapter
     /// IAdapter.GetSchemaAsync implementation - not supported for FileAdapter
     /// Schema must be determined from CSV content, not from file system
     /// </summary>
-    public Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
+    public override async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("FileAdapter does not support schema detection. Use ICsvProcessingService to analyze CSV content.");
     }
@@ -618,7 +525,7 @@ public class FileAdapter : IAdapter
     /// IAdapter.EnsureDestinationStructureAsync implementation - not supported for FileAdapter
     /// File structure is determined by content, not by adapter
     /// </summary>
-    public Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
+    public override Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("FileAdapter does not support destination structure management. File structure is determined by content.");
     }

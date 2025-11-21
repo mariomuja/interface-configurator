@@ -4,6 +4,7 @@ using System.IO;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 
 namespace InterfaceConfigurator.Main.Adapters;
@@ -13,21 +14,16 @@ namespace InterfaceConfigurator.Main.Adapters;
 /// When used as Source: Reads CSV and writes to MessageBox
 /// When used as Destination: Reads from MessageBox and writes CSV
 /// </summary>
-public class CsvAdapter : IAdapter
+public class CsvAdapter : AdapterBase
 {
-    public string AdapterName => "CSV";
-    public string AdapterAlias => "CSV";
-    public bool SupportsRead => true;
-    public bool SupportsWrite => true;
-    public string AdapterRole { get; }
+    public override string AdapterName => "CSV";
+    public override string AdapterAlias => "CSV";
+    public override bool SupportsRead => true;
+    public override bool SupportsWrite => true;
 
     private readonly ICsvProcessingService _csvProcessingService;
     private readonly IAdapterConfigurationService _adapterConfig;
     private readonly BlobServiceClient _blobServiceClient;
-    private readonly IMessageBoxService? _messageBoxService;
-    private readonly IMessageSubscriptionService? _subscriptionService;
-    private readonly string? _interfaceName;
-    private readonly Guid? _adapterInstanceGuid;
     private readonly string? _receiveFolder;
     private readonly string _fileMask;
     private readonly int _batchSize;
@@ -71,21 +67,23 @@ public class CsvAdapter : IAdapter
         FileAdapter? fileAdapter = null,
         string adapterRole = "Source",
         ILogger<CsvAdapter>? logger = null)
+        : base(
+            messageBoxService: messageBoxService,
+            subscriptionService: subscriptionService,
+            interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
+            adapterInstanceGuid: adapterInstanceGuid,
+            batchSize: batchSize ?? 1000,
+            adapterRole: adapterRole,
+            logger: logger)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
         _adapterConfig = adapterConfig ?? throw new ArgumentNullException(nameof(adapterConfig));
         _blobServiceClient = blobServiceClient ?? throw new ArgumentNullException(nameof(blobServiceClient));
-        _messageBoxService = messageBoxService;
-        _subscriptionService = subscriptionService;
-        _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
-        _adapterInstanceGuid = adapterInstanceGuid;
-        AdapterRole = adapterRole ?? "Source";
         
         _logger?.LogInformation("DEBUG CsvAdapter constructor: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}",
             _messageBoxService != null, _interfaceName, _adapterInstanceGuid.HasValue ? _adapterInstanceGuid.Value.ToString() : "NULL");
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
-        _batchSize = batchSize ?? 1000; // Increased default batch size from 100 to 1000 for better performance
         _fieldSeparator = fieldSeparator ?? "║"; // Default: Box Drawing Double Vertical Line (U+2551)
         _destinationReceiveFolder = destinationReceiveFolder;
         _destinationFileMask = destinationFileMask ?? "*.txt";
@@ -179,44 +177,7 @@ public class CsvAdapter : IAdapter
                 headers.Count, records.Count);
 
             // Write to MessageBox if AdapterRole is "Source"
-            if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
-                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
-            {
-                // Process records in batches of _batchSize, then debatch each batch into single rows
-                _logger?.LogInformation("Processing CsvData in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
-                    _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
-
-                // Process records in batches
-                for (int i = 0; i < records.Count; i += _batchSize)
-                {
-                    var batch = records.Skip(i).Take(_batchSize).ToList();
-                    var batchNumber = (i / _batchSize) + 1;
-                    var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
-
-                    _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
-                        batchNumber, totalBatches, batch.Count);
-
-                    // Debatch batch into single rows and write to MessageBox
-                    var messageIds = await _messageBoxService.WriteMessagesAsync(
-                        _interfaceName,
-                        AdapterName,
-                        "Source",
-                        _adapterInstanceGuid.Value,
-                        headers,
-                        batch,
-                        cancellationToken);
-
-                    _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
-                        messageIds.Count, batchNumber, totalBatches);
-                }
-
-                _logger?.LogInformation("Completed processing CsvData: {TotalRecords} records debatched into {TotalMessages} messages",
-                    records.Count, records.Count);
-            }
-            else if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger?.LogDebug("AdapterRole is '{AdapterRole}', skipping MessageBox write in ProcessCsvDataAsync", AdapterRole);
-            }
+            await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -348,7 +309,7 @@ public class CsvAdapter : IAdapter
         }
     }
 
-    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
+    public override async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
     {
         var hasExplicitSource = !string.IsNullOrWhiteSpace(source);
         var isRawAdapter = _adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase);
@@ -449,54 +410,13 @@ public class CsvAdapter : IAdapter
         }
     }
 
-    /// <summary>
-    /// Writes records to MessageBox in batches
-    /// </summary>
-    private async Task WriteRecordsToMessageBoxAsync(List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken)
-    {
-        if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
-        {
-            _logger?.LogWarning("Skipping MessageBox write: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
-                _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
-            return;
-        }
-
-        _logger?.LogInformation("Processing CSV data in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
-            _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
-
-        // Process records in batches
-        for (int i = 0; i < records.Count; i += _batchSize)
-        {
-            var batch = records.Skip(i).Take(_batchSize).ToList();
-            var batchNumber = (i / _batchSize) + 1;
-            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
-
-            _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
-                batchNumber, totalBatches, batch.Count);
-
-            // Debatch batch into single rows and write to MessageBox
-            var messageIds = await _messageBoxService.WriteMessagesAsync(
-                _interfaceName,
-                AdapterName,
-                "Source",
-                _adapterInstanceGuid.Value,
-                headers,
-                batch,
-                cancellationToken);
-
-            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
-                messageIds.Count, batchNumber, totalBatches);
-        }
-
-        _logger?.LogInformation("Completed processing all batches: {TotalRecords} records debatched into {TotalMessages} messages",
-            records.Count, records.Count);
-    }
+    // WriteRecordsToMessageBoxAsync moved to AdapterBase.WriteRecordsToMessageBoxAsync
 
     // BuildDefaultBlobSourcePath removed - now handled by FileAdapter.BuildDefaultBlobSourcePath
     // ReadFromBlobStorageAsync removed - now handled by FileAdapter.ReadCsvFilesAsync
 
 
-    public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
+    public override async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(destination))
             throw new ArgumentException("Destination path cannot be empty", nameof(destination));
@@ -506,110 +426,20 @@ public class CsvAdapter : IAdapter
             _logger?.LogInformation("Writing CSV to destination: {Destination}, {RecordCount} records, AdapterRole: {AdapterRole}", 
                 destination, records?.Count ?? 0, AdapterRole);
 
-            // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
-            List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-            if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
-                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            // Read messages from MessageBox if AdapterRole is "Destination"
+            List<MessageBoxMessage>? processedMessages = null;
+            var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
+            if (messageBoxResult.HasValue)
             {
-                _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
-                
-                // Read pending messages (event-driven: messages are queued when added)
-                var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-                processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
-                
-                if (messages.Count > 0)
-                {
-                    // Process messages one by one (each message contains a single record)
-                    var processedRecords = new List<Dictionary<string, string>>();
-                    var processedHeaders = new List<string>();
-                    
-                    foreach (var message in messages)
-                    {
-                        // Try to acquire lock on message (prevent concurrent processing)
-                        var lockAcquired = await _messageBoxService.MarkMessageAsInProgressAsync(
-                            message.MessageId, lockTimeoutMinutes: 5, cancellationToken);
-                        
-                        if (!lockAcquired)
-                        {
-                            _logger?.LogWarning("Could not acquire lock on message {MessageId}, skipping (may be processed by another instance)", message.MessageId);
-                            continue; // Skip this message, another instance is processing it
-                        }
-
-                        try
-                        {
-                            // Create subscription for this message (if subscription service is available)
-                            if (_subscriptionService != null)
-                            {
-                                await _subscriptionService.CreateSubscriptionAsync(
-                                    message.MessageId, _interfaceName, AdapterName, cancellationToken);
-                            }
-                            
-                            // Extract single record from message
-                            (var messageHeaders, var singleRecord) = _messageBoxService.ExtractDataFromMessage(message);
-                            
-                            // Use headers from first message
-                            if (processedHeaders.Count == 0)
-                            {
-                                processedHeaders = messageHeaders;
-                            }
-                            
-                            processedRecords.Add(singleRecord);
-                            processedMessages.Add(message); // Track processed messages for subscription marking
-                            
-                            _logger?.LogInformation("Processed message {MessageId} from MessageBox", message.MessageId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox: {ErrorMessage}", message.MessageId, ex.Message);
-                            
-                            // Release lock and mark as error (will handle retry logic)
-                            try
-                            {
-                                await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                                await _messageBoxService.MarkMessageAsErrorAsync(message.MessageId, ex.Message, cancellationToken);
-                            }
-                            catch (Exception lockEx)
-                            {
-                                _logger?.LogError(lockEx, "Error releasing lock or marking error for message {MessageId}", message.MessageId);
-                            }
-                            
-                            // Mark subscription as error if subscription service is available
-                            if (_subscriptionService != null)
-                            {
-                                try
-                                {
-                                    await _subscriptionService.MarkSubscriptionAsErrorAsync(
-                                        message.MessageId, AdapterName, ex.Message, cancellationToken);
-                                }
-                                catch (Exception subEx)
-                                {
-                                    _logger?.LogError(subEx, "Error marking subscription as error for message {MessageId}", message.MessageId);
-                                }
-                            }
-                            // Continue with next message
-                        }
-                    }
-                    
-                    if (processedRecords.Count > 0)
-                    {
-                        headers = processedHeaders;
-                        records = processedRecords;
-                        
-                        _logger?.LogInformation("Read {RecordCount} records from {MessageCount} MessageBox messages", 
-                            processedRecords.Count, messages.Count);
-                    }
-                    else
-                    {
-                        // No messages processed, return early
-                        _logger?.LogInformation("No messages were successfully processed from MessageBox for interface {InterfaceName}", _interfaceName);
-                        return;
-                    }
-                }
-                else
-                {
-                    _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}", _interfaceName);
-                    return;
-                }
+                var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+                headers = messageHeaders;
+                records = messageRecords;
+                processedMessages = messages;
+            }
+            else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
+            {
+                // No messages found, return early
+                return;
             }
             
             // Validate headers and records if not reading from MessageBox
@@ -678,48 +508,10 @@ public class CsvAdapter : IAdapter
 
             _logger?.LogInformation("Successfully wrote CSV to {Destination}: {RecordCount} records", destination, records?.Count ?? 0);
 
-            // Mark subscriptions as processed for all messages that were processed
-            if (_messageBoxService != null && _subscriptionService != null && processedMessages != null && processedMessages.Count > 0)
+            // Mark messages as processed if they came from MessageBox
+            if (processedMessages != null && processedMessages.Count > 0)
             {
-                foreach (var message in processedMessages)
-                {
-                    try
-                    {
-                        // Release lock before marking as processed
-                        await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Processed", cancellationToken);
-                        
-                        await _subscriptionService.MarkSubscriptionAsProcessedAsync(
-                            message.MessageId, AdapterName, $"Written to CSV destination: {destination}", cancellationToken);
-                        
-                        // Mark message as processed (releases lock automatically)
-                        await _messageBoxService.MarkMessageAsProcessedAsync(
-                            message.MessageId, $"Written to CSV destination: {destination}", cancellationToken);
-                        
-                        // Check if all subscriptions are processed, then remove message
-                        var allProcessed = await _subscriptionService.AreAllSubscriptionsProcessedAsync(message.MessageId, cancellationToken);
-                        if (allProcessed)
-                        {
-                            _logger?.LogInformation("All subscriptions processed for message {MessageId}. Retaining record for auditing.", message.MessageId);
-                        }
-                        else
-                        {
-                            _logger?.LogDebug("Message {MessageId} still has pending subscribers.", message.MessageId);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error marking subscription as processed for message {MessageId}", message.MessageId);
-                        // Release lock on error
-                        try
-                        {
-                            await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                        }
-                        catch (Exception releaseEx)
-                        {
-                            _logger?.LogWarning(releaseEx, "Error releasing message lock for message {MessageId}: {ErrorMessage}", message.MessageId, releaseEx.Message);
-                        }
-                    }
-                }
+                await MarkMessagesAsProcessedAsync(processedMessages, $"Written to CSV destination: {destination}", cancellationToken);
             }
         }
         catch (Exception ex)
@@ -729,7 +521,7 @@ public class CsvAdapter : IAdapter
         }
     }
 
-    public async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
+    public override async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
     {
         var (headers, records) = await ReadAsync(source, cancellationToken);
 
@@ -753,7 +545,7 @@ public class CsvAdapter : IAdapter
         return columnTypes;
     }
 
-    public Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
+    public override Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
     {
         // CSV files don't require structure validation - they are schema-less
         // The structure is determined by the headers in the file

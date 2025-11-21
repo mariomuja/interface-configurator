@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using Renci.SshNet;
 using Renci.SshNet.Sftp;
@@ -12,13 +13,12 @@ namespace InterfaceConfigurator.Main.Adapters;
 /// SFTP Adapter for reading files from SFTP servers
 /// Can be used standalone or by other adapters (e.g., CsvAdapter) to retrieve data
 /// </summary>
-public class SftpAdapter : IAdapter
+public class SftpAdapter : AdapterBase
 {
-    public string AdapterName => "SFTP";
-    public string AdapterAlias => "SFTP";
-    public bool SupportsRead => true;
-    public bool SupportsWrite => true; // SFTP adapter can be used as destination
-    public string AdapterRole { get; }
+    public override string AdapterName => "SFTP";
+    public override string AdapterAlias => "SFTP";
+    public override bool SupportsRead => true;
+    public override bool SupportsWrite => true; // SFTP adapter can be used as destination
 
     private readonly string _host;
     private readonly int _port;
@@ -29,11 +29,6 @@ public class SftpAdapter : IAdapter
     private readonly string _fileMask;
     private readonly int _maxConnectionPoolSize;
     private readonly int _fileBufferSize;
-    private readonly ILogger<SftpAdapter>? _logger;
-    private readonly IMessageBoxService? _messageBoxService;
-    private readonly string? _interfaceName;
-    private readonly Guid? _adapterInstanceGuid;
-    private readonly int _batchSize;
     
     // Connection pool for SFTP clients
     private readonly SemaphoreSlim _connectionSemaphore;
@@ -55,6 +50,14 @@ public class SftpAdapter : IAdapter
         int? fileBufferSize = null,
         int? batchSize = null,
         ILogger<SftpAdapter>? logger = null)
+        : base(
+            messageBoxService: messageBoxService,
+            subscriptionService: null,
+            interfaceName: interfaceName,
+            adapterInstanceGuid: adapterInstanceGuid,
+            batchSize: batchSize ?? 1000,
+            adapterRole: adapterRole,
+            logger: logger)
     {
         if (string.IsNullOrWhiteSpace(host))
             throw new ArgumentException("SFTP Host cannot be empty", nameof(host));
@@ -63,7 +66,6 @@ public class SftpAdapter : IAdapter
         if (string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(sshKey))
             throw new ArgumentException("Either SFTP Password or SSH Key must be provided");
 
-        AdapterRole = adapterRole ?? "Source";
         _host = host;
         _port = port;
         _username = username;
@@ -73,11 +75,6 @@ public class SftpAdapter : IAdapter
         _fileMask = fileMask ?? "*.txt";
         _maxConnectionPoolSize = maxConnectionPoolSize ?? 5;
         _fileBufferSize = fileBufferSize ?? 8192;
-        _batchSize = batchSize ?? 1000;
-        _messageBoxService = messageBoxService;
-        _interfaceName = interfaceName;
-        _adapterInstanceGuid = adapterInstanceGuid;
-        _logger = logger;
 
         // Initialize connection pool
         _connectionSemaphore = new SemaphoreSlim(_maxConnectionPoolSize, _maxConnectionPoolSize);
@@ -297,7 +294,7 @@ public class SftpAdapter : IAdapter
     /// IAdapter.ReadAsync implementation - reads files from SFTP server
     /// Returns headers and records for compatibility with other adapters
     /// </summary>
-    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
+    public override async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
         string source,
         CancellationToken cancellationToken = default)
     {
@@ -310,7 +307,7 @@ public class SftpAdapter : IAdapter
     /// IAdapter.WriteAsync implementation - writes data to SFTP server
     /// When AdapterRole is "Destination", reads messages from MessageBox first
     /// </summary>
-    public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
+    public override async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(destination))
             throw new ArgumentException("Destination path cannot be empty", nameof(destination));
@@ -318,72 +315,20 @@ public class SftpAdapter : IAdapter
         _logger?.LogInformation("Writing to SFTP destination: {Destination}, {RecordCount} records, AdapterRole: {AdapterRole}", 
             destination, records?.Count ?? 0, AdapterRole);
 
-        // Declare processedMessages outside the if block
-        List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-
-        // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
-        if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
-            _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+        // Read messages from MessageBox if AdapterRole is "Destination"
+        List<MessageBoxMessage>? processedMessages = null;
+        var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
+        if (messageBoxResult.HasValue)
         {
-            _logger?.LogInformation("Reading messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
-            
-            var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-            processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
-            
-            if (messages.Count > 0)
-            {
-                var processedRecords = new List<Dictionary<string, string>>();
-                var processedHeaders = new List<string>();
-                
-                foreach (var message in messages)
-                {
-                    var lockAcquired = await _messageBoxService.MarkMessageAsInProgressAsync(
-                        message.MessageId, lockTimeoutMinutes: 5, cancellationToken);
-                    
-                    if (!lockAcquired)
-                    {
-                        _logger?.LogWarning("Could not acquire lock on message {MessageId}, skipping", message.MessageId);
-                        continue;
-                    }
-
-                    try
-                    {
-                        var (messageHeaders, singleRecord) = _messageBoxService.ExtractDataFromMessage(message);
-                        
-                        if (processedHeaders.Count == 0)
-                        {
-                            processedHeaders = messageHeaders;
-                        }
-                        
-                        processedRecords.Add(singleRecord);
-                        processedMessages.Add(message);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox", message.MessageId);
-                        await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                        await _messageBoxService.MarkMessageAsErrorAsync(message.MessageId, ex.Message, cancellationToken);
-                    }
-                }
-                
-                if (processedRecords.Count > 0)
-                {
-                    headers = processedHeaders;
-                    records = processedRecords;
-                    _logger?.LogInformation("Read {RecordCount} records from {MessageCount} MessageBox messages", 
-                        processedRecords.Count, messages.Count);
-                }
-                else
-                {
-                    _logger?.LogInformation("No messages were successfully processed from MessageBox");
-                    return;
-                }
-            }
-            else
-            {
-                _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}", _interfaceName);
-                return;
-            }
+            var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+            headers = messageHeaders;
+            records = messageRecords;
+            processedMessages = messages;
+        }
+        else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
+        {
+            // No messages found, return early
+            return;
         }
 
         // Validate headers and records
@@ -421,22 +366,9 @@ public class SftpAdapter : IAdapter
             _logger?.LogInformation("Successfully wrote {RecordCount} records to SFTP: {FullPath}", records?.Count ?? 0, fullPath);
             
             // Mark messages as processed if they came from MessageBox
-            if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
-                _messageBoxService != null && processedMessages != null && processedMessages.Count > 0)
+            if (processedMessages != null && processedMessages.Count > 0)
             {
-                foreach (var msg in processedMessages)
-                {
-                    try
-                    {
-                        await _messageBoxService.ReleaseMessageLockAsync(msg.MessageId, "Processed", cancellationToken);
-                        await _messageBoxService.MarkMessageAsProcessedAsync(
-                            msg.MessageId, $"Written to SFTP destination: {fullPath}", cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error marking message {MessageId} as processed", msg.MessageId);
-                    }
-                }
+                await MarkMessagesAsProcessedAsync(processedMessages, $"Written to SFTP destination: {fullPath}", cancellationToken);
             }
         }
         finally
@@ -462,7 +394,7 @@ public class SftpAdapter : IAdapter
     /// IAdapter.GetSchemaAsync implementation - not supported for SFTP adapter
     /// Schema must be determined from CSV content, not from SFTP itself
     /// </summary>
-    public Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
+    public override Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("SFTP adapter does not support schema detection. Use ICsvProcessingService to analyze CSV content.");
     }
@@ -470,7 +402,7 @@ public class SftpAdapter : IAdapter
     /// <summary>
     /// IAdapter.EnsureDestinationStructureAsync implementation - not supported for SFTP adapter
     /// </summary>
-    public Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
+    public override Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("SFTP adapter does not support writing. It is read-only.");
     }

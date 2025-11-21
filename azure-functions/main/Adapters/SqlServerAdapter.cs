@@ -14,13 +14,12 @@ namespace InterfaceConfigurator.Main.Adapters;
 /// Uses ApplicationDbContext to access the main application database (app-database)
 /// TransportData table is created/written in the main application database, NOT in MessageBox database
 /// </summary>
-public class SqlServerAdapter : IAdapter
+public class SqlServerAdapter : AdapterBase
 {
-    public string AdapterName => "SqlServer";
-    public string AdapterAlias => "SQL Server";
-    public bool SupportsRead => true;
-    public bool SupportsWrite => true;
-    public string AdapterRole { get; }
+    public override string AdapterName => "SqlServer";
+    public override string AdapterAlias => "SQL Server";
+    public override bool SupportsRead => true;
+    public override bool SupportsWrite => true;
 
     /// <summary>
     /// ApplicationDbContext connects to the configured SQL Server database
@@ -30,10 +29,6 @@ public class SqlServerAdapter : IAdapter
     private readonly string? _connectionString;
     private readonly IDynamicTableService _dynamicTableService;
     private readonly IDataService _dataService;
-    private readonly IMessageBoxService? _messageBoxService;
-    private readonly IMessageSubscriptionService? _subscriptionService;
-    private readonly string? _interfaceName;
-    private readonly Guid? _adapterInstanceGuid;
     private readonly ILogger<SqlServerAdapter>? _logger;
     private readonly CsvColumnAnalyzer _columnAnalyzer;
     private readonly TypeValidator _typeValidator;
@@ -45,7 +40,6 @@ public class SqlServerAdapter : IAdapter
     
     // General SQL Server adapter properties
     private readonly bool _useTransaction;
-    private readonly int _batchSize;
     private readonly int _commandTimeout;
     private readonly bool _failOnBadStatement;
     private readonly IInterfaceConfigurationService? _configService;
@@ -71,6 +65,14 @@ public class SqlServerAdapter : IAdapter
         string adapterRole = "Source",
         ILogger<SqlServerAdapter>? logger = null,
         ProcessingStatisticsService? statisticsService = null)
+        : base(
+            messageBoxService: messageBoxService,
+            subscriptionService: subscriptionService,
+            interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
+            adapterInstanceGuid: adapterInstanceGuid,
+            batchSize: batchSize ?? 1000,
+            adapterRole: adapterRole,
+            logger: logger)
     {
         if (context == null && string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Either context or connectionString must be provided", nameof(context));
@@ -79,19 +81,13 @@ public class SqlServerAdapter : IAdapter
         _connectionString = connectionString;
         _dynamicTableService = dynamicTableService ?? throw new ArgumentNullException(nameof(dynamicTableService));
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
-        _messageBoxService = messageBoxService;
-        _subscriptionService = subscriptionService;
-        _interfaceName = interfaceName ?? "FromCsvToSqlServerExample";
-        _adapterInstanceGuid = adapterInstanceGuid;
         _pollingStatement = pollingStatement;
         _pollingInterval = pollingInterval ?? 60;
         _tableName = tableName;
         _useTransaction = useTransaction ?? false;
-        _batchSize = batchSize ?? 1000;
         _commandTimeout = commandTimeout ?? 30;
         _failOnBadStatement = failOnBadStatement ?? false;
         _configService = configService;
-        AdapterRole = adapterRole ?? "Source";
         _logger = logger;
         _statisticsService = statisticsService;
         _columnAnalyzer = new CsvColumnAnalyzer();
@@ -125,7 +121,7 @@ public class SqlServerAdapter : IAdapter
         return new ApplicationDbContext(optionsBuilder.Options);
     }
 
-    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
+    public override async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(string source, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -220,32 +216,8 @@ public class SqlServerAdapter : IAdapter
 
             _logger?.LogInformation("Successfully read {RecordCount} records from SQL Server table: {Source}", records.Count, source);
 
-            // If AdapterRole is "Source" and MessageBoxService is available, debatch and write to MessageBox
-            // Each record is written as a separate message, triggering events
-            if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
-                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue)
-            {
-                _logger?.LogInformation("Debatching SQL Server data and writing to MessageBox as Source adapter: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, Records={RecordCount}", 
-                    _interfaceName, _adapterInstanceGuid.Value, records.Count);
-                var messageIds = await _messageBoxService.WriteMessagesAsync(
-                    _interfaceName,
-                    AdapterName,
-                    "Source",
-                    _adapterInstanceGuid.Value,
-                    headers,
-                    records,
-                    cancellationToken);
-                _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox", messageIds.Count);
-            }
-            else if (AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase) && 
-                     _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
-            {
-                _logger?.LogWarning("AdapterInstanceGuid is missing. Messages will not be written to MessageBox.");
-            }
-            else if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger?.LogDebug("AdapterRole is '{AdapterRole}', skipping MessageBox write in ReadAsync", AdapterRole);
-            }
+            // Write to MessageBox if AdapterRole is "Source"
+            await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
 
             return (headers, records);
         }
@@ -256,7 +228,7 @@ public class SqlServerAdapter : IAdapter
         }
     }
 
-    public async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
+    public override async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(destination))
             throw new ArgumentException("Destination table name cannot be empty", nameof(destination));
@@ -266,110 +238,20 @@ public class SqlServerAdapter : IAdapter
             _logger?.LogInformation("Writing {RecordCount} records to SQL Server table: {Destination}, AdapterRole: {AdapterRole}", 
                 records?.Count ?? 0, destination, AdapterRole);
 
-            // If AdapterRole is "Destination" and MessageBoxService is available, read messages from MessageBox
-            List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>? processedMessages = null;
-            if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase) && 
-                _messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+            // Read messages from MessageBox if AdapterRole is "Destination"
+            List<MessageBoxMessage>? processedMessages = null;
+            var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
+            if (messageBoxResult.HasValue)
             {
-                _logger?.LogInformation("Subscribing to messages from MessageBox as Destination adapter: Interface={InterfaceName}", _interfaceName);
-                
-                // Read pending messages (event-driven: messages are queued when added)
-                var messages = await _messageBoxService.ReadMessagesAsync(_interfaceName, "Pending", cancellationToken);
-                processedMessages = new List<InterfaceConfigurator.Main.Core.Models.MessageBoxMessage>();
-                
-                if (messages.Count > 0)
-                {
-                    // Process messages one by one (each message contains a single record)
-                    var processedRecords = new List<Dictionary<string, string>>();
-                    var processedHeaders = new List<string>();
-                    
-                    foreach (var message in messages)
-                    {
-                        // Try to acquire lock on message (prevent concurrent processing)
-                        var lockAcquired = await _messageBoxService.MarkMessageAsInProgressAsync(
-                            message.MessageId, lockTimeoutMinutes: 5, cancellationToken);
-                        
-                        if (!lockAcquired)
-                        {
-                            _logger?.LogWarning("Could not acquire lock on message {MessageId}, skipping (may be processed by another instance)", message.MessageId);
-                            continue; // Skip this message, another instance is processing it
-                        }
-
-                        try
-                        {
-                            // Create subscription for this message (if subscription service is available)
-                            if (_subscriptionService != null)
-                            {
-                                await _subscriptionService.CreateSubscriptionAsync(
-                                    message.MessageId, _interfaceName, AdapterName, cancellationToken);
-                            }
-                            
-                            // Extract single record from message
-                            (var messageHeaders, var singleRecord) = _messageBoxService.ExtractDataFromMessage(message);
-                            
-                            // Use headers from first message
-                            if (processedHeaders.Count == 0)
-                            {
-                                processedHeaders = messageHeaders;
-                            }
-                            
-                            processedRecords.Add(singleRecord);
-                            processedMessages.Add(message); // Track processed messages for subscription marking
-                            
-                            _logger?.LogInformation("Processed message {MessageId} from MessageBox", message.MessageId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogError(ex, "Error processing message {MessageId} from MessageBox: {ErrorMessage}", message.MessageId, ex.Message);
-                            
-                            // Release lock and mark as error (will handle retry logic)
-                            try
-                            {
-                                await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                                await _messageBoxService.MarkMessageAsErrorAsync(message.MessageId, ex.Message, cancellationToken);
-                            }
-                            catch (Exception lockEx)
-                            {
-                                _logger?.LogError(lockEx, "Error releasing lock or marking error for message {MessageId}", message.MessageId);
-                            }
-                            
-                            // Mark subscription as error if subscription service is available
-                            if (_subscriptionService != null)
-                            {
-                                try
-                                {
-                                    await _subscriptionService.MarkSubscriptionAsErrorAsync(
-                                        message.MessageId, AdapterName, ex.Message, cancellationToken);
-                                }
-                                catch (Exception subEx)
-                                {
-                                    _logger?.LogError(subEx, "Error marking subscription as error for message {MessageId}", message.MessageId);
-                                }
-                            }
-                            // Continue with next message
-                        }
-                    }
-                    
-                    if (processedRecords.Count > 0)
-                    {
-                        headers = processedHeaders;
-                        records = processedRecords;
-                        
-                        _logger?.LogInformation("Read {RecordCount} records from {MessageCount} MessageBox messages", 
-                            processedRecords.Count, messages.Count);
-                    }
-                    else
-                    {
-                        // No messages processed, return early
-                        _logger?.LogInformation("No messages were successfully processed from MessageBox for interface {InterfaceName}", _interfaceName);
-                        return;
-                    }
-                }
-                else
-                {
-                    _logger?.LogWarning("No pending messages found in MessageBox for interface {InterfaceName}. Will use provided records if available.", _interfaceName);
-                    // Continue to fallback: use provided records if available
-                }
+                var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+                headers = messageHeaders;
+                records = messageRecords;
+                processedMessages = messages;
+            }
+            else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
+            {
+                // No messages found, but continue to fallback: use provided records if available
+                _logger?.LogWarning("No messages found in MessageBox. Will use provided records if available.");
             }
             
             // If no messages were read from MessageBox, use provided records (fallback for direct calls)
@@ -476,47 +358,9 @@ public class SqlServerAdapter : IAdapter
             }
 
             // Mark subscriptions as processed for all messages that were processed
-            if (_messageBoxService != null && _subscriptionService != null && processedMessages != null && processedMessages.Count > 0)
+            if (processedMessages != null && processedMessages.Count > 0)
             {
-                foreach (var message in processedMessages)
-                {
-                    try
-                    {
-                        // Release lock before marking as processed
-                        await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Processed", cancellationToken);
-                        
-                        await _subscriptionService.MarkSubscriptionAsProcessedAsync(
-                            message.MessageId, AdapterName, $"Written to SQL Server table: {destination}", cancellationToken);
-                        
-                        // Mark message as processed (releases lock automatically)
-                        await _messageBoxService.MarkMessageAsProcessedAsync(
-                            message.MessageId, $"Written to SQL Server table: {destination}", cancellationToken);
-                        
-                        // Check if all subscriptions are processed, then remove message
-                        var allProcessed = await _subscriptionService.AreAllSubscriptionsProcessedAsync(message.MessageId, cancellationToken);
-                        if (allProcessed)
-                        {
-                            _logger?.LogInformation("All subscriptions processed for message {MessageId}. Retaining record for auditing.", message.MessageId);
-                        }
-                        else
-                        {
-                            _logger?.LogDebug("Message {MessageId} still has pending subscribers.", message.MessageId);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error marking subscription as processed for message {MessageId}", message.MessageId);
-                        // Release lock on error
-                        try
-                        {
-                            await _messageBoxService.ReleaseMessageLockAsync(message.MessageId, "Error", cancellationToken);
-                        }
-                        catch (Exception releaseEx)
-                        {
-                            _logger?.LogWarning(releaseEx, "Error releasing message lock for message {MessageId}: {ErrorMessage}", message.MessageId, releaseEx.Message);
-                        }
-                    }
-                }
+                await MarkMessagesAsProcessedAsync(processedMessages, $"Written to SQL Server table: {destination}", cancellationToken);
             }
 
             _logger?.LogInformation("Successfully wrote {RecordCount} records to SQL Server table: {Destination}", records?.Count ?? 0, destination);
@@ -528,7 +372,7 @@ public class SqlServerAdapter : IAdapter
         }
     }
 
-    public async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
+    public override async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(source))
             throw new ArgumentException("Source table name cannot be empty", nameof(source));
@@ -554,7 +398,7 @@ public class SqlServerAdapter : IAdapter
         }
     }
 
-    public async Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
+    public override async Task EnsureDestinationStructureAsync(string destination, Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo> columnTypes, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(destination))
             throw new ArgumentException("Destination table name cannot be empty", nameof(destination));
