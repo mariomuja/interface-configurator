@@ -5,7 +5,7 @@ import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatSnackBarModule, MatSnackBar, MatSnackBarHorizontalPosition, MatSnackBarVerticalPosition } from '@angular/material/snack-bar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
@@ -288,12 +288,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfigurationen');
         
         // Show as warning (less intrusive) since this is not critical for basic functionality
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -599,12 +594,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         
         // Only show error popup if it's a different error or hasn't been shown too many times
         if (errorKey !== this.lastErrorShown || this.errorShownCount < 3) {
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 15000, // Longer duration for detailed messages
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
+          this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
           
           if (errorKey === this.lastErrorShown) {
             this.errorShownCount++;
@@ -987,12 +977,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         
         // Only show error popup if it's a different error or hasn't been shown too many times
         if (errorKey !== this.lastErrorShown || this.errorShownCount < 3) {
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 15000, // Longer duration for detailed messages
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
+          this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
           
           if (errorKey === this.lastErrorShown) {
             this.errorShownCount++;
@@ -1068,11 +1053,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         error: (error) => {
           console.error('Error creating interface configuration:', error);
           const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen der Interface-Konfiguration');
-          this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-            duration: 12000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
+          this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
+            duration: 12000
           });
           this.uploadAndStartTransport(interfaceName);
         }
@@ -1089,11 +1071,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           },
           error: (error) => {
             const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Destination-Adapters');
-            this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-              duration: 12000,
-              panelClass: ['error-snackbar'],
-              verticalPosition: 'top',
-              horizontalPosition: 'center'
+            this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
+              duration: 12000
             });
             this.uploadAndStartTransport(interfaceName);
           }
@@ -1111,11 +1090,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (error) => {
           const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren des Source-Adapters');
-          this.snackBar.open(detailedMessage + '\n\nTransport wird trotzdem gestartet...', 'OK', { 
-            duration: 12000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
+          this.showErrorMessageWithCopy(detailedMessage + '\n\nTransport wird trotzdem gestartet...', {
+            duration: 12000
           });
           this.uploadAndStartTransport(interfaceName);
         }
@@ -1180,12 +1156,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Extract detailed error message with all available information
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Starten des Transports');
         
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 15000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
         this.isTransporting = false;
         this.autoStartedInterfaces.delete(interfaceName);
       }
@@ -1208,15 +1179,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           console.error('Error dropping table:', error);
           console.error('Full error object:', JSON.stringify(error, null, 2));
           
-          // Extract detailed error message with all available information
-          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Löschen der Tabelle');
-          
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 15000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
+        // Extract detailed error message with all available information
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Löschen der Tabelle');
+        
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
         }
       });
     }
@@ -1239,12 +1205,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           // Extract detailed error message with all available information
           const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Leeren der Protokolltabelle');
           
-          this.snackBar.open(detailedMessage, 'Schließen', { 
-            duration: 15000,
-            panelClass: ['error-snackbar'],
-            verticalPosition: 'top',
-            horizontalPosition: 'center'
-          });
+          this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
           this.isLoading = false;
         }
       });
@@ -1276,12 +1237,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Extract detailed error message with all available information
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler bei der Diagnose');
         
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 15000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
       }
     });
   }
@@ -1368,12 +1324,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating interface name:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Interface-Namens');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous name
         this.currentInterfaceName = activeConfig.interfaceName;
       }
@@ -1400,12 +1351,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating source instance name:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Source-Instanz-Namens');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous name
         this.sourceInstanceName = activeConfig.sourceInstanceName || 'Source';
       }
@@ -1434,12 +1380,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating destination instance name:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Destination-Instanz-Namens');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous name
         this.destinationInstanceName = activeConfig.destinationInstanceName || 'Destination';
       }
@@ -1480,12 +1421,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error toggling source adapter:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren/Deaktivieren des Source-Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceIsEnabled = activeConfig.sourceIsEnabled ?? true;
       }
@@ -1518,12 +1454,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error toggling destination adapter:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren/Deaktivieren des Destination-Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.destinationIsEnabled = activeConfig.destinationIsEnabled ?? true;
       }
@@ -1543,12 +1474,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isRestartingSource = false;
         console.error('Error restarting source adapter:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Neustarten des Source-Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -1566,12 +1492,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isRestartingDestination = false;
         console.error('Error restarting destination adapter:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Neustarten des Destination-Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -1599,12 +1520,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating receive folder:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Receive Folders');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceReceiveFolder = activeConfig.sourceReceiveFolder || '';
       }
@@ -1635,12 +1551,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating file mask:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der File Mask');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceFileMask = activeConfig.sourceFileMask || '*.txt';
       }
@@ -1671,12 +1582,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating batch size:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der Batch Size');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceBatchSize = activeConfig.sourceBatchSize ?? 100;
       }
@@ -1722,12 +1628,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating SQL connection properties:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Server Verbindungseigenschaften');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous values
         this.loadInterfaceConfigurations();
       }
@@ -1761,12 +1662,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating SQL polling properties:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Server Polling-Eigenschaften');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous values
         this.loadInterfaceConfigurations();
       }
@@ -1847,11 +1743,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  private showErrorMessageWithCopy(message: string): void {
+  private showErrorMessageWithCopy(
+    message: string,
+    options: {
+      duration?: number;
+      verticalPosition?: MatSnackBarVerticalPosition;
+      horizontalPosition?: MatSnackBarHorizontalPosition;
+    } = {}
+  ): void {
     const snackRef = this.snackBar.open(message, 'Kopieren', {
-      duration: 8000,
+      duration: options.duration ?? 10000,
       panelClass: ['error-snackbar'],
-      verticalPosition: 'top'
+      verticalPosition: options.verticalPosition ?? 'top',
+      horizontalPosition: options.horizontalPosition ?? 'center'
     });
 
     snackRef.onAction().subscribe(() => {
@@ -2017,12 +1921,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             error: (error) => {
               console.error('Error updating CSV data:', error);
               const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der CSV Data');
-              this.snackBar.open(detailedMessage, 'Schließen', {
-                duration: 10000,
-                panelClass: ['error-snackbar'],
-                verticalPosition: 'top',
-                horizontalPosition: 'center'
-              });
+              this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
             }
           });
         }
@@ -2065,12 +1964,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
               error: (error) => {
                 console.error('Error updating SQL transaction properties:', error);
                 const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Transaction Properties');
-                this.snackBar.open(detailedMessage, 'Schließen', {
-                  duration: 10000,
-                  panelClass: ['error-snackbar'],
-                  verticalPosition: 'top',
-                  horizontalPosition: 'center'
-                });
+                this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
                 // Restore previous values
                 this.loadInterfaceConfigurations();
               }
@@ -2180,12 +2074,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating field separator:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Field Separators');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.sourceFieldSeparator = activeConfig.sourceFieldSeparator || '║';
       }
@@ -2216,12 +2105,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating CSV polling interval:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Polling-Intervalls');
-        this.snackBar.open(detailedMessage, 'Schließen', {
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         this.csvPollingInterval = activeConfig.csvPollingInterval ?? 10;
       }
     });
@@ -2251,12 +2135,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating destination receive folder:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Destination Receive Folders');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.destinationReceiveFolder = activeConfig.destinationReceiveFolder || '';
       }
@@ -2287,12 +2166,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error updating destination file mask:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der Destination File Mask');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.destinationFileMask = activeConfig.destinationFileMask || '*.txt';
       }
@@ -2367,12 +2241,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             error: (error) => {
               console.error('Error creating default interface:', error);
               const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Standard-Interfaces');
-              this.snackBar.open(detailedMessage, 'Schließen', { 
-                duration: 10000,
-                panelClass: ['error-snackbar'],
-                verticalPosition: 'top',
-                horizontalPosition: 'center'
-              });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
             }
           });
           this.selectedInterfaceConfig = null;
@@ -2519,12 +2388,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error creating interface:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Interfaces');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -2546,12 +2410,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error deleting interface:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Löschen des Interfaces');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -2734,12 +2593,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         
         // Otherwise show the actual error
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Interface-Konfiguration');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -3274,12 +3128,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       error: (error) => {
         console.error('Error removing destination adapter:', error);
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Entfernen des Destination Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -3319,12 +3168,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Revert local change on error
         instance.isEnabled = !enabled;
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des Destination Adapters');
-        this.snackBar.open(detailedMessage, 'Schließen', { 
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -3465,12 +3309,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }).catch(error => {
       console.error('Error saving destination adapter instances:', error);
       const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Speichern der Destination Adapter Instances');
-      this.snackBar.open(detailedMessage, 'Schließen', {
-        duration: 10000,
-        panelClass: ['error-snackbar'],
-        verticalPosition: 'top',
-        horizontalPosition: 'center'
-      });
+      this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       this.loadDestinationAdapterInstances(); // Reload to restore previous state
     });
   }
@@ -3660,12 +3499,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Revert local changes on error
         this.loadDestinationAdapterInstances();
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der Destination Adapter Instance');
-        this.snackBar.open(detailedMessage, 'Schließen', {
-          duration: 10000,
-          panelClass: ['error-snackbar'],
-          verticalPosition: 'top',
-          horizontalPosition: 'center'
-        });
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }

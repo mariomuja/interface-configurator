@@ -456,7 +456,11 @@
 }
 
 .message-box-spinner {
-  --mdc-circular-progress-active-indicator-color: #fff;
+  margin: 0 auto;
+}
+
+.message-box-spinner ::ng-deep .mdc-circular-progress__indeterminate-circle-graphic {
+  stroke: #03a9f4 !important;
 }
 
 .log-card {
