@@ -1851,6 +1851,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       // Use cached config if we just saved (within last 2 seconds)
       // This avoids race condition where backend hasn't updated yet
       console.log('Using cached config (recent save detected)');
+      console.log('cachedConfig.sourceIsEnabled:', cachedConfig?.sourceIsEnabled);
+      console.log('cachedConfig.sources:', cachedConfig?.sources);
       this.openSourceAdapterSettingsDialog(cachedConfig);
       return;
     }
@@ -1872,8 +1874,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           // Sync local state from fresh config
           // Use explicit check for undefined - false is a valid value!
           // IMPORTANT: Always use the value from backend, even if it's false
+          // Check both direct property and hierarchical structure
           if (freshConfig.sourceIsEnabled !== undefined) {
             this.sourceIsEnabled = freshConfig.sourceIsEnabled;
+          } else if (freshConfig.sources?.[this.sourceAdapterName]?.isEnabled !== undefined) {
+            this.sourceIsEnabled = freshConfig.sources[this.sourceAdapterName].isEnabled;
           }
           this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
           this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
@@ -1908,6 +1913,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Use explicit checks for undefined/null to handle empty strings, 0, and false correctly
     console.log('openSourceAdapterSettingsDialog - activeConfig:', activeConfig);
     console.log('openSourceAdapterSettingsDialog - sourceIsEnabled from config:', activeConfig?.sourceIsEnabled);
+    console.log('openSourceAdapterSettingsDialog - sources hierarchy:', activeConfig?.sources);
+    console.log('openSourceAdapterSettingsDialog - isEnabled from sources:', activeConfig?.sources?.[this.sourceAdapterName]?.isEnabled);
     console.log('openSourceAdapterSettingsDialog - sourceIsEnabled local:', this.sourceIsEnabled);
     
     const dialogData: AdapterPropertiesData = {
@@ -1917,8 +1924,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       instanceName: activeConfig?.sourceInstanceName !== undefined ? activeConfig.sourceInstanceName : this.sourceInstanceName,
       // Read isEnabled from config (backend) - use explicit boolean check
       // If config exists, use its value (even if false). Only fallback to local state if config is null/undefined
+      // IMPORTANT: Check both sourceIsEnabled directly and in the sources hierarchy
       isEnabled: activeConfig !== null && activeConfig !== undefined 
-        ? (activeConfig.sourceIsEnabled !== undefined ? activeConfig.sourceIsEnabled : true)
+        ? (activeConfig.sourceIsEnabled !== undefined 
+            ? activeConfig.sourceIsEnabled 
+            : (activeConfig.sources?.[this.sourceAdapterName]?.isEnabled !== undefined
+                ? activeConfig.sources[this.sourceAdapterName].isEnabled
+                : true))
         : this.sourceIsEnabled,
       // Use explicit undefined checks - empty string is a valid value!
       receiveFolder: activeConfig?.sourceReceiveFolder !== undefined ? activeConfig.sourceReceiveFolder : this.sourceReceiveFolder,
