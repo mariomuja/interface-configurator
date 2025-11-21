@@ -37,6 +37,8 @@ public class ToggleInterfaceConfiguration
             optionsResponse.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
             optionsResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
             optionsResponse.Headers.Add("Access-Control-Max-Age", "3600");
+            // Write empty body to ensure headers are sent
+            await optionsResponse.WriteStringAsync("");
             return optionsResponse;
         }
 
