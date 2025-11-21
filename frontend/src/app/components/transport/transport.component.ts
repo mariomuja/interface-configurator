@@ -1507,6 +1507,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   // Track when we last saved enabled status to avoid race conditions
   private lastEnabledSaveTime: { [interfaceName: string]: number } = {};
 
+  onSourceEnabledChangeFromHeader(newValue: boolean): void {
+    // Update local state first
+    this.sourceIsEnabled = newValue;
+    // Then save to backend
+    this.onSourceEnabledChange();
+  }
+
   onSourceEnabledChange(): void {
     const activeInterfaceName = this.getActiveInterfaceName();
     if (!activeInterfaceName) {

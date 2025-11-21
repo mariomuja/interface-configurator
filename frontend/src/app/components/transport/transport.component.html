@@ -42,6 +42,7 @@
       (restart)="restartSourceAdapter()"
       (expandedChange)="sourceCardExpanded = $event"
       (csvDataChange)="onCsvDataChange($event)"
+      (enabledChange)="onSourceEnabledChangeFromHeader($event)"
       (settingsClick)="openSourceAdapterSettings()"
       (explorerClick)="openBlobContainerExplorer('Source', sourceAdapterName, sourceInstanceName, sourceAdapterInstanceGuid)">
       <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
@@ -109,22 +110,14 @@
         </tr>
       </table>
     </div>
-    <div class="table-empty-message" *ngIf="sourceIsEnabled && sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
-      <p>No MessageBox messages yet. The CSV source pushes data automatically when it is enabled.</p>
-    </div>
     <div class="table-empty-message" *ngIf="!sourceIsEnabled">
       <p>The source adapter is disabled. Enable the source adapter to start generating messages.</p>
     </div>
+    <div class="table-empty-message" *ngIf="sourceIsEnabled && sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
+      <p>No messages in MessageBox yet.</p>
+    </div>
     <div class="table-empty-message" *ngIf="sourceIsEnabled && !sourceAdapterInstanceGuid">
-      <div class="message-box-spinner-container">
-        <mat-spinner
-          class="message-box-spinner"
-          diameter="42"
-          strokeWidth="4"
-          color="accent">
-        </mat-spinner>
-      </div>
-      <p>Source adapter instances are writing data to the MessageBox. Please wait for the data to arrive.</p>
+      <p>Waiting for source adapter instance configuration...</p>
     </div>
   </div>
 </mat-expansion-panel>

@@ -127,6 +127,11 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
     if (changes['csvData'] && this.hasViewInitialized) {
       this.renderCsvData();
     }
+    // Ensure toggle reflects the current isEnabled state from parent
+    if (changes['isEnabled'] && changes['isEnabled'].currentValue !== undefined) {
+      // The ngModel binding will automatically update the toggle
+      // This is just to ensure we're in sync
+    }
   }
 
   ngAfterViewInit(): void {
