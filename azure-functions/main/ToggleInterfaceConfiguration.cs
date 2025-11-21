@@ -31,14 +31,9 @@ public class ToggleInterfaceConfiguration
         // Handle CORS preflight requests
         if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
         {
-            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
+            var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.NoContent); // Use 204 No Content for OPTIONS
             // Set CORS headers explicitly
-            optionsResponse.Headers.Add("Access-Control-Allow-Origin", "*");
-            optionsResponse.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-            optionsResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            optionsResponse.Headers.Add("Access-Control-Max-Age", "3600");
-            // Write empty body to ensure headers are sent
-            await optionsResponse.WriteStringAsync("");
+            CorsHelper.AddCorsHeaders(optionsResponse);
             return optionsResponse;
         }
 
@@ -51,8 +46,8 @@ public class ToggleInterfaceConfiguration
             if (string.IsNullOrWhiteSpace(requestBody))
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 CorsHelper.AddCorsHeaders(badRequestResponse);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Request body is empty" }));
                 return badRequestResponse;
             }
@@ -70,8 +65,8 @@ public class ToggleInterfaceConfiguration
             {
                 _logger.LogError(jsonEx, "JSON deserialization error. Request body: {RequestBody}", requestBody);
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 CorsHelper.AddCorsHeaders(badRequestResponse);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Invalid JSON: {jsonEx.Message}" }));
                 return badRequestResponse;
             }
@@ -79,8 +74,8 @@ public class ToggleInterfaceConfiguration
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 CorsHelper.AddCorsHeaders(badRequestResponse);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "InterfaceName is required" }));
                 return badRequestResponse;
             }
@@ -88,8 +83,8 @@ public class ToggleInterfaceConfiguration
             if (request.AdapterType != "Source" && request.AdapterType != "Destination")
             {
                 var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 CorsHelper.AddCorsHeaders(badRequestResponse);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "AdapterType must be 'Source' or 'Destination'" }));
                 return badRequestResponse;
             }
@@ -106,8 +101,9 @@ public class ToggleInterfaceConfiguration
             }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            // Set CORS headers FIRST before any other headers or body
             CorsHelper.AddCorsHeaders(response);
+            response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
                 message = $"{request.AdapterType} adapter for interface configuration '{request.InterfaceName}' {(request.Enabled ? "enabled" : "disabled")}",
                 interfaceName = request.InterfaceName,
@@ -120,8 +116,8 @@ public class ToggleInterfaceConfiguration
         {
             _logger.LogError(ex, "Error toggling interface configuration");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
-            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(errorResponse);
+            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
