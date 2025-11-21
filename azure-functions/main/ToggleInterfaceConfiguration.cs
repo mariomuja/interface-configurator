@@ -39,11 +39,36 @@ public class ToggleInterfaceConfiguration
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var options = new JsonSerializerOptions
+            
+            _logger.LogInformation("ToggleInterfaceConfiguration request body: {RequestBody}", requestBody ?? "(null)");
+            
+            if (string.IsNullOrWhiteSpace(requestBody))
             {
-                PropertyNameCaseInsensitive = true
-            };
-            var request = JsonSerializer.Deserialize<ToggleInterfaceConfigRequest>(requestBody, options);
+                var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
+                await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Request body is empty" }));
+                return badRequestResponse;
+            }
+            
+            ToggleInterfaceConfigRequest? request;
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                request = JsonSerializer.Deserialize<ToggleInterfaceConfigRequest>(requestBody, options);
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(jsonEx, "JSON deserialization error. Request body: {RequestBody}", requestBody);
+                var badRequestResponse = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                badRequestResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(badRequestResponse);
+                await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Invalid JSON: {jsonEx.Message}" }));
+                return badRequestResponse;
+            }
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {
