@@ -133,39 +133,25 @@
 <!-- Blob Container Explorer Card - REMOVED: Now shown in modal dialog per adapter instance -->
 <!--
 <mat-card class="blob-container-card">
-  <mat-card-header>
+  <mat-card-header class="blob-container-header-compact">
     <div class="blob-container-header">
-      <mat-icon>folder</mat-icon>
-      <div class="blob-container-header-text">
-        <h3>Blob Container Explorer</h3>
-        <p>Folder structure of csv-files container</p>
-      </div>
-      <span class="file-count" *ngIf="!isLoadingBlobContainer">
-        {{ getTotalFileCount() }} files
-        <span *ngIf="getSelectedBlobFilesCount() > 0" class="selected-count">
-          ({{ getSelectedBlobFilesCount() }} selected)
-        </span>
-      </span>
-    </div>
-    <div class="blob-container-actions">
-      <button mat-raised-button 
+      <mat-icon class="header-icon-small">folder</mat-icon>
+      <span class="header-title-small">Blob Container Explorer</span>
+      <button mat-icon-button 
+              (click)="loadBlobContainerFolders()" 
+              [disabled]="isLoadingBlobContainer" 
+              matTooltip="Refresh"
+              class="header-reload-button">
+        <mat-icon class="icon-small">{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+      </button>
+      <button mat-icon-button 
               color="warn" 
               (click)="deleteSelectedBlobFiles()" 
               [disabled]="getSelectedBlobFilesCount() === 0 || isDeletingBlobFiles || isLoadingBlobContainer"
-              matTooltip="Delete selected files"
-              *ngIf="getSelectedBlobFilesCount() > 0">
-        <mat-icon>delete</mat-icon>
-        Delete ({{ getSelectedBlobFilesCount() }})
-      </button>
-      <button mat-icon-button 
-              (click)="deselectAllBlobFiles()" 
-              [disabled]="getSelectedBlobFilesCount() === 0"
-              matTooltip="Deselect all"
-              *ngIf="getSelectedBlobFilesCount() > 0">
-        <mat-icon>clear</mat-icon>
-      </button>
-      <button mat-icon-button (click)="loadBlobContainerFolders()" [disabled]="isLoadingBlobContainer" matTooltip="Refresh blob container">
-        <mat-icon>{{ isLoadingBlobContainer ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+              matTooltip="Delete selected"
+              *ngIf="getSelectedBlobFilesCount() > 0"
+              class="header-delete-button">
+        <mat-icon class="icon-small">delete</mat-icon>
       </button>
     </div>
   </mat-card-header>
@@ -177,70 +163,71 @@
       <div *ngIf="blobContainerFolders.length === 0" class="table-empty-message">
         <p>No folders found in blob container.</p>
       </div>
-      <div *ngFor="let folder of blobContainerFolders" class="folder-section">
-        <div class="folder-header">
-          <mat-icon class="folder-icon">folder</mat-icon>
-          <span class="folder-path">{{ folder.path === '/' ? '/ (root)' : folder.path }}</span>
-          <span class="folder-file-count">
-            ({{ folder.files.length }}<span *ngIf="folder.totalFileCount > folder.files.length"> of {{ folder.totalFileCount }}</span> files)
+      <div *ngFor="let folder of blobContainerFolders" class="folder-section-compact">
+        <div class="folder-header-compact">
+          <mat-icon class="folder-icon-small">folder</mat-icon>
+          <span class="folder-path-compact">{{ folder.path === '/' ? '/ (root)' : folder.path }}</span>
+          <span class="folder-file-count-compact">
+            {{ folder.files.length }}<span *ngIf="folder.totalFileCount > folder.files.length">/{{ folder.totalFileCount }}</span>
           </span>
         </div>
-        <div class="file-list" *ngIf="folder.files.length > 0">
-          <div class="file-list-header">
-            <div class="file-header-checkbox">
+        <div class="file-list-compact" *ngIf="folder.files.length > 0">
+          <div class="file-list-header-compact">
+            <div class="file-header-checkbox-compact">
               <mat-checkbox 
                 [checked]="areAllFilesInFolderSelected(folder)"
                 [indeterminate]="areSomeFilesInFolderSelected(folder)"
                 (change)="toggleFolderSelection(folder)"
-                (click)="$event.stopPropagation()">
+                (click)="$event.stopPropagation()"
+                class="checkbox-small">
               </mat-checkbox>
             </div>
-            <div class="file-header-item file-header-name" (click)="onBlobContainerSortChange('name')" [class.sorted]="blobContainerSortBy === 'name'">
-              <span>Filename</span>
-              <mat-icon *ngIf="blobContainerSortBy === 'name'" class="sort-icon">
+            <div class="file-header-item-compact file-header-name-compact" (click)="onBlobContainerSortChange('name')" [class.sorted]="blobContainerSortBy === 'name'">
+              <span class="header-text-small">Name</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'name'" class="sort-icon-small">
                 {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
               </mat-icon>
             </div>
-            <div class="file-header-item file-header-size" (click)="onBlobContainerSortChange('size')" [class.sorted]="blobContainerSortBy === 'size'">
-              <span>Size</span>
-              <mat-icon *ngIf="blobContainerSortBy === 'size'" class="sort-icon">
+            <div class="file-header-item-compact file-header-size-compact" (click)="onBlobContainerSortChange('size')" [class.sorted]="blobContainerSortBy === 'size'">
+              <span class="header-text-small">Size</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'size'" class="sort-icon-small">
                 {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
               </mat-icon>
             </div>
-            <div class="file-header-item file-header-date" (click)="onBlobContainerSortChange('date')" [class.sorted]="blobContainerSortBy === 'date'">
-              <span>Date</span>
-              <mat-icon *ngIf="blobContainerSortBy === 'date'" class="sort-icon">
+            <div class="file-header-item-compact file-header-date-compact" (click)="onBlobContainerSortChange('date')" [class.sorted]="blobContainerSortBy === 'date'">
+              <span class="header-text-small">Date</span>
+              <mat-icon *ngIf="blobContainerSortBy === 'date'" class="sort-icon-small">
                 {{ blobContainerSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
               </mat-icon>
             </div>
           </div>
-          <div *ngFor="let file of folder.files" class="file-item" [class.selected]="isBlobFileSelected(file.fullPath)">
+          <div *ngFor="let file of folder.files" class="file-item-compact" [class.selected]="isBlobFileSelected(file.fullPath)">
             <mat-checkbox 
               [checked]="isBlobFileSelected(file.fullPath)"
               (change)="toggleBlobFileSelection(file.fullPath)"
               (click)="$event.stopPropagation()"
-              class="file-checkbox">
+              class="file-checkbox-compact checkbox-small">
             </mat-checkbox>
-            <mat-icon class="file-icon">description</mat-icon>
-            <span class="file-name">{{ file.name }}</span>
-            <span class="file-size">{{ formatFileSize(file.size) }}</span>
-            <span class="file-date">{{ file.lastModified | date:'short' }}</span>
+            <mat-icon class="file-icon-small">description</mat-icon>
+            <span class="file-name-compact">{{ file.name }}</span>
+            <span class="file-size-compact">{{ formatFileSize(file.size) }}</span>
+            <span class="file-date-compact">{{ file.lastModified | date:'short' }}</span>
           </div>
-          <div class="load-more-container" *ngIf="getBlobFolderPagination(folder.path).hasMore">
+          <div class="load-more-container-compact" *ngIf="getBlobFolderPagination(folder.path).hasMore">
             <button 
               mat-button 
               color="primary" 
               (click)="loadMoreBlobFiles(folder.path)"
               [disabled]="getBlobFolderPagination(folder.path).isLoadingMore"
-              class="load-more-button">
-              <mat-icon *ngIf="!getBlobFolderPagination(folder.path).isLoadingMore">expand_more</mat-icon>
-              <mat-icon *ngIf="getBlobFolderPagination(folder.path).isLoadingMore" class="spinning">hourglass_empty</mat-icon>
-              <span>{{ getBlobFolderPagination(folder.path).isLoadingMore ? 'Loading...' : 'Load More' }}</span>
+              class="load-more-button-compact">
+              <mat-icon *ngIf="!getBlobFolderPagination(folder.path).isLoadingMore" class="icon-small">expand_more</mat-icon>
+              <mat-icon *ngIf="getBlobFolderPagination(folder.path).isLoadingMore" class="spinning icon-small">hourglass_empty</mat-icon>
+              <span class="button-text-small">{{ getBlobFolderPagination(folder.path).isLoadingMore ? 'Loading...' : 'More' }}</span>
             </button>
           </div>
         </div>
-        <div class="folder-empty" *ngIf="folder.files.length === 0">
-          <p>No files in this folder</p>
+        <div class="folder-empty-compact" *ngIf="folder.files.length === 0">
+          <p class="empty-text-small">No files</p>
         </div>
       </div>
     </div>

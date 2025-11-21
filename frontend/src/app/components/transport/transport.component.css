@@ -554,6 +554,242 @@
   margin-top: 16px;
 }
 
+.blob-container-header-compact {
+  padding: 4px 8px !important;
+  min-height: 32px !important;
+}
+
+.header-icon-small {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  color: #3f51b5;
+}
+
+.header-title-small {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.header-reload-button,
+.header-delete-button {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+}
+
+.icon-small {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.folder-section-compact {
+  margin-bottom: 8px;
+  border-left: 2px solid #3f51b5;
+  padding-left: 8px;
+}
+
+.folder-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: #3f51b5;
+}
+
+.folder-icon-small {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  color: #3f51b5;
+}
+
+.folder-path-compact {
+  font-family: 'Courier New', monospace;
+  flex: 1;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.folder-file-count-compact {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: normal;
+}
+
+.file-list-compact {
+  margin-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-list-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 3px;
+  margin-bottom: 2px;
+  font-weight: 500;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.7);
+  min-height: 20px;
+}
+
+.header-text-small {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.file-header-checkbox-compact {
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-header-item-compact {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+  font-family: 'Courier New', monospace;
+}
+
+.file-header-item-compact:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.file-header-item-compact.sorted {
+  color: #3f51b5;
+}
+
+.file-header-name-compact {
+  flex: 1;
+  text-align: left;
+}
+
+.file-header-size-compact {
+  min-width: 50px;
+  text-align: right;
+}
+
+.file-header-date-compact {
+  min-width: 100px;
+  text-align: right;
+}
+
+.sort-icon-small {
+  font-size: 12px !important;
+  width: 12px !important;
+  height: 12px !important;
+  color: #3f51b5;
+}
+
+.file-item-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+  min-height: 18px;
+  font-size: 10px;
+}
+
+.file-item-compact:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.file-item-compact.selected {
+  background-color: rgba(63, 81, 181, 0.1);
+  border-left: 2px solid #3f51b5;
+}
+
+.file-checkbox-compact {
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox {
+  --mdc-checkbox-state-layer-size: 32px;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox .mdc-checkbox {
+  padding: 4px;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox .mdc-checkbox__native-control {
+  width: 16px;
+  height: 16px;
+}
+
+.file-icon-small {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.file-name-compact {
+  font-family: 'Courier New', monospace;
+  flex: 1;
+  color: #333;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size-compact {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: rgba(0, 0, 0, 0.6);
+  min-width: 50px;
+  text-align: right;
+}
+
+.file-date-compact {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: rgba(0, 0, 0, 0.6);
+  min-width: 100px;
+  text-align: right;
+}
+
+.load-more-container-compact {
+  display: flex;
+  justify-content: center;
+  padding: 4px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.load-more-button-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+}
+
+.button-text-small {
+  font-size: 10px;
+}
+
 .blob-container-header {
   display: flex;
   align-items: center;
@@ -596,9 +832,10 @@
 
 .blob-container-explorer {
   font-family: 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 10px;
   max-height: 600px;
   overflow-y: auto;
+  padding: 4px;
 }
 
 .folder-section {
@@ -703,6 +940,79 @@
   color: #3f51b5;
 }
 
+.file-item-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+  min-height: 20px;
+  font-size: 10px;
+}
+
+.file-item-compact:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.file-item-compact.selected {
+  background-color: rgba(63, 81, 181, 0.1);
+  border-left: 2px solid #3f51b5;
+}
+
+.file-checkbox-compact {
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox {
+  --mdc-checkbox-state-layer-size: 32px;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox .mdc-checkbox {
+  padding: 4px;
+}
+
+.checkbox-small ::ng-deep .mat-mdc-checkbox .mdc-checkbox__native-control {
+  width: 16px;
+  height: 16px;
+}
+
+.file-icon-small {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.file-name-compact {
+  font-family: 'Courier New', monospace;
+  flex: 1;
+  color: #333;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size-compact {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: rgba(0, 0, 0, 0.6);
+  min-width: 50px;
+  text-align: right;
+}
+
+.file-date-compact {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: rgba(0, 0, 0, 0.6);
+  min-width: 100px;
+  text-align: right;
+}
+
 .file-item {
   display: flex;
   align-items: center;
@@ -757,12 +1067,47 @@
   text-align: right;
 }
 
+.folder-empty-compact {
+  margin-left: 20px;
+  padding: 4px;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+  font-size: 9px;
+}
+
+.empty-text-small {
+  margin: 0;
+  font-size: 9px;
+}
+
 .folder-empty {
   margin-left: 28px;
   padding: 8px;
   color: rgba(0, 0, 0, 0.5);
   font-style: italic;
   font-size: 12px;
+}
+
+.load-more-container-compact {
+  display: flex;
+  justify-content: center;
+  padding: 4px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.load-more-button-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+}
+
+.button-text-small {
+  font-size: 10px;
 }
 
 .load-more-container {

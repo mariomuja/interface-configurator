@@ -711,15 +711,51 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.blobContainerPagination.clear();
     this.transportService.getBlobContainerFolders('csv-files', '', this.BLOB_FILES_PER_PAGE).subscribe({
       next: (folders) => {
+        // Ensure all 3 CSV folders are shown (csv-incoming, csv-processed, csv-error)
+        const requiredFolders = ['/csv-incoming', '/csv-processed', '/csv-error'];
+        const folderMap = new Map<string, any>();
+        
+        // Add existing folders from API response
+        (folders || []).forEach((folder: any) => {
+          folderMap.set(folder.path, folder);
+        });
+        
+        // Ensure all required folders exist (create empty ones if missing)
+        requiredFolders.forEach(folderPath => {
+          if (!folderMap.has(folderPath)) {
+            folderMap.set(folderPath, {
+              path: folderPath,
+              files: [],
+              totalFileCount: 0,
+              hasMoreFiles: false
+            });
+          }
+        });
+        
+        // Convert map back to array and sort
+        const allFolders = Array.from(folderMap.values());
+        
         // Initialize pagination state for each folder
-        folders.forEach((folder: any) => {
+        allFolders.forEach((folder: any) => {
           this.blobContainerPagination.set(folder.path, {
             loadedCount: folder.files?.length || 0,
             hasMore: folder.hasMoreFiles || false,
             isLoadingMore: false
           });
         });
-        this.blobContainerFolders = this.sortBlobContainerFolders(folders || []);
+        
+        // Sort folders: csv-incoming first, then csv-processed, then csv-error
+        const sortedFolders = allFolders.sort((a, b) => {
+          const order = ['/csv-incoming', '/csv-processed', '/csv-error'];
+          const aIndex = order.indexOf(a.path);
+          const bIndex = order.indexOf(b.path);
+          if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+          if (aIndex !== -1) return -1;
+          if (bIndex !== -1) return 1;
+          return a.path.localeCompare(b.path);
+        });
+        
+        this.blobContainerFolders = this.sortBlobContainerFolders(sortedFolders);
         this.isLoadingBlobContainer = false;
       },
       error: (error) => {
