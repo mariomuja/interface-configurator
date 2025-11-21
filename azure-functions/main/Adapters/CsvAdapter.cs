@@ -47,6 +47,9 @@ public class CsvAdapter : IAdapter
     
     // SFTP adapter instance (used when adapterType is SFTP)
     private readonly SftpAdapter? _sftpAdapter;
+    
+    // File adapter instance (used when adapterType is FILE)
+    private readonly FileAdapter? _fileAdapter;
 
     public CsvAdapter(
         ICsvProcessingService csvProcessingService,
@@ -64,6 +67,7 @@ public class CsvAdapter : IAdapter
         string? destinationFileMask = null,
         string? adapterType = null,
         SftpAdapter? sftpAdapter = null,
+        FileAdapter? fileAdapter = null,
         ILogger<CsvAdapter>? logger = null)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
@@ -84,14 +88,20 @@ public class CsvAdapter : IAdapter
         _destinationFileMask = destinationFileMask ?? "*.txt";
         _logger = logger;
         
-        // Adapter type and SFTP adapter
+        // Adapter type and adapters
         _adapterType = adapterType ?? "FILE";
         _sftpAdapter = sftpAdapter;
+        _fileAdapter = fileAdapter;
         
-        // Validate SFTP adapter is provided when adapter type is SFTP
+        // Validate adapters are provided when needed
         if (_adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase) && _sftpAdapter == null)
         {
             throw new ArgumentException("SftpAdapter instance is required when adapterType is SFTP", nameof(sftpAdapter));
+        }
+        
+        if (_adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase) && _fileAdapter == null)
+        {
+            throw new ArgumentException("FileAdapter instance is required when adapterType is FILE", nameof(fileAdapter));
         }
     }
 
@@ -295,41 +305,29 @@ public class CsvAdapter : IAdapter
 
         try
         {
+            if (_fileAdapter == null)
+            {
+                throw new InvalidOperationException("FileAdapter is required for uploading CsvData to csv-incoming");
+            }
+
             // Ensure CSV folders exist before uploading
-            await EnsureCsvFoldersExistAsync(cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-incoming", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-processed", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-error", cancellationToken);
 
             // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
             var now = DateTime.UtcNow;
             var fileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
-            var blobPath = $"csv-incoming/{fileName}";
-            
-            // Get container client (default: csv-files)
-            var containerName = "csv-files";
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            
-            // Ensure container exists
-            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            var blobPath = $"csv-files/csv-incoming/{fileName}";
             
             // Upload CSV data to csv-incoming folder
-            var blobClient = containerClient.GetBlobClient(blobPath);
-            var content = Encoding.UTF8.GetBytes(_csvData);
-            
-            await blobClient.UploadAsync(
-                new BinaryData(content),
-                new Azure.Storage.Blobs.Models.BlobUploadOptions
-                {
-                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
-                    {
-                        ContentType = "text/csv"
-                    }
-                },
-                cancellationToken);
+            await _fileAdapter.WriteFileAsync(blobPath, _csvData, cancellationToken);
 
             _logger?.LogInformation("Successfully uploaded CsvData to csv-incoming folder: {FileName}, DataLength={DataLength}",
                 fileName, _csvData.Length);
             
             // Clean up old files in csv-incoming folder (keep only 10 most recent)
-            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
+            await _fileAdapter.CleanupOldFilesAsync("csv-files", "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -385,11 +383,49 @@ public class CsvAdapter : IAdapter
                 return (headers, records);
             }
 
+            // Use FileAdapter to read CSV files from blob storage
+            if (_fileAdapter == null)
+            {
+                throw new InvalidOperationException("FILE adapter is not configured. FileAdapter instance is required for FILE adapter type.");
+            }
+            
             var effectiveSource = hasExplicitSource
                 ? source
-                : BuildDefaultBlobSourcePath();
-
-            return await ReadFromBlobStorageAsync(effectiveSource!, cancellationToken);
+                : _fileAdapter.BuildDefaultBlobSourcePath(_receiveFolder);
+            
+            var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, _fieldSeparator, effectiveSource, cancellationToken);
+            
+            // For FILE adapter type: Copy files to csv-incoming folder if reading from a different folder
+            // This will trigger the blob trigger which processes the file
+            var pathParts = effectiveSource.Split('/', 2);
+            if (pathParts.Length == 2)
+            {
+                var containerName = pathParts[0];
+                var blobPath = pathParts[1];
+                var isFolder = blobPath.EndsWith("/") || (!blobPath.Contains(".") && !string.IsNullOrWhiteSpace(blobPath));
+                
+                if (isFolder || !string.IsNullOrWhiteSpace(_receiveFolder))
+                {
+                    var filePaths = await _fileAdapter.ListFilesAsync(effectiveSource, cancellationToken);
+                    foreach (var filePath in filePaths)
+                    {
+                        if (!filePath.Contains("csv-incoming/"))
+                        {
+                            var fullSourcePath = $"{containerName}/{filePath}";
+                            var content = await _fileAdapter.ReadFileAsync(fullSourcePath, cancellationToken);
+                            await UploadFileToIncomingAsync(content, filePath, cancellationToken);
+                        }
+                    }
+                }
+            }
+            
+            // Write to MessageBox if conditions are met
+            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue && csvRecords.Count > 0)
+            {
+                await WriteRecordsToMessageBoxAsync(csvHeaders, csvRecords, cancellationToken);
+            }
+            
+            return (csvHeaders, csvRecords);
         }
         catch (Exception ex)
         {
@@ -398,39 +434,51 @@ public class CsvAdapter : IAdapter
         }
     }
 
-    private string BuildDefaultBlobSourcePath()
+    /// <summary>
+    /// Writes records to MessageBox in batches
+    /// </summary>
+    private async Task WriteRecordsToMessageBoxAsync(List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken)
     {
-        var folder = _receiveFolder?.Trim();
-
-        if (string.IsNullOrWhiteSpace(folder))
+        if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
         {
-            folder = "csv-files/csv-incoming";
-        }
-        else
-        {
-            folder = folder.Replace("\\", "/").Trim('/');
-
-            // If folder already includes a container name (e.g., csv-files/csv-incoming), keep it.
-            // Otherwise, assume csv-files as the default container.
-            if (!folder.Contains("/"))
-            {
-                folder = $"csv-files/{folder}";
-            }
-            else if (!folder.Contains(":") && !folder.StartsWith("csv-files/", StringComparison.OrdinalIgnoreCase))
-            {
-                folder = $"csv-files/{folder}";
-            }
+            _logger?.LogWarning("Skipping MessageBox write: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
+                _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
+            return;
         }
 
-        if (!folder.EndsWith("/"))
+        _logger?.LogInformation("Processing CSV data in batches of {BatchSize} rows: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, TotalRecords={RecordCount}",
+            _batchSize, _interfaceName, _adapterInstanceGuid.Value, records.Count);
+
+        // Process records in batches
+        for (int i = 0; i < records.Count; i += _batchSize)
         {
-            folder += "/";
+            var batch = records.Skip(i).Take(_batchSize).ToList();
+            var batchNumber = (i / _batchSize) + 1;
+            var totalBatches = (int)Math.Ceiling((double)records.Count / _batchSize);
+
+            _logger?.LogInformation("Processing batch {BatchNumber}/{TotalBatches}: {BatchRecordCount} records",
+                batchNumber, totalBatches, batch.Count);
+
+            // Debatch batch into single rows and write to MessageBox
+            var messageIds = await _messageBoxService.WriteMessagesAsync(
+                _interfaceName,
+                AdapterName,
+                "Source",
+                _adapterInstanceGuid.Value,
+                headers,
+                batch,
+                cancellationToken);
+
+            _logger?.LogInformation("Successfully debatched and wrote {MessageCount} messages to MessageBox from batch {BatchNumber}/{TotalBatches}",
+                messageIds.Count, batchNumber, totalBatches);
         }
 
-        return folder;
+        _logger?.LogInformation("Completed processing all batches: {TotalRecords} records debatched into {TotalMessages} messages",
+            records.Count, records.Count);
     }
 
-    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadFromBlobStorageAsync(string source, CancellationToken cancellationToken)
+    // BuildDefaultBlobSourcePath removed - now handled by FileAdapter.BuildDefaultBlobSourcePath
+    // ReadFromBlobStorageAsync removed - now handled by FileAdapter.ReadCsvFilesAsync
     {
         // Parse source path: "container-name/blob-path" or "container-name/folder/blob-name" or "container-name/folder/" (folder)
         var pathParts = source.Split('/', 2);
@@ -954,43 +1002,31 @@ public class CsvAdapter : IAdapter
     /// </summary>
     private async Task UploadFileToIncomingAsync(string csvContent, string originalFileName, CancellationToken cancellationToken)
     {
+        if (_fileAdapter == null)
+        {
+            throw new InvalidOperationException("FileAdapter is required for uploading files to csv-incoming");
+        }
+
         try
         {
             // Ensure CSV folders exist before uploading
-            await EnsureCsvFoldersExistAsync(cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-incoming", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-processed", cancellationToken);
+            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-error", cancellationToken);
 
             // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
             var now = DateTime.UtcNow;
             var fileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
-            var blobPath = $"csv-incoming/{fileName}";
-            
-            // Get container client (default: csv-files)
-            var containerName = "csv-files";
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            
-            // Ensure container exists
-            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            var blobPath = $"csv-files/csv-incoming/{fileName}";
             
             // Upload CSV content to csv-incoming folder
-            var blobClient = containerClient.GetBlobClient(blobPath);
-            var content = Encoding.UTF8.GetBytes(csvContent);
-            
-            await blobClient.UploadAsync(
-                new BinaryData(content),
-                new Azure.Storage.Blobs.Models.BlobUploadOptions
-                {
-                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders
-                    {
-                        ContentType = "text/csv"
-                    }
-                },
-                cancellationToken);
+            await _fileAdapter.WriteFileAsync(blobPath, csvContent, cancellationToken);
 
             _logger?.LogInformation("Successfully uploaded file to csv-incoming folder: {FileName} (from {OriginalFileName}), DataLength={DataLength}",
                 fileName, originalFileName, csvContent.Length);
             
             // Clean up old files in csv-incoming folder (keep only 10 most recent)
-            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
+            await _fileAdapter.CleanupOldFilesAsync("csv-files", "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1050,68 +1086,6 @@ public class CsvAdapter : IAdapter
         }
     }
 
-    /// <summary>
-    /// Cleans up old files in a blob folder, keeping only the most recent N files
-    /// Excludes placeholder files like .folder-initialized
-    /// </summary>
-    private async Task CleanupOldFilesAsync(string containerName, string folderPath, int maxFiles, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            
-            // Ensure folder path ends with /
-            if (!folderPath.EndsWith("/"))
-                folderPath += "/";
-            
-            // List all blobs in the folder
-            var blobs = new List<(string Name, DateTimeOffset CreatedOn)>();
-            await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: folderPath, cancellationToken: cancellationToken))
-            {
-                // Skip placeholder files
-                if (blobItem.Name.EndsWith(".folder-initialized", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                
-                // Get blob properties to get creation time
-                var blobClient = containerClient.GetBlobClient(blobItem.Name);
-                var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-                
-                blobs.Add((blobItem.Name, properties.Value.CreatedOn));
-            }
-            
-            // Sort by creation time (newest first)
-            var sortedBlobs = blobs.OrderByDescending(b => b.CreatedOn).ToList();
-            
-            // If we have more than maxFiles, delete the older ones
-            if (sortedBlobs.Count > maxFiles)
-            {
-                var filesToDelete = sortedBlobs.Skip(maxFiles).ToList();
-                _logger?.LogInformation("Cleaning up {DeleteCount} old files from {FolderPath} (keeping {KeepCount} most recent)", 
-                    filesToDelete.Count, folderPath, maxFiles);
-                
-                foreach (var (blobName, _) in filesToDelete)
-                {
-                    try
-                    {
-                        var blobClient = containerClient.GetBlobClient(blobName);
-                        await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
-                        _logger?.LogDebug("Deleted old file: {BlobName}", blobName);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "Error deleting old file {BlobName} from {FolderPath}", blobName, folderPath);
-                        // Continue with other files even if one fails
-                    }
-                }
-                
-                _logger?.LogInformation("Successfully cleaned up {DeleteCount} old files from {FolderPath}", filesToDelete.Count, folderPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error cleaning up old files in folder {FolderPath}", folderPath);
-            // Don't throw - cleanup failure shouldn't fail the main operation
-        }
-    }
+    // CleanupOldFilesAsync removed - now handled by FileAdapter.CleanupOldFilesAsync
 }
 

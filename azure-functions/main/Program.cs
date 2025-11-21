@@ -262,6 +262,16 @@ var host = new HostBuilder()
                     logger?.LogError("BlobServiceClient is required for CsvAdapter but is not available. Please configure MainStorageConnection or AzureWebJobsStorage.");
                     throw new InvalidOperationException("BlobServiceClient is required for CsvAdapter. Please configure MainStorageConnection or AzureWebJobsStorage in local.settings.json");
                 }
+                // Create FileAdapter for default FILE adapter type
+                var fileLogger = sp.GetService<ILogger<FileAdapter>>();
+                var fileAdapter = new FileAdapter(
+                    blobServiceClient,
+                    receiveFolder: null,
+                    fileMask: null,
+                    destinationReceiveFolder: null,
+                    destinationFileMask: null,
+                    logger: fileLogger);
+
                 return new CsvAdapter(
                     csvProcessingService: csvProcessingService, 
                     adapterConfig: adapterConfig, 
@@ -278,6 +288,7 @@ var host = new HostBuilder()
                     destinationFileMask: null,
                     adapterType: null,
                     sftpAdapter: null, // SftpAdapter will be created by AdapterFactory when needed
+                    fileAdapter: fileAdapter,
                     logger: logger);
             });
             

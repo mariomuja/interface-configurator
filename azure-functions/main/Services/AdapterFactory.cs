@@ -210,6 +210,20 @@ public class AdapterFactory : IAdapterFactory
                 sftpLogger);
         }
 
+        // Create FileAdapter if adapter type is FILE (or default)
+        FileAdapter? fileAdapter = null;
+        if (adapterType == null || adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase))
+        {
+            var fileLogger = _serviceProvider.GetService<ILogger<FileAdapter>>();
+            fileAdapter = new FileAdapter(
+                blobServiceClient,
+                receiveFolder,
+                fileMask,
+                destinationReceiveFolder,
+                destinationFileMask,
+                fileLogger);
+        }
+
         return new CsvAdapter(
             csvProcessingService,
             adapterConfig,
@@ -226,6 +240,7 @@ public class AdapterFactory : IAdapterFactory
             destinationFileMask,
             adapterType,
             sftpAdapter,
+            fileAdapter,
             logger);
     }
 
