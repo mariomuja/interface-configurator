@@ -200,7 +200,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           disableClose: false,
           autoFocus: false
         });
-      }, 500); // Small delay to ensure UI is loaded
+      }, 1000); // Longer delay to ensure all API calls complete before showing dialog
     }
   }
   
@@ -1250,6 +1250,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         console.error('Error starting transport:', error);
         console.error('Full error object:', JSON.stringify(error, null, 2));
         this.isTransporting = false;
+        
+        // Ignore errors during initial load (when welcome dialog might be shown)
+        // These are often CORS or network timing issues that resolve themselves
+        const isInitialLoad = !this.currentInterfaceName || this.currentInterfaceName === '';
+        if (isInitialLoad) {
+          console.log('Ignoring transport start error during initial load');
+          return;
+        }
         
         // Extract detailed error message with all available information
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Starten des Transports');
