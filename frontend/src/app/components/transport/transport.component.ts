@@ -1434,11 +1434,30 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Record when we saved - this helps avoid race conditions when reopening dialog
         this.lastEnabledSaveTime[activeInterfaceName] = Date.now();
         
-        // Reload configurations AFTER a delay to ensure backend has processed and persisted the change
-        // This ensures that when the dialog is reopened, it reads the correct value from backend
+        // DON'T reload configurations immediately after save - it will overwrite our cached values
+        // The cache is already updated above, so we don't need to reload right away
+        // Only reload after a longer delay to sync with backend, but preserve our saved value
         setTimeout(() => {
+          // Save the enabled state before reload
+          const savedEnabledState = enabledValueToSave;
           this.loadInterfaceConfigurations();
-        }, 1000);
+          // After reload completes, ensure our saved value is preserved
+          setTimeout(() => {
+            const reloadedConfig = this.getInterfaceConfig(activeInterfaceName);
+            if (reloadedConfig) {
+              // Always use the value we just saved, not what backend returned
+              // This ensures consistency even if backend hasn't persisted yet
+              if (reloadedConfig.sourceIsEnabled !== savedEnabledState) {
+                console.log(`Restoring saved sourceIsEnabled value: ${savedEnabledState} (backend had: ${reloadedConfig.sourceIsEnabled})`);
+                reloadedConfig.sourceIsEnabled = savedEnabledState;
+                const configIndex = this.interfaceConfigurations.findIndex(c => c.interfaceName === activeInterfaceName);
+                if (configIndex >= 0) {
+                  this.interfaceConfigurations[configIndex].sourceIsEnabled = savedEnabledState;
+                }
+              }
+            }
+          }, 200);
+        }, 2000);
         
         this.snackBar.open(
           `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden sofort verarbeitet.' : 'Der Prozess stoppt sofort.'}`,
