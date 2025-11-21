@@ -10,7 +10,7 @@ using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWorkerDefaults()
+    .ConfigureFunctionsWorkerDefaults(worker => worker.UseMiddleware<InterfaceConfigurator.Main.Middleware.CorsMiddleware>())
     .ConfigureServices((context, services) =>
     {
         try

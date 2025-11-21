@@ -138,6 +138,34 @@
     ]
   },
   {
+    "name": "DeleteBlobFile",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.DeleteBlobFile.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "delete",
+          "options"
+        ],
+        "route": "DeleteBlobFile",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
     "name": "DeleteInterfaceConfiguration",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.DeleteInterfaceConfiguration.Run",
@@ -202,6 +230,34 @@
           "options"
         ],
         "route": "diagnose",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
+      }
+    ]
+  },
+  {
+    "name": "GetBlobContainerFolders",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.GetBlobContainerFolders.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "get",
+          "options"
+        ],
+        "route": "GetBlobContainerFolders",
         "properties": {}
       },
       {
@@ -579,6 +635,34 @@
         "type": "timerTrigger",
         "schedule": "0 */1 * * * *",
         "properties": {}
+      }
+    ]
+  },
+  {
+    "name": "StartTransport",
+    "scriptFile": "main.dll",
+    "entryPoint": "InterfaceConfigurator.Main.StartTransport.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "req",
+        "direction": "In",
+        "type": "httpTrigger",
+        "authLevel": "Anonymous",
+        "methods": [
+          "post",
+          "options"
+        ],
+        "route": "start-transport",
+        "properties": {}
+      },
+      {
+        "name": "$return",
+        "type": "http",
+        "direction": "Out"
       }
     ]
   },

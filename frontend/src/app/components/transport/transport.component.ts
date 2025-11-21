@@ -134,6 +134,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedBlobFiles: Set<string> = new Set(); // Set of full paths of selected files
   isDeletingBlobFiles = false;
   messageBoxExpanded: boolean = true;
+  blobContainerPagination: Map<string, { loadedCount: number; hasMore: boolean; isLoadingMore: boolean }> = new Map();
+  readonly BLOB_FILES_PER_PAGE = 10;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
@@ -706,8 +708,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   loadBlobContainerFolders(): void {
     this.isLoadingBlobContainer = true;
-    this.transportService.getBlobContainerFolders('csv-files', '').subscribe({
+    this.blobContainerPagination.clear();
+    this.transportService.getBlobContainerFolders('csv-files', '', this.BLOB_FILES_PER_PAGE).subscribe({
       next: (folders) => {
+        // Initialize pagination state for each folder
+        folders.forEach((folder: any) => {
+          this.blobContainerPagination.set(folder.path, {
+            loadedCount: folder.files?.length || 0,
+            hasMore: folder.hasMoreFiles || false,
+            isLoadingMore: false
+          });
+        });
         this.blobContainerFolders = this.sortBlobContainerFolders(folders || []);
         this.isLoadingBlobContainer = false;
       },
@@ -715,8 +726,52 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         console.error('Error loading blob container folders:', error);
         this.isLoadingBlobContainer = false;
         this.blobContainerFolders = [];
+        this.blobContainerPagination.clear();
       }
     });
+  }
+
+  loadMoreBlobFiles(folderPath: string): void {
+    const pagination = this.blobContainerPagination.get(folderPath);
+    if (!pagination || !pagination.hasMore || pagination.isLoadingMore) {
+      return;
+    }
+
+    pagination.isLoadingMore = true;
+    const currentLoadedCount = pagination.loadedCount;
+    const nextPageStart = currentLoadedCount;
+    const maxFiles = nextPageStart + this.BLOB_FILES_PER_PAGE;
+
+    this.transportService.getBlobContainerFolders('csv-files', folderPath.replace(/^\//, ''), maxFiles).subscribe({
+      next: (folders) => {
+        const folder = folders.find((f: any) => f.path === folderPath);
+        if (folder) {
+          // Update the folder's files with the new data
+          const existingFolder = this.blobContainerFolders.find(f => f.path === folderPath);
+          if (existingFolder) {
+            existingFolder.files = folder.files;
+            existingFolder.hasMoreFiles = folder.hasMoreFiles;
+            existingFolder.totalFileCount = folder.totalFileCount;
+          }
+
+          // Update pagination state
+          pagination.loadedCount = folder.files?.length || 0;
+          pagination.hasMore = folder.hasMoreFiles || false;
+          pagination.isLoadingMore = false;
+
+          // Re-sort after loading more
+          this.blobContainerFolders = this.sortBlobContainerFolders(this.blobContainerFolders);
+        }
+      },
+      error: (error) => {
+        console.error('Error loading more blob files:', error);
+        pagination.isLoadingMore = false;
+      }
+    });
+  }
+
+  getBlobFolderPagination(folderPath: string): { loadedCount: number; hasMore: boolean; isLoadingMore: boolean } {
+    return this.blobContainerPagination.get(folderPath) || { loadedCount: 0, hasMore: false, isLoadingMore: false };
   }
 
   sortBlobContainerFolders(folders: any[]): any[] {

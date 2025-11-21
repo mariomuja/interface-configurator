@@ -49,6 +49,8 @@ public class GetBlobContainerFolders
             var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             var containerName = queryParams["containerName"] ?? "csv-files";
             var folderPrefix = queryParams["folderPrefix"] ?? "";
+            var maxFilesPerFolder = int.TryParse(queryParams["maxFiles"], out var maxFiles) ? maxFiles : 10;
+            var continuationToken = queryParams["continuationToken"];
 
             if (_blobServiceClient == null)
             {
@@ -72,6 +74,10 @@ public class GetBlobContainerFolders
                 prefix: folderPrefix,
                 cancellationToken: executionContext.CancellationToken))
             {
+                // Skip placeholder files
+                if (blobItem.Name.EndsWith(".folder-initialized", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var blobPath = blobItem.Name;
                 var pathParts = blobPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
                 
@@ -106,14 +112,22 @@ public class GetBlobContainerFolders
                 }
             }
 
-            // Build folder structure
+            // Build folder structure with pagination
             var folderStructure = new List<FolderInfo>();
             foreach (var folder in folders.OrderBy(f => f.Key))
             {
+                // Sort by LastModified descending (newest first), then take only maxFilesPerFolder
+                var sortedFiles = folder.Value
+                    .OrderByDescending(f => f.LastModified)
+                    .Take(maxFilesPerFolder)
+                    .ToList();
+
                 folderStructure.Add(new FolderInfo
                 {
                     Path = folder.Key,
-                    Files = folder.Value.OrderBy(f => f.Name).ToList()
+                    Files = sortedFiles,
+                    TotalFileCount = folder.Value.Count,
+                    HasMoreFiles = folder.Value.Count > maxFilesPerFolder
                 });
             }
 
@@ -147,6 +161,8 @@ public class GetBlobContainerFolders
     {
         public string Path { get; set; } = string.Empty;
         public List<BlobItemInfo> Files { get; set; } = new List<BlobItemInfo>();
+        public int TotalFileCount { get; set; }
+        public bool HasMoreFiles { get; set; }
     }
 
     private class BlobItemInfo
@@ -158,6 +174,7 @@ public class GetBlobContainerFolders
         public string ContentType { get; set; } = string.Empty;
     }
 }
+
 
 
 

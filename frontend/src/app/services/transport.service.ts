@@ -290,10 +290,11 @@ export class TransportService {
     return this.http.get<any[]>(`${this.apiUrl}/GetMessageBoxMessages?${params.toString()}`);
   }
 
-  getBlobContainerFolders(containerName: string = 'csv-files', folderPrefix: string = ''): Observable<any[]> {
+  getBlobContainerFolders(containerName: string = 'csv-files', folderPrefix: string = '', maxFiles: number = 10): Observable<any[]> {
     const params = new HttpParams()
       .set('containerName', containerName)
-      .set('folderPrefix', folderPrefix);
+      .set('folderPrefix', folderPrefix)
+      .set('maxFiles', maxFiles.toString());
     return this.http.get<any[]>(`${this.apiUrl}/GetBlobContainerFolders`, { params });
   }
 

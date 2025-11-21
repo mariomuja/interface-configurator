@@ -21,7 +21,7 @@ if (-not $fullZipPath) {
     Write-Host "❌ ZIP nicht gefunden: $ZipPath" -ForegroundColor Red
     Write-Host "Erstelle neues ZIP..." -ForegroundColor Yellow
     Push-Location "azure-functions/main"
-    dotnet publish --configuration Release --output ./publish
+    dotnet publish --no-self-contained --configuration Release --output ./publish
     Pop-Location
     $fullZipPath = Resolve-Path $ZipPath
 }

@@ -345,6 +345,9 @@ public class CsvAdapter : IAdapter
 
             _logger?.LogInformation("Successfully uploaded CsvData to csv-incoming folder: {FileName}, DataLength={DataLength}",
                 fileName, _csvData.Length);
+            
+            // Clean up old files in csv-incoming folder (keep only 10 most recent)
+            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1173,6 +1176,9 @@ public class CsvAdapter : IAdapter
 
             _logger?.LogInformation("Successfully uploaded file to csv-incoming folder: {FileName} (from {OriginalFileName}), DataLength={DataLength}",
                 fileName, originalFileName, csvContent.Length);
+            
+            // Clean up old files in csv-incoming folder (keep only 10 most recent)
+            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1221,11 +1227,78 @@ public class CsvAdapter : IAdapter
 
             _logger?.LogInformation("Successfully copied file to csv-incoming folder: {FileName} (from {SourcePath}), DataLength={DataLength}",
                 uniqueFileName, sourceBlobPath, csvContent.Length);
+            
+            // Clean up old files in csv-incoming folder (keep only 10 most recent)
+            await CleanupOldFilesAsync(containerName, "csv-incoming", maxFiles: 10, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error copying file to csv-incoming folder: {SourcePath}", sourceBlobPath);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Cleans up old files in a blob folder, keeping only the most recent N files
+    /// Excludes placeholder files like .folder-initialized
+    /// </summary>
+    private async Task CleanupOldFilesAsync(string containerName, string folderPath, int maxFiles, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure folder path ends with /
+            if (!folderPath.EndsWith("/"))
+                folderPath += "/";
+            
+            // List all blobs in the folder
+            var blobs = new List<(string Name, DateTimeOffset CreatedOn)>();
+            await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: folderPath, cancellationToken: cancellationToken))
+            {
+                // Skip placeholder files
+                if (blobItem.Name.EndsWith(".folder-initialized", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                
+                // Get blob properties to get creation time
+                var blobClient = containerClient.GetBlobClient(blobItem.Name);
+                var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                
+                blobs.Add((blobItem.Name, properties.Value.CreatedOn));
+            }
+            
+            // Sort by creation time (newest first)
+            var sortedBlobs = blobs.OrderByDescending(b => b.CreatedOn).ToList();
+            
+            // If we have more than maxFiles, delete the older ones
+            if (sortedBlobs.Count > maxFiles)
+            {
+                var filesToDelete = sortedBlobs.Skip(maxFiles).ToList();
+                _logger?.LogInformation("Cleaning up {DeleteCount} old files from {FolderPath} (keeping {KeepCount} most recent)", 
+                    filesToDelete.Count, folderPath, maxFiles);
+                
+                foreach (var (blobName, _) in filesToDelete)
+                {
+                    try
+                    {
+                        var blobClient = containerClient.GetBlobClient(blobName);
+                        await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                        _logger?.LogDebug("Deleted old file: {BlobName}", blobName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error deleting old file {BlobName} from {FolderPath}", blobName, folderPath);
+                        // Continue with other files even if one fails
+                    }
+                }
+                
+                _logger?.LogInformation("Successfully cleaned up {DeleteCount} old files from {FolderPath}", filesToDelete.Count, folderPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error cleaning up old files in folder {FolderPath}", folderPath);
+            // Don't throw - cleanup failure shouldn't fail the main operation
         }
     }
 }

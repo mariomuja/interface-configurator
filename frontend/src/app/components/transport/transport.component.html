@@ -181,7 +181,9 @@
         <div class="folder-header">
           <mat-icon class="folder-icon">folder</mat-icon>
           <span class="folder-path">{{ folder.path === '/' ? '/ (root)' : folder.path }}</span>
-          <span class="folder-file-count">({{ folder.files.length }} files)</span>
+          <span class="folder-file-count">
+            ({{ folder.files.length }}<span *ngIf="folder.totalFileCount > folder.files.length"> of {{ folder.totalFileCount }}</span> files)
+          </span>
         </div>
         <div class="file-list" *ngIf="folder.files.length > 0">
           <div class="file-list-header">
@@ -223,6 +225,18 @@
             <span class="file-name">{{ file.name }}</span>
             <span class="file-size">{{ formatFileSize(file.size) }}</span>
             <span class="file-date">{{ file.lastModified | date:'short' }}</span>
+          </div>
+          <div class="load-more-container" *ngIf="getBlobFolderPagination(folder.path).hasMore">
+            <button 
+              mat-button 
+              color="primary" 
+              (click)="loadMoreBlobFiles(folder.path)"
+              [disabled]="getBlobFolderPagination(folder.path).isLoadingMore"
+              class="load-more-button">
+              <mat-icon *ngIf="!getBlobFolderPagination(folder.path).isLoadingMore">expand_more</mat-icon>
+              <mat-icon *ngIf="getBlobFolderPagination(folder.path).isLoadingMore" class="spinning">hourglass_empty</mat-icon>
+              <span>{{ getBlobFolderPagination(folder.path).isLoadingMore ? 'Loading...' : 'Load More' }}</span>
+            </button>
           </div>
         </div>
         <div class="folder-empty" *ngIf="folder.files.length === 0">
