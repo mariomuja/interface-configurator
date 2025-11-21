@@ -192,7 +192,10 @@ public class GetInterfaceConfiguration
             sourceProperties["sqlFailOnBadStatement"] = config.SqlFailOnBadStatement;
         }
 
-        sourceInstance["properties"] = sourceProperties;
+        foreach (var property in sourceProperties)
+        {
+            sourceInstance[property.Key] = property.Value;
+        }
         sources[sourceAdapterName] = sourceInstance;
         result["sources"] = sources;
 
@@ -273,7 +276,10 @@ public class GetInterfaceConfiguration
                 destProperties["sqlFailOnBadStatement"] = GetBoolValue(instanceConfig, "sqlFailOnBadStatement") ?? config.SqlFailOnBadStatement;
             }
 
-            destInstance["properties"] = destProperties;
+            foreach (var property in destProperties)
+            {
+                destInstance[property.Key] = property.Value;
+            }
             
             // Add instance to destinations (use instanceName as key)
             var adapterDestinations = destinations[adapterName] as JsonObject;
