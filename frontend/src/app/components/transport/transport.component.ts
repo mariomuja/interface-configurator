@@ -1799,12 +1799,58 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openSourceAdapterSettings(): void {
-    const activeConfig = this.getInterfaceConfig();
+    // Reload configuration to ensure we have the latest values from the backend
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return;
+    }
+
+    // Fetch fresh configuration from backend before opening dialog
+    this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+      next: (freshConfig) => {
+        if (freshConfig) {
+          // Update local cache
+          const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
+          if (index >= 0) {
+            this.interfaceConfigurations[index] = freshConfig;
+          } else {
+            this.interfaceConfigurations.push(freshConfig);
+          }
+          
+          // Sync local state from fresh config
+          this.sourceIsEnabled = freshConfig.sourceIsEnabled ?? this.sourceIsEnabled;
+          this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
+          this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
+          this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
+          this.sourceBatchSize = freshConfig.sourceBatchSize ?? this.sourceBatchSize;
+          this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
+          this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
+          this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+          
+          // Now open the dialog with fresh data
+          this.openSourceAdapterSettingsDialog(freshConfig);
+        } else {
+          // Fallback to cached config if fresh fetch fails
+          const activeConfig = this.getInterfaceConfig();
+          this.openSourceAdapterSettingsDialog(activeConfig);
+        }
+      },
+      error: (error) => {
+        console.error('Error loading fresh configuration:', error);
+        // Fallback to cached config if fetch fails
+        const activeConfig = this.getInterfaceConfig();
+        this.openSourceAdapterSettingsDialog(activeConfig);
+      }
+    });
+  }
+
+  private openSourceAdapterSettingsDialog(activeConfig: any): void {
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
       adapterName: this.sourceAdapterName,
       instanceName: this.sourceInstanceName,
-      isEnabled: this.sourceIsEnabled,
+      // Read isEnabled from config (backend) instead of local state
+      isEnabled: activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled,
       receiveFolder: this.sourceReceiveFolder,
       fileMask: this.sourceFileMask,
       batchSize: this.sourceBatchSize,
@@ -1971,17 +2017,88 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             });
           }
         }
+
+        // Reload configuration after all saves to ensure local state is synced with backend
+        const interfaceName = this.getActiveInterfaceName();
+        if (interfaceName) {
+          this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+            next: (freshConfig) => {
+              if (freshConfig) {
+                // Update local cache
+                const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
+                if (index >= 0) {
+                  this.interfaceConfigurations[index] = freshConfig;
+                }
+                // Sync local state from fresh config
+                this.sourceIsEnabled = freshConfig.sourceIsEnabled ?? this.sourceIsEnabled;
+                this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
+                this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
+                this.sourceFileMask = freshConfig.sourceFileMask || this.sourceFileMask;
+                this.sourceBatchSize = freshConfig.sourceBatchSize ?? this.sourceBatchSize;
+                this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
+                this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
+                this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+              }
+            },
+            error: (error) => {
+              console.error('Error reloading configuration after save:', error);
+            }
+          });
+        }
       }
     });
   }
 
   openDestinationAdapterSettings(): void {
-    const activeConfig = this.getInterfaceConfig();
+    // Reload configuration to ensure we have the latest values from the backend
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return;
+    }
+
+    // Fetch fresh configuration from backend before opening dialog
+    this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+      next: (freshConfig) => {
+        if (freshConfig) {
+          // Update local cache
+          const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
+          if (index >= 0) {
+            this.interfaceConfigurations[index] = freshConfig;
+          } else {
+            this.interfaceConfigurations.push(freshConfig);
+          }
+          
+          // Sync local state from fresh config
+          this.destinationIsEnabled = freshConfig.destinationIsEnabled ?? this.destinationIsEnabled;
+          this.destinationInstanceName = freshConfig.destinationInstanceName || this.destinationInstanceName;
+          this.destinationReceiveFolder = freshConfig.destinationReceiveFolder || this.destinationReceiveFolder;
+          this.destinationFileMask = freshConfig.destinationFileMask || this.destinationFileMask;
+          this.destinationAdapterInstanceGuid = freshConfig.destinationAdapterInstanceGuid || this.destinationAdapterInstanceGuid;
+          
+          // Now open the dialog with fresh data
+          this.openDestinationAdapterSettingsDialog(freshConfig);
+        } else {
+          // Fallback to cached config if fresh fetch fails
+          const activeConfig = this.getInterfaceConfig();
+          this.openDestinationAdapterSettingsDialog(activeConfig);
+        }
+      },
+      error: (error) => {
+        console.error('Error loading fresh configuration:', error);
+        // Fallback to cached config if fetch fails
+        const activeConfig = this.getInterfaceConfig();
+        this.openDestinationAdapterSettingsDialog(activeConfig);
+      }
+    });
+  }
+
+  private openDestinationAdapterSettingsDialog(activeConfig: any): void {
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
       adapterName: activeConfig?.destinationAdapterName === 'CSV' ? 'CSV' : 'SqlServer',
       instanceName: this.destinationInstanceName,
-      isEnabled: this.destinationIsEnabled,
+      // Read isEnabled from config (backend) instead of local state
+      isEnabled: activeConfig?.destinationIsEnabled ?? this.destinationIsEnabled,
       receiveFolder: this.destinationReceiveFolder,
       fileMask: this.destinationFileMask,
       fieldSeparator: this.sourceFieldSeparator,
@@ -2049,6 +2166,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.destinationFileMask !== undefined && result.destinationFileMask !== this.destinationFileMask) {
           this.destinationFileMask = result.destinationFileMask;
           this.updateDestinationFileMask(result.destinationFileMask);
+        }
+
+        // Reload configuration after all saves to ensure local state is synced with backend
+        const interfaceName = this.getActiveInterfaceName();
+        if (interfaceName) {
+          this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
+            next: (freshConfig) => {
+              if (freshConfig) {
+                // Update local cache
+                const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
+                if (index >= 0) {
+                  this.interfaceConfigurations[index] = freshConfig;
+                }
+                // Sync local state from fresh config
+                this.destinationIsEnabled = freshConfig.destinationIsEnabled ?? this.destinationIsEnabled;
+                this.destinationInstanceName = freshConfig.destinationInstanceName || this.destinationInstanceName;
+                this.destinationReceiveFolder = freshConfig.destinationReceiveFolder || this.destinationReceiveFolder;
+                this.destinationFileMask = freshConfig.destinationFileMask || this.destinationFileMask;
+                this.destinationAdapterInstanceGuid = freshConfig.destinationAdapterInstanceGuid || this.destinationAdapterInstanceGuid;
+              }
+            },
+            error: (error) => {
+              console.error('Error reloading configuration after save:', error);
+            }
+          });
         }
       }
     });
