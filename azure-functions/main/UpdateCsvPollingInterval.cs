@@ -38,7 +38,10 @@ public class UpdateCsvPollingInterval
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateCsvPollingIntervalRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateCsvPollingIntervalRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

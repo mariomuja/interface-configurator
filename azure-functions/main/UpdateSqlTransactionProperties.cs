@@ -38,7 +38,10 @@ public class UpdateSqlTransactionProperties
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateSqlTransactionPropertiesRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateSqlTransactionPropertiesRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

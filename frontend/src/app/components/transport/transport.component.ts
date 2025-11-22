@@ -402,8 +402,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // If backend already has CSV data, use it and sync locally
     // Don't mark as initialized - backend CSV data should still be refreshable
+    // NEVER replace existing CSV data - it must only be set ONCE after adapter creation
     if (existingCsvData && existingCsvData.trim().length > 0) {
-      // Sync local data with backend
+      // Sync local data with backend - preserve existing data as-is
       if (existingCsvData !== this.lastSyncedCsvData) {
         this.lastSyncedCsvData = existingCsvData;
         this.applyCsvDataLocally(existingCsvData);
@@ -448,17 +449,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   generateSampleCsvData(): CsvRecord[] {
     const data: CsvRecord[] = [];
-    const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer', 'Maria Garcia', 'Hans Mueller', 'Sophie Laurent', 'Giuseppe Rossi', 'Emma Johnson'];
-    const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Paris', 'London', 'Madrid', 'Rome', 'Vienna'];
-    
+    const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer', 'Julia Wagner', 'Michael Schulz', 'Laura Becker', 'Daniel Koch', 'Sophie Richter'];
+    const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dortmund', 'Essen'];
+    const domains = ['example.com', 'test.org', 'mail.net', 'company.io'];
+
     // Generate ~100 rows with proper formatting
     for (let i = 1; i <= 100; i++) {
       const name = names[Math.floor(Math.random() * names.length)];
       const city = cities[Math.floor(Math.random() * cities.length)];
+      const domain = domains[Math.floor(Math.random() * domains.length)];
       data.push({
         id: i,
         name: `${name} ${i}`,
-        email: `user${i}@example.com`,
+        email: `user${i}@${domain}`,
         age: Math.floor(Math.random() * 40) + 20,
         city: city,
         salary: Math.floor(Math.random() * 50000) + 30000
@@ -1051,9 +1054,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   loadProcessLogs(): void {
     this.transportService.getProcessLogs().subscribe({
       next: (logs) => {
-        // Enrich logs with component information
-        const enrichedLogs = logs.map(log => ({
+        // Map backend datetime_created to frontend timestamp
+        // Backend returns datetime_created, frontend expects timestamp
+        const enrichedLogs = logs.map((log: any) => ({
           ...log,
+          timestamp: log.datetime_created || log.timestamp || new Date().toISOString(),
           component: this.extractComponent(log.message, log.details)
         }));
         
@@ -4019,6 +4024,21 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         return '';
       }
 
+      // Detect separator from first line for display
+      const firstLine = lines[0];
+      let displaySeparator = this.FIELD_SEPARATOR;
+      if (firstLine.includes(".'")) {
+        displaySeparator = ".'";
+      } else if (firstLine.includes(this.sourceFieldSeparator)) {
+        displaySeparator = this.sourceFieldSeparator;
+      } else if (firstLine.includes(this.FIELD_SEPARATOR)) {
+        displaySeparator = this.FIELD_SEPARATOR;
+      } else if (firstLine.includes('|')) {
+        displaySeparator = '|';
+      } else if (firstLine.includes(';')) {
+        displaySeparator = ';';
+      }
+      
       // Build HTML with colored columns
       const htmlLines = lines.map((line) => {
         const values = this.parseCsvLine(line);
@@ -4028,8 +4048,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           return `<span style="color: ${color};">${escapedValue}</span>`;
         });
         
-        // Add separator between cells
-        const separator = `<span style="color: #999;">${this.FIELD_SEPARATOR}</span>`;
+        // Add separator between cells (use detected separator)
+        const separator = `<span style="color: #999;">${this.escapeHtml(displaySeparator)}</span>`;
         return cells.join(separator);
       });
 
@@ -4142,11 +4162,31 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /**
    * Parse a CSV line handling quoted values and custom field separator
+   * Detects separator dynamically from the data (supports ║, .', |, ;, etc.)
    */
   private parseCsvLine(line: string): string[] {
     const values: string[] = [];
     let current = '';
     let inQuotes = false;
+    
+    // Detect separator from the line - check for common separators
+    let separator = this.FIELD_SEPARATOR; // Default
+    if (line.includes(".'")) {
+      separator = ".'"; // Old format separator
+    } else if (line.includes(this.sourceFieldSeparator)) {
+      separator = this.sourceFieldSeparator; // Use configured separator
+    } else if (line.includes(this.FIELD_SEPARATOR)) {
+      separator = this.FIELD_SEPARATOR; // Use default
+    } else if (line.includes('|')) {
+      separator = '|';
+    } else if (line.includes(';')) {
+      separator = ';';
+    } else if (line.includes(',')) {
+      separator = ',';
+    }
+    
+    // Handle multi-character separator
+    const isMultiCharSeparator = separator.length > 1;
     
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
@@ -4161,13 +4201,25 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           // Toggle quote state
           inQuotes = !inQuotes;
         }
-      } else if (char === this.FIELD_SEPARATOR && !inQuotes) {
-        // End of value (using custom separator)
-        values.push(current.trim());
-        current = '';
-      } else {
-        current += char;
+      } else if (!inQuotes) {
+        if (isMultiCharSeparator) {
+          // Check for multi-character separator
+          const substr = line.substring(i, i + separator.length);
+          if (substr === separator) {
+            values.push(current.trim());
+            current = '';
+            i += separator.length - 1; // Skip separator characters
+            continue;
+          }
+        } else if (char === separator) {
+          // End of value (using single-character separator)
+          values.push(current.trim());
+          current = '';
+          continue;
+        }
       }
+      
+      current += char;
     }
     
     // Add last value

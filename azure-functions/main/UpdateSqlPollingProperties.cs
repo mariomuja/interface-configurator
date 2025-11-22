@@ -38,7 +38,10 @@ public class UpdateSqlPollingProperties
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateSqlPollingPropertiesRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateSqlPollingPropertiesRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

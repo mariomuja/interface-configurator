@@ -41,7 +41,10 @@ public class UpdateCsvData
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateCsvDataRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateCsvDataRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

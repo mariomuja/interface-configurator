@@ -38,7 +38,10 @@ public class UpdateDestinationAdapterInstance
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateDestinationAdapterInstanceRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateDestinationAdapterInstanceRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName) || request.AdapterInstanceGuid == Guid.Empty)
             {

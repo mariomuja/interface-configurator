@@ -38,7 +38,10 @@ public class UpdateFieldSeparator
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateFieldSeparatorRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateFieldSeparatorRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

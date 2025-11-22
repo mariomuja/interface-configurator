@@ -228,7 +228,13 @@ var host = new HostBuilder()
             });
             
             // Register Adapter Services (these handle null DbContext gracefully)
-            services.AddScoped<IDataService, DataServiceAdapter>();
+            services.AddScoped<IDataService>(sp =>
+            {
+                var context = sp.GetRequiredService<ApplicationDbContext>();
+                var loggingService = sp.GetService<ILoggingService>();
+                var logger = sp.GetService<ILogger<DataServiceAdapter>>();
+                return new DataServiceAdapter(context, loggingService, logger);
+            });
             services.AddScoped<IDynamicTableService, DynamicTableService>();
             
             // Register Error Row Service (requires BlobServiceClient)

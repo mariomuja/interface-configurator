@@ -38,7 +38,10 @@ public class UpdateInterfaceName
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateInterfaceNameRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateInterfaceNameRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.OldInterfaceName) || string.IsNullOrWhiteSpace(request.NewInterfaceName))
             {

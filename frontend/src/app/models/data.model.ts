@@ -12,11 +12,14 @@ export interface SqlRecord {
 
 export interface ProcessLog {
   id: number;
-  timestamp: string;
-  level: 'info' | 'warning' | 'error';
+  timestamp: string; // Maps from backend datetime_created
+  datetime_created?: string; // Backend field name
+  level: 'info' | 'warning' | 'error' | string; // Backend may return other levels
   message: string;
   details?: string;
   component?: string;
+  interfaceName?: string;
+  messageId?: string;
 }
 
 

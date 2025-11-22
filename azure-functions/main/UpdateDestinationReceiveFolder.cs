@@ -38,7 +38,10 @@ public class UpdateDestinationReceiveFolder
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateDestinationReceiveFolderRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateDestinationReceiveFolderRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {

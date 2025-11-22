@@ -43,7 +43,10 @@ public class CreateInterfaceConfiguration
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<CreateInterfaceConfigRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<CreateInterfaceConfigRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null)
             {

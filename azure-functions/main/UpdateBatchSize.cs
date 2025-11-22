@@ -38,7 +38,10 @@ public class UpdateBatchSize
         try
         {
             var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<UpdateBatchSizeRequest>(requestBody);
+            var request = JsonSerializer.Deserialize<UpdateBatchSizeRequest>(requestBody, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
             if (request == null || string.IsNullOrWhiteSpace(request.InterfaceName))
             {
