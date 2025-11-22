@@ -172,7 +172,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
-    this.populateSampleCsvForDemo(true);
+    // Don't populate sample CSV data here - it will be initialized when CSV adapter instance is created
+    // via ensureCsvDataInitialized() in loadInterfaceData()
     this.loadSqlData();
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
@@ -400,8 +401,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // If backend already has CSV data, use it and sync locally
+    // Mark as initialized so sample data is never generated again for this interface
     if (existingCsvData && existingCsvData.trim().length > 0) {
-      this.csvDataInitialization.delete(interfaceName);
+      this.csvDataInitialization.add(interfaceName); // Mark as initialized
       // Sync local data with backend
       if (existingCsvData !== this.lastSyncedCsvData) {
         this.lastSyncedCsvData = existingCsvData;
@@ -411,11 +413,13 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // Prevent multiple initializations for the same interface
+    // Once sample data has been assigned, never overwrite it unless user explicitly changes it
     if (this.csvDataInitialization.has(interfaceName)) {
       return;
     }
 
-    // Backend has no CSV data - generate sample data and write to backend
+    // Backend has no CSV data - generate sample data ONCE and write to backend
+    // This only happens when CSV adapter instance is first created
     this.csvDataInitialization.add(interfaceName);
     const sample = this.getDemoSampleCsv();
     this.applyCsvDataLocally(sample.text, sample.records);
@@ -1375,6 +1379,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // Don't refresh CSV data if it's already been initialized for this interface
+    // Sample data should only be assigned ONCE when CSV adapter instance is created
+    if (this.csvDataInitialization.has(interfaceName)) {
+      return;
+    }
+
     this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
       next: (config) => {
         if (!config || config._isPlaceholder) {
@@ -1390,6 +1400,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           }
         } else {
           // Backend has no CSV data - generate sample data and write to backend
+          // This will only run once per interface due to csvDataInitialization Set check above
           this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
         }
       },
@@ -2271,15 +2282,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
                 
                 // Always sync CSV data with backend (backend is source of truth)
+                // Sample data is only initialized ONCE when CSV adapter instance is first created
                 const incomingCsvData = freshConfig.csvData || '';
                 if (incomingCsvData && incomingCsvData.trim().length > 0) {
                   // Backend has CSV data - sync local data with backend
+                  // Mark as initialized to prevent sample data from being generated
+                  this.csvDataInitialization.add(interfaceName);
                   if (incomingCsvData !== this.lastSyncedCsvData) {
                     this.lastSyncedCsvData = incomingCsvData;
                     this.applyCsvDataLocally(incomingCsvData);
                   }
                 } else {
-                  // Backend has no CSV data - generate sample data and write to backend
+                  // Backend has no CSV data - generate sample data ONCE and write to backend
+                  // This only happens when CSV adapter instance is first created
                   this.ensureCsvDataInitialized(interfaceName, incomingCsvData);
                 }
               }
@@ -2660,7 +2675,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const config = this.interfaceConfigurations.find(c => c.interfaceName === this.currentInterfaceName);
     if (!config || config._isPlaceholder) {
       this.selectedInterfaceConfig = null;
-      this.populateSampleCsvForDemo(true);
+      // Don't populate sample CSV data here for placeholder - wait for real adapter instance creation
       return;
     }
 
@@ -2731,15 +2746,19 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sqlBatchSize = config.sqlBatchSize ?? this.sqlBatchSize;
     
     // Load CsvData property - always sync with backend
+    // Sample data is only initialized ONCE when CSV adapter instance is first created
     const incomingCsvData = config.csvData || '';
     if (incomingCsvData && incomingCsvData.trim().length > 0) {
       // Backend has CSV data - always use it (backend is source of truth)
+      // Mark as initialized to prevent sample data from being generated
+      this.csvDataInitialization.add(config.interfaceName);
       if (incomingCsvData !== this.lastSyncedCsvData) {
         this.lastSyncedCsvData = incomingCsvData;
         this.applyCsvDataLocally(incomingCsvData);
       }
     } else {
-      // Backend has no CSV data - generate sample data and write to backend
+      // Backend has no CSV data - generate sample data ONCE and write to backend
+      // This only happens when CSV adapter instance is first created
       this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
     }
     this.isCsvDataUpdateInFlight = false;
@@ -2842,7 +2861,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.currentInterfaceName = this.DEFAULT_INTERFACE_NAME;
       this.selectedInterfaceConfig = null;
       this.applyDefaultInterfaceState();
-      this.populateSampleCsvForDemo(true);
+      // Don't populate sample CSV data here - it will be initialized when CSV adapter instance is created
       return;
     }
 
@@ -3206,7 +3225,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             SourceFileMask: config.sourceFileMask || '*.txt',
             SourceBatchSize: config.sourceBatchSize || 100,
             SourceFieldSeparator: config.sourceFieldSeparator || '║',
-            CsvData: config.csvData || null,
+            // CsvData excluded from JSON description (not part of interface configuration)
             CsvAdapterType: config.csvAdapterType || 'FILE',
             CsvPollingInterval: config.csvPollingInterval || 10,
             SftpHost: config.sftpHost || null,
