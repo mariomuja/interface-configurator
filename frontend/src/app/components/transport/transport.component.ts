@@ -401,9 +401,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     // If backend already has CSV data, use it and sync locally
-    // Mark as initialized so sample data is never generated again for this interface
+    // Don't mark as initialized - backend CSV data should still be refreshable
     if (existingCsvData && existingCsvData.trim().length > 0) {
-      this.csvDataInitialization.add(interfaceName); // Mark as initialized
       // Sync local data with backend
       if (existingCsvData !== this.lastSyncedCsvData) {
         this.lastSyncedCsvData = existingCsvData;
@@ -412,14 +411,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Prevent multiple initializations for the same interface
-    // Once sample data has been assigned, never overwrite it unless user explicitly changes it
+    // Prevent multiple sample data generations for the same interface
+    // Only mark as initialized when we actually GENERATE sample data
     if (this.csvDataInitialization.has(interfaceName)) {
       return;
     }
 
     // Backend has no CSV data - generate sample data ONCE and write to backend
     // This only happens when CSV adapter instance is first created
+    // Mark as initialized to prevent regenerating sample data
     this.csvDataInitialization.add(interfaceName);
     const sample = this.getDemoSampleCsv();
     this.applyCsvDataLocally(sample.text, sample.records);
@@ -1379,12 +1379,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Don't refresh CSV data if it's already been initialized for this interface
-    // Sample data should only be assigned ONCE when CSV adapter instance is created
-    if (this.csvDataInitialization.has(interfaceName)) {
-      return;
-    }
-
     this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
       next: (config) => {
         if (!config || config._isPlaceholder) {
@@ -1394,13 +1388,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const incomingCsvData = config.csvData || '';
         if (incomingCsvData && incomingCsvData.trim().length > 0) {
           // Backend has CSV data - always sync local data with backend (backend is source of truth)
+          // Backend CSV data should always be refreshable, even if sample data was previously generated
           if (incomingCsvData !== this.lastSyncedCsvData) {
             this.lastSyncedCsvData = incomingCsvData;
             this.applyCsvDataLocally(incomingCsvData);
           }
         } else {
-          // Backend has no CSV data - generate sample data and write to backend
-          // This will only run once per interface due to csvDataInitialization Set check above
+          // Backend has no CSV data - only generate sample data if we haven't already generated it
+          // This prevents regenerating sample data, but allows refreshing backend CSV data
           this.ensureCsvDataInitialized(config.interfaceName, incomingCsvData);
         }
       },
@@ -2286,8 +2281,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 const incomingCsvData = freshConfig.csvData || '';
                 if (incomingCsvData && incomingCsvData.trim().length > 0) {
                   // Backend has CSV data - sync local data with backend
-                  // Mark as initialized to prevent sample data from being generated
-                  this.csvDataInitialization.add(interfaceName);
+                  // Don't mark as initialized - backend CSV data should remain refreshable
                   if (incomingCsvData !== this.lastSyncedCsvData) {
                     this.lastSyncedCsvData = incomingCsvData;
                     this.applyCsvDataLocally(incomingCsvData);
@@ -2750,8 +2744,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const incomingCsvData = config.csvData || '';
     if (incomingCsvData && incomingCsvData.trim().length > 0) {
       // Backend has CSV data - always use it (backend is source of truth)
-      // Mark as initialized to prevent sample data from being generated
-      this.csvDataInitialization.add(config.interfaceName);
+      // Don't mark as initialized - backend CSV data should remain refreshable
       if (incomingCsvData !== this.lastSyncedCsvData) {
         this.lastSyncedCsvData = incomingCsvData;
         this.applyCsvDataLocally(incomingCsvData);
