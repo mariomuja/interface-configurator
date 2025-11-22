@@ -431,28 +431,155 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
     /// </summary>
     private DestinationAdapterInstance CreateDefaultDestinationInstance(InterfaceConfiguration config)
     {
+        // Get SQL Server properties from environment variables if not set in config
+        var sqlServer = config.SqlServerName ?? Environment.GetEnvironmentVariable("AZURE_SQL_SERVER") ?? string.Empty;
+        var sqlDatabase = config.SqlDatabaseName ?? Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE") ?? "AppDatabase";
+        var sqlUser = config.SqlUserName ?? Environment.GetEnvironmentVariable("AZURE_SQL_USER") ?? string.Empty;
+        var sqlPassword = config.SqlPassword ?? Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD") ?? string.Empty;
+        var sqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false;
+        
+        // Determine instance name based on interface name
+        var instanceName = config.DestinationInstanceName ?? "Destination";
+        if (string.IsNullOrWhiteSpace(config.DestinationInstanceName) && !string.IsNullOrWhiteSpace(config.InterfaceName))
+        {
+            // Use interface name to create a meaningful instance name
+            instanceName = $"{config.InterfaceName} Destination";
+        }
+        
+        // Create configuration JSON with SQL Server properties
+        var destinationInstanceConfig = JsonSerializer.Serialize(new
+        {
+            destination = "TransportData",
+            tableName = config.SqlTableName ?? "TransportData",
+            sqlServerName = sqlServer,
+            sqlDatabaseName = sqlDatabase,
+            sqlUserName = sqlUser,
+            sqlPassword = sqlPassword,
+            sqlIntegratedSecurity = sqlIntegratedSecurity
+        });
+        
         return new DestinationAdapterInstance
         {
-            InstanceName = config.DestinationInstanceName ?? "Destination",
+            InstanceName = instanceName,
             AdapterName = config.DestinationAdapterName ?? "SqlServer",
-            IsEnabled = config.DestinationIsEnabled ?? true,
+            IsEnabled = config.DestinationIsEnabled ?? false,
             AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
-            Configuration = config.DestinationConfiguration ?? string.Empty,
-            SqlServerName = config.SqlServerName,
-            SqlDatabaseName = config.SqlDatabaseName,
-            SqlUserName = config.SqlUserName,
-            SqlPassword = config.SqlPassword,
-            SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false,
-            SqlTableName = config.SqlTableName,
+            Configuration = !string.IsNullOrWhiteSpace(config.DestinationConfiguration) ? config.DestinationConfiguration : destinationInstanceConfig,
+            SqlServerName = sqlServer,
+            SqlDatabaseName = sqlDatabase,
+            SqlUserName = sqlUser,
+            SqlPassword = sqlPassword,
+            SqlIntegratedSecurity = sqlIntegratedSecurity,
+            SqlTableName = config.SqlTableName ?? "TransportData",
             SqlUseTransaction = config.SqlUseTransaction ?? false,
             SqlBatchSize = config.SqlBatchSize ?? 1000,
             SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
             SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
             DestinationReceiveFolder = config.DestinationReceiveFolder,
             DestinationFileMask = config.DestinationFileMask ?? "*.txt",
-            CreatedAt = config.CreatedAt,
+            CreatedAt = config.CreatedAt ?? DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    private void EnsureSqlServerPropertiesSet(DestinationAdapterInstance instance)
+    {
+        if (instance.AdapterName != "SqlServer")
+            return;
+            
+        // Set properties from environment variables if not already set
+        if (string.IsNullOrWhiteSpace(instance.SqlServerName))
+        {
+            instance.SqlServerName = Environment.GetEnvironmentVariable("AZURE_SQL_SERVER") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(instance.SqlDatabaseName))
+        {
+            instance.SqlDatabaseName = Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE") ?? "AppDatabase";
+        }
+        if (string.IsNullOrWhiteSpace(instance.SqlUserName))
+        {
+            instance.SqlUserName = Environment.GetEnvironmentVariable("AZURE_SQL_USER") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(instance.SqlPassword))
+        {
+            instance.SqlPassword = Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(instance.SqlTableName))
+        {
+            instance.SqlTableName = "TransportData";
+        }
+        
+        // Update configuration JSON if needed
+        if (!string.IsNullOrWhiteSpace(instance.Configuration))
+        {
+            try
+            {
+                var configDict = JsonSerializer.Deserialize<Dictionary<string, object>>(instance.Configuration);
+                if (configDict != null)
+                {
+                    bool configUpdated = false;
+                    if (!configDict.ContainsKey("sqlServerName") || string.IsNullOrWhiteSpace(configDict["sqlServerName"]?.ToString()))
+                    {
+                        configDict["sqlServerName"] = instance.SqlServerName;
+                        configUpdated = true;
+                    }
+                    if (!configDict.ContainsKey("sqlDatabaseName") || string.IsNullOrWhiteSpace(configDict["sqlDatabaseName"]?.ToString()))
+                    {
+                        configDict["sqlDatabaseName"] = instance.SqlDatabaseName;
+                        configUpdated = true;
+                    }
+                    if (!configDict.ContainsKey("sqlUserName") || string.IsNullOrWhiteSpace(configDict["sqlUserName"]?.ToString()))
+                    {
+                        configDict["sqlUserName"] = instance.SqlUserName;
+                        configUpdated = true;
+                    }
+                    if (!configDict.ContainsKey("sqlPassword") || string.IsNullOrWhiteSpace(configDict["sqlPassword"]?.ToString()))
+                    {
+                        configDict["sqlPassword"] = instance.SqlPassword;
+                        configUpdated = true;
+                    }
+                    if (!configDict.ContainsKey("tableName") || string.IsNullOrWhiteSpace(configDict["tableName"]?.ToString()))
+                    {
+                        configDict["tableName"] = instance.SqlTableName;
+                        configUpdated = true;
+                    }
+                    if (configUpdated)
+                    {
+                        instance.Configuration = JsonSerializer.Serialize(configDict);
+                    }
+                }
+            }
+            catch
+            {
+                // If configuration is not valid JSON, create new one
+                var newConfig = JsonSerializer.Serialize(new
+                {
+                    destination = "TransportData",
+                    tableName = instance.SqlTableName ?? "TransportData",
+                    sqlServerName = instance.SqlServerName,
+                    sqlDatabaseName = instance.SqlDatabaseName,
+                    sqlUserName = instance.SqlUserName,
+                    sqlPassword = instance.SqlPassword,
+                    sqlIntegratedSecurity = instance.SqlIntegratedSecurity ?? false
+                });
+                instance.Configuration = newConfig;
+            }
+        }
+        else
+        {
+            // Create configuration JSON if missing
+            var newConfig = JsonSerializer.Serialize(new
+            {
+                destination = "TransportData",
+                tableName = instance.SqlTableName ?? "TransportData",
+                sqlServerName = instance.SqlServerName,
+                sqlDatabaseName = instance.SqlDatabaseName,
+                sqlUserName = instance.SqlUserName,
+                sqlPassword = instance.SqlPassword,
+                sqlIntegratedSecurity = instance.SqlIntegratedSecurity ?? false
+            });
+            instance.Configuration = newConfig;
+        }
     }
 
     public async Task<List<InterfaceConfiguration>> GetAllConfigurationsAsync(CancellationToken cancellationToken = default)
@@ -965,27 +1092,62 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             if (_configurations.TryGetValue(interfaceName, out var config))
             {
-                if (config.DestinationAdapterInstances != null && config.DestinationAdapterInstances.Count > 0)
+                // Use Destinations dictionary (new structure)
+                if (config.Destinations != null && config.Destinations.Count > 0)
                 {
-                    return config.DestinationAdapterInstances.ToList();
+                    var instances = config.Destinations.Values.ToList();
+                    // Ensure all SQL Server instances have properties set from environment variables if missing
+                    foreach (var instance in instances)
+                    {
+                        if (instance.AdapterName == "SqlServer")
+                        {
+                            EnsureSqlServerPropertiesSet(instance);
+                        }
+                    }
+                    return instances;
                 }
                 
                 // Backward compatibility: create instance from legacy properties
                 if (!string.IsNullOrWhiteSpace(config.DestinationAdapterName))
                 {
-                    return new List<DestinationAdapterInstance>
+                    var sqlServer = config.SqlServerName ?? Environment.GetEnvironmentVariable("AZURE_SQL_SERVER") ?? string.Empty;
+                    var sqlDatabase = config.SqlDatabaseName ?? Environment.GetEnvironmentVariable("AZURE_SQL_DATABASE") ?? "AppDatabase";
+                    var sqlUser = config.SqlUserName ?? Environment.GetEnvironmentVariable("AZURE_SQL_USER") ?? string.Empty;
+                    var sqlPassword = config.SqlPassword ?? Environment.GetEnvironmentVariable("AZURE_SQL_PASSWORD") ?? string.Empty;
+                    
+                    var destinationInstanceConfig = JsonSerializer.Serialize(new
                     {
-                        new DestinationAdapterInstance
-                        {
-                            AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
-                            InstanceName = config.DestinationInstanceName ?? "Destination",
-                            AdapterName = config.DestinationAdapterName ?? "SqlServer",
-                            IsEnabled = config.DestinationIsEnabled ?? true,
-                            Configuration = config.DestinationConfiguration ?? string.Empty,
-                            CreatedAt = config.CreatedAt,
-                            UpdatedAt = config.UpdatedAt
-                        }
+                        destination = "TransportData",
+                        tableName = config.SqlTableName ?? "TransportData",
+                        sqlServerName = sqlServer,
+                        sqlDatabaseName = sqlDatabase,
+                        sqlUserName = sqlUser,
+                        sqlPassword = sqlPassword,
+                        sqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false
+                    });
+                    
+                    var instance = new DestinationAdapterInstance
+                    {
+                        AdapterInstanceGuid = config.DestinationAdapterInstanceGuid ?? Guid.NewGuid(),
+                        InstanceName = config.DestinationInstanceName ?? "Destination",
+                        AdapterName = config.DestinationAdapterName ?? "SqlServer",
+                        IsEnabled = config.DestinationIsEnabled ?? false,
+                        Configuration = !string.IsNullOrWhiteSpace(config.DestinationConfiguration) ? config.DestinationConfiguration : destinationInstanceConfig,
+                        SqlServerName = sqlServer,
+                        SqlDatabaseName = sqlDatabase,
+                        SqlUserName = sqlUser,
+                        SqlPassword = sqlPassword,
+                        SqlIntegratedSecurity = config.SqlIntegratedSecurity ?? false,
+                        SqlTableName = config.SqlTableName ?? "TransportData",
+                        SqlUseTransaction = config.SqlUseTransaction ?? false,
+                        SqlBatchSize = config.SqlBatchSize ?? 1000,
+                        SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
+                        SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
+                        CreatedAt = config.CreatedAt ?? DateTime.UtcNow,
+                        UpdatedAt = config.UpdatedAt ?? DateTime.UtcNow
                     };
+                    
+                    return new List<DestinationAdapterInstance> { instance };
                 }
                 
                 return new List<DestinationAdapterInstance>();
