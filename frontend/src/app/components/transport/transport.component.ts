@@ -448,10 +448,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   generateSampleCsvData(): CsvRecord[] {
     const data: CsvRecord[] = [];
-    const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer'];
-    const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt'];
+    const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer', 'Maria Garcia', 'Hans Mueller', 'Sophie Laurent', 'Giuseppe Rossi', 'Emma Johnson'];
+    const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Paris', 'London', 'Madrid', 'Rome', 'Vienna'];
     
-    for (let i = 1; i <= 50; i++) {
+    // Generate ~100 rows with proper formatting
+    for (let i = 1; i <= 100; i++) {
       const name = names[Math.floor(Math.random() * names.length)];
       const city = cities[Math.floor(Math.random() * cities.length)];
       data.push({
