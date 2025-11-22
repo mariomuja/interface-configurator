@@ -477,7 +477,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
             DestinationReceiveFolder = config.DestinationReceiveFolder,
             DestinationFileMask = config.DestinationFileMask ?? "*.txt",
-            CreatedAt = config.CreatedAt ?? DateTime.UtcNow,
+            CreatedAt = config.CreatedAt != default ? config.CreatedAt : DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
     }
@@ -560,7 +560,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     sqlDatabaseName = instance.SqlDatabaseName,
                     sqlUserName = instance.SqlUserName,
                     sqlPassword = instance.SqlPassword,
-                    sqlIntegratedSecurity = instance.SqlIntegratedSecurity ?? false
+                    sqlIntegratedSecurity = instance.SqlIntegratedSecurity
                 });
                 instance.Configuration = newConfig;
             }
@@ -576,7 +576,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                 sqlDatabaseName = instance.SqlDatabaseName,
                 sqlUserName = instance.SqlUserName,
                 sqlPassword = instance.SqlPassword,
-                sqlIntegratedSecurity = instance.SqlIntegratedSecurity ?? false
+                sqlIntegratedSecurity = instance.SqlIntegratedSecurity
             });
             instance.Configuration = newConfig;
         }
@@ -1143,7 +1143,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                         SqlBatchSize = config.SqlBatchSize ?? 1000,
                         SqlCommandTimeout = config.SqlCommandTimeout ?? 30,
                         SqlFailOnBadStatement = config.SqlFailOnBadStatement ?? false,
-                        CreatedAt = config.CreatedAt ?? DateTime.UtcNow,
+                        CreatedAt = config.CreatedAt != default ? config.CreatedAt : DateTime.UtcNow,
                         UpdatedAt = config.UpdatedAt ?? DateTime.UtcNow
                     };
                     
