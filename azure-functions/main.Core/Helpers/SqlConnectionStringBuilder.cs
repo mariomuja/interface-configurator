@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main.Core.Helpers;
 
 /// <summary>
@@ -104,6 +106,8 @@ public static class SqlConnectionStringBuilder
             config.SqlIntegratedSecurity ?? false);
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
 
 
 

@@ -4,6 +4,8 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using System.Text.Json;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
@@ -217,4 +219,8 @@ public class DestinationAdapterFunction
         }
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
+
+#pragma warning restore CS0618 // Type or member is obsolete
 

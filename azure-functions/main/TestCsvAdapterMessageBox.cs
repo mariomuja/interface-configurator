@@ -9,6 +9,8 @@ using InterfaceConfigurator.Main.Helpers;
 using InterfaceConfigurator.Main.Adapters;
 using System.Linq;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
@@ -146,9 +148,11 @@ public class TestCsvAdapterMessageBox
                             error = ex.Message,
                             stackTrace = ex.StackTrace
                         });
-                    }
-                }
-            }
+        }
+    }
+}
+
+#pragma warning restore CS0618 // Type or member is obsolete
 
             var result = new
             {

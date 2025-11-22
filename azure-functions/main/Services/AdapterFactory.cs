@@ -7,6 +7,8 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Data;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
@@ -28,6 +30,7 @@ public class AdapterFactory : IAdapterFactory
         if (config == null)
             throw new ArgumentNullException(nameof(config));
 
+#pragma warning disable CS0618 // Type or member is obsolete - Used for backward compatibility
         var adapterName = config.SourceAdapterName;
         var configJson = config.SourceConfiguration;
 
@@ -381,4 +384,6 @@ public class AdapterFactory : IAdapterFactory
             statisticsService);
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
 

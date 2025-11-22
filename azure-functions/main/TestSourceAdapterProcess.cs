@@ -9,6 +9,8 @@ using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Adapters;
 using System.Linq;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
@@ -207,4 +209,6 @@ public class TestSourceAdapterProcess
         return tempConfig;
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
 

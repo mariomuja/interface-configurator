@@ -7,6 +7,8 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Helpers;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
+
 namespace InterfaceConfigurator.Main;
 
 public class GetInterfaceConfiguration
@@ -158,6 +160,7 @@ public class GetInterfaceConfiguration
         else
         {
             // Fallback to old structure for backward compatibility
+#pragma warning disable CS0618 // Type or member is obsolete - Used for backward compatibility
             var sourceInstanceName = config.SourceInstanceName ?? config.SourceAdapterName ?? "Source";
             var sourceObj = new JsonObject
             {
@@ -199,6 +202,7 @@ public class GetInterfaceConfiguration
                 ["UpdatedAt"] = config.UpdatedAt.HasValue ? JsonValue.Create(config.UpdatedAt.Value) : null
             };
             sources[sourceInstanceName] = sourceObj;
+#pragma warning restore CS0618 // Type or member is obsolete
         }
         
         return sources;
@@ -243,6 +247,7 @@ public class GetInterfaceConfiguration
         else
         {
             // Fallback to old structure for backward compatibility
+#pragma warning disable CS0618 // Type or member is obsolete - Used for backward compatibility
             // Try DestinationAdapterInstances list first
             if (config.DestinationAdapterInstances != null && config.DestinationAdapterInstances.Count > 0)
             {
@@ -291,6 +296,7 @@ public class GetInterfaceConfiguration
                 };
                 destinations[destInstanceName] = destObj;
             }
+#pragma warning restore CS0618 // Type or member is obsolete
         }
         
         return destinations;
@@ -306,6 +312,7 @@ public class GetInterfaceConfiguration
 
         // Build sources section
         var sources = new JsonObject();
+#pragma warning disable CS0618 // Type or member is obsolete - Used for backward compatibility
         var sourceAdapterName = config.SourceAdapterName ?? "CSV";
         
         // Parse source configuration
@@ -478,6 +485,7 @@ public class GetInterfaceConfiguration
         }
 
         result["destinations"] = destinations;
+#pragma warning restore CS0618 // Type or member is obsolete
 
         return result;
     }
@@ -515,4 +523,6 @@ public class GetInterfaceConfiguration
         return null;
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
 

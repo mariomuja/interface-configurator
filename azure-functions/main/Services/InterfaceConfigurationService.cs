@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 
+#pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility migration
+
 namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
@@ -277,6 +279,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
     private void MigrateToNewFormat(InterfaceConfiguration config)
     {
         // Migrate source if old properties exist and Sources dictionary is empty
+#pragma warning disable CS0618 // Type or member is obsolete - Used for backward compatibility migration
         if (config.Sources.Count == 0 && !string.IsNullOrEmpty(config.SourceAdapterName))
         {
             var sourceInstance = new SourceAdapterInstance
@@ -400,6 +403,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     destInstance.InstanceName, config.InterfaceName);
             }
         }
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     /// <summary>

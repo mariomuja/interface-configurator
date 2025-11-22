@@ -221,7 +221,9 @@ public class StartTransport
         public string? InterfaceName { get; set; }
 
         [JsonPropertyName("csvContent")]
-        public string? CsvContent { get; set; }
+        public string? CsvContent { get; set;         }
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete
 

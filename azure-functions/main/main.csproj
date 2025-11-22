@@ -5,6 +5,7 @@
     <OutputType>Exe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
   <!-- Trigger deployment - WEBSITE_RUN_FROM_PACKAGE fix -->
   <ItemGroup>
