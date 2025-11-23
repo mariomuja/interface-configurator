@@ -27,6 +27,12 @@ import { AuthService } from '../../services/auth.service';
       <h2 mat-dialog-title>Anmelden</h2>
       
       <mat-dialog-content>
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="error-message">
+          <mat-icon>error</mat-icon>
+          <span>{{ errorMessage }}</span>
+        </div>
+        
         <!-- Demo-User Quick Login -->
         <div class="demo-login-section">
           <h3>Demo-Benutzer (ohne Passwort)</h3>
@@ -200,6 +206,23 @@ import { AuthService } from '../../services/auth.service';
     .admin-info mat-icon {
       color: #ff9800;
     }
+    
+    .error-message {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      background-color: #ffebee;
+      border-left: 4px solid #f44336;
+      border-radius: 4px;
+      color: #c62828;
+      font-size: 14px;
+    }
+    
+    .error-message mat-icon {
+      color: #f44336;
+    }
   `]
 })
 export class LoginDialogComponent {
@@ -207,6 +230,7 @@ export class LoginDialogComponent {
   password = '';
   loggingIn = false;
   isDemoLogin = false;
+  errorMessage = '';
 
   constructor(
     public dialogRef: MatDialogRef<LoginDialogComponent>,
@@ -217,6 +241,7 @@ export class LoginDialogComponent {
   loginAsDemo(): void {
     this.isDemoLogin = true;
     this.loggingIn = true;
+    this.errorMessage = '';
     // Demo-User "test" can login without password
     this.authService.login('test', '').subscribe({
       next: (response) => {
@@ -228,15 +253,15 @@ export class LoginDialogComponent {
           this.dialogRef.close(true);
         } else {
           // Show error message and keep dialog open
-          const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
-          this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
+          this.errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${this.errorMessage}`, 'Schließen', { 
             duration: 10000,
             horizontalPosition: 'center',
             verticalPosition: 'top',
             panelClass: ['error-snackbar'],
             politeness: 'assertive'
           });
-          console.error('Demo login failed:', errorMessage);
+          console.error('Demo login failed:', this.errorMessage);
           // Dialog remains open so user can see the error and try again
         }
       },
@@ -263,8 +288,9 @@ export class LoginDialogComponent {
         if (error?.status) {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
-        // Show error message and keep dialog open
-        this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
+        // Show error message in dialog and snackbar
+        this.errorMessage = `Demo-Anmeldung fehlgeschlagen: ${errorMessage}`;
+        this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
           verticalPosition: 'top',
@@ -280,12 +306,14 @@ export class LoginDialogComponent {
 
   login(): void {
     if (!this.username || !this.password) {
-      this.snackBar.open('Bitte geben Sie Benutzername und Passwort ein', 'Schließen', { duration: 3000 });
+      this.errorMessage = 'Bitte geben Sie Benutzername und Passwort ein';
+      this.snackBar.open(this.errorMessage, 'Schließen', { duration: 3000 });
       return;
     }
 
     this.isDemoLogin = false;
     this.loggingIn = true;
+    this.errorMessage = '';
     this.authService.login(this.username, this.password).subscribe({
       next: (response) => {
         this.loggingIn = false;
@@ -296,8 +324,8 @@ export class LoginDialogComponent {
           this.dialogRef.close(true);
         } else {
           // Show error message and keep dialog open
-          const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
-          this.snackBar.open(errorMessage, 'Schließen', { 
+          this.errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.snackBar.open(this.errorMessage, 'Schließen', { 
             duration: 5000,
             horizontalPosition: 'center',
             verticalPosition: 'top',
@@ -328,8 +356,9 @@ export class LoginDialogComponent {
         if (error?.status) {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
-        // Show error message and keep dialog open
-        this.snackBar.open(errorMessage, 'Schließen', { 
+        // Show error message in dialog and snackbar
+        this.errorMessage = errorMessage;
+        this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
           verticalPosition: 'top',
