@@ -7,7 +7,7 @@
 param(
     [string]$OldResourceGroup = "rg-infrastructure-as-code",
     [string]$NewResourceGroup = "rg-interface-configurator",
-    [string]$Location = "Central US",
+    [string]$Location = "West Europe",
     [string]$SubscriptionId = ""
 )
 

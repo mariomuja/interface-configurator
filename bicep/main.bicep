@@ -2,13 +2,10 @@
 // They are kept for reference but Azure CLI handles authentication
 
 @description('Name of the resource group')
-@allowed([
-  'rg-interface-configurator'
-])
 param resourceGroupName string = 'rg-interface-configurator'
 
 @description('Azure region for resources')
-param location string = 'West Europe'
+param location string = 'Central US'
 
 @description('Azure region for SQL Server (if different from main location, leave empty to use main location)')
 param sqlLocation string = ''
@@ -239,7 +236,7 @@ resource functionsStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' 
 }
 
 // App Service Plan for Azure Functions
-resource functionsAppServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
+resource functionsAppServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = if (enableFunctionApp) {
   name: functionsAppPlanName
   location: location
   kind: 'linux'

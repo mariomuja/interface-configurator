@@ -228,6 +228,8 @@ import { Observable } from 'rxjs';
       position: relative;
       overflow: hidden;
       white-space: nowrap;
+      width: 100%;
+      max-width: 1200px;
     }
     
     .concept-text {
@@ -542,6 +544,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.availableLanguages = this.translationService.getAvailableLanguages();
     this.currentLanguage = this.translationService.getCurrentLanguageValue();
     this.startConceptRotation();
+    
+    // Open login dialog on app start if not authenticated
+    if (!this.authService.isAuthenticated()) {
+      setTimeout(() => {
+        this.openLogin();
+      }, 100);
+    }
   }
   
   ngOnDestroy(): void {

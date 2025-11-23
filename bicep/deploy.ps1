@@ -3,10 +3,10 @@
 
 param(
     [Parameter(Mandatory = $false)]
-    [string]$ResourceGroupName = "rg-interface-configuration",
+    [string]$ResourceGroupName = "rg-interface-configurator",
     
     [Parameter(Mandatory = $false)]
-    [string]$Location = "Central US",
+    [string]$Location = "West Europe",
     
     [Parameter(Mandatory = $false)]
     [string]$ParametersFile = "parameters.json",

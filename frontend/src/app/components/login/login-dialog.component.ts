@@ -87,11 +87,11 @@ import { AuthService } from '../../services/auth.service';
           mat-raised-button 
           color="primary" 
           (click)="login()" 
-          [disabled]="loggingIn || !username || !password"
-          *ngIf="!isDemoLogin">
+          [disabled]="loggingIn || (!isDemoLogin && (!username || !password))">
           <mat-icon *ngIf="!loggingIn">login</mat-icon>
           <span *ngIf="loggingIn">Wird angemeldet...</span>
-          <span *ngIf="!loggingIn">Als Admin anmelden</span>
+          <span *ngIf="!loggingIn && isDemoLogin">Als Demo anmelden</span>
+          <span *ngIf="!loggingIn && !isDemoLogin">Als Admin anmelden</span>
         </button>
       </mat-dialog-actions>
     </div>
@@ -221,19 +221,30 @@ export class LoginDialogComponent {
     this.authService.login('test', '').subscribe({
       next: (response) => {
         this.loggingIn = false;
+        this.isDemoLogin = false;
         if (response.success) {
           this.snackBar.open(`Willkommen, ${response.user?.username}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
-          this.dialogRef.close(true);
+          // Close dialog after a short delay to allow snackbar to show
+          setTimeout(() => {
+            this.dialogRef.close(true);
+          }, 100);
         } else {
           this.snackBar.open(response.errorMessage || 'Anmeldung fehlgeschlagen', 'Schließen', { duration: 3000 });
         }
-        this.isDemoLogin = false;
       },
       error: (error) => {
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
-        this.snackBar.open('Fehler bei der Anmeldung', 'Schließen', { duration: 3000 });
+        // For demo login, we'll still close the dialog and show a warning
+        // This allows the user to continue even if the API is temporarily unavailable
+        this.snackBar.open('Demo-Anmeldung: API nicht erreichbar, aber lokale Anmeldung aktiviert', 'Schließen', { duration: 3000 });
+        // Create a local demo user session using AuthService method
+        this.authService.setDemoUser();
+        // Close dialog after a short delay
+        setTimeout(() => {
+          this.dialogRef.close(true);
+        }, 100);
       }
     });
   }

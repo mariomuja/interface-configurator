@@ -84,6 +84,16 @@ export class AuthService {
     }
     return {};
   }
+
+  /**
+   * Sets a demo user session (for offline demo login)
+   */
+  setDemoUser(): void {
+    const demoUser: User = { id: 0, username: 'test', role: 'user' };
+    localStorage.setItem(this.tokenKey, 'demo-token');
+    localStorage.setItem(this.userKey, JSON.stringify(demoUser));
+    this.currentUserSubject.next(demoUser);
+  }
 }
 
 
