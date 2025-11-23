@@ -144,6 +144,22 @@ public class SourceAdapterInstance
     [MaxLength(500)]
     public string? SapRfcDestination { get; set; }
 
+    [MaxLength(500)]
+    public string? SapRfcFunctionModule { get; set; } // Konfigurierbares RFC-Funktionsmodul (z.B. "IDOC_INBOUND_ASYNCHRONOUS", "BAPI_*")
+
+    [MaxLength(2000)]
+    public string? SapRfcParameters { get; set; } // JSON-String mit RFC-Parametern
+
+    [MaxLength(500)]
+    public string? SapODataServiceUrl { get; set; } // OData Service URL für S/4HANA (z.B. "/sap/opu/odata/sap/API_*")
+
+    [MaxLength(500)]
+    public string? SapRestApiEndpoint { get; set; } // REST API Endpoint für S/4HANA
+
+    public bool SapUseOData { get; set; } = false; // OData statt RFC verwenden
+
+    public bool SapUseRestApi { get; set; } = false; // REST API statt RFC verwenden
+
     // Dynamics 365 Adapter Properties
     [MaxLength(500)]
     public string? Dynamics365TenantId { get; set; }

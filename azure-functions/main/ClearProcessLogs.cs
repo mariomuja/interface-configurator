@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -25,9 +26,17 @@ public class ClearProcessLogsFunction
 
     [Function("ClearProcessLogs")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ClearProcessLogs")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "ClearProcessLogs")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Delete all logs from MessageBox database
@@ -37,6 +46,7 @@ public class ClearProcessLogsFunction
             
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(response);
             response.WriteString(System.Text.Json.JsonSerializer.Serialize(new { message = "Logs cleared successfully" }));
 
             return response;
@@ -46,6 +56,7 @@ public class ClearProcessLogsFunction
             _logger.LogError(ex, "Error clearing process logs");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }

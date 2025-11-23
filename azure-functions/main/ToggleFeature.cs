@@ -29,9 +29,17 @@ public class ToggleFeatureFunction
 
     [Function("ToggleFeature")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ToggleFeature")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "ToggleFeature")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Get user from token

@@ -25,9 +25,17 @@ public class InitializeMessageBoxFunction
 
     [Function("InitializeMessageBox")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "InitializeMessageBox")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "InitializeMessageBox")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            InterfaceConfigurator.Main.Helpers.CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             _logger.LogInformation("Initializing MessageBox database and tables...");
@@ -49,6 +57,7 @@ public class InitializeMessageBoxFunction
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            InterfaceConfigurator.Main.Helpers.CorsHelper.AddCorsHeaders(response);
             response.WriteString(System.Text.Json.JsonSerializer.Serialize(new { 
                 success = true, 
                 message = message,
@@ -76,6 +85,7 @@ public class InitializeMessageBoxFunction
             _logger.LogError(sqlEx, errorMessage);
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            InterfaceConfigurator.Main.Helpers.CorsHelper.AddCorsHeaders(errorResponse);
             errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { 
                 success = false, 
                 error = errorMessage,
@@ -88,6 +98,7 @@ public class InitializeMessageBoxFunction
             _logger.LogError(ex, "Error initializing MessageBox database");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            InterfaceConfigurator.Main.Helpers.CorsHelper.AddCorsHeaders(errorResponse);
             errorResponse.WriteString(System.Text.Json.JsonSerializer.Serialize(new { 
                 success = false, 
                 error = ex.Message 

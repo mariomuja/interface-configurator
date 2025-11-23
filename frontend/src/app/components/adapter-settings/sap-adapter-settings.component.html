@@ -1,0 +1,167 @@
+<div class="sap-adapter-settings">
+  <h3>SAP Adapter Configuration</h3>
+
+  <!-- Target System Selection -->
+  <div class="section">
+    <h4>Connection</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Application Server</mat-label>
+      <input matInput [(ngModel)]="sapApplicationServer" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP Application Server hostname or IP address" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>System Number</mat-label>
+      <input matInput [(ngModel)]="sapSystemNumber" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP System Number (usually 00)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Client</mat-label>
+      <input matInput [(ngModel)]="sapClient" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP Client number (usually 100, 200, etc.)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Username</mat-label>
+      <input matInput type="text" [(ngModel)]="sapUsername" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP Username" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Password</mat-label>
+      <input matInput type="password" [(ngModel)]="sapPassword" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP Password" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Language</mat-label>
+      <input matInput [(ngModel)]="sapLanguage" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="SAP Language code (e.g., EN, DE)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Endpoint Selection -->
+  <div class="section">
+    <h4>Endpoint / Module</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Endpoint Type</mat-label>
+      <mat-select [(ngModel)]="endpointId" (ngModelChange)="onEndpointChange()">
+        <mat-option *ngFor="let endpoint of availableEndpoints" [value]="endpoint.id">
+          {{ endpoint.name }}
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the SAP endpoint type: OData (S/4HANA), REST API, RFC Gateway, or IDOC" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <div *ngIf="selectedEndpoint" class="endpoint-info">
+      <p><mat-icon>info</mat-icon> {{ selectedEndpoint.description }}</p>
+    </div>
+  </div>
+
+  <!-- Entity Selection -->
+  <div class="section" *ngIf="selectedEndpoint && availableEntities.length > 0">
+    <h4>Entity / Function</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Entity Name</mat-label>
+      <mat-select [(ngModel)]="entityName" (ngModelChange)="onEntityChange()">
+        <mat-option *ngFor="let entity of availableEntities" [value]="entity">
+          {{ entity }}
+        </mat-option>
+        <mat-option value="custom">
+          <em>Custom (enter manually)</em>
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the entity or function module to use" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="entityName === 'custom' || (!availableEntities.includes(entityName) && entityName)" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Custom Entity Name</mat-label>
+      <input matInput [(ngModel)]="entityName" (ngModelChange)="onEntityChange()" />
+      <mat-icon matSuffix matTooltip="Enter custom entity name" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- OData Configuration -->
+  <div class="section" *ngIf="showODataFields">
+    <h4>OData Service Configuration</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>OData Service URL</mat-label>
+      <input matInput [(ngModel)]="sapODataServiceUrl" (ngModelChange)="emitSettingsChange()" placeholder="/sap/opu/odata/sap/API_SALES_ORDER_SRV" />
+      <mat-icon matSuffix matTooltip="OData Service URL path (e.g., /sap/opu/odata/sap/API_SALES_ORDER_SRV)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- REST API Configuration -->
+  <div class="section" *ngIf="showRestApiFields">
+    <h4>REST API Configuration</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>REST API Endpoint</mat-label>
+      <input matInput [(ngModel)]="sapRestApiEndpoint" (ngModelChange)="emitSettingsChange()" placeholder="/sap/bc/rest/api/salesorder" />
+      <mat-icon matSuffix matTooltip="REST API Endpoint path" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- RFC Configuration -->
+  <div class="section" *ngIf="showRfcFields">
+    <h4>RFC Configuration</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>RFC Function Module</mat-label>
+      <input matInput [(ngModel)]="sapRfcFunctionModule" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="RFC Function Module name (e.g., IDOC_INBOUND_ASYNCHRONOUS, BAPI_SALESORDER_CREATEFROMDAT2)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>RFC Parameters (JSON)</mat-label>
+      <textarea matInput [(ngModel)]="sapRfcParameters" (ngModelChange)="emitSettingsChange()" rows="3" placeholder='{"IDOC_TYPE": "ORDERS05", "MANDT": "100"}'></textarea>
+      <mat-icon matSuffix matTooltip="RFC parameters as JSON string" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- IDOC Configuration -->
+  <div class="section" *ngIf="showIdocFields">
+    <h4>IDOC Configuration</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>IDOC Type</mat-label>
+      <input matInput [(ngModel)]="sapIdocType" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="IDOC Type (e.g., ORDERS05, INVOIC02, MATMAS05)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>IDOC Filter</mat-label>
+      <textarea matInput [(ngModel)]="sapIdocFilter" (ngModelChange)="emitSettingsChange()" rows="2" placeholder="Filter expression for IDOC query"></textarea>
+      <mat-icon matSuffix matTooltip="Filter expression for IDOC query" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Options -->
+  <div class="section">
+    <h4>Options</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Batch Size</mat-label>
+      <input matInput type="number" [(ngModel)]="sapBatchSize" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="Number of records to process per batch" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="adapterType === 'Source'" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Polling Interval (seconds)</mat-label>
+      <input matInput type="number" [(ngModel)]="sapPollingInterval" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="How often to poll for new data (in seconds)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Connection Timeout (seconds)</mat-label>
+      <input matInput type="number" [(ngModel)]="sapConnectionTimeout" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="Connection timeout in seconds" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+</div>
+

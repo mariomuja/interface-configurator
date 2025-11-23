@@ -78,8 +78,14 @@ Write-Host "`n6. Setze WEBSITE_RUN_FROM_PACKAGE..." -ForegroundColor Yellow
 Write-Host "   URL Länge: $($blobUrl.Length) Zeichen" -ForegroundColor White
 
 # Use JSON file to avoid PowerShell escaping issues
+# Set critical app settings for .NET Isolated Worker functions
+# These settings prevent sync trigger failures
 $settingsJson = @{
     WEBSITE_RUN_FROM_PACKAGE = $blobUrl
+    FUNCTIONS_EXTENSION_VERSION = "~4"
+    SCM_DO_BUILD_DURING_DEPLOYMENT = "false"
+    ENABLE_ORYX_BUILD = "false"
+    WEBSITE_USE_PLACEHOLDER = "0"
 } | ConvertTo-Json -Compress
 
 $tempSettingsFile = [System.IO.Path]::GetTempFileName()
@@ -124,8 +130,44 @@ while ($progress -lt 120) {
     Write-Host "   ... $progress Sekunden gewartet" -ForegroundColor Gray
 }
 
-# Step 10: Check Functions
-Write-Host "`n9. Prüfe Functions..." -ForegroundColor Cyan
+# Step 10: Sync Function Triggers
+Write-Host "`n9. Synchronisiere Function Triggers..." -ForegroundColor Yellow
+Write-Host "   (Wichtig für .NET Isolated Worker Functions)" -ForegroundColor White
+
+# Try to sync triggers using Azure CLI
+Write-Host "   Versuche Sync über Azure CLI..." -ForegroundColor Gray
+$syncResult = az functionapp function sync --resource-group $ResourceGroup --name $FunctionAppName --output none 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "   ✅ Sync über Azure CLI erfolgreich" -ForegroundColor Green
+} else {
+    Write-Host "   ⚠️  Sync über Azure CLI fehlgeschlagen (kann normal sein)" -ForegroundColor Yellow
+}
+
+# Alternative: Try admin API sync
+Write-Host "   Versuche Sync über Admin API..." -ForegroundColor Gray
+try {
+    $masterKey = az functionapp keys list --resource-group $ResourceGroup --name $FunctionAppName --query "masterKey" -o tsv 2>$null
+    if ($masterKey -and $masterKey -ne "None") {
+        $syncUrl = "https://$FunctionAppName.azurewebsites.net/admin/host/synctriggers"
+        $headers = @{
+            "x-functions-key" = $masterKey
+            "Content-Type" = "application/json"
+        }
+        $syncResponse = Invoke-RestMethod -Uri $syncUrl -Method Post -Headers $headers -TimeoutSec 60 -ErrorAction SilentlyContinue
+        Write-Host "   ✅ Sync über Admin API erfolgreich" -ForegroundColor Green
+    } else {
+        Write-Host "   ⚠️  Master Key nicht verfügbar, überspringe Admin API Sync" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "   ⚠️  Admin API Sync fehlgeschlagen: $_" -ForegroundColor Yellow
+}
+
+# Wait a bit for sync to complete
+Write-Host "   Warte 20 Sekunden für Sync-Abschluss..." -ForegroundColor Gray
+Start-Sleep -Seconds 20
+
+# Step 11: Check Functions
+Write-Host "`n10. Prüfe Functions..." -ForegroundColor Cyan
 $functionsOutput = az functionapp function list --resource-group $ResourceGroup --name $FunctionAppName -o json 2>&1
 if ($LASTEXITCODE -eq 0) {
     $functionsJson = $functionsOutput | Select-String -Pattern '^\s*\[|\{' | Out-String
@@ -153,8 +195,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Output: $functionsOutput" -ForegroundColor Yellow
 }
 
-# Step 11: Check Function App Status
-Write-Host "`n10. Prüfe Function App Status..." -ForegroundColor Cyan
+# Step 12: Check Function App Status
+Write-Host "`n11. Prüfe Function App Status..." -ForegroundColor Cyan
 $status = az functionapp show --resource-group $ResourceGroup --name $FunctionAppName --query "{state:state, enabled:enabled, defaultHostName:defaultHostName}" -o json | ConvertFrom-Json
 Write-Host "Status: $($status.state)" -ForegroundColor $(if ($status.state -eq "Running") { "Green" } else { "Yellow" })
 Write-Host "Enabled: $($status.enabled)" -ForegroundColor White

@@ -141,6 +141,22 @@ export class AdapterSelectDialogComponent {
       supportsDestination: true
     },
     {
+      name: 'FILE',
+      alias: 'File',
+      icon: 'insert_drive_file',
+      description: 'Dateien aus/in Azure Blob Storage',
+      supportsSource: true,
+      supportsDestination: true
+    },
+    {
+      name: 'SFTP',
+      alias: 'SFTP',
+      icon: 'cloud_upload',
+      description: 'Dateien von/zu SFTP-Servern',
+      supportsSource: true,
+      supportsDestination: true
+    },
+    {
       name: 'SqlServer',
       alias: 'SQL Server',
       icon: 'storage',

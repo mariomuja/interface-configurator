@@ -1,0 +1,18 @@
+.csv-destination-section,
+.raw-csv-section,
+.sftp-section {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.csv-destination-section h3,
+.raw-csv-section h3,
+.sftp-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 16px;
+  font-weight: 500;
+}
+

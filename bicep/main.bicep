@@ -265,6 +265,18 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
           value: 'dotnet-isolated'
         }
         {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'false'
+        }
+        {
+          name: 'ENABLE_ORYX_BUILD'
+          value: 'false'
+        }
+        {
           name: 'AZURE_FUNCTIONS_ENVIRONMENT'
           value: environment
         }

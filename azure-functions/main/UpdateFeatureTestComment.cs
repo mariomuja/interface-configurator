@@ -26,9 +26,17 @@ public class UpdateFeatureTestCommentFunction
 
     [Function("UpdateFeatureTestComment")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "UpdateFeatureTestComment")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "UpdateFeatureTestComment")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Get user from token

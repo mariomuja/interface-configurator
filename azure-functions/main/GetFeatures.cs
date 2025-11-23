@@ -29,9 +29,17 @@ public class GetFeaturesFunction
 
     [Function("GetFeatures")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetFeatures")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "options", Route = "GetFeatures")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Get user role from token (simplified - in production use proper JWT)

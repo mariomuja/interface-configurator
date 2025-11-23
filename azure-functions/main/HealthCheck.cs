@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -34,9 +35,17 @@ public class HealthCheck
 
     [Function("HealthCheck")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "options", Route = "health")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         _logger.LogInformation("Health check requested");
 
         var healthStatus = new HealthStatusResult
@@ -119,6 +128,7 @@ public class HealthCheck
 
         var response = req.CreateResponse(overallHealthy ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable);
         response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        CorsHelper.AddCorsHeaders(response);
 
         var jsonResponse = JsonSerializer.Serialize(healthStatus, new JsonSerializerOptions
         {

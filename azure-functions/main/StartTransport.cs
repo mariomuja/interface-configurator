@@ -49,11 +49,7 @@ public class StartTransport
         if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
         {
             var optionsResponse = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            // Set CORS headers explicitly
-            optionsResponse.Headers.Add("Access-Control-Allow-Origin", "*");
-            optionsResponse.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-            optionsResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            optionsResponse.Headers.Add("Access-Control-Max-Age", "3600");
+            CorsHelper.AddCorsHeaders(optionsResponse);
             return optionsResponse;
         }
 
@@ -90,11 +86,7 @@ public class StartTransport
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            // Set CORS headers explicitly
-            response.Headers.Add("Access-Control-Allow-Origin", "*");
-            response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-            response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            response.Headers.Add("Access-Control-Max-Age", "3600");
+            CorsHelper.AddCorsHeaders(response);
 
             await response.WriteStringAsync(JsonSerializer.Serialize(new
             {
@@ -109,11 +101,7 @@ public class StartTransport
             _logger.LogError(ex, "Error starting transport");
             var errorResponse = req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            // Set CORS headers explicitly
-            errorResponse.Headers.Add("Access-Control-Allow-Origin", "*");
-            errorResponse.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-            errorResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            errorResponse.Headers.Add("Access-Control-Max-Age", "3600");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new
             {
                 error = "Failed to start transport",

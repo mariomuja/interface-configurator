@@ -475,6 +475,12 @@ public class AdapterFactory : IAdapterFactory
             : 30;
         bool sapUseRfc = (isSource ? sourceInstance?.SapUseRfc : destInstance?.SapUseRfc) ?? true;
         string? sapRfcDestination = isSource ? sourceInstance?.SapRfcDestination : destInstance?.SapRfcDestination;
+        string? sapRfcFunctionModule = isSource ? sourceInstance?.SapRfcFunctionModule : destInstance?.SapRfcFunctionModule;
+        string? sapRfcParameters = isSource ? sourceInstance?.SapRfcParameters : destInstance?.SapRfcParameters;
+        string? sapODataServiceUrl = isSource ? sourceInstance?.SapODataServiceUrl : destInstance?.SapODataServiceUrl;
+        string? sapRestApiEndpoint = isSource ? sourceInstance?.SapRestApiEndpoint : destInstance?.SapRestApiEndpoint;
+        bool sapUseOData = (isSource ? sourceInstance?.SapUseOData : destInstance?.SapUseOData) ?? false;
+        bool sapUseRestApi = (isSource ? sourceInstance?.SapUseRestApi : destInstance?.SapUseRestApi) ?? false;
         
         string? sapReceiverPort = isSource ? null : destInstance?.SapReceiverPort; // Only for destination
         string? sapReceiverPartner = isSource ? null : destInstance?.SapReceiverPartner; // Only for destination
@@ -504,7 +510,13 @@ public class AdapterFactory : IAdapterFactory
             sapUseRfc,
             sapRfcDestination,
             sapReceiverPort,
-            sapReceiverPartner);
+            sapReceiverPartner,
+            sapRfcFunctionModule,
+            sapRfcParameters,
+            sapODataServiceUrl,
+            sapRestApiEndpoint,
+            sapUseOData,
+            sapUseRestApi);
     }
 
     private Dynamics365Adapter CreateDynamics365Adapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)

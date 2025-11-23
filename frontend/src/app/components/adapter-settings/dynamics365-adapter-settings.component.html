@@ -1,0 +1,119 @@
+<div class="dynamics365-adapter-settings">
+  <h3>Dynamics 365 Adapter Configuration</h3>
+
+  <!-- Authentication -->
+  <div class="section">
+    <h4>Authentication (OAuth 2.0)</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Tenant ID</mat-label>
+      <input matInput [(ngModel)]="dynamics365TenantId" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="Azure AD Tenant ID" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Client ID</mat-label>
+      <input matInput [(ngModel)]="dynamics365ClientId" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="Azure AD Application (Client) ID" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Client Secret</mat-label>
+      <input matInput type="password" [(ngModel)]="dynamics365ClientSecret" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="Azure AD Application Client Secret" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Instance URL</mat-label>
+      <input matInput [(ngModel)]="dynamics365InstanceUrl" (ngModelChange)="emitSettingsChange()" placeholder="https://org.crm.dynamics.com" />
+      <mat-icon matSuffix matTooltip="Dynamics 365 organization URL (e.g., https://org.crm.dynamics.com)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Module Selection -->
+  <div class="section">
+    <h4>Module / Endpoint</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Module</mat-label>
+      <mat-select [(ngModel)]="endpointId" (ngModelChange)="onEndpointChange()">
+        <mat-option *ngFor="let endpoint of availableEndpoints" [value]="endpoint.id">
+          {{ endpoint.name }}
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the Dynamics 365 module (Finance, Sales, Marketing, etc.)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <div *ngIf="selectedEndpoint" class="endpoint-info">
+      <p><mat-icon>info</mat-icon> {{ selectedEndpoint.description }}</p>
+    </div>
+  </div>
+
+  <!-- Entity Selection -->
+  <div class="section">
+    <h4>Entity</h4>
+    
+    <mat-form-field *ngIf="availableEntities.length > 0" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Entity Name</mat-label>
+      <mat-select [(ngModel)]="entityName" (ngModelChange)="onEntityChange()">
+        <mat-option *ngFor="let entity of availableEntities" [value]="entity">
+          {{ entity }}
+        </mat-option>
+        <mat-option value="custom">
+          <em>Custom (enter manually)</em>
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the entity to read/write data from/to" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="showCustomEntityInput || (selectedEndpoint?.isCustom)" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Entity Name</mat-label>
+      <input matInput [(ngModel)]="entityName" (ngModelChange)="onEntityChange()" placeholder="accounts, contacts, invoices, etc." />
+      <mat-icon matSuffix matTooltip="Enter the entity name (e.g., accounts, contacts, invoices)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Filter (Source only) -->
+  <div class="section" *ngIf="adapterType === 'Source'">
+    <h4>OData Filter (Optional)</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>OData Filter Query</mat-label>
+      <textarea matInput [(ngModel)]="dynamics365ODataFilter" (ngModelChange)="emitSettingsChange()" rows="2" placeholder="name eq 'Test' and statuscode eq 1"></textarea>
+      <mat-icon matSuffix matTooltip="OData filter query to filter records (e.g., name eq 'Test' and statuscode eq 1)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Options -->
+  <div class="section">
+    <h4>Options</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Batch Size</mat-label>
+      <input matInput type="number" [(ngModel)]="dynamics365BatchSize" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="Number of records to process per batch" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Page Size</mat-label>
+      <input matInput type="number" [(ngModel)]="dynamics365PageSize" (ngModelChange)="emitSettingsChange()" min="1" max="5000" />
+      <mat-icon matSuffix matTooltip="OData page size for paging (max 5000)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="adapterType === 'Source'" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Polling Interval (seconds)</mat-label>
+      <input matInput type="number" [(ngModel)]="dynamics365PollingInterval" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="How often to poll for new data (in seconds)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="adapterType === 'Destination'" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Use Batch Requests</mat-label>
+      <mat-select [(ngModel)]="dynamics365UseBatch" (ngModelChange)="emitSettingsChange()">
+        <mat-option [value]="true">Yes (Recommended)</mat-option>
+        <mat-option [value]="false">No (Individual requests)</mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Use OData batch requests for better performance when writing multiple records" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+</div>
+

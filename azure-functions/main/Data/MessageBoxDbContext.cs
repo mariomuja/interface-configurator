@@ -266,6 +266,10 @@ public class MessageBoxDbContext : DbContext
             entity.Property(e => e.SapIdocMessageType).HasMaxLength(500);
             entity.Property(e => e.SapIdocFilter).HasMaxLength(2000);
             entity.Property(e => e.SapRfcDestination).HasMaxLength(500);
+            entity.Property(e => e.SapRfcFunctionModule).HasMaxLength(500);
+            entity.Property(e => e.SapRfcParameters).HasMaxLength(2000);
+            entity.Property(e => e.SapODataServiceUrl).HasMaxLength(500);
+            entity.Property(e => e.SapRestApiEndpoint).HasMaxLength(500);
             
             // Dynamics 365 Adapter Properties
             entity.Property(e => e.Dynamics365TenantId).HasMaxLength(500);
@@ -319,6 +323,10 @@ public class MessageBoxDbContext : DbContext
             entity.Property(e => e.SapReceiverPort).HasMaxLength(500);
             entity.Property(e => e.SapReceiverPartner).HasMaxLength(500);
             entity.Property(e => e.SapRfcDestination).HasMaxLength(500);
+            entity.Property(e => e.SapRfcFunctionModule).HasMaxLength(500);
+            entity.Property(e => e.SapRfcParameters).HasMaxLength(2000);
+            entity.Property(e => e.SapODataServiceUrl).HasMaxLength(500);
+            entity.Property(e => e.SapRestApiEndpoint).HasMaxLength(500);
             
             // Dynamics 365 Adapter Properties
             entity.Property(e => e.Dynamics365TenantId).HasMaxLength(500);

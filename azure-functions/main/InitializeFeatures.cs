@@ -29,9 +29,17 @@ public class InitializeFeaturesFunction
 
     [Function("InitializeFeatures")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "InitializeFeatures")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", "options", Route = "InitializeFeatures")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Check admin role
@@ -773,6 +781,316 @@ Diese Funktion aktiviert die UI-Komponenten für die Verwaltung von Zieladaptern
             {
                 _logger.LogWarning(ex, "Feature 'Destination Adapter UI' konnte nicht erstellt werden (möglicherweise bereits vorhanden)");
             }
+
+            // Feature 9: SAP Adapter
+            try
+            {
+                await _featureService.CreateFeatureAsync(
+                    title: "SAP IDOC Adapter",
+                    description: "SAP-Adapter für Lesen und Senden von IDOCs (Intermediate Documents) - kann als Quelle oder Ziel verwendet werden",
+                    detailedDescription: @"**Was wurde implementiert:**
+Ein vollständiger SAP-Adapter für die Integration mit SAP-Systemen über IDOCs (Intermediate Documents).
+
+**Hauptfunktionen:**
+1. **Als Quelle (Source):**
+   - Liest IDOCs aus SAP-System
+   - Unterstützt RFC-Verbindungen
+   - Konfigurierbare IDOC-Typen und Filter
+   - Polling-basierte Abfrage
+
+2. **Als Ziel (Destination):**
+   - Sendet IDOCs an SAP-System
+   - Unterstützt verschiedene IDOC-Message-Typen
+   - Konfigurierbare Receiver-Ports und Partner
+
+**Konfigurierbare Eigenschaften:**
+- SAP Application Server
+- SAP System Number
+- SAP Client
+- SAP Username/Password
+- IDOC Type und Message Type
+- IDOC Filter
+- RFC Destination
+- Receiver Port und Partner
+- Polling Interval
+- Batch Size
+- Connection Timeout",
+                    technicalDetails: @"**Implementierung:**
+- azure-functions/main/Adapters/SapAdapter.cs
+- azure-functions/main/Services/AdapterFactory.cs (CreateSapAdapter)
+- Unterstützt sowohl Source- als auch Destination-Modus
+
+**SAP-Verbindung:**
+- RFC (Remote Function Call) Unterstützung
+- Direkte Application Server Verbindung
+- Konfigurierbare Authentifizierung",
+                    testInstructions: @"**Testanweisungen:**
+
+1. **SAP-Adapter als Quelle testen:**
+   - Interface mit SAP als Source erstellen
+   - SAP-Verbindungsparameter konfigurieren
+   - IDOC-Typ und Filter einstellen
+   - Transport starten und prüfen ob IDOCs gelesen werden
+
+2. **SAP-Adapter als Ziel testen:**
+   - Interface mit SAP als Destination erstellen
+   - SAP-Verbindungsparameter konfigurieren
+   - Receiver Port und Partner einstellen
+   - Transport starten und prüfen ob IDOCs gesendet werden
+
+**Erwartete Ergebnisse:**
+- SAP-Verbindung wird erfolgreich hergestellt
+- IDOCs werden korrekt gelesen/gesendet
+- Daten werden über MessageBox transportiert",
+                    knownIssues: @"**Bekannte Probleme:**
+- SAP RFC-Bibliothek muss in Produktion verfügbar sein
+- SAP-Verbindung erfordert Netzwerkzugriff auf SAP-System
+
+**Hinweise:**
+- SAP-Adapter erfordert SAP NCo (SAP .NET Connector) oder ähnliche Bibliothek
+- Produktive Nutzung erfordert zusätzliche Konfiguration",
+                    dependencies: @"**Abhängigkeiten:**
+- SAP NCo oder ähnliche RFC-Bibliothek
+- Netzwerkzugriff auf SAP-System
+- Gültige SAP-Anmeldedaten",
+                    category: "Adapter",
+                    priority: "High"
+                );
+                featuresCreated.Add("SAP IDOC Adapter");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Feature 'SAP IDOC Adapter' konnte nicht erstellt werden (möglicherweise bereits vorhanden)");
+            }
+
+            // Feature 10: Dynamics365 Adapter
+            try
+            {
+                await _featureService.CreateFeatureAsync(
+                    title: "Microsoft Dynamics 365 Adapter",
+                    description: "Dynamics 365-Adapter für Lesen und Schreiben von Daten - kann als Quelle oder Ziel verwendet werden",
+                    detailedDescription: @"**Was wurde implementiert:**
+Ein vollständiger Microsoft Dynamics 365-Adapter für die Integration mit Dynamics 365-Systemen über OData.
+
+**Hauptfunktionen:**
+1. **Als Quelle (Source):**
+   - Liest Daten aus Dynamics 365 über OData API
+   - Unterstützt OData-Filter
+   - Paginierung für große Datensätze
+   - Polling-basierte Abfrage
+
+2. **Als Ziel (Destination):**
+   - Schreibt Daten nach Dynamics 365
+   - Unterstützt Batch-Operationen
+   - Konfigurierbare Entity-Namen
+
+**Konfigurierbare Eigenschaften:**
+- Tenant ID
+- Client ID / Client Secret (Azure AD)
+- Instance URL
+- Entity Name
+- OData Filter (nur für Source)
+- Polling Interval
+- Batch Size
+- Page Size
+- Use Batch (für Destination)",
+                    technicalDetails: @"**Implementierung:**
+- azure-functions/main/Adapters/Dynamics365Adapter.cs
+- azure-functions/main/Services/AdapterFactory.cs (CreateDynamics365Adapter)
+- Unterstützt sowohl Source- als auch Destination-Modus
+
+**Dynamics 365-Verbindung:**
+- OAuth 2.0 Authentifizierung (Azure AD)
+- OData API für Datenzugriff
+- Batch-Operationen für bessere Performance",
+                    testInstructions: @"**Testanweisungen:**
+
+1. **Dynamics365-Adapter als Quelle testen:**
+   - Interface mit Dynamics365 als Source erstellen
+   - Azure AD-Anmeldedaten konfigurieren
+   - Entity Name und OData-Filter einstellen
+   - Transport starten und prüfen ob Daten gelesen werden
+
+2. **Dynamics365-Adapter als Ziel testen:**
+   - Interface mit Dynamics365 als Destination erstellen
+   - Azure AD-Anmeldedaten konfigurieren
+   - Entity Name einstellen
+   - Transport starten und prüfen ob Daten geschrieben werden
+
+**Erwartete Ergebnisse:**
+- Azure AD-Authentifizierung erfolgreich
+- Daten werden korrekt gelesen/geschrieben
+- Daten werden über MessageBox transportiert",
+                    knownIssues: @"**Bekannte Probleme:**
+- Azure AD-App-Registrierung erforderlich
+- Dynamics 365 API-Limits beachten
+
+**Hinweise:**
+- Erfordert gültige Azure AD-Anmeldedaten
+- API-Limits können Batch-Größe beeinflussen",
+                    dependencies: @"**Abhängigkeiten:**
+- Azure AD-App-Registrierung
+- Dynamics 365 API-Zugriff
+- Gültige OAuth 2.0 Credentials",
+                    category: "Adapter",
+                    priority: "High"
+                );
+                featuresCreated.Add("Microsoft Dynamics 365 Adapter");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Feature 'Microsoft Dynamics 365 Adapter' konnte nicht erstellt werden (möglicherweise bereits vorhanden)");
+            }
+
+            // Feature 11: CRM Adapter
+            try
+            {
+                await _featureService.CreateFeatureAsync(
+                    title: "Microsoft CRM Adapter",
+                    description: "Microsoft CRM-Adapter für Lesen und Schreiben von Daten - kann als Quelle oder Ziel verwendet werden",
+                    detailedDescription: @"**Was wurde implementiert:**
+Ein vollständiger Microsoft CRM-Adapter für die Integration mit Microsoft CRM-Systemen über Web API.
+
+**Hauptfunktionen:**
+1. **Als Quelle (Source):**
+   - Liest Daten aus Microsoft CRM über Web API
+   - Unterstützt FetchXML-Abfragen
+   - Polling-basierte Abfrage
+
+2. **Als Ziel (Destination):**
+   - Schreibt Daten nach Microsoft CRM
+   - Unterstützt Batch-Operationen
+   - Konfigurierbare Entity-Namen
+
+**Konfigurierbare Eigenschaften:**
+- Organization URL
+- Username/Password
+- Entity Name
+- FetchXML (nur für Source)
+- Polling Interval
+- Batch Size
+- Use Batch (für Destination)",
+                    technicalDetails: @"**Implementierung:**
+- azure-functions/main/Adapters/CrmAdapter.cs
+- azure-functions/main/Services/AdapterFactory.cs (CreateCrmAdapter)
+- Unterstützt sowohl Source- als auch Destination-Modus
+
+**CRM-Verbindung:**
+- Web API für Datenzugriff
+- Authentifizierung über Username/Password
+- Batch-Operationen für bessere Performance",
+                    testInstructions: @"**Testanweisungen:**
+
+1. **CRM-Adapter als Quelle testen:**
+   - Interface mit CRM als Source erstellen
+   - CRM-Anmeldedaten konfigurieren
+   - Entity Name und FetchXML einstellen
+   - Transport starten und prüfen ob Daten gelesen werden
+
+2. **CRM-Adapter als Ziel testen:**
+   - Interface mit CRM als Destination erstellen
+   - CRM-Anmeldedaten konfigurieren
+   - Entity Name einstellen
+   - Transport starten und prüfen ob Daten geschrieben werden
+
+**Erwartete Ergebnisse:**
+- CRM-Verbindung erfolgreich
+- Daten werden korrekt gelesen/geschrieben
+- Daten werden über MessageBox transportiert",
+                    knownIssues: @"**Bekannte Probleme:**
+- CRM-Anmeldedaten erforderlich
+- CRM API-Limits beachten
+
+**Hinweise:**
+- Erfordert gültige CRM-Anmeldedaten
+- API-Limits können Batch-Größe beeinflussen",
+                    dependencies: @"**Abhängigkeiten:**
+- Microsoft CRM-Zugriff
+- Gültige CRM-Anmeldedaten
+- Netzwerkzugriff auf CRM-System",
+                    category: "Adapter",
+                    priority: "High"
+                );
+                featuresCreated.Add("Microsoft CRM Adapter");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Feature 'Microsoft CRM Adapter' konnte nicht erstellt werden (möglicherweise bereits vorhanden)");
+            }
+
+            // Feature 12: SFTP Adapter
+            try
+            {
+                await _featureService.CreateFeatureAsync(
+                    title: "SFTP Adapter",
+                    description: "SFTP-Adapter für Dateitransfer über SFTP-Protokoll - kann als Quelle verwendet werden",
+                    detailedDescription: @"**Was wurde implementiert:**
+Ein vollständiger SFTP-Adapter für den Dateitransfer über das SFTP-Protokoll.
+
+**Hauptfunktionen:**
+1. **Als Quelle (Source):**
+   - Liest Dateien von SFTP-Server
+   - Unterstützt SSH-Key-Authentifizierung
+   - Konfigurierbare Dateimasken
+   - Polling-basierte Abfrage
+   - Automatischer Transfer zu csv-incoming
+
+2. **Als Ziel (Destination):**
+   - Nicht unterstützt (read-only)
+
+**Konfigurierbare Eigenschaften:**
+- SFTP Host und Port
+- Username/Password oder SSH Key
+- Remote Folder
+- File Mask
+- Polling Interval
+- Connection Pool Size
+- File Buffer Size",
+                    technicalDetails: @"**Implementierung:**
+- azure-functions/main/Adapters/SftpAdapter.cs
+- azure-functions/main/Adapters/CsvAdapter.cs (Integration)
+- Unterstützt nur Source-Modus
+
+**SFTP-Verbindung:**
+- SSH-Key oder Password-Authentifizierung
+- Konfigurierbare Verbindungspool-Größe
+- Buffer-Größe für Dateitransfer",
+                    testInstructions: @"**Testanweisungen:**
+
+1. **SFTP-Adapter als Quelle testen:**
+   - Interface mit CSV als Source erstellen
+   - Adapter-Typ ""SFTP"" wählen
+   - SFTP-Verbindungsparameter konfigurieren
+   - File Mask einstellen
+   - Transport starten und prüfen ob Dateien von SFTP gelesen werden
+
+**Erwartete Ergebnisse:**
+- SFTP-Verbindung erfolgreich
+- Dateien werden von SFTP-Server gelesen
+- Dateien werden zu csv-incoming transferiert
+- Daten werden über MessageBox transportiert",
+                    knownIssues: @"**Bekannte Probleme:**
+- SFTP-Server-Zugriff erforderlich
+- SSH-Key muss korrekt formatiert sein
+
+**Hinweise:**
+- Erfordert gültige SFTP-Anmeldedaten
+- SSH-Key-Authentifizierung wird empfohlen",
+                    dependencies: @"**Abhängigkeiten:**
+- SFTP-Server-Zugriff
+- Gültige SFTP-Anmeldedaten oder SSH-Key
+- Netzwerkzugriff auf SFTP-Server",
+                    category: "Adapter",
+                    priority: "Medium"
+                );
+                featuresCreated.Add("SFTP Adapter");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Feature 'SFTP Adapter' konnte nicht erstellt werden (möglicherweise bereits vorhanden)");
+            }
+
+            // Feature 13: (entfernt - war Fehlerkorrektur, kein neues Feature)
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

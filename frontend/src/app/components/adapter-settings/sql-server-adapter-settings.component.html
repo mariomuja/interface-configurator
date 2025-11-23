@@ -1,0 +1,100 @@
+<!-- SQL Server Connection Properties -->
+<div class="sql-section">
+  <h3>SQL Server Connection</h3>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Server Name</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="sqlServerName" (ngModelChange)="onSqlPropertyChange()" />
+    <mat-icon matSuffix matTooltip="SQL Server name or IP address. For Azure SQL: use the full FQDN (e.g., 'sql-server.database.windows.net'). For on-premises: use server name or IP address (e.g., '192.168.1.100' or 'localhost')." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Database Name</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="sqlDatabaseName" (ngModelChange)="onSqlPropertyChange()" />
+    <mat-icon matSuffix matTooltip="The name of the SQL Server database to connect to." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <!-- Table Name (only for Destination adapters) -->
+  <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="adapterType === 'Destination'" floatLabel="always">
+    <mat-label>Table Name</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="tableName" />
+    <mat-icon matSuffix matTooltip="The name of the destination table in the SQL Server database. The table will be automatically created with dynamic columns based on the CSV data structure." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <div class="toggle-container compact-toggle">
+    <div class="toggle-header">
+      <mat-slide-toggle [(ngModel)]="sqlIntegratedSecurity" (ngModelChange)="onSqlPropertyChange()" color="primary">
+        <span class="toggle-label normal-font">Integrated Security (Windows Authentication)</span>
+      </mat-slide-toggle>
+      <mat-icon class="help-icon" matTooltip="Use Windows Authentication (Integrated Security). When enabled, User Name and Password are not required. When disabled, SQL Authentication is used with User Name and Password." matTooltipPosition="right">help_outline</mat-icon>
+    </div>
+  </div>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="!sqlIntegratedSecurity" floatLabel="always">
+    <mat-label>User Name</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="sqlUserName" (ngModelChange)="onSqlPropertyChange()" />
+    <mat-icon matSuffix matTooltip="SQL login username (required when Integrated Security is disabled)." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="!sqlIntegratedSecurity" floatLabel="always">
+    <mat-label>Password</mat-label>
+    <input matInput class="compact-input" type="password" [(ngModel)]="sqlPassword" (ngModelChange)="onSqlPropertyChange()" />
+    <mat-icon matSuffix matTooltip="SQL login password (required when Integrated Security is disabled)." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Resource Group</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="sqlResourceGroup" (ngModelChange)="onSqlPropertyChange()" />
+    <mat-icon matSuffix matTooltip="Azure Resource Group name (for Azure SQL managed database access). Used for Azure-specific security and access management." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <!-- Connection String Display -->
+  <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="connectionString" floatLabel="always">
+    <mat-label>Connection String</mat-label>
+    <input matInput class="compact-input" [value]="connectionString" readonly />
+    <button mat-icon-button matSuffix (click)="copyConnectionString()" matTooltip="Copy connection string to clipboard">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+    <mat-icon matSuffix matTooltip="The generated connection string based on the SQL Server properties above. Click the copy button to copy it to clipboard." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <!-- Transaction and Batch Size Properties -->
+  <div class="toggle-container compact-toggle">
+    <div class="toggle-header">
+      <mat-slide-toggle [(ngModel)]="sqlUseTransaction" color="primary">
+        <span class="toggle-label normal-font">Use Transaction</span>
+      </mat-slide-toggle>
+      <mat-icon class="help-icon" matTooltip="Wrap execution in an explicit SQL transaction. When enabled, all database operations are wrapped in a transaction that can be committed or rolled back. This ensures atomicity - either all operations succeed or all are rolled back on error." matTooltipPosition="right">help_outline</mat-icon>
+    </div>
+  </div>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Batch Size</mat-label>
+    <input matInput class="compact-input" type="number" [(ngModel)]="sqlBatchSize" min="1" />
+    <mat-icon matSuffix matTooltip="Number of rows fetched at once when reading data from SQL Server. Larger batch sizes improve performance for large result sets but use more memory. Smaller batch sizes use less memory but may be slower. Default: 1000 rows per batch." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+</div>
+
+<!-- SQL Server Polling Properties (Source only) -->
+<div *ngIf="adapterType === 'Source'" class="sql-section">
+  <h3>Polling Configuration (Source Only)</h3>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Table Name</mat-label>
+    <input matInput class="compact-input" [(ngModel)]="tableName" />
+    <mat-icon matSuffix matTooltip="Table name for SQL Server adapter. Used in default PollingStatement if PollingStatement is not provided (default: 'SELECT * FROM Table')." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Polling Statement</mat-label>
+    <textarea matInput class="compact-input" [(ngModel)]="sqlPollingStatement" rows="2"></textarea>
+    <mat-icon matSuffix matTooltip="SQL SELECT or EXEC statement to poll for new data. This statement is executed periodically according to the Polling Interval. Example: 'SELECT * FROM Orders WHERE Processed = 0' or 'EXEC sp_GetNewOrders'. The results are debatched and written to MessageBox." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+    <mat-label>Polling Interval</mat-label>
+    <input matInput class="compact-input" type="number" [(ngModel)]="sqlPollingInterval" min="1" />
+    <mat-icon matSuffix matTooltip="How often the polling statement is executed (in seconds). The adapter will run the polling statement at this interval to check for new data. Default: 60 seconds." matTooltipPosition="left">help_outline</mat-icon>
+  </mat-form-field>
+</div>
+

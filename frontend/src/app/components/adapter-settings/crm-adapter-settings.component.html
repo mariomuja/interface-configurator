@@ -1,0 +1,111 @@
+<div class="crm-adapter-settings">
+  <h3>Microsoft CRM Adapter Configuration</h3>
+
+  <!-- Authentication -->
+  <div class="section">
+    <h4>Authentication</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Organization URL</mat-label>
+      <input matInput [(ngModel)]="crmOrganizationUrl" (ngModelChange)="emitSettingsChange()" placeholder="https://org.crm.dynamics.com" />
+      <mat-icon matSuffix matTooltip="CRM organization URL (e.g., https://org.crm.dynamics.com)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Username</mat-label>
+      <input matInput type="text" [(ngModel)]="crmUsername" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="CRM Username" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Password</mat-label>
+      <input matInput type="password" [(ngModel)]="crmPassword" (ngModelChange)="emitSettingsChange()" />
+      <mat-icon matSuffix matTooltip="CRM Password" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- Module Selection -->
+  <div class="section">
+    <h4>Module / Endpoint</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Module</mat-label>
+      <mat-select [(ngModel)]="endpointId" (ngModelChange)="onEndpointChange()">
+        <mat-option *ngFor="let endpoint of availableEndpoints" [value]="endpoint.id">
+          {{ endpoint.name }}
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the CRM module (Sales, Service, Marketing, etc.)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <div *ngIf="selectedEndpoint" class="endpoint-info">
+      <p><mat-icon>info</mat-icon> {{ selectedEndpoint.description }}</p>
+    </div>
+  </div>
+
+  <!-- Entity Selection -->
+  <div class="section">
+    <h4>Entity</h4>
+    
+    <mat-form-field *ngIf="availableEntities.length > 0" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Entity Name</mat-label>
+      <mat-select [(ngModel)]="entityName" (ngModelChange)="onEntityChange()">
+        <mat-option *ngFor="let entity of availableEntities" [value]="entity">
+          {{ entity }}
+        </mat-option>
+        <mat-option value="custom">
+          <em>Custom (enter manually)</em>
+        </mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Select the entity to read/write data from/to" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="showCustomEntityInput || (selectedEndpoint?.isCustom)" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Entity Name</mat-label>
+      <input matInput [(ngModel)]="entityName" (ngModelChange)="onEntityChange()" placeholder="account, contact, lead, etc." />
+      <mat-icon matSuffix matTooltip="Enter the entity name (e.g., account, contact, lead)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+
+  <!-- FetchXML (Source only) -->
+  <div class="section" *ngIf="adapterType === 'Source'">
+    <h4>FetchXML Query (Optional, Recommended)</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>FetchXML Query</mat-label>
+      <textarea matInput [(ngModel)]="crmFetchXml" (ngModelChange)="emitSettingsChange()" rows="6" placeholder='&lt;fetch&gt;&lt;entity name="contact"&gt;&lt;attribute name="firstname" /&gt;&lt;attribute name="lastname" /&gt;&lt;/entity&gt;&lt;/fetch&gt;'></textarea>
+      <mat-icon matSuffix matTooltip="FetchXML query for complex data retrieval (recommended by Microsoft). If not provided, OData query will be used." matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+    
+    <div class="fetchxml-info">
+      <p><mat-icon>info</mat-icon> FetchXML is recommended by Microsoft for complex queries. If not provided, a simple OData query will be used.</p>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="section">
+    <h4>Options</h4>
+    
+    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Batch Size</mat-label>
+      <input matInput type="number" [(ngModel)]="crmBatchSize" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="Number of records to process per batch" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="adapterType === 'Source'" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Polling Interval (seconds)</mat-label>
+      <input matInput type="number" [(ngModel)]="crmPollingInterval" (ngModelChange)="emitSettingsChange()" min="1" />
+      <mat-icon matSuffix matTooltip="How often to poll for new data (in seconds)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="adapterType === 'Destination'" appearance="outline" class="full-width" floatLabel="always">
+      <mat-label>Use ExecuteMultiple</mat-label>
+      <mat-select [(ngModel)]="crmUseBatch" (ngModelChange)="emitSettingsChange()">
+        <mat-option [value]="true">Yes (Recommended)</mat-option>
+        <mat-option [value]="false">No (Individual requests)</mat-option>
+      </mat-select>
+      <mat-icon matSuffix matTooltip="Use ExecuteMultiple for batch operations (recommended by Microsoft)" matTooltipPosition="left">help_outline</mat-icon>
+    </mat-form-field>
+  </div>
+</div>
+

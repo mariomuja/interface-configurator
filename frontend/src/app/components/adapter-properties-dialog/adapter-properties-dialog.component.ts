@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -9,10 +9,16 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { CsvAdapterSettingsComponent } from '../adapter-settings/csv-adapter-settings.component';
+import { SqlServerAdapterSettingsComponent } from '../adapter-settings/sql-server-adapter-settings.component';
+import { SapAdapterSettingsComponent } from '../adapter-settings/sap-adapter-settings.component';
+import { Dynamics365AdapterSettingsComponent } from '../adapter-settings/dynamics365-adapter-settings.component';
+import { CrmAdapterSettingsComponent } from '../adapter-settings/crm-adapter-settings.component';
+import { BaseAdapterSettingsComponent } from '../adapter-settings/base-adapter-settings.component';
 
 export interface AdapterPropertiesData {
   adapterType: 'Source' | 'Destination';
-  adapterName: 'CSV' | 'SqlServer';
+  adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM';
   instanceName: string;
   isEnabled: boolean;
   receiveFolder?: string; // Only for CSV adapters
@@ -71,47 +77,36 @@ export interface AdapterPropertiesData {
     MatSlideToggleModule,
     MatButtonModule,
     MatIconModule,
-    MatTooltipModule
+    MatTooltipModule,
+    CsvAdapterSettingsComponent,
+    SqlServerAdapterSettingsComponent,
+    SapAdapterSettingsComponent,
+    Dynamics365AdapterSettingsComponent,
+    CrmAdapterSettingsComponent
   ],
   templateUrl: './adapter-properties-dialog.component.html',
   styleUrl: './adapter-properties-dialog.component.css'
 })
-export class AdapterPropertiesDialogComponent implements OnInit {
+export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
   instanceName: string = '';
   isEnabled: boolean = true;
-  receiveFolder: string = '';
-  fileMask: string = '*.txt';
-  batchSize: number = 1000; // Increased default batch size for better performance
-  fieldSeparator: string = '║';
-  destinationReceiveFolder: string = '';
-  destinationFileMask: string = '*.txt';
-  // SFTP properties
-  csvAdapterType: string = 'RAW'; // Default to RAW for our example
-  csvData: string = ''; // CSV data content for RAW adapter type
-  sftpHost: string = '';
-  sftpPort: number = 22;
-  sftpUsername: string = '';
-  sftpPassword: string = '';
-  sftpSshKey: string = '';
-  sftpFolder: string = '';
-  sftpFileMask: string = '*.txt';
-  sftpMaxConnectionPoolSize: number = 5;
-  sftpFileBufferSize: number = 8192;
-  csvPollingInterval: number = 10;
-  // SQL Server properties
-  sqlServerName: string = '';
-  sqlDatabaseName: string = '';
-  sqlUserName: string = '';
-  sqlPassword: string = '';
-  sqlIntegratedSecurity: boolean = false;
-  sqlResourceGroup: string = '';
-  sqlPollingStatement: string = '';
-  sqlPollingInterval: number = 60;
-  sqlUseTransaction: boolean = false;
-  sqlBatchSize: number = 1000;
-  tableName: string = 'TransportData'; // Table name for SqlServer destination adapters
-  connectionString: string = '';
   adapterInstanceGuid: string = '';
+  
+  // References to adapter-specific settings components
+  @ViewChild(CsvAdapterSettingsComponent) csvAdapterSettings?: CsvAdapterSettingsComponent;
+  @ViewChild(SqlServerAdapterSettingsComponent) sqlServerAdapterSettings?: SqlServerAdapterSettingsComponent;
+  @ViewChild(SapAdapterSettingsComponent) sapAdapterSettings?: SapAdapterSettingsComponent;
+  @ViewChild(Dynamics365AdapterSettingsComponent) dynamics365AdapterSettings?: Dynamics365AdapterSettingsComponent;
+  @ViewChild(CrmAdapterSettingsComponent) crmAdapterSettings?: CrmAdapterSettingsComponent;
+  
+  // Adapter-specific settings (stored from event handlers for SAP, Dynamics365, CRM)
+  private adapterSettings: any = {};
+  
+  get adapterSettingsComponent(): BaseAdapterSettingsComponent | undefined {
+    return this.csvAdapterSettings || this.sqlServerAdapterSettings || 
+           this.sapAdapterSettings || this.dynamics365AdapterSettings || this.crmAdapterSettings;
+  }
+  
   // JQ Transformation properties (only for Destination adapters)
   jqScriptFile: string = '';
   sourceAdapterSubscription: string = '';
@@ -121,6 +116,9 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   deleteStatement: string = '';
   // Available source adapters for subscription
   availableSourceAdapters: Array<{ guid: string; name: string; adapterName: string }> = [];
+  
+  // Adapter-specific settings (stored from child components)
+  private adapterSettings: any = {};
 
   constructor(
     public dialogRef: MatDialogRef<AdapterPropertiesDialogComponent>,
@@ -131,43 +129,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.instanceName = this.data.instanceName || '';
     // Use explicit check for undefined - false is a valid value!
     this.isEnabled = this.data.isEnabled !== undefined ? this.data.isEnabled : true;
-    this.receiveFolder = this.data.receiveFolder || '';
-    this.fileMask = this.data.fileMask || '*.txt';
-    this.batchSize = this.data.batchSize ?? 100;
-    this.fieldSeparator = this.data.fieldSeparator || '║';
-    this.destinationReceiveFolder = this.data.destinationReceiveFolder || '';
-    this.destinationFileMask = this.data.destinationFileMask || '*.txt';
-    // SFTP / adapter type
-    if (this.data.adapterName === 'CSV') {
-      const fallbackType = this.data.adapterType === 'Destination' ? 'FILE' : 'RAW';
-      let selectedType = (this.data.csvAdapterType || fallbackType).toUpperCase();
-      if (this.data.adapterType === 'Destination' && selectedType === 'RAW') {
-        selectedType = 'FILE';
-      }
-      this.csvAdapterType = selectedType;
-    }
-    this.csvData = this.data.csvData || '';
-    this.sftpHost = this.data.sftpHost || '';
-    this.sftpPort = this.data.sftpPort ?? 22;
-    this.sftpUsername = this.data.sftpUsername || '';
-    this.sftpPassword = this.data.sftpPassword || '';
-    this.sftpSshKey = this.data.sftpSshKey || '';
-    this.sftpFolder = this.data.sftpFolder || '';
-    this.sftpFileMask = this.data.sftpFileMask || '*.txt';
-    this.sftpMaxConnectionPoolSize = this.data.sftpMaxConnectionPoolSize ?? 5;
-    this.sftpFileBufferSize = this.data.sftpFileBufferSize ?? 8192;
-    this.csvPollingInterval = this.data.csvPollingInterval ?? 10;
-    // SQL Server properties
-    this.sqlServerName = this.data.sqlServerName || '';
-    this.sqlDatabaseName = this.data.sqlDatabaseName || '';
-    this.sqlUserName = this.data.sqlUserName || '';
-    this.sqlPassword = this.data.sqlPassword || '';
-    this.sqlIntegratedSecurity = this.data.sqlIntegratedSecurity ?? false;
-    this.sqlResourceGroup = this.data.sqlResourceGroup || '';
-    this.sqlPollingStatement = this.data.sqlPollingStatement || '';
-    this.sqlPollingInterval = this.data.sqlPollingInterval ?? 60;
-    this.tableName = this.data.tableName || 'TransportData';
     this.adapterInstanceGuid = this.data.adapterInstanceGuid || '';
+    
     // JQ Transformation properties (only for Destination adapters)
     this.jqScriptFile = this.data.jqScriptFile || '';
     this.sourceAdapterSubscription = this.data.sourceAdapterSubscription || '';
@@ -177,7 +140,28 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.deleteStatement = this.data.deleteStatement || '';
     // Available source adapters
     this.availableSourceAdapters = this.data.availableSourceAdapters || [];
-    this.updateConnectionString();
+  }
+
+  ngAfterViewInit(): void {
+    // Initialize adapter-specific settings component after view is initialized
+    if (this.adapterSettingsComponent) {
+      this.adapterSettingsComponent.initializeSettings(this.data);
+      this.adapterSettingsComponent.instanceName = this.instanceName;
+      this.adapterSettingsComponent.isEnabled = this.isEnabled;
+      this.adapterSettingsComponent.adapterInstanceGuid = this.adapterInstanceGuid;
+      this.adapterSettingsComponent.adapterType = this.data.adapterType;
+    }
+    
+    // Also initialize SAP, Dynamics365, CRM components if they exist
+    if (this.sapAdapterSettings) {
+      this.sapAdapterSettings.initializeSettings(this.data);
+    }
+    if (this.dynamics365AdapterSettings) {
+      this.dynamics365AdapterSettings.initializeSettings(this.data);
+    }
+    if (this.crmAdapterSettings) {
+      this.crmAdapterSettings.initializeSettings(this.data);
+    }
   }
   
   onSelectJQScriptFile(): void {
@@ -195,67 +179,16 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     input.click();
   }
 
-  updateConnectionString(): void {
-    if (!this.showSqlServerProperties) {
-      this.connectionString = '';
-      return;
-    }
-
-    const parts: string[] = [];
-    
-    if (this.sqlServerName) {
-      if (this.sqlServerName.includes('.database.windows.net')) {
-        parts.push(`Server=tcp:${this.sqlServerName},1433`);
-      } else {
-        parts.push(`Server=${this.sqlServerName},1433`);
-      }
-    }
-    
-    if (this.sqlDatabaseName) {
-      parts.push(`Initial Catalog=${this.sqlDatabaseName}`);
-    }
-    
-    if (this.sqlIntegratedSecurity) {
-      parts.push('Integrated Security=True');
-    } else {
-      if (this.sqlUserName) {
-        parts.push(`User ID=${this.sqlUserName}`);
-      }
-      if (this.sqlPassword) {
-        parts.push(`Password=${this.sqlPassword}`);
-      }
-    }
-    
-    if (this.sqlServerName?.includes('.database.windows.net')) {
-      parts.push('Persist Security Info=False');
-      parts.push('MultipleActiveResultSets=False');
-      parts.push('Encrypt=True');
-      parts.push('TrustServerCertificate=False');
-      parts.push('Connection Timeout=30');
-    } else {
-      parts.push('Persist Security Info=False');
-      parts.push('MultipleActiveResultSets=True');
-      parts.push('Encrypt=False');
-      parts.push('Connection Timeout=30');
-    }
-    
-    this.connectionString = parts.length > 0 ? parts.join(';') + ';' : '';
+  onSapSettingsChange(settings: any): void {
+    this.adapterSettings = { ...this.adapterSettings, ...settings };
   }
 
-  onSqlPropertyChange(): void {
-    this.updateConnectionString();
+  onDynamics365SettingsChange(settings: any): void {
+    this.adapterSettings = { ...this.adapterSettings, ...settings };
   }
 
-  copyConnectionString(): void {
-    if (this.connectionString) {
-      navigator.clipboard.writeText(this.connectionString).then(() => {
-        // Show success feedback (you might want to use MatSnackBar here)
-        alert('Connection string copied to clipboard!');
-      }).catch(err => {
-        console.error('Failed to copy connection string:', err);
-        alert('Failed to copy connection string');
-      });
-    }
+  onCrmSettingsChange(settings: any): void {
+    this.adapterSettings = { ...this.adapterSettings, ...settings };
   }
 
   onCancel(): void {
@@ -263,38 +196,19 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   }
 
   onSave(): void {
-    this.dialogRef.close({
+    // Get settings from adapter-specific component
+    let adapterSettings = this.adapterSettingsComponent?.getSettings() || {};
+    
+    // Also merge adapter-specific settings from event handlers (for SAP, Dynamics365, CRM)
+    if (this.data.adapterName === 'SAP' || this.data.adapterName === 'Dynamics365' || this.data.adapterName === 'CRM') {
+      adapterSettings = { ...adapterSettings, ...this.adapterSettings };
+    }
+    
+    // Merge with common settings
+    const result = {
       instanceName: this.instanceName.trim() || (this.data.adapterType === 'Source' ? 'Source' : 'Destination'),
       isEnabled: this.isEnabled ?? true,
-      receiveFolder: this.data.adapterName === 'CSV' ? (this.receiveFolder.trim() || '') : undefined,
-      fileMask: this.data.adapterName === 'CSV' ? (this.fileMask.trim() || '*.txt') : undefined,
-      batchSize: this.data.adapterName === 'CSV' ? (this.batchSize > 0 ? this.batchSize : 100) : undefined,
-      fieldSeparator: this.data.adapterName === 'CSV' ? (this.fieldSeparator.trim() || '║') : undefined,
-      destinationReceiveFolder: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationReceiveFolder.trim() || '') : undefined,
-      destinationFileMask: this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' ? (this.destinationFileMask.trim() || '*.txt') : undefined,
-      // SFTP properties (only for CSV Source adapters)
-      csvAdapterType: this.data.adapterName === 'CSV' ? (this.csvAdapterType || (this.data.adapterType === 'Destination' ? 'FILE' : 'RAW')) : undefined,
-      csvData: this.showRawProperties ? (this.csvData.trim() || '') : undefined,
-      sftpHost: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpHost.trim() || '') : undefined,
-      sftpPort: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPort > 0 ? this.sftpPort : 22) : undefined,
-      sftpUsername: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpUsername.trim() || '') : undefined,
-      sftpPassword: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpPassword.trim() || '') : undefined,
-      sftpSshKey: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpSshKey.trim() || '') : undefined,
-      sftpFolder: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFolder.trim() || '') : undefined,
-      sftpFileMask: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileMask.trim() || '*.txt') : undefined,
-      sftpMaxConnectionPoolSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpMaxConnectionPoolSize > 0 ? this.sftpMaxConnectionPoolSize : 5) : undefined,
-      sftpFileBufferSize: this.showSftpProperties && this.csvAdapterType === 'SFTP' ? (this.sftpFileBufferSize > 0 ? this.sftpFileBufferSize : 8192) : undefined,
-          csvPollingInterval: this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' ? (this.csvPollingInterval > 0 ? this.csvPollingInterval : 10) : undefined,
-      // SQL Server properties
-      sqlServerName: this.data.adapterName === 'SqlServer' ? (this.sqlServerName.trim() || '') : undefined,
-      sqlDatabaseName: this.data.adapterName === 'SqlServer' ? (this.sqlDatabaseName.trim() || '') : undefined,
-      sqlUserName: this.data.adapterName === 'SqlServer' ? (this.sqlUserName.trim() || '') : undefined,
-      sqlPassword: this.data.adapterName === 'SqlServer' ? (this.sqlPassword.trim() || '') : undefined,
-      sqlIntegratedSecurity: this.data.adapterName === 'SqlServer' ? this.sqlIntegratedSecurity : undefined,
-      sqlResourceGroup: this.data.adapterName === 'SqlServer' ? (this.sqlResourceGroup.trim() || '') : undefined,
-      sqlPollingStatement: this.showSqlPollingProperties ? (this.sqlPollingStatement.trim() || '') : undefined,
-      sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined,
-      tableName: this.data.adapterName === 'SqlServer' ? (this.tableName.trim() || 'TransportData') : undefined,
+      ...adapterSettings,
       // JQ Transformation properties (only for Destination adapters)
       jqScriptFile: this.data.adapterType === 'Destination' ? (this.jqScriptFile.trim() || '') : undefined,
       sourceAdapterSubscription: this.data.adapterType === 'Destination' ? (this.sourceAdapterSubscription.trim() || '') : undefined,
@@ -302,7 +216,9 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       insertStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.insertStatement.trim() || '') : undefined,
       updateStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.updateStatement.trim() || '') : undefined,
       deleteStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.deleteStatement.trim() || '') : undefined
-    });
+    };
+    
+    this.dialogRef.close(result);
   }
   
   get showJQProperties(): boolean {
@@ -317,44 +233,8 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     return this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer';
   }
 
-  get showReceiveFolder(): boolean {
-    return this.data.adapterName === 'CSV' && this.showFileProperties;
-  }
-
-  get showFileMask(): boolean {
-    return this.data.adapterName === 'CSV' && this.showFileProperties;
-  }
-
-  get showBatchSize(): boolean {
-    return this.data.adapterName === 'CSV';
-  }
-
-  get showFieldSeparator(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination';
-  }
-
-  get showDestinationProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Destination' && this.csvAdapterType === 'FILE';
-  }
-
-  get showSqlServerProperties(): boolean {
-    return this.data.adapterName === 'SqlServer';
-  }
-
-  get showSqlPollingProperties(): boolean {
-    return this.data.adapterName === 'SqlServer' && this.data.adapterType === 'Source';
-  }
-
-  get showSftpProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.csvAdapterType === 'SFTP';
-  }
-
-  get showFileProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' && this.csvAdapterType === 'FILE';
-  }
-
-  get showRawProperties(): boolean {
-    return this.data.adapterName === 'CSV' && this.data.adapterType === 'Source' && this.csvAdapterType === 'RAW';
+  get showAdapterSettings(): boolean {
+    return this.data.adapterName === 'CSV' || this.data.adapterName === 'SqlServer';
   }
 
   get dialogTitle(): string {

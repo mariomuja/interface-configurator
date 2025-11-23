@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
 
@@ -26,9 +27,17 @@ public class GetProcessingStatisticsFunction
 
     [Function("GetProcessingStatistics")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetProcessingStatistics")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "options", Route = "GetProcessingStatistics")] HttpRequestData req,
         FunctionContext context)
     {
+        // Handle CORS preflight requests
+        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);
+            CorsHelper.AddCorsHeaders(optionsResponse);
+            return optionsResponse;
+        }
+
         try
         {
             // Parse query parameters using System.Web.HttpUtility (like other endpoints)
@@ -59,6 +68,7 @@ public class GetProcessingStatisticsFunction
                 
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(response);
                 await response.WriteStringAsync(JsonSerializer.Serialize(recentStats, new JsonSerializerOptions { WriteIndented = true }));
                 return response;
             }
@@ -69,6 +79,7 @@ public class GetProcessingStatisticsFunction
                 
                 var response = req.CreateResponse(HttpStatusCode.OK);
                 response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                CorsHelper.AddCorsHeaders(response);
                 await response.WriteStringAsync(JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
                 return response;
             }
@@ -78,6 +89,7 @@ public class GetProcessingStatisticsFunction
             _logger.LogError(ex, "Error getting processing statistics");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
             await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
             return errorResponse;
         }
