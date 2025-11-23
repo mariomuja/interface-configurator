@@ -217,9 +217,23 @@ export class LoginDialogComponent {
   loginAsDemo(): void {
     this.isDemoLogin = true;
     this.loggingIn = true;
+    
+    // Set a timeout to ensure dialog closes even if API call hangs
+    const timeout = setTimeout(() => {
+      if (this.loggingIn) {
+        this.loggingIn = false;
+        this.isDemoLogin = false;
+        console.warn('Demo login timeout - closing dialog and enabling local demo mode');
+        this.snackBar.open('Demo-Anmeldung: Timeout, aber lokale Anmeldung aktiviert', 'Schließen', { duration: 3000 });
+        this.authService.setDemoUser();
+        this.dialogRef.close(true);
+      }
+    }, 5000); // 5 second timeout
+    
     // Demo-User "test" can login without password
     this.authService.login('test', '').subscribe({
       next: (response) => {
+        clearTimeout(timeout);
         this.loggingIn = false;
         this.isDemoLogin = false;
         if (response.success) {
@@ -233,6 +247,7 @@ export class LoginDialogComponent {
         }
       },
       error: (error) => {
+        clearTimeout(timeout);
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
