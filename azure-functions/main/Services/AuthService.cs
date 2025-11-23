@@ -27,33 +27,41 @@ public class AuthService
     /// </summary>
     public async Task<UserInfo?> AuthenticateAsync(string username, string password)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username && u.IsActive);
-
-        if (user == null)
+        try
         {
-            _logger.LogWarning("Authentication failed: User not found: {Username}", username);
-            return null;
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username == username && u.IsActive);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Authentication failed: User not found: {Username}", username);
+                return null;
+            }
+
+            if (!VerifyPassword(password, user.PasswordHash))
+            {
+                _logger.LogWarning("Authentication failed: Invalid password for user: {Username}", username);
+                return null;
+            }
+
+            // Update last login
+            user.LastLoginDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User authenticated: {Username}, Role: {Role}", username, user.Role);
+
+            return new UserInfo
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Role = user.Role
+            };
         }
-
-        if (!VerifyPassword(password, user.PasswordHash))
+        catch (Exception ex)
         {
-            _logger.LogWarning("Authentication failed: Invalid password for user: {Username}", username);
-            return null;
+            _logger.LogError(ex, "Error authenticating user: {Username}. Error: {Message}", username, ex.Message);
+            throw; // Re-throw to let Login function handle it
         }
-
-        // Update last login
-        user.LastLoginDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("User authenticated: {Username}, Role: {Role}", username, user.Role);
-
-        return new UserInfo
-        {
-            Id = user.Id,
-            Username = user.Username,
-            Role = user.Role
-        };
     }
 
     /// <summary>
@@ -94,24 +102,35 @@ public class AuthService
     /// </summary>
     public async Task<UserInfo?> GetUserAsync(string username)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Username == username && u.IsActive);
-
-        if (user == null)
-            return null;
-
-        // Update last login
-        user.LastLoginDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Demo user logged in: {Username}, Role: {Role}", username, user.Role);
-
-        return new UserInfo
+        try
         {
-            Id = user.Id,
-            Username = user.Username,
-            Role = user.Role
-        };
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username == username && u.IsActive);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User not found: {Username}", username);
+                return null;
+            }
+
+            // Update last login
+            user.LastLoginDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Demo user logged in: {Username}, Role: {Role}", username, user.Role);
+
+            return new UserInfo
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Role = user.Role
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user: {Username}. Error: {Message}", username, ex.Message);
+            throw; // Re-throw to let Login function handle it
+        }
     }
 
     /// <summary>
