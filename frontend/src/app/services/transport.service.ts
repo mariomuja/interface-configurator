@@ -274,13 +274,6 @@ export class TransportService {
     });
   }
 
-  updateDestinationFileMask(interfaceName: string, destinationFileMask: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/UpdateDestinationFileMask`, {
-      interfaceName,
-      destinationFileMask
-    });
-  }
-
   updateDestinationJQScriptFile(interfaceName: string, adapterInstanceGuid: string, jqScriptFile: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/UpdateDestinationJQScriptFile`, {
       interfaceName,
@@ -306,6 +299,8 @@ export class TransportService {
       deleteStatement
     });
   }
+
+  updateDestinationFileMask(interfaceName: string, destinationFileMask: string): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/UpdateDestinationFileMask`, {
       interfaceName,
       destinationFileMask

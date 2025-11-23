@@ -21,6 +21,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
     
     private readonly BlobServiceClient? _blobServiceClient;
     private readonly ILogger<InterfaceConfigurationService>? _logger;
+    private readonly IServiceProvider? _serviceProvider;
     private readonly Dictionary<string, InterfaceConfiguration> _configurations = new();
     private readonly SemaphoreSlim _lock = new(1, 1);
     private bool _initialized = false;

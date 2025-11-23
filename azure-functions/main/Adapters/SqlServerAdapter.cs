@@ -375,27 +375,28 @@ public class SqlServerAdapter : AdapterBase
                         rowsSucceeded = 0;
                         throw;
                     }
-                finally
-                {
-                    // Record processing statistics
-                    try
+                    finally
                     {
-                        var duration = DateTime.UtcNow - startTime;
-                        if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                        // Record processing statistics
+                        try
                         {
-                            await _statisticsService.RecordProcessingStatsAsync(
-                                _interfaceName,
-                                rowsProcessed,
-                                rowsSucceeded,
-                                rowsFailed,
-                                duration,
-                                sourceFile,
-                                cancellationToken);
+                            var duration = DateTime.UtcNow - startTime;
+                            if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                            {
+                                await _statisticsService.RecordProcessingStatsAsync(
+                                    _interfaceName,
+                                    rowsProcessed,
+                                    rowsSucceeded,
+                                    rowsFailed,
+                                    duration,
+                                    sourceFile,
+                                    cancellationToken);
+                            }
                         }
-                    }
-                    catch (Exception statsEx)
-                    {
-                        _logger?.LogWarning(statsEx, "Failed to record processing statistics");
+                        catch (Exception statsEx)
+                        {
+                            _logger?.LogWarning(statsEx, "Failed to record processing statistics");
+                        }
                     }
                 }
             }

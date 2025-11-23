@@ -1,12 +1,12 @@
 {
   "version": 2,
   "framework": "angular",
-  "buildCommand": "cd frontend && npm install && npm run build:prod",
+  "buildCommand": "cd frontend && npm ci && npm run build:prod",
   "outputDirectory": "frontend/dist/interface-configuration/browser",
-  "installCommand": "cd frontend && npm install",
+  "installCommand": "cd frontend && npm ci",
   "build": {
     "env": {
-      "NODE_VERSION": "20"
+      "NODE_VERSION": "22"
     }
   },
   "cleanUrls": true,

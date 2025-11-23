@@ -381,7 +381,7 @@ public class AdapterFactory : IAdapterFactory
             jqService = _serviceProvider.GetService<JQTransformationService>();
             
             // Try to get properties from DestinationAdapterInstance if available
-            if (config.Destinations.TryGetValue(adapterInstanceGuid, out var destInstance))
+            if (config.Destinations.TryGetValue(adapterInstanceGuid.ToString(), out var destInstance))
             {
                 jqScriptFile = destInstance.JQScriptFile;
                 insertStatement = destInstance.InsertStatement;
