@@ -217,47 +217,29 @@ export class LoginDialogComponent {
   loginAsDemo(): void {
     this.isDemoLogin = true;
     this.loggingIn = true;
-    
-    // Set a timeout to ensure dialog closes even if API call hangs
-    const timeout = setTimeout(() => {
-      if (this.loggingIn) {
-        this.loggingIn = false;
-        this.isDemoLogin = false;
-        console.warn('Demo login timeout - closing dialog and enabling local demo mode');
-        this.snackBar.open('Demo-Anmeldung: Timeout, aber lokale Anmeldung aktiviert', 'Schließen', { duration: 3000 });
-        this.authService.setDemoUser();
-        this.dialogRef.close(true);
-      }
-    }, 5000); // 5 second timeout
-    
     // Demo-User "test" can login without password
     this.authService.login('test', '').subscribe({
       next: (response) => {
-        clearTimeout(timeout);
         this.loggingIn = false;
         this.isDemoLogin = false;
         if (response.success) {
           this.snackBar.open(`Willkommen, ${response.user?.username}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
-          // Close dialog immediately
+          // Close dialog only on successful login
           this.dialogRef.close(true);
         } else {
-          this.snackBar.open(response.errorMessage || 'Anmeldung fehlgeschlagen', 'Schließen', { duration: 3000 });
-          // Still close dialog even on failure for demo login
-          this.dialogRef.close(false);
+          // Show error message and keep dialog open
+          this.snackBar.open(response.errorMessage || 'Anmeldung fehlgeschlagen', 'Schließen', { duration: 5000 });
+          // Dialog remains open so user can see the error and try again
         }
       },
       error: (error) => {
-        clearTimeout(timeout);
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
-        // For demo login, we'll still close the dialog and show a warning
-        // This allows the user to continue even if the API is temporarily unavailable
-        this.snackBar.open('Demo-Anmeldung: API nicht erreichbar, aber lokale Anmeldung aktiviert', 'Schließen', { duration: 3000 });
-        // Create a local demo user session using AuthService method
-        this.authService.setDemoUser();
-        // Close dialog immediately - no delay needed
-        this.dialogRef.close(true);
+        // Show error message and keep dialog open
+        const errorMessage = error?.message || 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
+        // Dialog remains open so user can see the error and try again
       }
     });
   }
