@@ -30,7 +30,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
     private readonly string? _entityName;
     private readonly string? _odataFilter;
     private readonly int _pollingInterval;
-    private readonly int _batchSize;
+    private readonly int _dynamicsBatchSize;
     private readonly int _pageSize;
     private readonly bool _useBatch;
 
@@ -63,7 +63,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
         _entityName = entityName;
         _odataFilter = odataFilter;
         _pollingInterval = pollingInterval;
-        _batchSize = adapterBatchSize;
+        _dynamicsBatchSize = adapterBatchSize;
         _pageSize = pageSize;
         _useBatch = useBatch;
     }
@@ -522,12 +522,11 @@ public class Dynamics365Adapter : HttpClientAdapterBase
         await Task.CompletedTask;
     }
 
-    protected override void Dispose(bool disposing)
+    protected override void DisposeHttpClient()
     {
-        if (disposing && _disposeHttpClient)
+        if (_disposeHttpClient)
         {
             _httpClient?.Dispose();
         }
-        base.Dispose(disposing);
     }
 }

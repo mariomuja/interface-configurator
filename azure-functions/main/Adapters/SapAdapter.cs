@@ -706,12 +706,11 @@ public class SapAdapter : HttpClientAdapterBase
         await Task.CompletedTask;
     }
 
-    protected override void Dispose(bool disposing)
+    protected override void DisposeHttpClient()
     {
-        if (disposing && _disposeHttpClient)
+        if (_disposeHttpClient)
         {
             _httpClient?.Dispose();
         }
-        base.Dispose(disposing);
     }
 }

@@ -30,7 +30,7 @@ public class CrmAdapter : HttpClientAdapterBase
     private readonly string? _entityName;
     private readonly string? _fetchXml;
     private readonly int _pollingInterval;
-    private readonly int _batchSize;
+    private readonly int _crmBatchSize;
     private readonly bool _useBatch;
 
     public CrmAdapter(
@@ -59,7 +59,7 @@ public class CrmAdapter : HttpClientAdapterBase
         _entityName = entityName;
         _fetchXml = fetchXml;
         _pollingInterval = pollingInterval;
-        _batchSize = adapterBatchSize;
+        _crmBatchSize = adapterBatchSize;
         _useBatch = useBatch;
     }
 
@@ -181,7 +181,7 @@ public class CrmAdapter : HttpClientAdapterBase
             {
                 // Use OData query
                 apiUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
-                apiUrl += $"?$top={_batchSize}";
+                apiUrl += $"?$top={_crmBatchSize}";
                 apiUrl += "&$select=*";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
@@ -538,12 +538,11 @@ public class CrmAdapter : HttpClientAdapterBase
         await Task.CompletedTask;
     }
 
-    protected override void Dispose(bool disposing)
+    protected override void DisposeHttpClient()
     {
-        if (disposing && _disposeHttpClient)
+        if (_disposeHttpClient)
         {
             _httpClient?.Dispose();
         }
-        base.Dispose(disposing);
     }
 }
