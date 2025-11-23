@@ -230,11 +230,13 @@ export class LoginDialogComponent {
           // Show error message and keep dialog open
           const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
           this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
-            duration: 5000,
+            duration: 10000,
             horizontalPosition: 'center',
             verticalPosition: 'top',
-            panelClass: ['error-snackbar']
+            panelClass: ['error-snackbar'],
+            politeness: 'assertive'
           });
+          console.error('Demo login failed:', errorMessage);
           // Dialog remains open so user can see the error and try again
         }
       },
@@ -263,11 +265,14 @@ export class LoginDialogComponent {
         }
         // Show error message and keep dialog open
         this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
-          duration: 5000,
+          duration: 10000,
           horizontalPosition: 'center',
           verticalPosition: 'top',
-          panelClass: ['error-snackbar']
+          panelClass: ['error-snackbar'],
+          politeness: 'assertive'
         });
+        // Also log to console for debugging
+        console.error('Login failed:', errorMessage);
         // Dialog remains open so user can see the error and try again
       }
     });
@@ -325,11 +330,14 @@ export class LoginDialogComponent {
         }
         // Show error message and keep dialog open
         this.snackBar.open(errorMessage, 'Schließen', { 
-          duration: 5000,
+          duration: 10000,
           horizontalPosition: 'center',
           verticalPosition: 'top',
-          panelClass: ['error-snackbar']
+          panelClass: ['error-snackbar'],
+          politeness: 'assertive'
         });
+        // Also log to console for debugging
+        console.error('Login failed:', errorMessage);
         // Dialog remains open so user can see the error and try again
       }
     });
