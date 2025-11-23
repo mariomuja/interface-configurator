@@ -278,28 +278,44 @@ export class LoginDialogComponent {
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
+        console.error('Error object:', JSON.stringify(error, null, 2));
+        
         // Extract error message from HTTP error response
         let errorMessage = 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        
+        // Try to extract from error.error (HttpErrorResponse)
         if (error?.error) {
-          if (typeof error.error === 'string') {
-            errorMessage = error.error;
-          } else if (error.error?.errorMessage) {
+          // Check if error.error is a LoginResponse object
+          if (error.error?.errorMessage) {
             errorMessage = error.error.errorMessage;
+          } else if (error.error?.error?.message) {
+            errorMessage = error.error.error.message;
           } else if (error.error?.message) {
             errorMessage = error.error.message;
           } else if (error.error?.error) {
             errorMessage = error.error.error;
+          } else if (typeof error.error === 'string') {
+            errorMessage = error.error;
           }
         } else if (error?.message) {
           errorMessage = error.message;
         }
+        
         // Add HTTP status code if available
         if (error?.status) {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
+        
         // Show error message in dialog and snackbar
         this.errorMessage = `Demo-Anmeldung fehlgeschlagen: ${errorMessage}`;
+        console.log('Setting errorMessage to:', this.errorMessage);
         this.cdr.detectChanges();
+        
+        // Force another change detection cycle
+        setTimeout(() => {
+          this.cdr.detectChanges();
+        }, 0);
+        
         this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
@@ -307,6 +323,7 @@ export class LoginDialogComponent {
           panelClass: ['error-snackbar'],
           politeness: 'assertive'
         });
+        
         // Also log to console for debugging
         console.error('Login failed:', errorMessage);
         // Dialog remains open so user can see the error and try again
@@ -349,28 +366,44 @@ export class LoginDialogComponent {
       error: (error) => {
         this.loggingIn = false;
         console.error('Login error:', error);
+        console.error('Error object:', JSON.stringify(error, null, 2));
+        
         // Extract error message from HTTP error response
         let errorMessage = 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        
+        // Try to extract from error.error (HttpErrorResponse)
         if (error?.error) {
-          if (typeof error.error === 'string') {
-            errorMessage = error.error;
-          } else if (error.error?.errorMessage) {
+          // Check if error.error is a LoginResponse object
+          if (error.error?.errorMessage) {
             errorMessage = error.error.errorMessage;
+          } else if (error.error?.error?.message) {
+            errorMessage = error.error.error.message;
           } else if (error.error?.message) {
             errorMessage = error.error.message;
           } else if (error.error?.error) {
             errorMessage = error.error.error;
+          } else if (typeof error.error === 'string') {
+            errorMessage = error.error;
           }
         } else if (error?.message) {
           errorMessage = error.message;
         }
+        
         // Add HTTP status code if available
         if (error?.status) {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
+        
         // Show error message in dialog and snackbar
         this.errorMessage = errorMessage;
+        console.log('Setting errorMessage to:', this.errorMessage);
         this.cdr.detectChanges();
+        
+        // Force another change detection cycle
+        setTimeout(() => {
+          this.cdr.detectChanges();
+        }, 0);
+        
         this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
@@ -378,6 +411,7 @@ export class LoginDialogComponent {
           panelClass: ['error-snackbar'],
           politeness: 'assertive'
         });
+        
         // Also log to console for debugging
         console.error('Login failed:', errorMessage);
         // Dialog remains open so user can see the error and try again
