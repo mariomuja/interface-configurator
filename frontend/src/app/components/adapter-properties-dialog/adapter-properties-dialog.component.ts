@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, ViewChild } from '@angular/core';
+import { Component, Inject, OnInit, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -116,9 +116,6 @@ export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
   deleteStatement: string = '';
   // Available source adapters for subscription
   availableSourceAdapters: Array<{ guid: string; name: string; adapterName: string }> = [];
-  
-  // Adapter-specific settings (stored from child components)
-  private adapterSettings: any = {};
 
   constructor(
     public dialogRef: MatDialogRef<AdapterPropertiesDialogComponent>,
