@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using InterfaceConfigurator.Main.Adapters;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
+using InterfaceConfigurator.Main.Core.Factories;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
 
@@ -95,26 +97,19 @@ var host = new HostBuilder()
                 return service;
             });
             
-            // Register Interface Configuration Service
-            services.AddSingleton<IInterfaceConfigurationService>(sp =>
+            // Register Interface Configuration Service (now using MessageBoxDbContext instead of Blob Storage)
+            services.AddScoped<IInterfaceConfigurationService>(sp =>
             {
-                var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
-                var logger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationService>>();
-                var service = new InterfaceConfigurator.Main.Services.InterfaceConfigurationService(blobServiceClient, logger);
-                // Initialize on startup (fire and forget) with timeout
-                _ = Task.Run(async () =>
+                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var logger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationServiceV2>>();
+                if (messageBoxContext == null)
                 {
-                    try
-                    {
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                        await service.InitializeAsync(cts.Token);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger?.LogWarning(ex, "Failed to initialize interface configuration service on startup. Will retry on first use.");
-                    }
-                }, CancellationToken.None);
-                return service;
+                    // Fallback to Blob Storage if MessageBox is not available
+                    var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
+                    var fallbackLogger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationService>>();
+                    return new InterfaceConfigurator.Main.Services.InterfaceConfigurationService(blobServiceClient, fallbackLogger, sp);
+                }
+                return new InterfaceConfigurator.Main.Services.InterfaceConfigurationServiceV2(messageBoxContext, logger, sp);
             });
             
             // Register Adapter Factory
@@ -126,7 +121,7 @@ var host = new HostBuilder()
             // Register Event Queue (in-memory)
             services.AddSingleton<IEventQueue, InMemoryEventQueue>();
             
-            // Register Message Subscription Service
+            // Register Message Subscription Service (Legacy - kept for backward compatibility)
             services.AddScoped<IMessageSubscriptionService>(sp =>
             {
                 var messageBoxContext = sp.GetService<MessageBoxDbContext>();
@@ -136,6 +131,31 @@ var host = new HostBuilder()
                     return null!;
                 }
                 return new MessageSubscriptionService(messageBoxContext, logger);
+            });
+            
+            // Register Adapter Subscription Service (New: BizTalk-style subscriptions - filter criteria)
+            services.AddScoped<IAdapterSubscriptionService>(sp =>
+            {
+                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var logger = sp.GetService<ILogger<AdapterSubscriptionService>>();
+                if (messageBoxContext == null)
+                {
+                    return null!;
+                }
+                return new AdapterSubscriptionService(messageBoxContext, logger);
+            });
+            
+            // Register Message Processing Service (New: Tracks message processing status)
+            services.AddScoped<IMessageProcessingService>(sp =>
+            {
+                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var subscriptionService = sp.GetService<IAdapterSubscriptionService>();
+                var logger = sp.GetService<ILogger<MessageProcessingService>>();
+                if (messageBoxContext == null || subscriptionService == null)
+                {
+                    return null!;
+                }
+                return new MessageProcessingService(messageBoxContext, subscriptionService, logger);
             });
             
             // Register MessageBox Service
@@ -154,18 +174,8 @@ var host = new HostBuilder()
             });
             
             // Register SQL Server Logging Service (uses MessageBox database)
-            services.AddScoped<ILoggingService>(sp =>
-            {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
-                var logger = sp.GetService<ILogger<SqlServerLoggingService>>();
-                if (messageBoxContext == null)
-                {
-                    // Fallback to in-memory logging if MessageBox is not available
-                    var inMemoryLogger = sp.GetService<ILogger<InMemoryLoggingService>>();
-                    return new InMemoryLoggingService(inMemoryLogger);
-                }
-                return new SqlServerLoggingService(messageBoxContext, logger);
-            });
+            // Note: ILoggingService is now registered via FeatureFactory above
+            // This registration is removed - the factory handles it
             
             // Keep InMemoryLoggingService for backward compatibility (used by HTTP endpoints)
             services.AddSingleton<IInMemoryLoggingService, InMemoryLoggingService>();
@@ -227,15 +237,61 @@ var host = new HostBuilder()
                 return new CsvValidationService(logger);
             });
             
-            // Register Adapter Services (these handle null DbContext gracefully)
-            services.AddScoped<IDataService>(sp =>
+            // Register JQ Transformation Service
+            services.AddScoped<JQTransformationService>(sp =>
             {
-                var context = sp.GetRequiredService<ApplicationDbContext>();
-                var loggingService = sp.GetService<ILoggingService>();
-                var logger = sp.GetService<ILogger<DataServiceAdapter>>();
-                return new DataServiceAdapter(context, loggingService, logger);
+                var logger = sp.GetService<ILogger<JQTransformationService>>();
+                return new JQTransformationService(logger);
             });
+            
+            // Register Adapter Services (these handle null DbContext gracefully)
+            // Note: IDataService is now registered via FeatureFactory below
+            // This registration is removed - the factory handles it
             services.AddScoped<IDynamicTableService, DynamicTableService>();
+            
+            // Register AI Error Analysis and Auto-Fix Services
+            services.AddScoped<ErrorAnalysisService>();
+            services.AddScoped<AutoFixService>();
+            services.AddScoped<AutoTestService>();
+            
+            // Register Feature Management and Authentication Services
+            services.AddScoped<FeatureService>();
+            services.AddScoped<AuthService>();
+            
+            // Register Feature Factory Infrastructure
+            services.AddMemoryCache(); // Required for FeatureRegistry caching
+            services.AddScoped<IFeatureRegistry, FeatureRegistry>();
+            
+            // Register Feature Factories for Services
+            // Feature #5: Enhanced DataService (example - adjust feature number as needed)
+            services.AddFeatureFactory<IDataService, DataServiceAdapter, DataServiceAdapterV2>(featureNumber: 5);
+            
+            // Feature #6: Enhanced LoggingService (example - adjust feature number as needed)
+            services.AddScoped<ILoggingService>(sp =>
+            {
+                var featureRegistry = sp.GetRequiredService<IFeatureRegistry>();
+                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var logger = sp.GetService<ILogger<SqlServerLoggingService>>();
+                var loggerV2 = sp.GetService<ILogger<SqlServerLoggingServiceV2>>();
+                
+                if (messageBoxContext == null)
+                {
+                    var inMemoryLogger = sp.GetService<ILogger<InMemoryLoggingService>>();
+                    return new InMemoryLoggingService(inMemoryLogger);
+                }
+                
+                // Check if feature is enabled (synchronous check with cache)
+                var isEnabled = featureRegistry.IsFeatureEnabledAsync(6).GetAwaiter().GetResult();
+                
+                if (isEnabled)
+                {
+                    return new SqlServerLoggingServiceV2(messageBoxContext, loggerV2);
+                }
+                else
+                {
+                    return new SqlServerLoggingService(messageBoxContext, logger);
+                }
+            });
             
             // Register Error Row Service (requires BlobServiceClient)
             var storageConnectionString = Environment.GetEnvironmentVariable("MainStorageConnection") 

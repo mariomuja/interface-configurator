@@ -49,11 +49,11 @@ public class MessageBoxDatabaseInitializer : IHostedService
 
             if (created)
             {
-                _logger.LogInformation("MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics");
+                _logger.LogInformation("MessageBox database and tables created successfully. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, InterfaceConfigurations, SourceAdapterInstances, DestinationAdapterInstances");
             }
             else
             {
-                _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics");
+                _logger.LogInformation("MessageBox database and tables already exist. Tables: Messages, MessageSubscriptions, AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, InterfaceConfigurations, SourceAdapterInstances, DestinationAdapterInstances");
                 
                 // Check if Messages table has required columns (AdapterInstanceGuid, MessageHash, etc.)
                 try
@@ -92,6 +92,24 @@ public class MessageBoxDatabaseInitializer : IHostedService
                     _logger.LogWarning(ex, "Could not verify/create ProcessingStatistics table. It may need to be created manually.");
                 }
             }
+
+            // Initialize default users
+            try
+            {
+                var authService = scope.ServiceProvider.GetService<InterfaceConfigurator.Main.Services.AuthService>();
+                if (authService != null)
+                {
+                    await authService.InitializeDefaultUsersAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to initialize default users. They may already exist.");
+            }
+
+            // Note: Features are not auto-initialized on startup
+            // They should be created via InitializeFeatures API endpoint or manually
+            // This prevents duplicate features on every restart
         }
         catch (OperationCanceledException)
         {

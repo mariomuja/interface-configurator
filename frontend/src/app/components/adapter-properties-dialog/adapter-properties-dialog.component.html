@@ -229,6 +229,67 @@
       </mat-form-field>
     </div>
 
+    <!-- JQ Transformation Properties (Destination only) -->
+    <div *ngIf="showJQProperties" class="jq-section">
+      <h3>JSON Transformation (jq)</h3>
+
+      <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+        <mat-label>JQ Script File</mat-label>
+        <input matInput class="compact-input" [(ngModel)]="jqScriptFile" placeholder="file:///path/to/script.jq" />
+        <button mat-icon-button matSuffix (click)="onSelectJQScriptFile()" matTooltip="Select jq script file from file system">
+          <mat-icon>folder_open</mat-icon>
+        </button>
+        <mat-icon matSuffix matTooltip="URI to a jq script file for transforming JSON data from MessageBox before sending to destination. The script will be applied to each message's JSON data. Learn more about jq syntax: https://stedolan.github.io/jq/manual/" matTooltipPosition="left">help_outline</mat-icon>
+      </mat-form-field>
+
+      <div class="jq-description">
+        <p>
+          <mat-icon>info</mat-icon>
+          <span>jq is a lightweight and flexible command-line JSON processor. The script file will transform JSON data from MessageBox before it is sent to the destination. 
+          <a href="https://stedolan.github.io/jq/manual/" target="_blank" rel="noopener noreferrer">Learn jq syntax →</a></span>
+        </p>
+      </div>
+
+      <!-- Source Adapter Subscription (Destination only) -->
+      <mat-form-field appearance="outline" class="full-width compact-field" *ngIf="showSourceAdapterSubscription" floatLabel="always">
+        <mat-label>Subscribe to Source Adapter</mat-label>
+        <mat-select [(ngModel)]="sourceAdapterSubscription">
+          <mat-option value="">-- None --</mat-option>
+          <mat-option *ngFor="let adapter of availableSourceAdapters" [value]="adapter.guid">
+            {{ adapter.name }} ({{ adapter.adapterName }})
+          </mat-option>
+        </mat-select>
+        <mat-icon matSuffix matTooltip="Select which source adapter's data this destination adapter should subscribe to. This creates a subscription in the MessageBox, so this destination adapter will only receive messages from the selected source adapter." matTooltipPosition="left">help_outline</mat-icon>
+      </mat-form-field>
+    </div>
+
+    <!-- SQL Server Custom Statements (Destination only) -->
+    <div *ngIf="showCustomSqlStatements" class="sql-custom-statements-section">
+      <h3>Custom SQL Statements (OPENJSON)</h3>
+      <p class="section-description">
+        Define custom INSERT, UPDATE, or DELETE statements using SQL Server's OPENJSON function. 
+        The JSON data from MessageBox (or jq-transformed JSON if JQ Script File is provided) will be available as <code>@json</code> parameter.
+      </p>
+
+      <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+        <mat-label>INSERT Statement</mat-label>
+        <textarea matInput class="compact-input" [(ngModel)]="insertStatement" rows="4" placeholder="INSERT INTO MyTable SELECT * FROM OPENJSON(@json) WITH (Column1 NVARCHAR(100) '$.Column1', Column2 INT '$.Column2')"></textarea>
+        <mat-icon matSuffix matTooltip="Custom INSERT statement using OPENJSON. Use @json parameter to access the JSON data. Example: INSERT INTO MyTable SELECT * FROM OPENJSON(@json) WITH (Column1 NVARCHAR(100) '$.Column1', Column2 INT '$.Column2')" matTooltipPosition="left">help_outline</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+        <mat-label>UPDATE Statement</mat-label>
+        <textarea matInput class="compact-input" [(ngModel)]="updateStatement" rows="4" placeholder="UPDATE MyTable SET Column1 = j.Column1 FROM OPENJSON(@json) WITH (Id INT '$.Id', Column1 NVARCHAR(100) '$.Column1') AS j WHERE MyTable.Id = j.Id"></textarea>
+        <mat-icon matSuffix matTooltip="Custom UPDATE statement using OPENJSON. Use @json parameter to access the JSON data. Example: UPDATE MyTable SET Column1 = j.Column1 FROM OPENJSON(@json) WITH (Id INT '$.Id', Column1 NVARCHAR(100) '$.Column1') AS j WHERE MyTable.Id = j.Id" matTooltipPosition="left">help_outline</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width compact-field" floatLabel="always">
+        <mat-label>DELETE Statement</mat-label>
+        <textarea matInput class="compact-input" [(ngModel)]="deleteStatement" rows="4" placeholder="DELETE FROM MyTable WHERE Id IN (SELECT Id FROM OPENJSON(@json) WITH (Id INT '$.Id'))"></textarea>
+        <mat-icon matSuffix matTooltip="Custom DELETE statement using OPENJSON. Use @json parameter to access the JSON data. Example: DELETE FROM MyTable WHERE Id IN (SELECT Id FROM OPENJSON(@json) WITH (Id INT '$.Id'))" matTooltipPosition="left">help_outline</mat-icon>
+      </mat-form-field>
+    </div>
+
     <div class="toggle-container compact-toggle">
       <div class="toggle-header">
         <mat-slide-toggle [(ngModel)]="isEnabled" color="primary">

@@ -226,8 +226,8 @@
   </mat-card-content>
 </mat-card>
 
-    <!-- Destination Adapter Instances -->
-    <mat-card class="destinations-container-card">
+    <!-- Destination Adapter Instances (only shown if feature is enabled) -->
+    <mat-card class="destinations-container-card" *ngIf="isDestinationAdapterUIEnabled">
       <mat-card-header class="destinations-header">
         <button mat-icon-button (click)="destinationCardExpanded = !destinationCardExpanded" class="toggle-card-button">
           <mat-icon>{{ destinationCardExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>

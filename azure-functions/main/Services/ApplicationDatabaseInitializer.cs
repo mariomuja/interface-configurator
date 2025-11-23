@@ -56,6 +56,9 @@ public class ApplicationDatabaseInitializer : IHostedService
             {
                 _logger.LogInformation("Application database and tables already exist. Tables: TransportData");
             }
+
+            // Note: Features, Users, and InterfaceConfigurations are now in MessageBox database
+            // They are initialized by MessageBoxDatabaseInitializer
         }
         catch (OperationCanceledException)
         {

@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Services;
+using System.Text.Json;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -25,6 +27,10 @@ public abstract class AdapterBase : IAdapter
     protected readonly Guid? _adapterInstanceGuid;
     protected readonly int _batchSize;
     protected readonly ILogger? _logger;
+    
+    // JQ Transformation support
+    protected readonly JQTransformationService? _jqService;
+    protected readonly string? _jqScriptFile;
 
     protected AdapterBase(
         IMessageBoxService? messageBoxService = null,
@@ -33,7 +39,9 @@ public abstract class AdapterBase : IAdapter
         Guid? adapterInstanceGuid = null,
         int batchSize = 1000,
         string adapterRole = "Source",
-        ILogger? logger = null)
+        ILogger? logger = null,
+        JQTransformationService? jqService = null,
+        string? jqScriptFile = null)
     {
         _messageBoxService = messageBoxService;
         _subscriptionService = subscriptionService;
@@ -42,6 +50,8 @@ public abstract class AdapterBase : IAdapter
         _batchSize = batchSize;
         AdapterRole = adapterRole ?? "Source";
         _logger = logger;
+        _jqService = jqService;
+        _jqScriptFile = jqScriptFile;
     }
 
     // IAdapter interface methods - must be implemented by derived classes
@@ -165,13 +175,89 @@ public abstract class AdapterBase : IAdapter
                 // Extract single record from message
                 (var messageHeaders, var singleRecord) = _messageBoxService.ExtractDataFromMessage(message);
 
+                // Apply jq transformation if configured
+                Dictionary<string, string> transformedRecord = singleRecord;
+                List<string> transformedHeaders = messageHeaders;
+                
+                if (!string.IsNullOrWhiteSpace(_jqScriptFile) && _jqService != null)
+                {
+                    try
+                    {
+                        // Convert message to JSON for jq transformation
+                        var messageJson = JsonSerializer.Serialize(new
+                        {
+                            headers = messageHeaders,
+                            record = singleRecord,
+                            messageId = message.MessageId,
+                            interfaceName = message.InterfaceName,
+                            adapterName = message.AdapterName,
+                            adapterType = message.AdapterType,
+                            datetimeCreated = message.datetime_created
+                        });
+
+                        // Transform JSON using jq
+                        var transformedJson = await _jqService.TransformJsonAsync(
+                            messageJson,
+                            _jqScriptFile,
+                            cancellationToken);
+
+                        // Parse transformed JSON back to record
+                        var transformedData = JsonSerializer.Deserialize<JsonElement>(transformedJson);
+                        
+                        if (transformedData.ValueKind == JsonValueKind.Object)
+                        {
+                            // Extract headers and record from transformed JSON
+                            if (transformedData.TryGetProperty("headers", out var headersElement) && 
+                                headersElement.ValueKind == JsonValueKind.Array)
+                            {
+                                transformedHeaders = headersElement.EnumerateArray()
+                                    .Select(h => h.GetString() ?? string.Empty)
+                                    .ToList();
+                            }
+
+                            if (transformedData.TryGetProperty("record", out var recordElement) && 
+                                recordElement.ValueKind == JsonValueKind.Object)
+                            {
+                                transformedRecord = new Dictionary<string, string>();
+                                foreach (var prop in recordElement.EnumerateObject())
+                                {
+                                    transformedRecord[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                                }
+                            }
+                            else if (transformedData.ValueKind == JsonValueKind.Object)
+                            {
+                                // If no "record" property, use the entire object as record
+                                transformedRecord = new Dictionary<string, string>();
+                                foreach (var prop in transformedData.EnumerateObject())
+                                {
+                                    if (prop.Name != "headers" && prop.Name != "messageId" && 
+                                        prop.Name != "interfaceName" && prop.Name != "adapterName" && 
+                                        prop.Name != "adapterType" && prop.Name != "datetimeCreated")
+                                    {
+                                        transformedRecord[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                                    }
+                                }
+                            }
+                        }
+
+                        _logger?.LogInformation("Applied jq transformation to message {MessageId} using script {JQScriptFile}", 
+                            message.MessageId, _jqScriptFile);
+                    }
+                    catch (Exception jqEx)
+                    {
+                        _logger?.LogError(jqEx, "Error applying jq transformation to message {MessageId}: {ErrorMessage}", 
+                            message.MessageId, jqEx.Message);
+                        throw; // Re-throw to mark message as error
+                    }
+                }
+
                 // Use headers from first message
                 if (processedHeaders.Count == 0)
                 {
-                    processedHeaders = messageHeaders;
+                    processedHeaders = transformedHeaders;
                 }
 
-                processedRecords.Add(singleRecord);
+                processedRecords.Add(transformedRecord);
                 processedMessages.Add(message); // Track processed messages for subscription marking
 
                 _logger?.LogInformation("Processed message {MessageId} from MessageBox", message.MessageId);

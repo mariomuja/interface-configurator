@@ -1,0 +1,54 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace InterfaceConfigurator.Main.Core.Models;
+
+/// <summary>
+/// Tracks which messages have been processed by which adapters
+/// This is separate from subscriptions - subscriptions define filters, this tracks processing status
+/// </summary>
+[Table("MessageProcessing")]
+public class MessageProcessing
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int Id { get; set; }
+
+    [Required]
+    [Column("MessageId")]
+    public Guid MessageId { get; set; }
+
+    [Required]
+    [Column("AdapterInstanceGuid")]
+    public Guid AdapterInstanceGuid { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    [Column("InterfaceName")]
+    public string InterfaceName { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(100)]
+    [Column("AdapterName")]
+    public string AdapterName { get; set; } = string.Empty; // e.g., "SqlServer", "CSV"
+
+    [Required]
+    [MaxLength(50)]
+    [Column("Status")]
+    public string Status { get; set; } = "Pending"; // "Pending", "Processed", "Error"
+
+    [Required]
+    [Column("datetime_created", TypeName = "datetime2")]
+    public DateTime datetime_created { get; set; } = DateTime.UtcNow;
+
+    [Column("datetime_processed", TypeName = "datetime2")]
+    public DateTime? datetime_processed { get; set; }
+
+    [Column("ProcessingDetails", TypeName = "nvarchar(max)")]
+    public string? ProcessingDetails { get; set; }
+
+    [Column("ErrorMessage", TypeName = "nvarchar(max)")]
+    public string? ErrorMessage { get; set; }
+}
+
+

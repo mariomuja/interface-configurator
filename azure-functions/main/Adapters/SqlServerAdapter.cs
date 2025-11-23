@@ -44,6 +44,13 @@ public class SqlServerAdapter : AdapterBase
     private readonly bool _failOnBadStatement;
     private readonly IInterfaceConfigurationService? _configService;
     private readonly ProcessingStatisticsService? _statisticsService;
+    
+    // Custom SQL statements for OPENJSON operations
+    private readonly string? _insertStatement;
+    private readonly string? _updateStatement;
+    private readonly string? _deleteStatement;
+    private readonly JQTransformationService? _jqService;
+    private readonly string? _jqScriptFile;
 
     public SqlServerAdapter(
         ApplicationDbContext? context,
@@ -64,7 +71,12 @@ public class SqlServerAdapter : AdapterBase
         IInterfaceConfigurationService? configService = null,
         string adapterRole = "Source",
         ILogger<SqlServerAdapter>? logger = null,
-        ProcessingStatisticsService? statisticsService = null)
+        ProcessingStatisticsService? statisticsService = null,
+        string? insertStatement = null,
+        string? updateStatement = null,
+        string? deleteStatement = null,
+        JQTransformationService? jqService = null,
+        string? jqScriptFile = null)
         : base(
             messageBoxService: messageBoxService,
             subscriptionService: subscriptionService,
@@ -72,7 +84,9 @@ public class SqlServerAdapter : AdapterBase
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
             adapterRole: adapterRole,
-            logger: logger)
+            logger: logger,
+            jqService: jqService,
+            jqScriptFile: jqScriptFile)
     {
         if (context == null && string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Either context or connectionString must be provided", nameof(context));
@@ -92,6 +106,11 @@ public class SqlServerAdapter : AdapterBase
         _statisticsService = statisticsService;
         _columnAnalyzer = new CsvColumnAnalyzer();
         _typeValidator = new TypeValidator();
+        _insertStatement = insertStatement;
+        _updateStatement = updateStatement;
+        _deleteStatement = deleteStatement;
+        _jqService = jqService;
+        _jqScriptFile = jqScriptFile;
     }
 
     /// <summary>
@@ -281,57 +300,81 @@ public class SqlServerAdapter : AdapterBase
                 columnTypes[header] = typeInfo;
             }
 
-            // Ensure table structure matches
-            await EnsureDestinationStructureAsync(destination, columnTypes, cancellationToken);
-
-            // Insert rows using DataService with optional transaction support
+            // Variables for statistics
             var startTime = DateTime.UtcNow;
             var rowsProcessed = records?.Count ?? 0;
             var rowsSucceeded = 0;
             var rowsFailed = 0;
             string? sourceFile = null;
 
-            if (records != null && records.Count > 0)
+            // Check if custom SQL statements are provided
+            bool hasCustomStatements = !string.IsNullOrWhiteSpace(_insertStatement) || 
+                                     !string.IsNullOrWhiteSpace(_updateStatement) || 
+                                     !string.IsNullOrWhiteSpace(_deleteStatement);
+
+            if (hasCustomStatements)
             {
+                // Use custom SQL statements with OPENJSON
                 try
                 {
-                    if (_useTransaction)
-                    {
-                        // Wrap operations in an explicit transaction
-                        using var context = GetContext();
-                        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-                        try
-                        {
-                            _logger?.LogInformation("Starting transaction for writing {RecordCount} records to table {Destination}", records.Count, destination);
-                            
-                            await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
-                            
-                            await transaction.CommitAsync(cancellationToken);
-                            rowsSucceeded = records.Count;
-                            _logger?.LogInformation("Transaction committed successfully. Inserted {RecordCount} records into table {Destination}", records.Count, destination);
-                        }
-                        catch (Exception ex)
-                        {
-                            await transaction.RollbackAsync(cancellationToken);
-                            rowsFailed = records.Count;
-                            _logger?.LogError(ex, "Transaction rolled back due to error while writing to table {Destination}", destination);
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        // No transaction - use default behavior
-                        await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
-                        rowsSucceeded = records.Count;
-                        _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
-                    }
+                    await ExecuteCustomStatementsAsync(records, processedMessages, cancellationToken);
+                    rowsSucceeded = records?.Count ?? 0;
                 }
                 catch
                 {
-                    rowsFailed = records.Count;
+                    rowsFailed = records?.Count ?? 0;
                     rowsSucceeded = 0;
                     throw;
                 }
+            }
+            else
+            {
+                // Ensure table structure matches (only if not using custom statements)
+                await EnsureDestinationStructureAsync(destination, columnTypes, cancellationToken);
+
+                // Insert rows using DataService with optional transaction support
+
+                if (records != null && records.Count > 0)
+                {
+                    try
+                    {
+                        if (_useTransaction)
+                        {
+                            // Wrap operations in an explicit transaction
+                            using var context = GetContext();
+                            using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                            try
+                            {
+                                _logger?.LogInformation("Starting transaction for writing {RecordCount} records to table {Destination}", records.Count, destination);
+                                
+                                await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                                
+                                await transaction.CommitAsync(cancellationToken);
+                                rowsSucceeded = records.Count;
+                                _logger?.LogInformation("Transaction committed successfully. Inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                            }
+                            catch (Exception ex)
+                            {
+                                await transaction.RollbackAsync(cancellationToken);
+                                rowsFailed = records.Count;
+                                _logger?.LogError(ex, "Transaction rolled back due to error while writing to table {Destination}", destination);
+                                throw;
+                            }
+                        }
+                        else
+                        {
+                            // No transaction - use default behavior
+                            await _dataService.InsertRowsAsync(records, columnTypes, cancellationToken);
+                            rowsSucceeded = records.Count;
+                            _logger?.LogInformation("Successfully inserted {RecordCount} records into table {Destination}", records.Count, destination);
+                        }
+                    }
+                    catch
+                    {
+                        rowsFailed = records.Count;
+                        rowsSucceeded = 0;
+                        throw;
+                    }
                 finally
                 {
                     // Record processing statistics
@@ -439,6 +482,118 @@ public class SqlServerAdapter : AdapterBase
         }
 
         return sanitized;
+    }
+
+    /// <summary>
+    /// Executes custom INSERT/UPDATE/DELETE statements using OPENJSON
+    /// </summary>
+    private async Task ExecuteCustomStatementsAsync(
+        List<Dictionary<string, string>>? records,
+        List<MessageBoxMessage>? processedMessages,
+        CancellationToken cancellationToken = default)
+    {
+        if (records == null || records.Count == 0)
+        {
+            _logger?.LogInformation("No records to process with custom SQL statements");
+            return;
+        }
+
+        using var context = GetContext();
+        using var connection = context.Database.GetDbConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            // Convert records to JSON
+            var jsonData = new List<object>();
+            foreach (var record in records)
+            {
+                jsonData.Add(record);
+            }
+
+            var jsonString = System.Text.Json.JsonSerializer.Serialize(jsonData);
+
+            // Apply jq transformation if configured
+            if (!string.IsNullOrWhiteSpace(_jqScriptFile) && _jqService != null)
+            {
+                try
+                {
+                    jsonString = await _jqService.TransformJsonAsync(jsonString, _jqScriptFile, cancellationToken);
+                    _logger?.LogInformation("Applied jq transformation to JSON data before executing custom SQL statements");
+                }
+                catch (Exception jqEx)
+                {
+                    _logger?.LogError(jqEx, "Error applying jq transformation: {ErrorMessage}", jqEx.Message);
+                    throw;
+                }
+            }
+
+            // Execute INSERT statement if provided
+            if (!string.IsNullOrWhiteSpace(_insertStatement))
+            {
+                _logger?.LogInformation("Executing custom INSERT statement");
+                using var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText = _insertStatement;
+                insertCommand.CommandTimeout = _commandTimeout;
+                
+                // Add JSON parameter
+                var jsonParam = insertCommand.CreateParameter();
+                jsonParam.ParameterName = "@json";
+                jsonParam.Value = jsonString;
+                jsonParam.DbType = System.Data.DbType.String;
+                insertCommand.Parameters.Add(jsonParam);
+
+                var insertResult = await insertCommand.ExecuteNonQueryAsync(cancellationToken);
+                _logger?.LogInformation("INSERT statement executed successfully. Rows affected: {RowsAffected}", insertResult);
+            }
+
+            // Execute UPDATE statement if provided
+            if (!string.IsNullOrWhiteSpace(_updateStatement))
+            {
+                _logger?.LogInformation("Executing custom UPDATE statement");
+                using var updateCommand = connection.CreateCommand();
+                updateCommand.CommandText = _updateStatement;
+                updateCommand.CommandTimeout = _commandTimeout;
+                
+                // Add JSON parameter
+                var jsonParam = updateCommand.CreateParameter();
+                jsonParam.ParameterName = "@json";
+                jsonParam.Value = jsonString;
+                jsonParam.DbType = System.Data.DbType.String;
+                updateCommand.Parameters.Add(jsonParam);
+
+                var updateResult = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+                _logger?.LogInformation("UPDATE statement executed successfully. Rows affected: {RowsAffected}", updateResult);
+            }
+
+            // Execute DELETE statement if provided
+            if (!string.IsNullOrWhiteSpace(_deleteStatement))
+            {
+                _logger?.LogInformation("Executing custom DELETE statement");
+                using var deleteCommand = connection.CreateCommand();
+                deleteCommand.CommandText = _deleteStatement;
+                deleteCommand.CommandTimeout = _commandTimeout;
+                
+                // Add JSON parameter
+                var jsonParam = deleteCommand.CreateParameter();
+                jsonParam.ParameterName = "@json";
+                jsonParam.Value = jsonString;
+                jsonParam.DbType = System.Data.DbType.String;
+                deleteCommand.Parameters.Add(jsonParam);
+
+                var deleteResult = await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+                _logger?.LogInformation("DELETE statement executed successfully. Rows affected: {RowsAffected}", deleteResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error executing custom SQL statements: {ErrorMessage}", ex.Message);
+            throw;
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
     }
 }
 

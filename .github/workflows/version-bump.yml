@@ -1,0 +1,129 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'README.md'
+      - 'docs/**'
+      - '.github/workflows/version-bump.yml'
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Check if commit is from version bump
+        id: check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MSG" == "chore: bump version"* ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  bump-version:
+    needs: check-commit
+    if: needs.check-commit.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Read current version
+        id: version
+        run: |
+          if [ -f version.json ]; then
+            VERSION=$(node -p "require('./version.json').version")
+            BUILD=$(node -p "require('./version.json').buildNumber")
+            echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "current_build=$BUILD" >> $GITHUB_OUTPUT
+          else
+            echo "current_version=1.0.0" >> $GITHUB_OUTPUT
+            echo "current_build=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        id: bump
+        run: |
+          CURRENT_VERSION="${{ steps.version.outputs.current_version }}"
+          CURRENT_BUILD="${{ steps.version.outputs.current_build }}"
+          
+          # Increment build number
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+          
+          # Parse version (e.g., "1.2.3")
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          # Increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_build=$NEW_BUILD" >> $GITHUB_OUTPUT
+          
+          # Update version.json
+          cat > version.json << EOF
+          {
+            "version": "$NEW_VERSION",
+            "buildNumber": $NEW_BUILD,
+            "lastUpdated": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+          
+          # Update root package.json
+          if [ -f package.json ]; then
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              pkg.version = '$NEW_VERSION';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          fi
+          
+          # Update frontend package.json
+          if [ -f frontend/package.json ]; then
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+              pkg.version = '$NEW_VERSION';
+              fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          fi
+          
+          # Update Azure Functions .csproj if it has a Version property
+          if [ -f azure-functions/main/main.csproj ]; then
+            sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/g" azure-functions/main/main.csproj || true
+          fi
+          
+          # Copy version.json to frontend assets
+          mkdir -p frontend/src/assets
+          cp version.json frontend/src/assets/version.json
+
+      - name: Commit version bump
+        run: |
+          git add version.json package.json frontend/package.json azure-functions/main/main.csproj frontend/src/assets/version.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} (build ${{ steps.bump.outputs.new_build }})" || exit 0
+          git push

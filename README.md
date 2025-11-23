@@ -1,9 +1,3 @@
-<style>
-strong, b {
-  font-weight: 300 !important;
-}
-</style>
-
 # 📊 Interface Configuration Demo
 
 <div align="center">

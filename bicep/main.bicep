@@ -3,9 +3,9 @@
 
 @description('Name of the resource group')
 @allowed([
-  'rg-interface-configuration'
+  'rg-interface-configurator'
 ])
-param resourceGroupName string = 'rg-interface-configuration'
+param resourceGroupName string = 'rg-interface-configurator'
 
 @description('Azure region for resources')
 param location string = 'West Europe'

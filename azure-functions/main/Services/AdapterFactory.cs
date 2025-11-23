@@ -43,6 +43,9 @@ public class AdapterFactory : IAdapterFactory
             {
                 "CSV" => CreateCsvAdapter(config, configDict, isSource: true),
                 "SQLSERVER" => CreateSqlServerAdapter(config, configDict, isSource: true),
+                "SAP" => CreateSapAdapter(config, configDict, isSource: true),
+                "DYNAMICS365" => CreateDynamics365Adapter(config, configDict, isSource: true),
+                "CRM" => CreateCrmAdapter(config, configDict, isSource: true),
                 _ => throw new NotSupportedException($"Source adapter '{adapterName}' is not supported")
             };
         }
@@ -71,6 +74,9 @@ public class AdapterFactory : IAdapterFactory
             {
                 "CSV" => CreateCsvAdapter(config, configDict, isSource: false),
                 "SQLSERVER" => CreateSqlServerAdapter(config, configDict, isSource: false),
+                "SAP" => CreateSapAdapter(config, configDict, isSource: false),
+                "DYNAMICS365" => CreateDynamics365Adapter(config, configDict, isSource: false),
+                "CRM" => CreateCrmAdapter(config, configDict, isSource: false),
                 _ => throw new NotSupportedException($"Destination adapter '{adapterName}' is not supported")
             };
         }
@@ -362,6 +368,46 @@ public class AdapterFactory : IAdapterFactory
         var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
         var adapterRole = isSource ? "Source" : "Destination";
         
+        // Get jq transformation properties (only for destination adapters)
+        JQTransformationService? jqService = null;
+        string? jqScriptFile = null;
+        string? insertStatement = null;
+        string? updateStatement = null;
+        string? deleteStatement = null;
+        
+        if (!isSource)
+        {
+            // Get JQ service
+            jqService = _serviceProvider.GetService<JQTransformationService>();
+            
+            // Try to get properties from DestinationAdapterInstance if available
+            if (config.Destinations.TryGetValue(adapterInstanceGuid, out var destInstance))
+            {
+                jqScriptFile = destInstance.JQScriptFile;
+                insertStatement = destInstance.InsertStatement;
+                updateStatement = destInstance.UpdateStatement;
+                deleteStatement = destInstance.DeleteStatement;
+            }
+            
+            // Also check configDict for backward compatibility
+            if (configDict != null)
+            {
+                string? TryGetString(string key)
+                {
+                    if (configDict.TryGetValue(key, out var element) && element.ValueKind == JsonValueKind.String)
+                    {
+                        return element.GetString();
+                    }
+                    return null;
+                }
+                
+                jqScriptFile = TryGetString("jqScriptFile") ?? jqScriptFile;
+                insertStatement = TryGetString("insertStatement") ?? insertStatement;
+                updateStatement = TryGetString("updateStatement") ?? updateStatement;
+                deleteStatement = TryGetString("deleteStatement") ?? deleteStatement;
+            }
+        }
+        
         return new SqlServerAdapter(
             defaultContext,
             dynamicTableService,
@@ -381,7 +427,190 @@ public class AdapterFactory : IAdapterFactory
             configService,
             adapterRole,
             logger,
-            statisticsService);
+            statisticsService,
+            insertStatement,
+            updateStatement,
+            deleteStatement,
+            jqService,
+            jqScriptFile);
+    }
+
+    private SapAdapter CreateSapAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
+    {
+        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
+        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
+        var logger = _serviceProvider.GetService<ILogger<SapAdapter>>();
+
+        SourceAdapterInstance? sourceInstance = null;
+        DestinationAdapterInstance? destInstance = null;
+        Guid adapterInstanceGuid;
+
+        if (isSource)
+        {
+            sourceInstance = config.Sources.Values.FirstOrDefault();
+            adapterInstanceGuid = sourceInstance?.AdapterInstanceGuid ?? Guid.NewGuid();
+        }
+        else
+        {
+            destInstance = config.Destinations.Values.FirstOrDefault();
+            adapterInstanceGuid = destInstance?.AdapterInstanceGuid ?? Guid.NewGuid();
+        }
+
+        // SAP Properties from instance
+        string? sapApplicationServer = isSource ? sourceInstance?.SapApplicationServer : destInstance?.SapApplicationServer;
+        string? sapSystemNumber = isSource ? sourceInstance?.SapSystemNumber : destInstance?.SapSystemNumber;
+        string? sapClient = isSource ? sourceInstance?.SapClient : destInstance?.SapClient;
+        string? sapUsername = isSource ? sourceInstance?.SapUsername : destInstance?.SapUsername;
+        string? sapPassword = isSource ? sourceInstance?.SapPassword : destInstance?.SapPassword;
+        string? sapLanguage = (isSource ? sourceInstance?.SapLanguage : destInstance?.SapLanguage) ?? "EN";
+        string? sapIdocType = isSource ? sourceInstance?.SapIdocType : destInstance?.SapIdocType;
+        string? sapIdocMessageType = isSource ? sourceInstance?.SapIdocMessageType : destInstance?.SapIdocMessageType;
+        string? sapIdocFilter = isSource ? sourceInstance?.SapIdocFilter : null; // Only for source
+        int sapPollingInterval = isSource ? (sourceInstance?.SapPollingInterval > 0 ? sourceInstance.SapPollingInterval : 60) : 60;
+        int sapBatchSize = (isSource ? sourceInstance?.SapBatchSize : destInstance?.SapBatchSize) > 0 
+            ? (isSource ? sourceInstance!.SapBatchSize : destInstance!.SapBatchSize) 
+            : 100;
+        int sapConnectionTimeout = (isSource ? sourceInstance?.SapConnectionTimeout : destInstance?.SapConnectionTimeout) > 0 
+            ? (isSource ? sourceInstance!.SapConnectionTimeout : destInstance!.SapConnectionTimeout) 
+            : 30;
+        bool sapUseRfc = (isSource ? sourceInstance?.SapUseRfc : destInstance?.SapUseRfc) ?? true;
+        string? sapRfcDestination = isSource ? sourceInstance?.SapRfcDestination : destInstance?.SapRfcDestination;
+        
+        string? sapReceiverPort = isSource ? null : destInstance?.SapReceiverPort; // Only for destination
+        string? sapReceiverPartner = isSource ? null : destInstance?.SapReceiverPartner; // Only for destination
+
+        var adapterRole = isSource ? "Source" : "Destination";
+
+        return new SapAdapter(
+            messageBoxService,
+            subscriptionService,
+            config.InterfaceName,
+            adapterInstanceGuid,
+            sapBatchSize,
+            adapterRole,
+            logger,
+            sapApplicationServer,
+            sapSystemNumber,
+            sapClient,
+            sapUsername,
+            sapPassword,
+            sapLanguage,
+            sapIdocType,
+            sapIdocMessageType,
+            sapIdocFilter,
+            sapPollingInterval,
+            sapBatchSize,
+            sapConnectionTimeout,
+            sapUseRfc,
+            sapRfcDestination,
+            sapReceiverPort,
+            sapReceiverPartner);
+    }
+
+    private Dynamics365Adapter CreateDynamics365Adapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
+    {
+        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
+        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
+        var logger = _serviceProvider.GetService<ILogger<Dynamics365Adapter>>();
+
+        // Get adapter instance from Sources or Destinations dictionary
+        var instance = isSource 
+            ? config.Sources.Values.FirstOrDefault()
+            : null;
+
+        Guid adapterInstanceGuid = isSource 
+            ? (instance?.AdapterInstanceGuid ?? Guid.NewGuid())
+            : (config.Destinations.Values.FirstOrDefault()?.AdapterInstanceGuid ?? Guid.NewGuid());
+
+        // Dynamics 365 Properties from instance
+        string? tenantId = instance?.Dynamics365TenantId;
+        string? clientId = instance?.Dynamics365ClientId;
+        string? clientSecret = instance?.Dynamics365ClientSecret;
+        string? instanceUrl = instance?.Dynamics365InstanceUrl;
+        string? entityName = instance?.Dynamics365EntityName;
+        string? odataFilter = isSource ? instance?.Dynamics365ODataFilter : null; // Only for source
+        int pollingInterval = isSource ? (instance?.Dynamics365PollingInterval > 0 ? instance.Dynamics365PollingInterval : 60) : 60;
+        int batchSize = instance?.Dynamics365BatchSize > 0 ? instance.Dynamics365BatchSize : 100;
+        int pageSize = instance?.Dynamics365PageSize > 0 ? instance.Dynamics365PageSize : 50;
+        
+        bool useBatch = false;
+        if (!isSource)
+        {
+            var destInstance = config.Destinations.Values.FirstOrDefault();
+            useBatch = destInstance?.Dynamics365UseBatch ?? true;
+        }
+
+        var adapterRole = isSource ? "Source" : "Destination";
+
+        return new Dynamics365Adapter(
+            messageBoxService,
+            subscriptionService,
+            config.InterfaceName,
+            adapterInstanceGuid,
+            batchSize,
+            adapterRole,
+            logger,
+            tenantId,
+            clientId,
+            clientSecret,
+            instanceUrl,
+            entityName,
+            odataFilter,
+            pollingInterval,
+            batchSize,
+            pageSize,
+            useBatch);
+    }
+
+    private CrmAdapter CreateCrmAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
+    {
+        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
+        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
+        var logger = _serviceProvider.GetService<ILogger<CrmAdapter>>();
+
+        // Get adapter instance from Sources or Destinations dictionary
+        var instance = isSource 
+            ? config.Sources.Values.FirstOrDefault()
+            : null;
+
+        Guid adapterInstanceGuid = isSource 
+            ? (instance?.AdapterInstanceGuid ?? Guid.NewGuid())
+            : (config.Destinations.Values.FirstOrDefault()?.AdapterInstanceGuid ?? Guid.NewGuid());
+
+        // CRM Properties from instance
+        string? organizationUrl = instance?.CrmOrganizationUrl;
+        string? username = instance?.CrmUsername;
+        string? password = instance?.CrmPassword;
+        string? entityName = instance?.CrmEntityName;
+        string? fetchXml = isSource ? instance?.CrmFetchXml : null; // Only for source
+        int pollingInterval = isSource ? (instance?.CrmPollingInterval > 0 ? instance.CrmPollingInterval : 60) : 60;
+        int batchSize = instance?.CrmBatchSize > 0 ? instance.CrmBatchSize : 100;
+        
+        bool useBatch = false;
+        if (!isSource)
+        {
+            var destInstance = config.Destinations.Values.FirstOrDefault();
+            useBatch = destInstance?.CrmUseBatch ?? true;
+        }
+
+        var adapterRole = isSource ? "Source" : "Destination";
+
+        return new CrmAdapter(
+            messageBoxService,
+            subscriptionService,
+            config.InterfaceName,
+            adapterInstanceGuid,
+            batchSize,
+            adapterRole,
+            logger,
+            organizationUrl,
+            username,
+            password,
+            entityName,
+            fetchXml,
+            pollingInterval,
+            batchSize,
+            useBatch);
     }
 }
 

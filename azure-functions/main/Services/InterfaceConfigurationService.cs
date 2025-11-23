@@ -4,6 +4,7 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 #pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility migration
 
@@ -26,10 +27,12 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
 
     public InterfaceConfigurationService(
         BlobServiceClient? blobServiceClient,
-        ILogger<InterfaceConfigurationService>? logger = null)
+        ILogger<InterfaceConfigurationService>? logger = null,
+        IServiceProvider? serviceProvider = null)
     {
         _blobServiceClient = blobServiceClient;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -740,8 +743,43 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                 // Enable/disable all destination adapter instances
                 foreach (var dest in config.Destinations.Values)
                 {
+                    var wasEnabled = dest.IsEnabled;
                     dest.IsEnabled = enabled;
                     dest.UpdatedAt = DateTime.UtcNow;
+                    
+                    // Automatically create subscription when destination adapter is enabled
+                    // and has a SourceAdapterSubscription configured
+                    if (enabled && !wasEnabled && dest.SourceAdapterSubscription.HasValue)
+                    {
+                        // Create subscription asynchronously (fire and forget)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                if (_serviceProvider != null)
+                                {
+                                    var subscriptionService = _serviceProvider.GetService<IAdapterSubscriptionService>();
+                                    if (subscriptionService != null)
+                                    {
+                                        await subscriptionService.CreateOrUpdateSubscriptionAsync(
+                                            dest.AdapterInstanceGuid,
+                                            interfaceName,
+                                            dest.AdapterName,
+                                            filterCriteria: null, // No filter criteria - subscribe to all messages from the interface
+                                            cancellationToken);
+                                        
+                                        _logger?.LogInformation("Automatically created subscription for destination adapter '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' when enabled",
+                                            dest.InstanceName, dest.AdapterInstanceGuid, interfaceName);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogError(ex, "Error automatically creating subscription for destination adapter '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'",
+                                    dest.InstanceName, dest.AdapterInstanceGuid, interfaceName);
+                            }
+                        }, cancellationToken);
+                    }
                 }
                 config.UpdatedAt = DateTime.UtcNow;
             }
@@ -1327,6 +1365,166 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
             else
             {
                 _logger?.LogWarning("Interface configuration '{InterfaceName}' not found for updating SQL transaction properties", interfaceName);
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        await SaveConfigurationsAsync(cancellationToken);
+    }
+
+    public async Task UpdateDestinationJQScriptFileAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string jqScriptFile,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_configurations.TryGetValue(interfaceName, out var config))
+            {
+                // Try to find instance in Destinations dictionary
+                DestinationAdapterInstance? instance = null;
+                if (config.Destinations != null)
+                {
+                    instance = config.Destinations.Values.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+                
+                // Fallback to legacy DestinationAdapterInstances list
+                if (instance == null && config.DestinationAdapterInstances != null)
+                {
+                    instance = config.DestinationAdapterInstances.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+
+                if (instance != null)
+                {
+                    instance.JQScriptFile = string.IsNullOrWhiteSpace(jqScriptFile) ? null : jqScriptFile.Trim();
+                    instance.UpdatedAt = DateTime.UtcNow;
+                    config.UpdatedAt = DateTime.UtcNow;
+                    _logger?.LogInformation("JQ Script File for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{JQScriptFile}'",
+                        instance.InstanceName, adapterInstanceGuid, interfaceName, instance.JQScriptFile ?? "null");
+                }
+                else
+                {
+                    _logger?.LogWarning("Destination adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", adapterInstanceGuid, interfaceName);
+                    throw new KeyNotFoundException($"Destination adapter instance '{adapterInstanceGuid}' not found in interface '{interfaceName}'.");
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("Interface configuration '{InterfaceName}' not found", interfaceName);
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        await SaveConfigurationsAsync(cancellationToken);
+    }
+
+    public async Task UpdateDestinationSourceAdapterSubscriptionAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        Guid? sourceAdapterSubscription,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_configurations.TryGetValue(interfaceName, out var config))
+            {
+                // Try to find instance in Destinations dictionary
+                DestinationAdapterInstance? instance = null;
+                if (config.Destinations != null)
+                {
+                    instance = config.Destinations.Values.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+                
+                // Fallback to legacy DestinationAdapterInstances list
+                if (instance == null && config.DestinationAdapterInstances != null)
+                {
+                    instance = config.DestinationAdapterInstances.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+
+                if (instance != null)
+                {
+                    instance.SourceAdapterSubscription = sourceAdapterSubscription;
+                    instance.UpdatedAt = DateTime.UtcNow;
+                    config.UpdatedAt = DateTime.UtcNow;
+                    _logger?.LogInformation("Source Adapter Subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{SourceAdapterSubscription}'",
+                        instance.InstanceName, adapterInstanceGuid, interfaceName, sourceAdapterSubscription?.ToString() ?? "null");
+                }
+                else
+                {
+                    _logger?.LogWarning("Destination adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", adapterInstanceGuid, interfaceName);
+                    throw new KeyNotFoundException($"Destination adapter instance '{adapterInstanceGuid}' not found in interface '{interfaceName}'.");
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("Interface configuration '{InterfaceName}' not found", interfaceName);
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        await SaveConfigurationsAsync(cancellationToken);
+    }
+
+    public async Task UpdateDestinationSqlStatementsAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string insertStatement,
+        string updateStatement,
+        string deleteStatement,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_configurations.TryGetValue(interfaceName, out var config))
+            {
+                // Try to find instance in Destinations dictionary
+                DestinationAdapterInstance? instance = null;
+                if (config.Destinations != null)
+                {
+                    instance = config.Destinations.Values.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+                
+                // Fallback to legacy DestinationAdapterInstances list
+                if (instance == null && config.DestinationAdapterInstances != null)
+                {
+                    instance = config.DestinationAdapterInstances.FirstOrDefault(i => i.AdapterInstanceGuid == adapterInstanceGuid);
+                }
+
+                if (instance != null)
+                {
+                    instance.InsertStatement = string.IsNullOrWhiteSpace(insertStatement) ? null : insertStatement.Trim();
+                    instance.UpdateStatement = string.IsNullOrWhiteSpace(updateStatement) ? null : updateStatement.Trim();
+                    instance.DeleteStatement = string.IsNullOrWhiteSpace(deleteStatement) ? null : deleteStatement.Trim();
+                    instance.UpdatedAt = DateTime.UtcNow;
+                    config.UpdatedAt = DateTime.UtcNow;
+                    _logger?.LogInformation("SQL Statements for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated",
+                        instance.InstanceName, adapterInstanceGuid, interfaceName);
+                }
+                else
+                {
+                    _logger?.LogWarning("Destination adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", adapterInstanceGuid, interfaceName);
+                    throw new KeyNotFoundException($"Destination adapter instance '{adapterInstanceGuid}' not found in interface '{interfaceName}'.");
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("Interface configuration '{InterfaceName}' not found", interfaceName);
                 throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
             }
         }

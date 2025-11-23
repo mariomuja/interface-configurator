@@ -25,6 +25,9 @@ import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData }
 import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
+import { ErrorTrackingService } from '../../services/error-tracking.service';
+import { ErrorDialogComponent } from '../error-dialog/error-dialog.component';
+import { FeatureService, Feature } from '../../services/feature.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription, firstValueFrom } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -164,12 +167,48 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   sqlDisplayedColumns: string[] = []; // Will be populated dynamically from SQL data
   logDisplayedColumns: string[] = ['timestamp', 'level', 'component', 'message', 'details'];
 
+  // Feature flag for Destination Adapter UI
+  isDestinationAdapterUIEnabled: boolean = false;
+
   constructor(
     private transportService: TransportService,
     private translationService: TranslationService,
     private snackBar: MatSnackBar,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private errorTrackingService: ErrorTrackingService,
+    private featureService: FeatureService
   ) {}
+
+  /**
+   * Show error dialog with AI integration
+   */
+  private showErrorDialog(
+    error: Error | any,
+    functionName: string,
+    component: string = 'TransportComponent',
+    context?: any
+  ): void {
+    // Track error
+    this.errorTrackingService.trackError(functionName, error, component, context);
+    
+    // Add application state
+    this.errorTrackingService.addApplicationState('currentInterface', this.currentInterfaceName);
+    this.errorTrackingService.addApplicationState('sourceEnabled', this.sourceIsEnabled);
+    this.errorTrackingService.addApplicationState('destinationEnabled', this.destinationIsEnabled);
+    this.errorTrackingService.addApplicationState('sourceAdapterName', this.sourceAdapterName);
+    
+    // Show dialog
+    this.dialog.open(ErrorDialogComponent, {
+      width: '800px',
+      maxWidth: '90vw',
+      data: {
+        error: error,
+        functionName: functionName,
+        component: component,
+        context: context
+      }
+    });
+  }
 
   ngOnInit(): void {
     // Don't populate sample CSV data here - it will be initialized when CSV adapter instance is created
@@ -177,8 +216,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadSqlData();
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
-    this.loadDestinationAdapterInstances();
     this.loadBlobContainerFolders();
+    // Check feature first, then load destination adapters if enabled
+    this.checkDestinationAdapterUIFeature();
     // TEMPORARILY DISABLED: Auto-refresh disabled - only manual refresh via reload button
     // this.startAutoRefresh();
     
@@ -189,6 +229,49 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Show welcome dialog on first visit
     this.showWelcomeDialogIfNeeded();
+  }
+
+  /**
+   * Check if Destination Adapter UI feature is enabled
+   */
+  private checkDestinationAdapterUIFeature(): void {
+    this.featureService.getFeatures().subscribe({
+      next: (features) => {
+        const destinationAdapterUIFeature = features.find(f => 
+          f.title === 'Destination Adapter UI' || 
+          f.featureNumber === 8
+        );
+        this.isDestinationAdapterUIEnabled = destinationAdapterUIFeature?.isEnabled ?? false;
+        
+        // Only load destination adapter instances if feature is enabled
+        if (this.isDestinationAdapterUIEnabled) {
+          this.loadDestinationAdapterInstances();
+        } else {
+          // Clear destination adapter instances if feature is disabled
+          this.destinationAdapterInstances = [];
+        }
+      },
+      error: (error) => {
+        console.error('Error loading features:', error);
+        // Default to disabled if feature check fails
+        this.isDestinationAdapterUIEnabled = false;
+        this.destinationAdapterInstances = [];
+      }
+    });
+  }
+
+  /**
+   * Check if feature is enabled before allowing destination adapter operations
+   */
+  private ensureDestinationAdapterUIFeatureEnabled(): boolean {
+    if (!this.isDestinationAdapterUIEnabled) {
+      this.snackBar.open('Destination Adapter UI feature is not enabled. Please contact an administrator.', 'OK', { 
+        duration: 5000,
+        panelClass: ['error-snackbar']
+      });
+      return false;
+    }
+    return true;
   }
 
   showWelcomeDialogIfNeeded(): void {
@@ -562,19 +645,22 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }
       } catch (error) {
         console.error('Error reading file:', error);
-        this.snackBar.open('Fehler beim Lesen der Datei.', 'OK', {
-          duration: 3000,
-          panelClass: ['error-snackbar']
-        });
+        this.showErrorDialog(
+          error instanceof Error ? error : new Error(String(error)),
+          'onFileSelected',
+          'TransportComponent',
+          { fileName: file.name }
+        );
       }
       // Reset file input to allow selecting the same file again
       input.value = '';
     };
 
     reader.onerror = () => {
-      this.snackBar.open('Fehler beim Lesen der Datei.', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar']
+      const error = new Error('Fehler beim Lesen der Datei');
+      this.showErrorDialog(error, 'onFileSelected', 'TransportComponent', {
+        fileName: file.name,
+        errorType: 'FileReaderError'
       });
       input.value = '';
     };
@@ -2316,6 +2402,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationAdapterSettings(): void {
+    // Check if feature is enabled
+    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
     // Reload configuration to ensure we have the latest values from the backend
     const interfaceName = this.getActiveInterfaceName();
     if (!interfaceName) {
@@ -2359,6 +2449,44 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private openDestinationAdapterSettingsDialog(activeConfig: any): void {
+    // Get available source adapters for subscription selection
+    const interfaceName = this.getActiveInterfaceName();
+    const availableSourceAdapters: Array<{ guid: string; name: string; adapterName: string }> = [];
+    
+    if (interfaceName && activeConfig?.sources) {
+      // Load source adapters from the interface configuration
+      Object.values(activeConfig.sources).forEach((source: any) => {
+        if (source && source.adapterInstanceGuid) {
+          availableSourceAdapters.push({
+            guid: source.adapterInstanceGuid,
+            name: source.instanceName || 'Source',
+            adapterName: source.adapterName || 'CSV'
+          });
+        }
+      });
+    }
+    
+    // Get destination adapter instance properties if available
+    let jqScriptFile = '';
+    let sourceAdapterSubscription = '';
+    let insertStatement = '';
+    let updateStatement = '';
+    let deleteStatement = '';
+    
+    if (interfaceName && activeConfig?.destinations) {
+      const destInstance = Object.values(activeConfig.destinations).find((d: any) => 
+        d && d.adapterInstanceGuid === this.destinationAdapterInstanceGuid
+      ) as any;
+      
+      if (destInstance) {
+        jqScriptFile = destInstance.jqScriptFile || '';
+        sourceAdapterSubscription = destInstance.sourceAdapterSubscription || '';
+        insertStatement = destInstance.insertStatement || '';
+        updateStatement = destInstance.updateStatement || '';
+        deleteStatement = destInstance.deleteStatement || '';
+      }
+    }
+    
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Destination',
       adapterName: activeConfig?.destinationAdapterName === 'CSV' ? 'CSV' : 'SqlServer',
@@ -2376,7 +2504,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       sqlPassword: this.sqlPassword,
       sqlIntegratedSecurity: this.sqlIntegratedSecurity,
       sqlResourceGroup: this.sqlResourceGroup,
-      adapterInstanceGuid: this.destinationAdapterInstanceGuid
+      adapterInstanceGuid: this.destinationAdapterInstanceGuid,
+      // JQ Transformation properties
+      jqScriptFile: jqScriptFile,
+      sourceAdapterSubscription: sourceAdapterSubscription,
+      // SQL Server custom statements
+      insertStatement: insertStatement,
+      updateStatement: updateStatement,
+      deleteStatement: deleteStatement,
+      // Available source adapters
+      availableSourceAdapters: availableSourceAdapters
     };
 
     const dialogRef = this.dialog.open(AdapterPropertiesDialogComponent, {
@@ -2432,6 +2569,25 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.destinationFileMask !== undefined && result.destinationFileMask !== this.destinationFileMask) {
           this.destinationFileMask = result.destinationFileMask;
           this.updateDestinationFileMask(result.destinationFileMask);
+        }
+
+        // Update JQ Script File if changed (only for Destination adapters)
+        if (result.jqScriptFile !== undefined) {
+          this.updateDestinationJQScriptFile(result.jqScriptFile);
+        }
+
+        // Update Source Adapter Subscription if changed (only for Destination adapters)
+        if (result.sourceAdapterSubscription !== undefined) {
+          this.updateDestinationSourceAdapterSubscription(result.sourceAdapterSubscription);
+        }
+
+        // Update SQL Server custom statements if changed (only for Destination SqlServer adapters)
+        if (result.insertStatement !== undefined || result.updateStatement !== undefined || result.deleteStatement !== undefined) {
+          this.updateDestinationSqlStatements(
+            result.insertStatement,
+            result.updateStatement,
+            result.deleteStatement
+          );
         }
 
         // Reload configuration after all saves to ensure local state is synced with backend
@@ -2550,6 +2706,74 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
         this.destinationReceiveFolder = activeConfig.destinationReceiveFolder || '';
+      }
+    });
+  }
+
+  updateDestinationJQScriptFile(jqScriptFile?: string): void {
+    const jqScriptFileValue = jqScriptFile ?? '';
+    const interfaceName = this.getActiveInterfaceName();
+    
+    if (!interfaceName) {
+      return;
+    }
+
+    this.transportService.updateDestinationJQScriptFile(interfaceName, this.destinationAdapterInstanceGuid, jqScriptFileValue).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('JQ Script File aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating JQ Script File:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren des JQ Script Files');
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
+      }
+    });
+  }
+
+  updateDestinationSourceAdapterSubscription(sourceAdapterSubscription?: string): void {
+    const sourceAdapterSubscriptionValue = sourceAdapterSubscription ?? '';
+    const interfaceName = this.getActiveInterfaceName();
+    
+    if (!interfaceName) {
+      return;
+    }
+
+    this.transportService.updateDestinationSourceAdapterSubscription(interfaceName, this.destinationAdapterInstanceGuid, sourceAdapterSubscriptionValue).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('Source Adapter Subscription aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating Source Adapter Subscription:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der Source Adapter Subscription');
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
+      }
+    });
+  }
+
+  updateDestinationSqlStatements(insertStatement?: string, updateStatement?: string, deleteStatement?: string): void {
+    const interfaceName = this.getActiveInterfaceName();
+    
+    if (!interfaceName) {
+      return;
+    }
+
+    this.transportService.updateDestinationSqlStatements(
+      interfaceName,
+      this.destinationAdapterInstanceGuid,
+      insertStatement ?? '',
+      updateStatement ?? '',
+      deleteStatement ?? ''
+    ).subscribe({
+      next: () => {
+        this.loadInterfaceConfigurations();
+        this.snackBar.open('SQL Statements aktualisiert', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error updating SQL Statements:', error);
+        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktualisieren der SQL Statements');
+        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
       }
     });
   }
@@ -3350,6 +3574,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   loadDestinationAdapterInstances(): void {
+    // Don't load if feature is disabled
+    if (!this.isDestinationAdapterUIEnabled) {
+      this.destinationAdapterInstances = [];
+      return;
+    }
+    
     const interfaceName = this.getActiveInterfaceName();
     const activeConfig = this.getInterfaceConfig(interfaceName);
     this.transportService.getDestinationAdapterInstances(interfaceName).subscribe({
@@ -3482,6 +3712,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addDestinationAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+    // Check if feature is enabled
+    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
+    
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
     
     // Set default configuration based on adapter type
@@ -3555,6 +3790,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   removeDestinationAdapter(adapterInstanceGuid: string, instanceName: string): void {
+    // Check if feature is enabled
+    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
+    
     const confirmMessage = `Are you sure you want to remove destination adapter "${instanceName}"?`;
     if (!confirm(confirmMessage)) return;
 
@@ -3756,6 +3996,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationInstanceSettings(instance: DestinationAdapterInstance): void {
+    // Check if feature is enabled
+    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
+    
     const interfaceName = this.getActiveInterfaceName();
     const activeConfig = this.getInterfaceConfig(interfaceName);
     

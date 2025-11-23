@@ -163,5 +163,34 @@ public interface IInterfaceConfigurationService
         bool? useTransaction = null,
         int? batchSize = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update the JQ Script File for a destination adapter instance.
+    /// </summary>
+    Task UpdateDestinationJQScriptFileAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string jqScriptFile,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update the Source Adapter Subscription for a destination adapter instance.
+    /// </summary>
+    Task UpdateDestinationSourceAdapterSubscriptionAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        Guid? sourceAdapterSubscription,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update SQL Server custom statements (INSERT/UPDATE/DELETE) for a destination adapter instance.
+    /// </summary>
+    Task UpdateDestinationSqlStatementsAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string insertStatement,
+        string updateStatement,
+        string deleteStatement,
+        CancellationToken cancellationToken = default);
 }
 

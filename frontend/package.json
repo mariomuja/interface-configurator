@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "ng": "ng",
+    "prebuild": "node ../scripts/copy-version.js",
+    "prebuild:prod": "node ../scripts/copy-version.js",
     "start": "ng serve",
     "build": "ng build",
     "build:prod": "ng build --configuration production",

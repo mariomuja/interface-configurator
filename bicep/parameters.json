@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "resourceGroupName": {
-      "value": "rg-interface-configuration"
+      "value": "rg-interface-configurator"
     },
     "location": {
       "value": "Central US"

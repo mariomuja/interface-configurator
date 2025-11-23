@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     /// <summary>
     /// TransportData table - stores CSV data in the main application database
     /// This table is created in app-database (not MessageBox database)
+    /// Note: Features, Users, and InterfaceConfigurations are now in MessageBox database
     /// </summary>
     public DbSet<InterfaceConfigurator.Main.Models.TransportData> TransportData { get; set; }
 
@@ -41,6 +42,8 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.datetime_created).HasDatabaseName("IX_TransportData_datetime_created");
             // CSV columns are stored as individual columns, not as JSON
         });
+        
+        // Note: Features, Users, and InterfaceConfigurations are now in MessageBoxDbContext
 
     }
 }

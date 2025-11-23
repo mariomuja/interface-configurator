@@ -136,6 +136,78 @@ mat-dialog-content {
   border-top: 1px solid rgba(0, 0, 0, 0.12);
 }
 
+.jq-section {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.jq-description {
+  margin-top: 8px;
+  padding: 12px;
+  background-color: rgba(33, 150, 243, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid #2196F3;
+}
+
+.jq-description p {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+  line-height: 1.5;
+}
+
+.jq-description mat-icon {
+  color: #2196F3;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+
+.jq-description a {
+  color: #2196F3;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.jq-description a:hover {
+  text-decoration: underline;
+}
+
+.sql-custom-statements-section {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.section-description {
+  margin: 0 0 16px 0;
+  padding: 12px;
+  background-color: rgba(76, 175, 80, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid #4CAF50;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+  line-height: 1.5;
+}
+
+.section-description code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #d32f2f;
+}
+
 .guid-info {
   display: flex;
   align-items: flex-start;

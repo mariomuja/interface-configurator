@@ -47,6 +47,15 @@ export interface AdapterPropertiesData {
   sqlBatchSize?: number; // SQL Server adapter property
   tableName?: string; // Table name for SqlServer adapters (used for both source and destination)
   adapterInstanceGuid: string;
+  // JQ Transformation properties (only for Destination adapters)
+  jqScriptFile?: string; // URI to jq script file for JSON transformation
+  sourceAdapterSubscription?: string; // GUID of source adapter to subscribe to
+  // SQL Server custom statements (only for Destination adapters)
+  insertStatement?: string; // Custom INSERT statement using OPENJSON
+  updateStatement?: string; // Custom UPDATE statement using OPENJSON
+  deleteStatement?: string; // Custom DELETE statement using OPENJSON
+  // Available source adapters for subscription selection
+  availableSourceAdapters?: Array<{ guid: string; name: string; adapterName: string }>;
 }
 
 @Component({
@@ -103,6 +112,15 @@ export class AdapterPropertiesDialogComponent implements OnInit {
   tableName: string = 'TransportData'; // Table name for SqlServer destination adapters
   connectionString: string = '';
   adapterInstanceGuid: string = '';
+  // JQ Transformation properties (only for Destination adapters)
+  jqScriptFile: string = '';
+  sourceAdapterSubscription: string = '';
+  // SQL Server custom statements (only for Destination adapters)
+  insertStatement: string = '';
+  updateStatement: string = '';
+  deleteStatement: string = '';
+  // Available source adapters for subscription
+  availableSourceAdapters: Array<{ guid: string; name: string; adapterName: string }> = [];
 
   constructor(
     public dialogRef: MatDialogRef<AdapterPropertiesDialogComponent>,
@@ -150,7 +168,31 @@ export class AdapterPropertiesDialogComponent implements OnInit {
     this.sqlPollingInterval = this.data.sqlPollingInterval ?? 60;
     this.tableName = this.data.tableName || 'TransportData';
     this.adapterInstanceGuid = this.data.adapterInstanceGuid || '';
+    // JQ Transformation properties (only for Destination adapters)
+    this.jqScriptFile = this.data.jqScriptFile || '';
+    this.sourceAdapterSubscription = this.data.sourceAdapterSubscription || '';
+    // SQL Server custom statements (only for Destination adapters)
+    this.insertStatement = this.data.insertStatement || '';
+    this.updateStatement = this.data.updateStatement || '';
+    this.deleteStatement = this.data.deleteStatement || '';
+    // Available source adapters
+    this.availableSourceAdapters = this.data.availableSourceAdapters || [];
     this.updateConnectionString();
+  }
+  
+  onSelectJQScriptFile(): void {
+    // Create a file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.jq,.json';
+    input.onchange = (event: any) => {
+      const file = event.target.files[0];
+      if (file) {
+        // Convert to file:// URI
+        this.jqScriptFile = `file:///${file.path.replace(/\\/g, '/')}`;
+      }
+    };
+    input.click();
   }
 
   updateConnectionString(): void {
@@ -252,8 +294,27 @@ export class AdapterPropertiesDialogComponent implements OnInit {
       sqlResourceGroup: this.data.adapterName === 'SqlServer' ? (this.sqlResourceGroup.trim() || '') : undefined,
       sqlPollingStatement: this.showSqlPollingProperties ? (this.sqlPollingStatement.trim() || '') : undefined,
       sqlPollingInterval: this.showSqlPollingProperties ? (this.sqlPollingInterval > 0 ? this.sqlPollingInterval : 60) : undefined,
-      tableName: this.data.adapterName === 'SqlServer' ? (this.tableName.trim() || 'TransportData') : undefined
+      tableName: this.data.adapterName === 'SqlServer' ? (this.tableName.trim() || 'TransportData') : undefined,
+      // JQ Transformation properties (only for Destination adapters)
+      jqScriptFile: this.data.adapterType === 'Destination' ? (this.jqScriptFile.trim() || '') : undefined,
+      sourceAdapterSubscription: this.data.adapterType === 'Destination' ? (this.sourceAdapterSubscription.trim() || '') : undefined,
+      // SQL Server custom statements (only for Destination adapters)
+      insertStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.insertStatement.trim() || '') : undefined,
+      updateStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.updateStatement.trim() || '') : undefined,
+      deleteStatement: this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer' ? (this.deleteStatement.trim() || '') : undefined
     });
+  }
+  
+  get showJQProperties(): boolean {
+    return this.data.adapterType === 'Destination';
+  }
+  
+  get showSourceAdapterSubscription(): boolean {
+    return this.data.adapterType === 'Destination' && this.availableSourceAdapters.length > 0;
+  }
+  
+  get showCustomSqlStatements(): boolean {
+    return this.data.adapterType === 'Destination' && this.data.adapterName === 'SqlServer';
   }
 
   get showReceiveFolder(): boolean {
