@@ -222,13 +222,13 @@ export class LoginDialogComponent {
       next: (response) => {
         this.loggingIn = false;
         this.isDemoLogin = false;
-        if (response.success) {
-          this.snackBar.open(`Willkommen, ${response.user?.username}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
+        if (response && response.success) {
+          this.snackBar.open(`Willkommen, ${response.user?.username || 'Demo-Benutzer'}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
           // Close dialog only on successful login
           this.dialogRef.close(true);
         } else {
           // Show error message and keep dialog open
-          const errorMessage = response.errorMessage || 'Anmeldung fehlgeschlagen';
+          const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
           this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
           // Dialog remains open so user can see the error and try again
         }
@@ -237,8 +237,26 @@ export class LoginDialogComponent {
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
+        // Extract error message from HTTP error response
+        let errorMessage = 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        if (error?.error) {
+          if (typeof error.error === 'string') {
+            errorMessage = error.error;
+          } else if (error.error?.errorMessage) {
+            errorMessage = error.error.errorMessage;
+          } else if (error.error?.message) {
+            errorMessage = error.error.message;
+          } else if (error.error?.error) {
+            errorMessage = error.error.error;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        // Add HTTP status code if available
+        if (error?.status) {
+          errorMessage = `HTTP ${error.status}: ${errorMessage}`;
+        }
         // Show error message and keep dialog open
-        const errorMessage = error?.message || error?.error?.message || 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
         this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
         // Dialog remains open so user can see the error and try again
       }
@@ -256,14 +274,14 @@ export class LoginDialogComponent {
     this.authService.login(this.username, this.password).subscribe({
       next: (response) => {
         this.loggingIn = false;
-        if (response.success) {
+        if (response && response.success) {
           const roleText = response.user?.role === 'admin' ? ' (Admin)' : '';
           this.snackBar.open(`Willkommen, ${response.user?.username}!${roleText}`, 'Schließen', { duration: 2000 });
           // Close dialog only on successful login
           this.dialogRef.close(true);
         } else {
           // Show error message and keep dialog open
-          const errorMessage = response.errorMessage || 'Anmeldung fehlgeschlagen';
+          const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
           this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
           // Dialog remains open so user can see the error and try again
         }
@@ -271,8 +289,26 @@ export class LoginDialogComponent {
       error: (error) => {
         this.loggingIn = false;
         console.error('Login error:', error);
+        // Extract error message from HTTP error response
+        let errorMessage = 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        if (error?.error) {
+          if (typeof error.error === 'string') {
+            errorMessage = error.error;
+          } else if (error.error?.errorMessage) {
+            errorMessage = error.error.errorMessage;
+          } else if (error.error?.message) {
+            errorMessage = error.error.message;
+          } else if (error.error?.error) {
+            errorMessage = error.error.error;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        // Add HTTP status code if available
+        if (error?.status) {
+          errorMessage = `HTTP ${error.status}: ${errorMessage}`;
+        }
         // Show error message and keep dialog open
-        const errorMessage = error?.message || error?.error?.message || 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
         this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
         // Dialog remains open so user can see the error and try again
       }
