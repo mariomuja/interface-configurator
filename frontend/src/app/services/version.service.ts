@@ -23,7 +23,7 @@ export class VersionService {
     }
 
     return this.http.get<VersionInfo>('/assets/version.json').pipe(
-      map(version => {
+      map((version: VersionInfo) => {
         this.versionCache = version;
         return version;
       }),
