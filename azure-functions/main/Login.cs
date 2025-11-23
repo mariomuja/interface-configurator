@@ -66,14 +66,19 @@ public class LoginFunction
                 user = await _authService.GetUserAsync(loginRequest.Username);
                 if (user == null)
                 {
-                    var errorResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-                    CorsHelper.AddCorsHeaders(errorResponse);
-                    await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new LoginResponse
+                    var errorResponseObj = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    errorResponseObj.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                    CorsHelper.AddCorsHeaders(errorResponseObj);
+                    await errorResponseObj.WriteStringAsync(JsonSerializer.Serialize(new LoginResponse
                     {
                         Success = false,
                         ErrorMessage = "Demo user not found"
+                    }, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true
                     }));
-                    return errorResponse;
+                    return errorResponseObj;
                 }
             }
             else
@@ -98,7 +103,11 @@ public class LoginFunction
                     Success = false,
                     ErrorMessage = "Invalid username or password"
                 };
-                await response.WriteStringAsync(JsonSerializer.Serialize(errorResponse));
+                await response.WriteStringAsync(JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }));
                 return response;
             }
 
@@ -114,6 +123,7 @@ public class LoginFunction
 
             await response.WriteStringAsync(JsonSerializer.Serialize(loginResponse, new JsonSerializerOptions
             {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true
             }));
 
@@ -121,9 +131,28 @@ public class LoginFunction
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login");
-            return await ErrorResponseHelper.CreateErrorResponse(
-                req, HttpStatusCode.InternalServerError, "Failed to process login", ex, _logger);
+            _logger.LogError(ex, "Error during login: {Message}", ex.Message);
+            _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
+            
+            // Return error in LoginResponse format that frontend expects
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            errorResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            CorsHelper.AddCorsHeaders(errorResponse);
+            
+            // Create LoginResponse format that frontend expects
+            var loginErrorResponse = new LoginResponse
+            {
+                Success = false,
+                ErrorMessage = $"Login failed: {ex.Message}"
+            };
+            
+            await errorResponse.WriteStringAsync(JsonSerializer.Serialize(loginErrorResponse, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            }));
+            
+            return errorResponse;
         }
     }
 }
