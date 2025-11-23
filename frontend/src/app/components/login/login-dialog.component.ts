@@ -224,12 +224,12 @@ export class LoginDialogComponent {
         this.isDemoLogin = false;
         if (response.success) {
           this.snackBar.open(`Willkommen, ${response.user?.username}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
-          // Close dialog after a short delay to allow snackbar to show
-          setTimeout(() => {
-            this.dialogRef.close(true);
-          }, 100);
+          // Close dialog immediately
+          this.dialogRef.close(true);
         } else {
           this.snackBar.open(response.errorMessage || 'Anmeldung fehlgeschlagen', 'Schließen', { duration: 3000 });
+          // Still close dialog even on failure for demo login
+          this.dialogRef.close(false);
         }
       },
       error: (error) => {
@@ -241,10 +241,8 @@ export class LoginDialogComponent {
         this.snackBar.open('Demo-Anmeldung: API nicht erreichbar, aber lokale Anmeldung aktiviert', 'Schließen', { duration: 3000 });
         // Create a local demo user session using AuthService method
         this.authService.setDemoUser();
-        // Close dialog after a short delay
-        setTimeout(() => {
-          this.dialogRef.close(true);
-        }, 100);
+        // Close dialog immediately - no delay needed
+        this.dialogRef.close(true);
       }
     });
   }
