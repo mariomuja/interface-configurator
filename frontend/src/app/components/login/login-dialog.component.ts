@@ -54,7 +54,7 @@ import { AuthService } from '../../services/auth.service';
           <h3>Admin-Anmeldung</h3>
           <p class="admin-info">
             <mat-icon>admin_panel_settings</mat-icon>
-            Als Admin-Benutzer können Sie Features für alle anderen Benutzer freischalten.
+            Als Admin-Benutzer können Sie Features für andere Benutzer freischalten.
             Verwenden Sie Ihre Admin-Anmeldedaten.
           </p>
           
