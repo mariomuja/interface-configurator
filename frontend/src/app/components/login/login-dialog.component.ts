@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -211,17 +211,24 @@ import { AuthService } from '../../services/auth.service';
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px;
+      padding: 16px;
       margin-bottom: 16px;
       background-color: #ffebee;
-      border-left: 4px solid #f44336;
+      border: 2px solid #f44336;
       border-radius: 4px;
       color: #c62828;
       font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(244, 67, 54, 0.2);
+      z-index: 1000;
+      position: relative;
     }
     
     .error-message mat-icon {
       color: #f44336;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
     }
   `]
 })
@@ -235,7 +242,8 @@ export class LoginDialogComponent {
   constructor(
     public dialogRef: MatDialogRef<LoginDialogComponent>,
     private authService: AuthService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private cdr: ChangeDetectorRef
   ) {}
 
   loginAsDemo(): void {
@@ -254,6 +262,7 @@ export class LoginDialogComponent {
         } else {
           // Show error message and keep dialog open
           this.errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.cdr.detectChanges();
           this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${this.errorMessage}`, 'Schließen', { 
             duration: 10000,
             horizontalPosition: 'center',
@@ -290,6 +299,7 @@ export class LoginDialogComponent {
         }
         // Show error message in dialog and snackbar
         this.errorMessage = `Demo-Anmeldung fehlgeschlagen: ${errorMessage}`;
+        this.cdr.detectChanges();
         this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
@@ -307,6 +317,7 @@ export class LoginDialogComponent {
   login(): void {
     if (!this.username || !this.password) {
       this.errorMessage = 'Bitte geben Sie Benutzername und Passwort ein';
+      this.cdr.detectChanges();
       this.snackBar.open(this.errorMessage, 'Schließen', { duration: 3000 });
       return;
     }
@@ -325,6 +336,7 @@ export class LoginDialogComponent {
         } else {
           // Show error message and keep dialog open
           this.errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.cdr.detectChanges();
           this.snackBar.open(this.errorMessage, 'Schließen', { 
             duration: 5000,
             horizontalPosition: 'center',
@@ -358,6 +370,7 @@ export class LoginDialogComponent {
         }
         // Show error message in dialog and snackbar
         this.errorMessage = errorMessage;
+        this.cdr.detectChanges();
         this.snackBar.open(this.errorMessage, 'Schließen', { 
           duration: 10000,
           horizontalPosition: 'center',
