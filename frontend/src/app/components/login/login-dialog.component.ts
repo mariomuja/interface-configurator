@@ -229,7 +229,12 @@ export class LoginDialogComponent {
         } else {
           // Show error message and keep dialog open
           const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
-          this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
+          this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
+            duration: 5000,
+            horizontalPosition: 'center',
+            verticalPosition: 'top',
+            panelClass: ['error-snackbar']
+          });
           // Dialog remains open so user can see the error and try again
         }
       },
@@ -257,7 +262,12 @@ export class LoginDialogComponent {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
         // Show error message and keep dialog open
-        this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
+        this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { 
+          duration: 5000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top',
+          panelClass: ['error-snackbar']
+        });
         // Dialog remains open so user can see the error and try again
       }
     });
@@ -282,7 +292,12 @@ export class LoginDialogComponent {
         } else {
           // Show error message and keep dialog open
           const errorMessage = response?.errorMessage || 'Anmeldung fehlgeschlagen';
-          this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
+          this.snackBar.open(errorMessage, 'Schließen', { 
+            duration: 5000,
+            horizontalPosition: 'center',
+            verticalPosition: 'top',
+            panelClass: ['error-snackbar']
+          });
           // Dialog remains open so user can see the error and try again
         }
       },
@@ -309,7 +324,12 @@ export class LoginDialogComponent {
           errorMessage = `HTTP ${error.status}: ${errorMessage}`;
         }
         // Show error message and keep dialog open
-        this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
+        this.snackBar.open(errorMessage, 'Schließen', { 
+          duration: 5000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top',
+          panelClass: ['error-snackbar']
+        });
         // Dialog remains open so user can see the error and try again
       }
     });
