@@ -224,25 +224,23 @@ export class LoginDialogComponent {
         this.isDemoLogin = false;
         if (response.success) {
           this.snackBar.open(`Willkommen, ${response.user?.username}! (Demo-Benutzer)`, 'Schließen', { duration: 2000 });
-          // Close dialog on successful login
+          // Close dialog only on successful login
           this.dialogRef.close(true);
         } else {
-          // If API login fails, use offline demo user as fallback
-          console.warn('API login failed, using offline demo user');
-          this.authService.setDemoUser();
-          this.snackBar.open('Willkommen als Demo-Benutzer! (Offline-Modus)', 'Schließen', { duration: 2000 });
-          this.dialogRef.close(true);
+          // Show error message and keep dialog open
+          const errorMessage = response.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
+          // Dialog remains open so user can see the error and try again
         }
       },
       error: (error) => {
         this.loggingIn = false;
         this.isDemoLogin = false;
         console.error('Demo login error:', error);
-        // Use offline demo user as fallback when API fails
-        console.warn('API login error, using offline demo user as fallback');
-        this.authService.setDemoUser();
-        this.snackBar.open('Willkommen als Demo-Benutzer! (Offline-Modus)', 'Schließen', { duration: 2000 });
-        this.dialogRef.close(true);
+        // Show error message and keep dialog open
+        const errorMessage = error?.message || error?.error?.message || 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        this.snackBar.open(`Demo-Anmeldung fehlgeschlagen: ${errorMessage}`, 'Schließen', { duration: 5000 });
+        // Dialog remains open so user can see the error and try again
       }
     });
   }
@@ -261,15 +259,22 @@ export class LoginDialogComponent {
         if (response.success) {
           const roleText = response.user?.role === 'admin' ? ' (Admin)' : '';
           this.snackBar.open(`Willkommen, ${response.user?.username}!${roleText}`, 'Schließen', { duration: 2000 });
+          // Close dialog only on successful login
           this.dialogRef.close(true);
         } else {
-          this.snackBar.open(response.errorMessage || 'Anmeldung fehlgeschlagen', 'Schließen', { duration: 3000 });
+          // Show error message and keep dialog open
+          const errorMessage = response.errorMessage || 'Anmeldung fehlgeschlagen';
+          this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
+          // Dialog remains open so user can see the error and try again
         }
       },
       error: (error) => {
         this.loggingIn = false;
         console.error('Login error:', error);
-        this.snackBar.open('Fehler bei der Anmeldung', 'Schließen', { duration: 3000 });
+        // Show error message and keep dialog open
+        const errorMessage = error?.message || error?.error?.message || 'Fehler bei der Anmeldung. Bitte versuchen Sie es erneut.';
+        this.snackBar.open(errorMessage, 'Schließen', { duration: 5000 });
+        // Dialog remains open so user can see the error and try again
       }
     });
   }
