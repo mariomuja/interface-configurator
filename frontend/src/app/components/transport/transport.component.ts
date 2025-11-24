@@ -3847,7 +3847,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.snackBar.open(`Source adapter changed from ${oldAdapterName} to ${newAdapterName}`, 'OK', { duration: 3000 });
     
     // Reload interface configuration to get new adapter settings
-    this.loadInterfaceConfiguration(this.currentInterfaceName);
+    this.loadInterfaceConfigurations();
   }
 
   openDestinationAdapterSelectionDialog(): void {
@@ -3874,6 +3874,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   addDestinationAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
     // Check if feature is enabled
     if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
+    
+    // Validate that only CSV and SqlServer are supported as destination adapters
+    if (adapterName !== 'CSV' && adapterName !== 'SqlServer') {
+      this.snackBar.open(`Destination adapter type "${adapterName}" is not supported. Only CSV and SqlServer are supported.`, 'OK', { duration: 5000 });
       return;
     }
     
@@ -3911,10 +3917,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const adapterInstanceGuid = this.generateGuid();
     
     // Create local instance first (so it appears immediately)
-    const localInstance = {
+    const localInstance: DestinationAdapterInstance = {
       adapterInstanceGuid: adapterInstanceGuid,
       instanceName: instanceName,
-      adapterName: adapterName,
+      adapterName: adapterName as 'CSV' | 'SqlServer',
       isEnabled: false,
       configuration: defaultConfiguration
     };
