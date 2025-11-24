@@ -11,14 +11,14 @@ import { MatChipsModule } from '@angular/material/chips';
 export interface DestinationAdapterInstance {
   adapterInstanceGuid: string;
   instanceName: string;
-  adapterName: 'CSV' | 'SqlServer';
+  adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM';
   isEnabled: boolean;
   configuration?: any;
 }
 
 export interface DestinationInstancesDialogData {
   instances: DestinationAdapterInstance[];
-  availableAdapters: { name: 'CSV' | 'SqlServer'; displayName: string; icon: string }[];
+  availableAdapters: { name: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'; displayName: string; icon: string }[];
 }
 
 @Component({
@@ -39,7 +39,7 @@ export interface DestinationInstancesDialogData {
 })
 export class DestinationInstancesDialogComponent implements OnInit {
   instances: DestinationAdapterInstance[] = [];
-  availableAdapters: { name: 'CSV' | 'SqlServer'; displayName: string; icon: string }[] = [
+  availableAdapters: { name: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'; displayName: string; icon: string }[] = [
     { name: 'CSV', displayName: 'CSV', icon: 'description' },
     { name: 'SqlServer', displayName: 'SQL Server', icon: 'storage' }
   ];
@@ -54,7 +54,7 @@ export class DestinationInstancesDialogComponent implements OnInit {
     this.availableAdapters = this.data.availableAdapters || this.availableAdapters;
   }
 
-  onAddAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+  onAddAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
     // Set default configuration based on adapter type
     let defaultConfiguration: any = {};
     if (adapterName === 'SqlServer') {
@@ -95,12 +95,12 @@ export class DestinationInstancesDialogComponent implements OnInit {
     this.dialogRef.close();
   }
 
-  getAdapterIcon(adapterName: 'CSV' | 'SqlServer'): string {
+  getAdapterIcon(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): string {
     const adapter = this.availableAdapters.find(a => a.name === adapterName);
     return adapter?.icon || 'extension';
   }
 
-  getAdapterDisplayName(adapterName: 'CSV' | 'SqlServer'): string {
+  getAdapterDisplayName(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): string {
     const adapter = this.availableAdapters.find(a => a.name === adapterName);
     return adapter?.displayName || adapterName;
   }
@@ -113,7 +113,7 @@ export class DestinationInstancesDialogComponent implements OnInit {
     });
   }
 
-  private getDefaultInstanceName(adapterName: 'CSV' | 'SqlServer'): string {
+  private getDefaultInstanceName(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): string {
     // Count all existing instances to determine the next number
     const totalCount = this.instances.length;
     let counter = totalCount + 1;

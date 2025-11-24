@@ -3877,12 +3877,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     
-    // Validate that only CSV and SqlServer are supported as destination adapters
-    if (adapterName !== 'CSV' && adapterName !== 'SqlServer') {
-      this.snackBar.open(`Destination adapter type "${adapterName}" is not supported. Only CSV and SqlServer are supported.`, 'OK', { duration: 5000 });
-      return;
-    }
-    
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
     
     // Set default configuration based on adapter type
@@ -3920,7 +3914,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const localInstance: DestinationAdapterInstance = {
       adapterInstanceGuid: adapterInstanceGuid,
       instanceName: instanceName,
-      adapterName: adapterName as 'CSV' | 'SqlServer',
+      adapterName: adapterName,
       isEnabled: false,
       configuration: defaultConfiguration
     };
