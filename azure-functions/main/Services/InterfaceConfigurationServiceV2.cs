@@ -32,6 +32,142 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         _serviceProvider = serviceProvider;
     }
 
+    /// <summary>
+    /// Creates Service Bus subscription for a destination adapter instance if it's enabled
+    /// </summary>
+    private async Task CreateServiceBusSubscriptionIfEnabledAsync(
+        string interfaceName,
+        DestinationAdapterInstance instance,
+        CancellationToken cancellationToken)
+    {
+        if (!instance.IsEnabled)
+        {
+            _logger?.LogDebug("Destination adapter instance '{InstanceName}' is disabled, skipping Service Bus subscription creation", instance.InstanceName);
+            return;
+        }
+
+        try
+        {
+            var subscriptionService = _serviceProvider?.GetService<IServiceBusSubscriptionService>();
+            if (subscriptionService == null)
+            {
+                _logger?.LogWarning("Service Bus subscription service not available. Subscription will not be created for instance '{InstanceName}'", instance.InstanceName);
+                return;
+            }
+
+            await subscriptionService.CreateSubscriptionAsync(interfaceName, instance.AdapterInstanceGuid, cancellationToken);
+            _logger?.LogInformation("Created Service Bus subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'",
+                instance.InstanceName, instance.AdapterInstanceGuid, interfaceName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error creating Service Bus subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'. " +
+                "The instance was saved but subscription creation failed. You may need to manually create the subscription or retry.",
+                instance.InstanceName, instance.AdapterInstanceGuid, interfaceName);
+            // Don't throw - allow instance creation to succeed even if subscription creation fails
+        }
+    }
+
+    /// <summary>
+    /// Deletes Service Bus subscription for a destination adapter instance
+    /// </summary>
+    private async Task DeleteServiceBusSubscriptionAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subscriptionService = _serviceProvider?.GetService<IServiceBusSubscriptionService>();
+            if (subscriptionService == null)
+            {
+                _logger?.LogWarning("Service Bus subscription service not available. Subscription will not be deleted for adapter instance '{AdapterInstanceGuid}'", adapterInstanceGuid);
+                return;
+            }
+
+            await subscriptionService.DeleteSubscriptionAsync(interfaceName, adapterInstanceGuid, cancellationToken);
+            _logger?.LogInformation("Deleted Service Bus subscription for destination adapter instance '{AdapterInstanceGuid}' in interface '{InterfaceName}'",
+                adapterInstanceGuid, interfaceName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error deleting Service Bus subscription for destination adapter instance '{AdapterInstanceGuid}' in interface '{InterfaceName}'. " +
+                "The instance was removed but subscription deletion failed. You may need to manually delete the subscription.",
+                adapterInstanceGuid, interfaceName);
+            // Don't throw - allow instance deletion to succeed even if subscription deletion fails
+        }
+    }
+
+    /// <summary>
+    /// Ensures Service Bus subscriptions exist for all enabled destination adapter instances
+    /// Called during initialization to sync subscriptions with database state
+    /// </summary>
+    private async Task EnsureServiceBusSubscriptionsForEnabledInstancesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subscriptionService = _serviceProvider?.GetService<IServiceBusSubscriptionService>();
+            if (subscriptionService == null)
+            {
+                _logger?.LogWarning("Service Bus subscription service not available. Skipping subscription synchronization.");
+                return;
+            }
+
+            // Get all interface configurations
+            var allConfigs = await GetAllConfigurationsAsync(cancellationToken);
+            var subscriptionCount = 0;
+            var errorCount = 0;
+
+            foreach (var config in allConfigs)
+            {
+                try
+                {
+                    // Ensure topic exists for this interface
+                    await subscriptionService.EnsureTopicExistsAsync(config.InterfaceName, cancellationToken);
+
+                    // Get all destination adapter instances for this interface
+                    var destinationInstances = await GetDestinationAdapterInstancesAsync(config.InterfaceName, cancellationToken);
+                    
+                    // Create subscriptions for enabled instances
+                    foreach (var instance in destinationInstances.Where(i => i.IsEnabled))
+                    {
+                        try
+                        {
+                            // Check if subscription already exists
+                            var exists = await subscriptionService.SubscriptionExistsAsync(config.InterfaceName, instance.AdapterInstanceGuid, cancellationToken);
+                            if (!exists)
+                            {
+                                await subscriptionService.CreateSubscriptionAsync(config.InterfaceName, instance.AdapterInstanceGuid, cancellationToken);
+                                subscriptionCount++;
+                                _logger?.LogInformation("Created Service Bus subscription for existing enabled destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'",
+                                    instance.InstanceName, instance.AdapterInstanceGuid, config.InterfaceName);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            errorCount++;
+                            _logger?.LogError(ex, "Error creating subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'",
+                                instance.InstanceName, instance.AdapterInstanceGuid, config.InterfaceName);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errorCount++;
+                    _logger?.LogError(ex, "Error processing interface '{InterfaceName}' during subscription synchronization", config.InterfaceName);
+                }
+            }
+
+            _logger?.LogInformation("Service Bus subscription synchronization completed: {CreatedCount} subscriptions created, {ErrorCount} errors",
+                subscriptionCount, errorCount);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during Service Bus subscription synchronization");
+            // Don't throw - initialization should continue even if subscription sync fails
+        }
+    }
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -49,6 +185,9 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                 await SaveConfigurationAsync(defaultConfiguration, cancellationToken);
                 _logger?.LogInformation("Created default interface configuration '{InterfaceName}'", DefaultInterfaceName);
             }
+
+            // Ensure Service Bus subscriptions exist for all enabled destination adapter instances
+            await EnsureServiceBusSubscriptionsForEnabledInstancesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -845,6 +984,10 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                 };
                 config.Destinations[newInstance.InstanceName] = newInstance;
                 await SaveConfigurationAsync(config, cancellationToken);
+                
+                // Create Service Bus subscription for this destination adapter instance (if enabled)
+                await CreateServiceBusSubscriptionIfEnabledAsync(interfaceName, newInstance, cancellationToken);
+                
                 return newInstance;
             }
             throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
@@ -866,6 +1009,9 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                 var instanceToRemove = config.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == adapterInstanceGuid);
                 if (instanceToRemove != null)
                 {
+                    // Delete Service Bus subscription before removing instance
+                    await DeleteServiceBusSubscriptionAsync(interfaceName, adapterInstanceGuid, cancellationToken);
+                    
                     config.Destinations.Remove(instanceToRemove.InstanceName);
                     await SaveConfigurationAsync(config, cancellationToken);
                 }
@@ -902,11 +1048,28 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                 var instance = config.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == adapterInstanceGuid);
                 if (instance != null)
                 {
+                    var wasEnabled = instance.IsEnabled;
+                    
                     if (instanceName != null) instance.InstanceName = instanceName;
                     if (isEnabled.HasValue) instance.IsEnabled = isEnabled.Value;
                     if (configuration != null) instance.Configuration = configuration;
                     instance.UpdatedAt = DateTime.UtcNow;
                     await SaveConfigurationAsync(config, cancellationToken);
+                    
+                    // Manage Service Bus subscription based on enabled state
+                    if (isEnabled.HasValue && isEnabled.Value != wasEnabled)
+                    {
+                        if (isEnabled.Value)
+                        {
+                            // Instance was enabled - create subscription
+                            await CreateServiceBusSubscriptionIfEnabledAsync(interfaceName, instance, cancellationToken);
+                        }
+                        else
+                        {
+                            // Instance was disabled - delete subscription
+                            await DeleteServiceBusSubscriptionAsync(interfaceName, adapterInstanceGuid, cancellationToken);
+                        }
+                    }
                 }
                 else
                 {

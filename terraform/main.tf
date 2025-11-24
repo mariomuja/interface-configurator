@@ -172,6 +172,32 @@ resource "azurerm_application_insights" "functions" {
   }
 }
 
+# Azure Service Bus Namespace
+# Topics and subscriptions are created dynamically by the application when interfaces are configured
+resource "azurerm_servicebus_namespace" "main" {
+  name                = var.service_bus_namespace_name
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  sku                 = var.service_bus_sku
+  minimum_tls_version = "1.2"
+
+  tags = {
+    Environment = var.environment
+    Project     = "Infrastructure"
+  }
+}
+
+# Service Bus Namespace Authorization Rule (RootManageSharedAccessKey)
+# This provides full access to the namespace and is used by the application
+resource "azurerm_servicebus_namespace_authorization_rule" "root_manage" {
+  name         = "RootManageSharedAccessKey"
+  namespace_id = azurerm_servicebus_namespace.main.id
+
+  listen = true
+  send   = true
+  manage = true
+}
+
 # Storage Account for Functions (if needed)
 resource "azurerm_storage_account" "functions" {
   name                     = var.functions_storage_name
@@ -240,6 +266,9 @@ resource "azurerm_linux_function_app" "main" {
     # Application Insights integration
     "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.functions[0].instrumentation_key
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.functions[0].connection_string
+    # Service Bus connection string (used by ServiceBusService and ServiceBusSubscriptionService)
+    "ServiceBusConnectionString" = azurerm_servicebus_namespace_authorization_rule.root_manage.primary_connection_string
+    "AZURE_SERVICEBUS_CONNECTION_STRING" = azurerm_servicebus_namespace_authorization_rule.root_manage.primary_connection_string
     # Note: WEBSITE_RUN_FROM_PACKAGE is set by deployment workflow and should NOT be removed
     # Terraform will ignore this setting if it's managed by the deployment workflow
   }

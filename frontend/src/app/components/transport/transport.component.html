@@ -44,7 +44,8 @@
       (csvDataChange)="onCsvDataChange($event)"
       (enabledChange)="onSourceEnabledChangeFromHeader($event)"
       (settingsClick)="openSourceAdapterSettings()"
-      (explorerClick)="openBlobContainerExplorer('Source', sourceAdapterName, sourceInstanceName, sourceAdapterInstanceGuid)">
+      (explorerClick)="openBlobContainerExplorer('Source', sourceAdapterName, sourceInstanceName, sourceAdapterInstanceGuid)"
+      (adapterTypeChangeClick)="openSourceAdapterSelectionDialog()">
       <div class="sql-source-info" *ngIf="sourceAdapterName === 'SqlServer' && !isLoading">
         <p>SQL Server Source Adapter</p>
         <p *ngIf="sqlPollingStatement" class="polling-statement">
@@ -56,71 +57,82 @@
       </div>
     </app-adapter-card>
 
-<!-- MessageBox Data Card -->
-<mat-expansion-panel [(expanded)]="messageBoxExpanded" class="message-box-card">
-  <mat-expansion-panel-header>
-    <mat-panel-title>
-      <div class="message-box-header">
-        <mat-icon class="expand-icon">
-          {{ messageBoxExpanded ? 'expand_less' : 'expand_more' }}
-        </mat-icon>
-        <mat-icon>inbox</mat-icon>
-        <div class="message-box-header-text">
-          <h3>MessageBox (Source Output)</h3>
+    <!-- Service Bus Messages Card -->
+    <mat-expansion-panel [(expanded)]="serviceBusMessagesExpanded" class="service-bus-messages-card">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <div class="service-bus-messages-header">
+            <mat-icon class="expand-icon">
+              {{ serviceBusMessagesExpanded ? 'expand_less' : 'expand_more' }}
+            </mat-icon>
+            <mat-icon>message</mat-icon>
+            <div class="service-bus-messages-header-text">
+              <h3>Service Bus Messages</h3>
+            </div>
+            <span class="message-count" *ngIf="!isLoadingServiceBusMessages">
+              {{ serviceBusMessages.length }} messages
+            </span>
+          </div>
+        </mat-panel-title>
+        <mat-panel-description>
+          <button mat-icon-button (click)="loadServiceBusMessages(); $event.stopPropagation()" [disabled]="isLoadingServiceBusMessages" matTooltip="Refresh Service Bus messages">
+            <mat-icon>{{ isLoadingServiceBusMessages ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+          </button>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      
+      <div class="service-bus-messages-content">
+        <div *ngIf="isLoadingServiceBusMessages" class="spinner-container">
+          <mat-spinner diameter="40"></mat-spinner>
         </div>
-        <span class="message-count" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox">
-          {{ messageBoxTableData.length }} messages
-        </span>
+        <div class="service-bus-messages-table" *ngIf="!isLoadingServiceBusMessages && serviceBusMessages.length > 0">
+          <table mat-table [dataSource]="serviceBusMessagesDataSource" class="data-table compact-table">
+            <ng-container matColumnDef="enqueuedTime">
+              <th mat-header-cell *matHeaderCellDef>Time</th>
+              <td mat-cell *matCellDef="let message">{{ message.enqueuedTime | date:'short' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="adapterName">
+              <th mat-header-cell *matHeaderCellDef>Adapter</th>
+              <td mat-cell *matCellDef="let message">{{ message.adapterName }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="messageId">
+              <th mat-header-cell *matHeaderCellDef>Message ID</th>
+              <td mat-cell *matCellDef="let message" class="message-id-cell">
+                <span class="message-id-truncated" [matTooltip]="message.messageId">{{ message.messageId | slice:0:20 }}...</span>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="deliveryCount">
+              <th mat-header-cell *matHeaderCellDef>Delivery</th>
+              <td mat-cell *matCellDef="let message">{{ message.deliveryCount }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Actions</th>
+              <td mat-cell *matCellDef="let message">
+                <button mat-icon-button (click)="openServiceBusMessageDialog(message)" matTooltip="View message details" color="primary">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="serviceBusMessagesDisplayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: serviceBusMessagesDisplayedColumns" class="service-bus-message-row"></tr>
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" [attr.colspan]="serviceBusMessagesDisplayedColumns.length">
+                No data
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div class="table-empty-message" *ngIf="!isLoadingServiceBusMessages && serviceBusMessages.length === 0">
+          <p>No messages in Service Bus yet.</p>
+        </div>
       </div>
-    </mat-panel-title>
-    <mat-panel-description>
-      <button mat-icon-button (click)="loadMessageBoxData(); $event.stopPropagation()" [disabled]="isLoadingMessageBox || !sourceAdapterInstanceGuid" matTooltip="Refresh MessageBox data">
-        <mat-icon>{{ isLoadingMessageBox ? 'hourglass_empty' : 'refresh' }}</mat-icon>
-      </button>
-    </mat-panel-description>
-  </mat-expansion-panel-header>
-  
-  <div class="message-box-content">
-    <div *ngIf="sourceAdapterInstanceGuid && isLoadingMessageBox" class="spinner-container">
-      <mat-spinner></mat-spinner>
-    </div>
-    <div class="message-box-table" *ngIf="sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length > 0">
-      <table mat-table [dataSource]="messageBoxTableData" class="data-table">
-        <ng-container matColumnDef="datetimeCreated">
-          <th mat-header-cell *matHeaderCellDef>Timestamp</th>
-          <td mat-cell *matCellDef="let row">{{ row.datetimeCreated | date:'short' }}</td>
-        </ng-container>
+    </mat-expansion-panel>
 
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>Status</th>
-          <td mat-cell *matCellDef="let row">{{ row.status }}</td>
-        </ng-container>
-
-        <ng-container *ngFor="let column of messageBoxRecordColumns" [matColumnDef]="column">
-          <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
-          <td mat-cell *matCellDef="let row">{{ getMessageBoxRecordValue(row, column) }}</td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="messageBoxDisplayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: messageBoxDisplayedColumns"></tr>
-        <tr class="mat-row" *matNoDataRow>
-          <td class="mat-cell" [attr.colspan]="messageBoxDisplayedColumns.length">
-            No data
-          </td>
-        </tr>
-      </table>
-    </div>
-    <div class="table-empty-message" *ngIf="!sourceIsEnabled">
-      <p>The source adapter is disabled. Enable the source adapter to start generating messages.</p>
-    </div>
-    <div class="table-empty-message" *ngIf="sourceIsEnabled && sourceAdapterInstanceGuid && !isLoadingMessageBox && messageBoxTableData.length === 0">
-      <p>No messages in MessageBox yet.</p>
-    </div>
-    <div class="table-empty-message" *ngIf="sourceIsEnabled && !sourceAdapterInstanceGuid">
-      <p>Waiting for source adapter instance configuration...</p>
-    </div>
-  </div>
-</mat-expansion-panel>
 
 <!-- Blob Container Explorer Card - REMOVED: Now shown in modal dialog per adapter instance -->
 <!--
@@ -226,8 +238,8 @@
   </mat-card-content>
 </mat-card>
 
-    <!-- Destination Adapter Instances (only shown if feature is enabled) -->
-    <mat-card class="destinations-container-card" *ngIf="isDestinationAdapterUIEnabled">
+    <!-- Destination Adapter Instances -->
+    <mat-card class="destinations-container-card">
       <mat-card-header class="destinations-header">
         <button mat-icon-button (click)="destinationCardExpanded = !destinationCardExpanded" class="toggle-card-button">
           <mat-icon>{{ destinationCardExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
@@ -235,19 +247,11 @@
         <div class="destinations-header-actions">
           <button mat-raised-button 
                   color="primary" 
-                  (click)="addDestinationAdapter('CSV')" 
+                  (click)="openDestinationAdapterSelectionDialog()" 
                   class="add-destination-button"
-                  matTooltip="Add CSV destination adapter">
-            <mat-icon>description</mat-icon>
-            Add CSV
-          </button>
-          <button mat-raised-button 
-                  color="primary" 
-                  (click)="addDestinationAdapter('SqlServer')" 
-                  class="add-destination-button"
-                  matTooltip="Add SQL Server destination adapter">
-            <mat-icon>storage</mat-icon>
-            Add SQL Server
+                  matTooltip="Add destination adapter">
+            <mat-icon>add</mat-icon>
+            Add Destination Adapter
           </button>
         </div>
       </mat-card-header>

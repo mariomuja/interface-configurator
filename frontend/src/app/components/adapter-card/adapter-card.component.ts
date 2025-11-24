@@ -11,7 +11,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 export type AdapterType = 'Source' | 'Destination';
-export type AdapterName = 'CSV' | 'SqlServer';
+export type AdapterName = 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM';
 
 @Component({
   selector: 'app-adapter-card',
@@ -57,6 +57,7 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   @Output() primaryAction = new EventEmitter<void>(); // For "Start Transport" or "Drop Table" buttons
   @Output() settingsClick = new EventEmitter<void>(); // For opening settings dialog
   @Output() explorerClick = new EventEmitter<void>(); // For opening blob container explorer dialog
+  @Output() adapterTypeChangeClick = new EventEmitter<void>(); // For changing adapter type (Source only)
 
   private readonly FIELD_SEPARATOR = '║';
   private readonly COLUMN_COLORS = [
@@ -110,6 +111,10 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
     this.explorerClick.emit();
   }
 
+  onAdapterTypeChange(): void {
+    this.adapterTypeChangeClick.emit();
+  }
+
   onCsvDataInput(event: Event): void {
     const element = event.target as HTMLElement;
     if (element) {
@@ -160,6 +165,46 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
       return 'primary';
     } else {
       return 'accent';
+    }
+  }
+
+  getAdapterCardClass(): string {
+    switch (this.adapterName) {
+      case 'CSV':
+      case 'FILE':
+      case 'SFTP':
+        return 'csv-card';
+      case 'SqlServer':
+        return 'sql-card';
+      case 'SAP':
+        return 'sap-card';
+      case 'Dynamics365':
+        return 'dynamics365-card';
+      case 'CRM':
+        return 'crm-card';
+      default:
+        return 'adapter-card';
+    }
+  }
+
+  getAdapterDisplayName(): string {
+    switch (this.adapterName) {
+      case 'CSV':
+        return 'CSV';
+      case 'FILE':
+        return 'File';
+      case 'SFTP':
+        return 'SFTP';
+      case 'SqlServer':
+        return 'SQL Server';
+      case 'SAP':
+        return 'SAP';
+      case 'Dynamics365':
+        return 'Dynamics 365';
+      case 'CRM':
+        return 'Microsoft CRM';
+      default:
+        return this.adapterName;
     }
   }
 

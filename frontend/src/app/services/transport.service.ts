@@ -330,6 +330,15 @@ export class TransportService {
     return this.http.get<any[]>(`${this.apiUrl}/GetMessageBoxMessages?${params.toString()}`);
   }
 
+  getServiceBusMessages(interfaceName: string, maxMessages: number = 100): Observable<any[]> {
+    const params = new URLSearchParams({
+      interfaceName,
+      maxMessages: maxMessages.toString()
+    });
+    
+    return this.http.get<any[]>(`${this.apiUrl}/GetServiceBusMessages?${params.toString()}`);
+  }
+
   getBlobContainerFolders(containerName: string = 'csv-files', folderPrefix: string = '', maxFiles: number = 10): Observable<any[]> {
     const params = new HttpParams()
       .set('containerName', containerName)

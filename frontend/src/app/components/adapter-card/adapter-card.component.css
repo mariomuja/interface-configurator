@@ -37,6 +37,19 @@
   display: none !important;
 }
 
+.change-adapter-button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: rgba(0, 0, 0, 0.6);
+  transition: color 0.2s ease;
+}
+
+.change-adapter-button:hover {
+  color: rgba(0, 0, 0, 0.87);
+}
+
 .settings-button {
   flex: 0 0 auto;
   width: 36px;
@@ -90,6 +103,17 @@
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
+}
+
+.adapter-type-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* Status icon removed from card headers */
@@ -312,15 +336,42 @@ mat-slide-toggle {
 
 .data-card.adapter-enabled .settings-button,
 .data-card.adapter-enabled .restart-button,
-.data-card.adapter-enabled .explorer-button {
+.data-card.adapter-enabled .explorer-button,
+.data-card.adapter-enabled .change-adapter-button {
   color: rgba(0, 0, 0, 0.6);
   transition: color 0.2s ease;
 }
 
 .data-card.adapter-enabled .settings-button:hover,
 .data-card.adapter-enabled .restart-button:hover,
-.data-card.adapter-enabled .explorer-button:hover {
+.data-card.adapter-enabled .explorer-button:hover,
+.data-card.adapter-enabled .change-adapter-button:hover {
   color: rgba(0, 0, 0, 0.87);
+}
+
+/* Adapter type specific card styles */
+.data-card.csv-card {
+  border-left: 4px solid #2196F3; /* Blue for CSV */
+}
+
+.data-card.sql-card {
+  border-left: 4px solid #4CAF50; /* Green for SQL Server */
+}
+
+.data-card.sap-card {
+  border-left: 4px solid #FF9800; /* Orange for SAP */
+}
+
+.data-card.dynamics365-card {
+  border-left: 4px solid #00BCD4; /* Cyan for Dynamics 365 */
+}
+
+.data-card.crm-card {
+  border-left: 4px solid #9C27B0; /* Purple for CRM */
+}
+
+.data-card.adapter-card {
+  border-left: 4px solid #757575; /* Grey for unknown adapters */
 }
 
 /* CSV text container - restrict to 10 rows with vertical scrollbar */

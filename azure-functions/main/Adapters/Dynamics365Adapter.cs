@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Net.Http.Headers;
 using System.Net;
 using System.Linq;
+using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -35,6 +36,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
     private readonly bool _useBatch;
 
     public Dynamics365Adapter(
+        IServiceBusService? serviceBusService = null,
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
@@ -54,7 +56,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
         int pageSize = 50,
         bool useBatch = true,
         HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient)
+        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient)
     {
         _tenantId = tenantId;
         _clientId = clientId;
@@ -247,16 +249,16 @@ public class Dynamics365Adapter : HttpClientAdapterBase
 
         try
         {
-            // Read messages from MessageBox if AdapterRole is "Destination"
-            List<MessageBoxMessage>? processedMessages = null;
-            var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
-            if (messageBoxResult.HasValue)
+            // Read messages from Service Bus if AdapterRole is "Destination"
+            List<ServiceBusMessage>? processedMessages = null;
+            var serviceBusResult = await ReadMessagesFromServiceBusAsync(cancellationToken);
+            if (serviceBusResult.HasValue)
             {
-                var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+                var (messageHeaders, messageRecords, messages) = serviceBusResult.Value;
                 headers = messageHeaders;
                 records = messageRecords;
                 processedMessages = messages;
-                _logger?.LogInformation("Dynamics 365 Adapter (Destination): Read {Count} records from MessageBox", records.Count);
+                _logger?.LogInformation("Dynamics 365 Adapter (Destination): Read {Count} records from Service Bus", records.Count);
             }
             else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
             {

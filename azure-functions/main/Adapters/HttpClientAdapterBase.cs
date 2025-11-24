@@ -21,6 +21,7 @@ public abstract class HttpClientAdapterBase : AdapterBase
     protected DateTime _tokenExpiry = DateTime.MinValue;
 
     protected HttpClientAdapterBase(
+        IServiceBusService? serviceBusService = null,
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
@@ -31,7 +32,7 @@ public abstract class HttpClientAdapterBase : AdapterBase
         HttpClient? httpClient = null,
         JQTransformationService? jqService = null,
         string? jqScriptFile = null)
-        : base(messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile)
+        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile)
     {
         if (httpClient != null)
         {

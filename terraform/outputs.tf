@@ -66,3 +66,14 @@ output "functions_storage_account_name" {
   description = "Name of the Functions storage account"
   value       = azurerm_storage_account.functions.name
 }
+
+output "service_bus_namespace_name" {
+  description = "Name of the Service Bus namespace"
+  value       = azurerm_servicebus_namespace.main.name
+}
+
+output "service_bus_namespace_connection_string" {
+  description = "Connection string for the Service Bus namespace"
+  value       = azurerm_servicebus_namespace_authorization_rule.root_manage.primary_connection_string
+  sensitive   = true
+}

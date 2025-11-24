@@ -437,6 +437,7 @@ public class AdapterFactory : IAdapterFactory
 
     private SapAdapter CreateSapAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
+        var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
         var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
         var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<SapAdapter>>();
@@ -488,6 +489,7 @@ public class AdapterFactory : IAdapterFactory
         var adapterRole = isSource ? "Source" : "Destination";
 
         return new SapAdapter(
+            serviceBusService,
             messageBoxService,
             subscriptionService,
             config.InterfaceName,
@@ -521,6 +523,7 @@ public class AdapterFactory : IAdapterFactory
 
     private Dynamics365Adapter CreateDynamics365Adapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
+        var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
         var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
         var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<Dynamics365Adapter>>();
@@ -555,6 +558,7 @@ public class AdapterFactory : IAdapterFactory
         var adapterRole = isSource ? "Source" : "Destination";
 
         return new Dynamics365Adapter(
+            serviceBusService,
             messageBoxService,
             subscriptionService,
             config.InterfaceName,
@@ -576,6 +580,7 @@ public class AdapterFactory : IAdapterFactory
 
     private CrmAdapter CreateCrmAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
+        var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
         var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
         var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<CrmAdapter>>();
@@ -608,6 +613,7 @@ public class AdapterFactory : IAdapterFactory
         var adapterRole = isSource ? "Source" : "Destination";
 
         return new CrmAdapter(
+            serviceBusService,
             messageBoxService,
             subscriptionService,
             config.InterfaceName,

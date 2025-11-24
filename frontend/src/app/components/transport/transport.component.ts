@@ -19,12 +19,14 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { AdapterCardComponent } from '../adapter-card/adapter-card.component';
 import { AdapterPropertiesDialogComponent, AdapterPropertiesData } from '../adapter-properties-dialog/adapter-properties-dialog.component';
+import { AdapterSelectDialogComponent, AdapterSelectData } from '../adapter-select-dialog/adapter-select-dialog.component';
 import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from '../destination-instances-dialog/destination-instances-dialog.component';
 import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
 import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData } from '../blob-container-explorer-dialog/blob-container-explorer-dialog.component';
 import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.component';
 import { DiagnoseDialogComponent, DiagnoseDialogData } from '../diagnose-dialog/diagnose-dialog.component';
 import { AddInterfaceDialogComponent, AddInterfaceDialogData } from '../add-interface-dialog/add-interface-dialog.component';
+import { ServiceBusMessageDialogComponent } from '../service-bus-message-dialog/service-bus-message-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { ErrorTrackingService } from '../../services/error-tracking.service';
@@ -34,13 +36,6 @@ import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription, firstValueFrom } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
-interface MessageBoxTableRow {
-  messageId: string;
-  datetimeCreated: string;
-  status: string;
-  record: Record<string, string>;
-  headers: string[];
-}
 
 @Component({
   selector: 'app-transport',
@@ -122,16 +117,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   private destinationCardExpandedStates: Map<string, boolean> = new Map();
   isRestartingSource: boolean = false;
   isRestartingDestination: boolean = false;
-  sourceAdapterName: 'CSV' | 'SqlServer' = 'CSV';
+  sourceAdapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM' = 'CSV';
   private refreshSubscription?: Subscription;
   private lastErrorShown: string = '';
   private errorShownCount: number = 0;
   private demoSampleCsvCache: { text: string; records: CsvRecord[] } | null = null;
   private autoStartedInterfaces = new Set<string>();
-  messageBoxTableData: MessageBoxTableRow[] = [];
-  messageBoxRecordColumns: string[] = [];
-  messageBoxDisplayedColumns: string[] = ['datetimeCreated', 'status'];
-  isLoadingMessageBox = false;
   
   // Blob Container Explorer
   blobContainerFolders: any[] = [];
@@ -141,9 +132,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   blobContainerSortOrder: 'asc' | 'desc' = 'desc'; // desc = newest first
   selectedBlobFiles: Set<string> = new Set(); // Set of full paths of selected files
   isDeletingBlobFiles = false;
-  messageBoxExpanded: boolean = true;
   blobContainerPagination: Map<string, { loadedCount: number; hasMore: boolean; isLoadingMore: boolean }> = new Map();
   readonly BLOB_FILES_PER_PAGE = 10;
+  
+  // Service Bus Messages
+  serviceBusMessages: any[] = [];
+  serviceBusMessagesDataSource = new MatTableDataSource<any>([]);
+  serviceBusMessagesDisplayedColumns: string[] = ['enqueuedTime', 'adapterName', 'messageId', 'deliveryCount', 'actions'];
+  isLoadingServiceBusMessages = false;
+  serviceBusMessagesExpanded: boolean = true;
+  private serviceBusMessagesRefreshInterval?: Subscription;
   
   selectedComponent: string = 'all';
   availableComponents: string[] = ['all', 'Azure Function', 'Blob Storage', 'SQL Server', 'Vercel API'];
@@ -736,78 +734,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  loadMessageBoxData(): void {
-    const interfaceName = this.getActiveInterfaceName();
-    if (!interfaceName) {
-      this.messageBoxTableData = [];
-      this.messageBoxRecordColumns = [];
-      this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-      this.isLoadingMessageBox = false;
-      return;
-    }
-
-    this.isLoadingMessageBox = true;
-
-    // Try to load all messages for the interface first (without adapterInstanceGuid filter)
-    // This shows all messages regardless of adapter instance, which is useful for debugging
-    // If adapterInstanceGuid is available, we can optionally filter by it
-    const guidString = this.sourceAdapterInstanceGuid ? String(this.sourceAdapterInstanceGuid) : null;
-
-    console.log('Loading MessageBox data:', {
-      interfaceName,
-      sourceAdapterInstanceGuid: guidString || 'none (loading all)',
-      adapterType: 'Source'
-    });
-
-    // Load messages - if GUID is available, use it; otherwise load all messages for interface
-    // Pass null for status to get all messages (Pending, Processed, Error, etc.)
-    this.transportService.getMessageBoxMessages(interfaceName, guidString || '', 'Source', null).subscribe({
-      next: (messages) => {
-        console.log('MessageBox messages received:', messages?.length || 0, messages);
-        
-        if (messages && messages.length > 0) {
-          console.log('Sample message:', messages[0]);
-        }
-        
-        const rows = (messages || []).map((msg: any) => ({
-          messageId: msg.messageId,
-          datetimeCreated: msg.datetimeCreated,
-          status: msg.status,
-          record: msg.record || {},
-          headers: msg.headers || []
-        })) as MessageBoxTableRow[];
-
-        // Sort by datetimeCreated descending (newest first)
-        rows.sort((a, b) => {
-          const dateA = new Date(a.datetimeCreated).getTime();
-          const dateB = new Date(b.datetimeCreated).getTime();
-          return dateB - dateA;
-        });
-
-        this.messageBoxTableData = rows;
-        this.messageBoxRecordColumns = this.extractMessageBoxColumns(this.messageBoxTableData);
-        this.messageBoxDisplayedColumns = ['datetimeCreated', 'status', ...this.messageBoxRecordColumns];
-        this.isLoadingMessageBox = false;
-        
-        console.log('MessageBox table data set:', this.messageBoxTableData.length, 'rows');
-      },
-      error: (error) => {
-        console.error('Error loading MessageBox data:', error);
-        console.error('Request details:', {
-          interfaceName,
-          sourceAdapterInstanceGuid: guidString,
-          adapterType: 'Source',
-          error: error,
-          errorMessage: error?.message,
-          errorStatus: error?.status
-        });
-        this.isLoadingMessageBox = false;
-        this.messageBoxTableData = [];
-        this.messageBoxRecordColumns = [];
-        this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-      }
-    });
-  }
 
   loadBlobContainerFolders(): void {
     this.isLoadingBlobContainer = true;
@@ -1185,6 +1111,45 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
+
+  loadServiceBusMessages(): void {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      this.serviceBusMessages = [];
+      this.serviceBusMessagesDataSource.data = [];
+      return;
+    }
+
+    this.isLoadingServiceBusMessages = true;
+
+    this.transportService.getServiceBusMessages(interfaceName, 100).subscribe({
+      next: (messages) => {
+        // Sort by enqueuedTime descending (newest first)
+        this.serviceBusMessages = (messages || []).sort((a: any, b: any) => {
+          const dateA = new Date(a.enqueuedTime).getTime();
+          const dateB = new Date(b.enqueuedTime).getTime();
+          return dateB - dateA;
+        });
+        this.serviceBusMessagesDataSource.data = this.serviceBusMessages;
+        this.isLoadingServiceBusMessages = false;
+      },
+      error: (error) => {
+        console.error('Error loading Service Bus messages:', error);
+        this.isLoadingServiceBusMessages = false;
+        this.serviceBusMessages = [];
+        this.serviceBusMessagesDataSource.data = [];
+      }
+    });
+  }
+
+  openServiceBusMessageDialog(message: any): void {
+    this.dialog.open(ServiceBusMessageDialogComponent, {
+      width: '800px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      data: { message }
+    });
+  }
   
   extractComponent(message: string, details?: string): string {
     const text = `${message} ${details || ''}`.toLowerCase();
@@ -1338,8 +1303,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Only show message if source adapter was enabled BEFORE we started transport
         // (not if we enabled it just to start transport)
         if (sourceWasEnabledBeforeStart) {
-          // Show a more user-friendly message about the MessageBox architecture
-          const userMessage = 'Transport gestartet. CSV-Daten werden über MessageBox verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
+          // Show a more user-friendly message about the Service Bus architecture
+          const userMessage = 'Transport gestartet. CSV-Daten werden über Service Bus verarbeitet und an alle aktivierten Zieladapter weitergeleitet.';
           this.snackBar.open(userMessage, 'Schließen', { duration: 7000 });
         }
         this.isTransporting = false;
@@ -1348,7 +1313,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // But we refresh immediately to show any existing data and start monitoring
         this.loadSqlData();
         this.loadProcessLogs();
-        this.loadMessageBoxData();
         this.loadInterfaceConfigurations();
       },
       error: (error) => {
@@ -1470,8 +1434,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadSqlData();
       this.loadProcessLogs();
       this.refreshCurrentInterfaceCsvData();
-      this.loadMessageBoxData();
       this.loadBlobContainerFolders();
+    });
+    
+    // Refresh Service Bus messages every 5 seconds (slightly less frequent)
+    this.serviceBusMessagesRefreshInterval = interval(5000).subscribe(() => {
+      if (this.serviceBusMessagesExpanded && this.currentInterfaceName) {
+        this.loadServiceBusMessages();
+      }
     });
   }
 
@@ -3017,7 +2987,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     // Reload adapter instances and data
     this.loadDestinationAdapterInstances();
     this.loadSqlData();
-    this.loadMessageBoxData();
     
     // Do NOT automatically start transport - user must explicitly start it via Start Transport button
     // Transport is only started when user clicks the "Start Transport" button
@@ -3191,10 +3160,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.lastSyncedCsvData = '';
     this.isCsvDataUpdateInFlight = false;
     this.tableExists = false;
-    this.messageBoxTableData = [];
-    this.messageBoxRecordColumns = [];
-    this.messageBoxDisplayedColumns = ['datetimeCreated', 'status'];
-    this.isLoadingMessageBox = false;
 
     this.sqlServerName = '';
     this.sqlDatabaseName = '';
@@ -3390,7 +3355,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       'destinationAdapterInstances': 'Array of destination adapter instances. Each instance contains all properties for a destination adapter.',
       
       // Adapter instance properties (used in both source and destination)
-      'adapterInstanceGuid': 'A unique identifier (GUID) assigned to this adapter instance. Used internally to track which adapter instance created each message in the MessageBox.',
+      'adapterInstanceGuid': 'A unique identifier (GUID) assigned to this adapter instance. Used internally to track which adapter instance created each message in the Service Bus.',
       'instanceName': 'A user-friendly name to identify this adapter instance. Displayed in the UI and helps distinguish between multiple instances.',
       'adapterName': 'Type of adapter (CSV or SqlServer)',
       'isEnabled': 'Controls whether this adapter instance is active. When enabled, the adapter process runs automatically. When disabled, the process stops immediately.',
@@ -3842,7 +3807,71 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  addDestinationAdapter(adapterName: 'CSV' | 'SqlServer'): void {
+  openSourceAdapterSelectionDialog(): void {
+    if (!this.currentInterfaceName) {
+      this.snackBar.open('Please select an interface first', 'OK', { duration: 3000 });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(AdapterSelectDialogComponent, {
+      width: '800px',
+      maxWidth: '90vw',
+      data: {
+        adapterType: 'Source' as const
+      } as AdapterSelectData
+    });
+
+    dialogRef.afterClosed().subscribe((selectedAdapterName: string | null) => {
+      if (selectedAdapterName && selectedAdapterName !== this.sourceAdapterName) {
+        this.changeSourceAdapterType(selectedAdapterName as any);
+      }
+    });
+  }
+
+  changeSourceAdapterType(newAdapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
+    if (!this.currentInterfaceName) {
+      this.snackBar.open('Please select an interface first', 'OK', { duration: 3000 });
+      return;
+    }
+
+    // TODO: Implement backend API call to change source adapter type
+    // For now, update local state
+    const oldAdapterName = this.sourceAdapterName;
+    this.sourceAdapterName = newAdapterName;
+    
+    // Reset adapter-specific properties
+    if (newAdapterName !== 'CSV') {
+      this.csvDataText = '';
+    }
+    
+    this.snackBar.open(`Source adapter changed from ${oldAdapterName} to ${newAdapterName}`, 'OK', { duration: 3000 });
+    
+    // Reload interface configuration to get new adapter settings
+    this.loadInterfaceConfiguration(this.currentInterfaceName);
+  }
+
+  openDestinationAdapterSelectionDialog(): void {
+    if (!this.currentInterfaceName) {
+      this.snackBar.open('Please select an interface first', 'OK', { duration: 3000 });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(AdapterSelectDialogComponent, {
+      width: '800px',
+      maxWidth: '90vw',
+      data: {
+        adapterType: 'Destination' as const
+      } as AdapterSelectData
+    });
+
+    dialogRef.afterClosed().subscribe((selectedAdapterName: string | null) => {
+      if (selectedAdapterName) {
+        this.addDestinationAdapter(selectedAdapterName as any);
+      }
+    });
+  }
+
+  addDestinationAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
     // Check if feature is enabled
     if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
       return;
@@ -4321,8 +4350,24 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  getAdapterIcon(adapterName: 'CSV' | 'SqlServer'): string {
-    return adapterName === 'CSV' ? 'description' : 'storage';
+  getAdapterIcon(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): string {
+    switch (adapterName) {
+      case 'CSV':
+      case 'FILE':
+        return 'description';
+      case 'SFTP':
+        return 'cloud_upload';
+      case 'SqlServer':
+        return 'storage';
+      case 'SAP':
+        return 'business';
+      case 'Dynamics365':
+        return 'cloud';
+      case 'CRM':
+        return 'contacts';
+      default:
+        return 'extension';
+    }
   }
 
   getLevelColor(level: string): string {
@@ -4628,19 +4673,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     return Array.from(allKeys);
   }
 
-  private extractMessageBoxColumns(rows: MessageBoxTableRow[]): string[] {
-    const columns = new Set<string>();
-    rows.forEach(row => {
-      if (row?.record) {
-        Object.keys(row.record).forEach(key => columns.add(key));
-      }
-    });
-    return Array.from(columns);
-  }
-
-  getMessageBoxRecordValue(row: MessageBoxTableRow, column: string): string {
-    return row?.record?.[column] ?? '';
-  }
 
   /**
    * Get display value for a cell (handles different data types)

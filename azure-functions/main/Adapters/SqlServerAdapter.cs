@@ -6,6 +6,7 @@ using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
+using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -257,12 +258,12 @@ public class SqlServerAdapter : AdapterBase
             _logger?.LogInformation("Writing {RecordCount} records to SQL Server table: {Destination}, AdapterRole: {AdapterRole}", 
                 records?.Count ?? 0, destination, AdapterRole);
 
-            // Read messages from MessageBox if AdapterRole is "Destination"
-            List<MessageBoxMessage>? processedMessages = null;
-            var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
-            if (messageBoxResult.HasValue)
+            // Read messages from Service Bus if AdapterRole is "Destination"
+            List<ServiceBusMessage>? processedMessages = null;
+            var serviceBusResult = await ReadMessagesFromServiceBusAsync(cancellationToken);
+            if (serviceBusResult.HasValue)
             {
-                var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+                var (messageHeaders, messageRecords, messages) = serviceBusResult.Value;
                 headers = messageHeaders;
                 records = messageRecords;
                 processedMessages = messages;
@@ -490,7 +491,7 @@ public class SqlServerAdapter : AdapterBase
     /// </summary>
     private async Task ExecuteCustomStatementsAsync(
         List<Dictionary<string, string>>? records,
-        List<MessageBoxMessage>? processedMessages,
+        List<ServiceBusMessage>? processedMessages,
         CancellationToken cancellationToken = default)
     {
         if (records == null || records.Count == 0)

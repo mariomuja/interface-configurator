@@ -158,7 +158,39 @@ var host = new HostBuilder()
                 return new MessageProcessingService(messageBoxContext, subscriptionService, logger);
             });
             
-            // Register MessageBox Service
+            // Register Service Bus Service (primary message communication)
+            services.AddScoped<IServiceBusService>(sp =>
+            {
+                var connectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString")
+                    ?? Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING");
+                var logger = sp.GetService<ILogger<ServiceBusService>>();
+                
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    logger?.LogWarning("Service Bus connection string not configured. Service Bus functionality will be disabled.");
+                    return null!;
+                }
+                
+                return new ServiceBusService(connectionString, logger);
+            });
+            
+            // Register Service Bus Subscription Service (manages subscriptions for destination adapters)
+            services.AddScoped<IServiceBusSubscriptionService>(sp =>
+            {
+                var connectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString")
+                    ?? Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING");
+                var logger = sp.GetService<ILogger<ServiceBusSubscriptionService>>();
+                
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    logger?.LogWarning("Service Bus connection string not configured. Subscription management will be disabled.");
+                    return null!;
+                }
+                
+                return new ServiceBusSubscriptionService(connectionString, logger);
+            });
+            
+            // Register MessageBox Service (kept for backward compatibility during migration)
             services.AddScoped<IMessageBoxService>(sp =>
             {
                 var messageBoxContext = sp.GetService<MessageBoxDbContext>();

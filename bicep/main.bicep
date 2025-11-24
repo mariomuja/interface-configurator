@@ -92,6 +92,17 @@ param githubBranch string = 'main'
 @description('Path to the Function App code in the repository (reserved for future use)')
 param githubRepoPath string = 'azure-functions/main'
 
+@description('Name for Service Bus namespace (descriptive, no suffix, no hyphens - Azure requirement)')
+param serviceBusNamespaceName string = 'sb-interface-configurator'
+
+@description('SKU for Service Bus namespace (Basic, Standard, Premium)')
+@allowed([
+  'Basic'
+  'Standard'
+  'Premium'
+])
+param serviceBusSku string = 'Standard'
+
 // Note: No random suffix - using descriptive names directly
 // Azure resource names must be globally unique, so descriptive names are used
 
@@ -220,6 +231,37 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = if (en
   tags: commonTags
 }
 
+// Azure Service Bus Namespace
+// Topics and subscriptions are created dynamically by the application when interfaces are configured
+resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2023-01-01-preview' = {
+  name: serviceBusNamespaceName
+  location: location
+  sku: {
+    name: serviceBusSku
+    tier: serviceBusSku
+    capacity: serviceBusSku == 'Premium' ? 1 : 0
+  }
+  properties: {
+    minimumTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
+  }
+  tags: commonTags
+}
+
+// Service Bus Namespace Authorization Rule (RootManageSharedAccessKey)
+// This provides full access to the namespace and is used by the application
+resource serviceBusAuthRule 'Microsoft.ServiceBus/namespaces/authorizationRules@2023-01-01-preview' = {
+  parent: serviceBusNamespace
+  name: 'RootManageSharedAccessKey'
+  properties: {
+    rights: [
+      'Listen'
+      'Manage'
+      'Send'
+    ]
+  }
+}
+
 // Storage Account for Functions
 resource functionsStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: functionsStorageName
@@ -324,6 +366,14 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (enableFunctionApp) {
           name: 'MainStorageConnection'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${az.environment().suffixes.storage}'
         }
+        {
+          name: 'ServiceBusConnectionString'
+          value: 'Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/;SharedAccessKeyName=${serviceBusAuthRule.name};SharedAccessKey=${serviceBusAuthRule.listKeys().primaryKey}'
+        }
+        {
+          name: 'AZURE_SERVICEBUS_CONNECTION_STRING'
+          value: 'Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/;SharedAccessKeyName=${serviceBusAuthRule.name};SharedAccessKey=${serviceBusAuthRule.listKeys().primaryKey}'
+        }
       ]
       cors: corsAllowedOrigins != [] ? {
         allowedOrigins: corsAllowedOrigins
@@ -355,4 +405,6 @@ output functionAppUrl string = enableFunctionApp && functionApp != null ? 'https
 output functionsStorageAccountName string = functionsStorageAccount.name
 output applicationInsightsName string = enableFunctionApp && applicationInsights != null ? applicationInsights.name : ''
 output applicationInsightsInstrumentationKey string = enableFunctionApp && applicationInsights != null ? applicationInsights.properties.InstrumentationKey : ''
+output serviceBusNamespaceName string = serviceBusNamespace.name
+output serviceBusNamespaceConnectionString string = 'Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/;SharedAccessKeyName=${serviceBusAuthRule.name};SharedAccessKey=${serviceBusAuthRule.listKeys().primaryKey}'
 

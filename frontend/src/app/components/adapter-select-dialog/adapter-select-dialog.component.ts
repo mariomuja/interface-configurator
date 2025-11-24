@@ -125,6 +125,17 @@ export interface AdapterInfo {
       font-size: 12px;
       color: rgba(0,0,0,0.6);
       text-align: center;
+      min-height: 36px;
+    }
+    
+    mat-dialog-content {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    
+    mat-dialog-actions {
+      padding: 16px 24px;
+      border-top: 1px solid rgba(0,0,0,0.12);
     }
   `]
 })

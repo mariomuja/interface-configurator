@@ -6,6 +6,7 @@ using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using Renci.SshNet;
 using Renci.SshNet.Sftp;
+using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
@@ -315,12 +316,12 @@ public class SftpAdapter : AdapterBase
         _logger?.LogInformation("Writing to SFTP destination: {Destination}, {RecordCount} records, AdapterRole: {AdapterRole}", 
             destination, records?.Count ?? 0, AdapterRole);
 
-        // Read messages from MessageBox if AdapterRole is "Destination"
-        List<MessageBoxMessage>? processedMessages = null;
-        var messageBoxResult = await ReadMessagesFromMessageBoxAsync(cancellationToken);
-        if (messageBoxResult.HasValue)
+        // Read messages from Service Bus if AdapterRole is "Destination"
+        List<ServiceBusMessage>? processedMessages = null;
+        var serviceBusResult = await ReadMessagesFromServiceBusAsync(cancellationToken);
+        if (serviceBusResult.HasValue)
         {
-            var (messageHeaders, messageRecords, messages) = messageBoxResult.Value;
+            var (messageHeaders, messageRecords, messages) = serviceBusResult.Value;
             headers = messageHeaders;
             records = messageRecords;
             processedMessages = messages;

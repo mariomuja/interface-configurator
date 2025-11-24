@@ -195,3 +195,20 @@ variable "github_repo_path" {
   type        = string
   default     = "azure-functions/main"
 }
+
+variable "service_bus_namespace_name" {
+  description = "Name for Service Bus namespace (descriptive, no suffix, no hyphens - Azure requirement)"
+  type        = string
+  default     = "sb-interface-configurator"
+}
+
+variable "service_bus_sku" {
+  description = "SKU for Service Bus namespace (Basic, Standard, Premium)"
+  type        = string
+  default     = "Standard"
+  
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.service_bus_sku)
+    error_message = "Service Bus SKU must be Basic, Standard, or Premium."
+  }
+}

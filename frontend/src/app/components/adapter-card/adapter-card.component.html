@@ -1,5 +1,5 @@
 <mat-expansion-panel [(expanded)]="expanded" (opened)="onExpandedChange(true)" (closed)="onExpandedChange(false)" 
-                     [class]="'data-card ' + (adapterName === 'CSV' ? 'csv-card' : 'sql-card')"
+                     [class]="'data-card ' + getAdapterCardClass()"
                      [class.disabled-card]="isDisabled"
                      [class.adapter-disabled]="!isEnabled"
                      [class.adapter-enabled]="isEnabled"
@@ -10,6 +10,14 @@
         <mat-icon class="expand-icon">
           {{ expanded ? 'expand_less' : 'expand_more' }}
         </mat-icon>
+        
+        <button mat-icon-button (click)="onAdapterTypeChange(); $event.stopPropagation()" 
+                *ngIf="adapterType === 'Source'"
+                class="change-adapter-button" 
+                [disabled]="isDisabled"
+                matTooltip="Adapter-Typ ändern">
+          <mat-icon>swap_horiz</mat-icon>
+        </button>
         
         <button mat-icon-button (click)="onSettings(); $event.stopPropagation()" 
                 class="settings-button" 
@@ -35,6 +43,7 @@
         
         <div class="instance-name-display">
           <span class="instance-name-text">{{ instanceName || (adapterType === 'Source' ? 'Source' : 'Destination') }}</span>
+          <span class="adapter-type-badge" *ngIf="adapterName">{{ getAdapterDisplayName() }}</span>
           <mat-icon *ngIf="isDisabled && adapterType === 'Destination' && adapterName === 'SqlServer'" class="warning-icon" 
                     matTooltip="Die Zieltabelle existiert nicht. Beim nächsten CSV-Upload wird die Tabelle mit den CSV-Spalten automatisch neu erstellt.">
             info
