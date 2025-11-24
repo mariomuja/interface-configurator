@@ -584,7 +584,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
             SourceFileMask = "*.csv",
             SourceBatchSize = 100,
             SourceFieldSeparator = "║",
-            CsvAdapterType = "FILE",
+            CsvAdapterType = "RAW",
+            CsvData = "Id║Name║Email║Age\n1║John Doe║john.doe@example.com║30\n2║Jane Smith║jane.smith@example.com║25\n3║Bob Johnson║bob.johnson@example.com║35",
             CsvPollingInterval = 10,
             CreatedAt = DateTime.UtcNow
         };

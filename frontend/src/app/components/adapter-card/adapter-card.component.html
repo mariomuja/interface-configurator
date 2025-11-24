@@ -63,6 +63,13 @@
           <mat-icon>fingerprint</mat-icon>
           <span class="guid-text">{{ adapterInstanceGuid.substring(0, 8) }}...</span>
         </div>
+        
+        <!-- Container App Status Indicator -->
+        <div class="container-app-status" *ngIf="containerAppStatus" [class]="'status-' + containerAppStatus.toLowerCase()"
+             [matTooltip]="getContainerAppStatusTooltip()">
+          <mat-icon>{{ getContainerAppStatusIcon() }}</mat-icon>
+          <span>{{ getContainerAppStatusText() }}</span>
+        </div>
       </div>
     </mat-panel-title>
     <mat-panel-description *ngIf="adapterType === 'Destination'">

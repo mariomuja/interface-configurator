@@ -187,6 +187,51 @@
   background-color: rgba(0, 0, 0, 0.02);
 }
 
+/* Container App Status Indicator */
+.container-app-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+
+.container-app-status mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.container-app-status.status-creating {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.container-app-status.status-running {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.container-app-status.status-stopped {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.container-app-status.status-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.container-app-status.status-unknown {
+  background-color: #e2e3e5;
+  color: #383d41;
+}
+
 .data-card.disabled-card ::ng-deep .mat-expansion-panel-body {
   background-color: rgba(0, 0, 0, 0.01);
 }

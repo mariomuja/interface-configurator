@@ -89,6 +89,16 @@ export class TransportService {
     return this.http.get<ProcessLog[]>(`${this.apiUrl}/GetProcessLogs`);
   }
 
+  getContainerAppStatus(adapterInstanceGuid: string): Observable<{ exists: boolean; status: string; errorMessage?: string; lastChecked?: string }> {
+    const params = new HttpParams().set('adapterInstanceGuid', adapterInstanceGuid);
+    return this.http.get<{ exists: boolean; status: string; errorMessage?: string; lastChecked?: string }>(
+      `${this.apiUrl}/GetContainerAppStatus`,
+      { params }
+    ).pipe(
+      catchError(() => of({ exists: false, status: 'Unknown', errorMessage: 'Failed to check container app status' }))
+    );
+  }
+
   startTransport(interfaceName: string, csvContent?: string): Observable<{ message: string; fileId: string }> {
     return this.http.post<{ message: string; fileId: string }>(`${this.apiUrl}/start-transport`, {
       interfaceName,

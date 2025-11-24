@@ -290,6 +290,14 @@ var host = new HostBuilder()
             services.AddScoped<FeatureService>();
             services.AddScoped<AuthService>();
             
+            // Register Container App Service for dynamic container app management
+            services.AddScoped<IContainerAppService>(sp =>
+            {
+                var logger = sp.GetService<ILogger<ContainerAppService>>();
+                var configuration = sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+                return new ContainerAppService(logger!, configuration!);
+            });
+            
             // Register Feature Factory Infrastructure
             services.AddMemoryCache(); // Required for FeatureRegistry caching
             services.AddScoped<IFeatureRegistry, FeatureRegistry>();

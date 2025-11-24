@@ -42,7 +42,10 @@ import { Observable } from 'rxjs';
             <span class="app-title">{{ getTranslation('app.title') }}</span>
             <span class="app-version" *ngIf="versionString$ | async as version">{{ version }}</span>
           </div>
-          <p class="app-description">There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.</p>
+          <div class="description-row">
+            <p class="app-description">There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.</p>
+            <span class="app-description-right">Your additional text here</span>
+          </div>
           <div class="concept-banner">
             <div class="concept-frame">
               <div class="concept-text-wrapper">
@@ -115,7 +118,7 @@ import { Observable } from 'rxjs';
       align-items: flex-start;
       justify-content: space-between;
       width: 100%;
-      padding: 6px 0;
+      padding: 4px 0;
       gap: 12px;
     }
     
@@ -132,7 +135,7 @@ import { Observable } from 'rxjs';
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     
     .app-title {
@@ -153,21 +156,37 @@ import { Observable } from 'rxjs';
       white-space: nowrap;
     }
     
+    .description-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 2px;
+    }
+    
     .app-description {
       font-size: 10px;
-      line-height: 1.3;
+      line-height: 1.2;
       color: rgba(255, 255, 255, 0.9);
-      margin: 0 0 4px 0;
+      margin: 0;
       text-align: left;
-      width: 100%;
+      flex: 1 1 auto;
       word-wrap: break-word;
       overflow-wrap: break-word;
       white-space: normal;
     }
     
+    .app-description-right {
+      font-size: 10px;
+      line-height: 1.2;
+      color: rgba(255, 255, 255, 0.9);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    
     .concept-banner {
       width: 100%;
-      margin-top: 4px;
+      margin-top: 2px;
       overflow: visible;
     }
     
@@ -175,7 +194,7 @@ import { Observable } from 'rxjs';
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-radius: 6px;
-      padding: 6px 12px;
+      padding: 4px 12px;
       position: relative;
       overflow: visible;
       box-shadow: 
@@ -238,7 +257,7 @@ import { Observable } from 'rxjs';
     
     .concept-text {
       font-size: 10px;
-      line-height: 1.4;
+      line-height: 1.1;
       color: rgba(255, 255, 255, 0.95);
       display: inline;
       animation: textScroll 0.5s ease-in-out;
@@ -246,6 +265,8 @@ import { Observable } from 'rxjs';
       white-space: normal;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      margin: 0;
+      padding: 0;
     }
     
     @keyframes textScroll {

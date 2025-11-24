@@ -14,6 +14,7 @@ export interface AdapterInfo {
   name: string;
   alias: string;
   icon: string;
+  iconType?: 'material' | 'svg'; // 'material' for Material Icons, 'svg' for SVG data/image
   description: string;
   supportsSource: boolean;
   supportsDestination: boolean;
@@ -46,7 +47,8 @@ export interface AdapterInfo {
             (click)="selectAdapter(adapter)">
             <mat-card-content>
               <div class="adapter-icon">
-                <mat-icon [fontIcon]="adapter.icon" class="large-icon"></mat-icon>
+                <mat-icon *ngIf="!adapter.iconType || adapter.iconType === 'material'" [fontIcon]="adapter.icon" class="large-icon"></mat-icon>
+                <img *ngIf="adapter.iconType === 'svg'" [src]="adapter.icon" [alt]="adapter.alias + ' icon'" class="large-icon-img">
               </div>
               <h3>{{ adapter.alias }}</h3>
               <p class="adapter-description">{{ adapter.description }}</p>
@@ -114,6 +116,12 @@ export interface AdapterInfo {
       color: #1976d2;
     }
     
+    .large-icon-img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+    
     .adapter-card h3 {
       margin: 0 0 8px 0;
       text-align: center;
@@ -178,7 +186,8 @@ export class AdapterSelectDialogComponent {
     {
       name: 'SAP',
       alias: 'SAP',
-      icon: 'business',
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiMwMDk5Q0MiLz4KPC9zdmc+',
+      iconType: 'svg',
       description: 'IDOCs aus SAP abrufen oder an SAP senden',
       supportsSource: true,
       supportsDestination: true
@@ -186,7 +195,8 @@ export class AdapterSelectDialogComponent {
     {
       name: 'Dynamics365',
       alias: 'Dynamics 365',
-      icon: 'cloud',
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiMwMDc4RDQiLz4KPC9zdmc+',
+      iconType: 'svg',
       description: 'Daten aus/in Microsoft Dynamics 365',
       supportsSource: true,
       supportsDestination: true
@@ -194,7 +204,8 @@ export class AdapterSelectDialogComponent {
     {
       name: 'CRM',
       alias: 'Microsoft CRM',
-      icon: 'contacts',
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiNGRjUwMDAiLz4KPC9zdmc+',
+      iconType: 'svg',
       description: 'Daten aus/in Microsoft CRM',
       supportsSource: true,
       supportsDestination: true

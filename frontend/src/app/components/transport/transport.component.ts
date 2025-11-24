@@ -4780,6 +4780,54 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.expandedExceptions.add(row.id);
     }
   }
+
+  // Container App Status Tracking
+  private containerAppStatuses: Map<string, 'Creating' | 'Running' | 'Stopped' | 'Error' | 'Unknown' | null> = new Map();
+
+  /**
+   * Get container app status for an adapter instance
+   */
+  getContainerAppStatus(adapterInstanceGuid: string): 'Creating' | 'Running' | 'Stopped' | 'Error' | 'Unknown' | null {
+    if (!adapterInstanceGuid) {
+      return null;
+    }
+    return this.containerAppStatuses.get(adapterInstanceGuid) || null;
+  }
+
+  /**
+   * Check container app status for an adapter instance
+   */
+  checkContainerAppStatus(adapterInstanceGuid: string): void {
+    if (!adapterInstanceGuid) {
+      return;
+    }
+
+    this.transportService.getContainerAppStatus(adapterInstanceGuid).subscribe({
+      next: (status) => {
+        if (status.exists) {
+          if (status.status === 'Succeeded' || status.status === 'Running') {
+            this.containerAppStatuses.set(adapterInstanceGuid, 'Running');
+          } else if (status.status === 'Stopped' || status.status === 'Stopped') {
+            this.containerAppStatuses.set(adapterInstanceGuid, 'Stopped');
+          } else if (status.status === 'Creating' || status.status === 'Provisioning') {
+            this.containerAppStatuses.set(adapterInstanceGuid, 'Creating');
+          } else if (status.status === 'Failed' || status.errorMessage) {
+            this.containerAppStatuses.set(adapterInstanceGuid, 'Error');
+          } else {
+            this.containerAppStatuses.set(adapterInstanceGuid, 'Unknown');
+          }
+        } else {
+          // Container app doesn't exist yet - mark as Creating if we just created the adapter instance
+          // Otherwise, mark as Unknown
+          this.containerAppStatuses.set(adapterInstanceGuid, 'Unknown');
+        }
+      },
+      error: (err) => {
+        console.error('Error checking container app status:', err);
+        this.containerAppStatuses.set(adapterInstanceGuid, 'Error');
+      }
+    });
+  }
 }
 
 

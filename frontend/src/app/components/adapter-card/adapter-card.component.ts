@@ -47,6 +47,7 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   @Input() csvData: string = ''; // CSV data content (bound to CsvData property)
   @Input() isDisabled: boolean = false; // If true, card appears greyed out (for unsupported multiple destinations)
   @Input() primaryActionDisabled: boolean = false; // If true, the primary action button is disabled
+  @Input() containerAppStatus: 'Creating' | 'Running' | 'Stopped' | 'Error' | 'Unknown' | null = null; // Container app status
 
   @Output() instanceNameChange = new EventEmitter<string>();
   @Output() enabledChange = new EventEmitter<boolean>();
@@ -279,6 +280,51 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  getContainerAppStatusIcon(): string {
+    switch (this.containerAppStatus) {
+      case 'Creating':
+        return 'hourglass_empty';
+      case 'Running':
+        return 'check_circle';
+      case 'Stopped':
+        return 'stop_circle';
+      case 'Error':
+        return 'error';
+      default:
+        return 'help_outline';
+    }
+  }
+
+  getContainerAppStatusText(): string {
+    switch (this.containerAppStatus) {
+      case 'Creating':
+        return 'Creating Container...';
+      case 'Running':
+        return 'Container Running';
+      case 'Stopped':
+        return 'Container Stopped';
+      case 'Error':
+        return 'Container Error';
+      default:
+        return 'Status Unknown';
+    }
+  }
+
+  getContainerAppStatusTooltip(): string {
+    switch (this.containerAppStatus) {
+      case 'Creating':
+        return 'Container app is being created. This may take a few minutes.';
+      case 'Running':
+        return 'Container app is running and ready to process data.';
+      case 'Stopped':
+        return 'Container app is stopped.';
+      case 'Error':
+        return 'There was an error creating or running the container app.';
+      default:
+        return 'Container app status is unknown.';
+    }
   }
 }
 

@@ -10,13 +10,16 @@ namespace InterfaceConfigurator.Main;
 public class AddDestinationAdapterInstance
 {
     private readonly IInterfaceConfigurationService _configService;
+    private readonly IContainerAppService _containerAppService;
     private readonly ILogger<AddDestinationAdapterInstance> _logger;
 
     public AddDestinationAdapterInstance(
         IInterfaceConfigurationService configService,
+        IContainerAppService containerAppService,
         ILogger<AddDestinationAdapterInstance> logger)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _containerAppService = containerAppService ?? throw new ArgumentNullException(nameof(containerAppService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -58,6 +61,35 @@ public class AddDestinationAdapterInstance
 
             _logger.LogInformation("Added destination adapter instance '{InstanceName}' ({AdapterName}) to interface '{InterfaceName}'", 
                 instance.InstanceName, instance.AdapterName, request.InterfaceName);
+
+            // Create container app for this adapter instance (fire and forget)
+            if (instance.AdapterInstanceGuid.HasValue)
+            {
+                // Get full configuration to pass to container app
+                var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
+                var fullInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == instance.AdapterInstanceGuid.Value);
+                
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        _logger.LogInformation("Creating container app for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                        var containerAppInfo = await _containerAppService.CreateContainerAppAsync(
+                            instance.AdapterInstanceGuid.Value,
+                            instance.AdapterName,
+                            "Destination",
+                            request.InterfaceName,
+                            instance.InstanceName,
+                            fullInstance ?? instance, // Pass full instance configuration
+                            executionContext.CancellationToken);
+                        _logger.LogInformation("Container app created successfully: {Name}", containerAppInfo.ContainerAppName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error creating container app for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                    }
+                }, CancellationToken.None);
+            }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

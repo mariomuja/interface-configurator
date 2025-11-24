@@ -231,7 +231,7 @@ export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
   }
 
   get showAdapterSettings(): boolean {
-    return this.data.adapterName === 'CSV' || this.data.adapterName === 'SqlServer';
+    return this.data.adapterName === 'CSV' || this.data.adapterName === 'FILE' || this.data.adapterName === 'SFTP' || this.data.adapterName === 'SqlServer';
   }
 
   get dialogTitle(): string {

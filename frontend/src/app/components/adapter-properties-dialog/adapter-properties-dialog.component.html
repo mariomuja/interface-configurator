@@ -13,7 +13,7 @@
 
     <!-- Adapter-specific settings components -->
     <app-csv-adapter-settings 
-      *ngIf="data.adapterName === 'CSV'"
+      *ngIf="data.adapterName === 'CSV' || data.adapterName === 'FILE' || data.adapterName === 'SFTP'"
       [instanceName]="instanceName"
       [isEnabled]="isEnabled"
       [adapterInstanceGuid]="adapterInstanceGuid"

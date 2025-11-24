@@ -10,13 +10,16 @@ namespace InterfaceConfigurator.Main;
 public class UpdateDestinationAdapterInstance
 {
     private readonly IInterfaceConfigurationService _configService;
+    private readonly IContainerAppService _containerAppService;
     private readonly ILogger<UpdateDestinationAdapterInstance> _logger;
 
     public UpdateDestinationAdapterInstance(
         IInterfaceConfigurationService configService,
+        IContainerAppService containerAppService,
         ILogger<UpdateDestinationAdapterInstance> logger)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _containerAppService = containerAppService ?? throw new ArgumentNullException(nameof(containerAppService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -63,11 +66,33 @@ public class UpdateDestinationAdapterInstance
             _logger.LogInformation("Updated destination adapter instance '{AdapterInstanceGuid}' in interface '{InterfaceName}'", 
                 request.AdapterInstanceGuid, request.InterfaceName);
 
+            // Update container app configuration (fire and forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
+                    var updatedInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == request.AdapterInstanceGuid);
+                    if (updatedInstance != null)
+                    {
+                        await _containerAppService.UpdateContainerAppConfigurationAsync(
+                            request.AdapterInstanceGuid,
+                            updatedInstance,
+                            executionContext.CancellationToken);
+                        _logger.LogInformation("Container app configuration updated for adapter instance {Guid}", request.AdapterInstanceGuid);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error updating container app configuration for adapter instance {Guid}", request.AdapterInstanceGuid);
+                }
+            }, CancellationToken.None);
+
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
-                message = $"Destination adapter instance '{request.AdapterInstanceGuid}' updated successfully",
+                message = $"Destination adapter instance '{request.AdapterInstanceGuid}' updated successfully. Container app configuration update initiated.",
                 interfaceName = request.InterfaceName,
                 adapterInstanceGuid = request.AdapterInstanceGuid
             }));
