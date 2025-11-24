@@ -168,7 +168,7 @@ import { Observable } from 'rxjs';
     .concept-banner {
       width: 100%;
       margin-top: 4px;
-      overflow: hidden;
+      overflow: visible;
     }
     
     .concept-frame {
@@ -177,7 +177,7 @@ import { Observable } from 'rxjs';
       border-radius: 6px;
       padding: 6px 12px;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: 
         0 2px 8px rgba(0, 0, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.2),
@@ -186,7 +186,6 @@ import { Observable } from 'rxjs';
       perspective: 1000px;
       animation: frameGlow 3s ease-in-out infinite;
       width: 100%;
-      min-width: 800px;
       max-width: 100%;
     }
     
@@ -229,20 +228,24 @@ import { Observable } from 'rxjs';
     
     .concept-text-wrapper {
       position: relative;
-      overflow: hidden;
-      white-space: nowrap;
+      overflow: visible;
+      white-space: normal;
       width: 100%;
       max-width: 100%;
-      min-width: 800px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .concept-text {
       font-size: 10px;
       line-height: 1.4;
       color: rgba(255, 255, 255, 0.95);
-      display: inline-block;
+      display: inline;
       animation: textScroll 0.5s ease-in-out;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      white-space: normal;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     @keyframes textScroll {
