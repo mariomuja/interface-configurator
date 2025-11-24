@@ -187,6 +187,26 @@
 mat-slide-toggle {
   flex: 0 0 auto;
   margin-left: 8px;
+  /* Always ensure toggle is visible and interactive */
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Ensure toggle is always in normal color, even when card is disabled */
+.data-card mat-slide-toggle ::ng-deep .mdc-switch {
+  opacity: 1 !important;
+}
+
+.data-card mat-slide-toggle ::ng-deep .mdc-switch__track {
+  opacity: 1 !important;
+}
+
+.data-card mat-slide-toggle ::ng-deep .mdc-switch__thumb {
+  opacity: 1 !important;
+}
+
+.data-card mat-slide-toggle ::ng-deep .mdc-switch__thumb-underlay {
+  opacity: 1 !important;
 }
 
 /* Disabled adapter styling - grey appearance */
@@ -228,9 +248,30 @@ mat-slide-toggle {
 
 .data-card.adapter-disabled .settings-button,
 .data-card.adapter-disabled .restart-button,
-.data-card.adapter-disabled .explorer-button,
-.data-card.adapter-disabled mat-slide-toggle {
+.data-card.adapter-disabled .explorer-button {
   color: #757575 !important;
+}
+
+/* Enabled toggle MUST always appear in normal color, never greyed out */
+.data-card.adapter-disabled mat-slide-toggle {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.data-card.adapter-disabled mat-slide-toggle ::ng-deep .mdc-switch {
+  opacity: 1 !important;
+}
+
+.data-card.adapter-disabled mat-slide-toggle ::ng-deep .mdc-switch__track {
+  opacity: 1 !important;
+}
+
+.data-card.adapter-disabled mat-slide-toggle ::ng-deep .mdc-switch__thumb {
+  opacity: 1 !important;
+}
+
+.data-card.adapter-disabled mat-slide-toggle ::ng-deep .mdc-switch__thumb-underlay {
+  opacity: 1 !important;
 }
 
 /* Enabled adapter styling - normal, clearly visible */

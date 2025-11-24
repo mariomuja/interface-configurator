@@ -1949,73 +1949,54 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openBlobContainerExplorer(adapterType: 'Source' | 'Destination', adapterName: string, instanceName: string, adapterInstanceGuid: string): void {
-    const interfaceName = this.getActiveInterfaceName();
-    if (!interfaceName) {
-      this.snackBar.open('Bitte zuerst eine Schnittstelle auswählen.', 'OK', { duration: 4000 });
-      return;
-    }
-
+    // Blob Container Explorer doesn't actually need the interface configuration or adapterInstanceGuid
+    // It just lists blob container folders, which doesn't require interface-specific data
+    // If adapterInstanceGuid is missing, we can still open the explorer with default values
+    
+    // Try to get adapterInstanceGuid from local config if not provided
     if (!adapterInstanceGuid) {
-      this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
-        next: (config) => {
-          if (!config) {
-            this.snackBar.open('Konnte Konfiguration nicht laden, bitte erneut versuchen.', 'OK', { duration: 4000 });
-            return;
+      const interfaceName = this.getActiveInterfaceName();
+      const activeConfig = this.getInterfaceConfig(interfaceName);
+      
+      if (activeConfig) {
+        if (adapterType === 'Source') {
+          // Try new structure first (sources dictionary)
+          if (activeConfig.sources && Object.keys(activeConfig.sources).length > 0) {
+            const sourceInstance = Object.values(activeConfig.sources)[0] as any;
+            adapterInstanceGuid = sourceInstance?.adapterInstanceGuid || sourceInstance?.AdapterInstanceGuid || '';
           }
-
-          let refreshedGuid: string | undefined;
-
-          if (adapterType === 'Source') {
-            // Try new structure first (sources dictionary)
-            if (config.sources && Object.keys(config.sources).length > 0) {
-              const sourceInstance = Object.values(config.sources)[0] as any;
-              refreshedGuid = sourceInstance?.adapterInstanceGuid;
-            }
-            // Fallback to old structure
-            if (!refreshedGuid) {
-              refreshedGuid = config.sourceAdapterInstanceGuid;
-            }
-            if (refreshedGuid) {
-              this.sourceAdapterInstanceGuid = refreshedGuid;
-            }
-          } else {
-            const destinationInstances = config.destinationAdapterInstances || [];
-            const matchingInstance = destinationInstances.find((inst: DestinationAdapterInstance) =>
-              (inst.instanceName && inst.instanceName === instanceName) ||
-              (inst.adapterInstanceGuid && inst.adapterInstanceGuid === adapterInstanceGuid) ||
-              (inst.adapterName && inst.adapterName === adapterName)
-            );
-
-            if (matchingInstance?.adapterInstanceGuid) {
-              const matchedGuid = matchingInstance.adapterInstanceGuid;
-              refreshedGuid = matchedGuid;
-              const localIndex = this.destinationAdapterInstances.findIndex((inst: DestinationAdapterInstance) => inst.instanceName === instanceName);
-              if (localIndex >= 0) {
-                this.destinationAdapterInstances[localIndex].adapterInstanceGuid = matchedGuid;
-              }
-            }
+          // Fallback to old structure
+          if (!adapterInstanceGuid) {
+            adapterInstanceGuid = activeConfig.sourceAdapterInstanceGuid || '';
           }
-
-          if (refreshedGuid) {
-            this.openBlobContainerExplorer(adapterType, adapterName, instanceName, refreshedGuid);
-          } else {
-            this.showErrorMessageWithCopy('Für diesen Adapter konnte kein GUID ermittelt werden. Bitte prüfen Sie die Adapterkonfiguration.');
+          if (adapterInstanceGuid) {
+            this.sourceAdapterInstanceGuid = adapterInstanceGuid;
           }
-        },
-        error: (error) => {
-          console.error('Error refreshing adapter instance GUID:', error);
-          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Laden der Konfiguration.');
-          this.showErrorMessageWithCopy(detailedMessage);
+        } else {
+          // For destinations, try to find matching instance
+          const destinationInstances = this.destinationAdapterInstances || activeConfig.destinationAdapterInstances || [];
+          const matchingInstance = destinationInstances.find((inst: any) =>
+            (inst.instanceName && inst.instanceName === instanceName) ||
+            (inst.adapterName && inst.adapterName === adapterName)
+          );
+          
+          if (matchingInstance?.adapterInstanceGuid) {
+            adapterInstanceGuid = matchingInstance.adapterInstanceGuid;
+          }
         }
-      });
-      return;
+      }
+      
+      // If still no GUID, use empty string - Blob Container Explorer doesn't actually need it
+      if (!adapterInstanceGuid) {
+        adapterInstanceGuid = '';
+      }
     }
 
     const dialogData: BlobContainerExplorerDialogData = {
       adapterType: adapterType,
       adapterName: adapterName,
       instanceName: instanceName,
-      adapterInstanceGuid: adapterInstanceGuid
+      adapterInstanceGuid: adapterInstanceGuid || '' // Empty GUID is acceptable - explorer doesn't need it
     };
 
     const dialogRef = this.dialog.open(BlobContainerExplorerDialogComponent, {
@@ -2188,9 +2169,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       fileMask: activeConfig?.sourceFileMask !== undefined ? activeConfig.sourceFileMask : this.sourceFileMask,
       batchSize: activeConfig?.sourceBatchSize !== undefined ? activeConfig.sourceBatchSize : this.sourceBatchSize,
       fieldSeparator: activeConfig?.sourceFieldSeparator !== undefined ? activeConfig.sourceFieldSeparator : this.sourceFieldSeparator,
-      csvAdapterType: activeConfig?.csvAdapterType,
-      csvData: this.csvDataText || activeConfig?.csvData || '',
-      csvPollingInterval: activeConfig?.csvPollingInterval !== undefined ? activeConfig.csvPollingInterval : this.csvPollingInterval,
+      csvAdapterType: activeConfig?.csvAdapterType || (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0 
+        ? (Object.values(activeConfig.sources)[0] as any)?.csvAdapterType || (Object.values(activeConfig.sources)[0] as any)?.CsvAdapterType
+        : undefined),
+      csvData: this.csvDataText || activeConfig?.csvData || activeConfig?.CsvData || 
+        (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0 
+          ? ((Object.values(activeConfig.sources)[0] as any)?.csvData || (Object.values(activeConfig.sources)[0] as any)?.CsvData || '')
+          : ''),
+      csvPollingInterval: activeConfig?.csvPollingInterval !== undefined ? activeConfig.csvPollingInterval : 
+        (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0
+          ? ((Object.values(activeConfig.sources)[0] as any)?.csvPollingInterval || (Object.values(activeConfig.sources)[0] as any)?.CsvPollingInterval)
+          : this.csvPollingInterval),
       // SFTP properties - use explicit undefined checks
       sftpHost: activeConfig?.sftpHost !== undefined ? activeConfig.sftpHost : '',
       sftpPort: activeConfig?.sftpPort !== undefined ? activeConfig.sftpPort : 22,
@@ -3000,7 +2989,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Load CsvData property - always sync with backend
     // Sample data is only initialized ONCE when CSV adapter instance is first created
-    const incomingCsvData = config.csvData || '';
+    // Try new structure first (sources dictionary)
+    let incomingCsvData = '';
+    if (config.sources && Object.keys(config.sources).length > 0) {
+      const sourceInstance = Object.values(config.sources)[0] as any;
+      incomingCsvData = sourceInstance?.csvData || sourceInstance?.CsvData || '';
+    }
+    // Fallback to old structure
+    if (!incomingCsvData) {
+      incomingCsvData = config.csvData || config.CsvData || '';
+    }
+    
     if (incomingCsvData && incomingCsvData.trim().length > 0) {
       // Backend has CSV data - always use it (backend is source of truth)
       // Don't mark as initialized - backend CSV data should remain refreshable
@@ -3045,27 +3044,75 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         sourceAdapterName: 'CSV',
         destinationAdapterName: 'SqlServer'
       }).subscribe({
-        next: () => {
-          // Optimistically add placeholder so it appears immediately
-          const placeholderConfig = {
-            interfaceName: interfaceName,
-            sourceAdapterName: 'CSV',
-            destinationAdapterName: 'SqlServer',
-            sourceInstanceName: 'Source',
-            destinationInstanceName: 'Destination',
-            sourceIsEnabled: false,
-            destinationIsEnabled: false,
-            _isPlaceholder: true
-          };
-          this.interfaceConfigurations = [
-            ...this.interfaceConfigurations.filter(c => c.interfaceName !== interfaceName),
-            placeholderConfig
-          ].sort((a, b) => a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' }));
-          this.currentInterfaceName = interfaceName;
-          this.selectedInterfaceConfig = null;
-          
-          this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
-          this.loadInterfaceConfigurations();
+        next: (createdConfig) => {
+          // The API returns the created configuration - use it directly
+          if (createdConfig && createdConfig.interfaceName) {
+            // Remove any placeholder with the same name
+            this.interfaceConfigurations = this.interfaceConfigurations.filter(
+              c => c.interfaceName !== interfaceName || !c._isPlaceholder
+            );
+            
+            // Add the real configuration from the API response
+            // Normalize the config to match our expected format
+            const normalizedConfig: any = {
+              interfaceName: createdConfig.interfaceName || createdConfig.InterfaceName || interfaceName,
+              sourceAdapterName: createdConfig.sourceAdapterName || createdConfig.SourceAdapterName || 'CSV',
+              destinationAdapterName: createdConfig.destinationAdapterName || createdConfig.DestinationAdapterName || 'SqlServer',
+              sourceInstanceName: createdConfig.sourceInstanceName || createdConfig.SourceInstanceName || 'Source',
+              destinationInstanceName: createdConfig.destinationInstanceName || createdConfig.DestinationInstanceName || 'Destination',
+              sourceIsEnabled: createdConfig.sourceIsEnabled !== undefined ? createdConfig.sourceIsEnabled : 
+                              (createdConfig.SourceIsEnabled !== undefined ? createdConfig.SourceIsEnabled : false),
+              destinationIsEnabled: createdConfig.destinationIsEnabled !== undefined ? createdConfig.destinationIsEnabled :
+                                   (createdConfig.DestinationIsEnabled !== undefined ? createdConfig.DestinationIsEnabled : false),
+              _isPlaceholder: false
+            };
+            
+            // Handle new hierarchical structure (Sources/Destinations)
+            if (createdConfig.sources || createdConfig.Sources) {
+              const sources = createdConfig.sources || createdConfig.Sources || {};
+              const sourceKeys = Object.keys(sources);
+              if (sourceKeys.length > 0) {
+                const firstSource = sources[sourceKeys[0]];
+                normalizedConfig.sourceInstanceName = firstSource.instanceName || firstSource.InstanceName || sourceKeys[0];
+                normalizedConfig.sourceAdapterName = firstSource.adapterName || firstSource.AdapterName || 'CSV';
+                normalizedConfig.sourceIsEnabled = firstSource.isEnabled !== undefined ? firstSource.isEnabled :
+                                                  (firstSource.IsEnabled !== undefined ? firstSource.IsEnabled : false);
+              }
+            }
+            
+            if (createdConfig.destinations || createdConfig.Destinations) {
+              const destinations = createdConfig.destinations || createdConfig.Destinations || {};
+              const destKeys = Object.keys(destinations);
+              if (destKeys.length > 0) {
+                const firstDest = destinations[destKeys[0]];
+                normalizedConfig.destinationInstanceName = firstDest.instanceName || firstDest.InstanceName || destKeys[0];
+                normalizedConfig.destinationAdapterName = firstDest.adapterName || firstDest.AdapterName || 'SqlServer';
+                normalizedConfig.destinationIsEnabled = firstDest.isEnabled !== undefined ? firstDest.isEnabled :
+                                                       (firstDest.IsEnabled !== undefined ? firstDest.IsEnabled : false);
+              }
+            }
+            
+            // Add to list and sort
+            this.interfaceConfigurations = [
+              ...this.interfaceConfigurations,
+              normalizedConfig
+            ].sort((a, b) => a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' }));
+            
+            // Select the new interface
+            this.currentInterfaceName = normalizedConfig.interfaceName;
+            this.selectedInterfaceConfig = null;
+            
+            this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
+            
+            // Reload to get full configuration with all properties
+            this.loadInterfaceConfigurations();
+          } else {
+            // Fallback: if API doesn't return config, reload from server
+            this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
+            this.currentInterfaceName = interfaceName;
+            this.selectedInterfaceConfig = null;
+            this.loadInterfaceConfigurations();
+          }
         },
         error: (error) => {
           console.error('Error creating interface:', error);
@@ -3443,68 +3490,133 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       const structuredConfig: any = {
         InterfaceName: config.InterfaceName || config.interfaceName || this.currentInterfaceName || 'Unknown Interface',
         Description: config.Description !== undefined ? config.Description : (config.description !== undefined ? config.description : null),
-        Sources: config.Sources || config.sources || {},
-        Destinations: config.Destinations || config.destinations || {},
+        Sources: {},
+        Destinations: {},
         CreatedAt: config.CreatedAt || config.createdAt || null,
         UpdatedAt: config.UpdatedAt !== undefined ? config.UpdatedAt : (config.updatedAt !== undefined ? config.updatedAt : null)
       };
 
-      // If the config doesn't have the new structure yet (migration not complete),
-      // build it from the old structure for backward compatibility
-      if (!structuredConfig.Sources || Object.keys(structuredConfig.Sources).length === 0) {
-        // Build Sources from old structure
-        structuredConfig.Sources = {};
-        if (config.sourceAdapterName || config.sourceInstanceName) {
-          const sourceInstanceName = config.sourceInstanceName || config.sourceAdapterName || 'Source';
-          structuredConfig.Sources[sourceInstanceName] = {
-            InstanceName: sourceInstanceName,
-            AdapterName: config.sourceAdapterName || 'CSV',
-            IsEnabled: config.sourceIsEnabled !== undefined ? config.sourceIsEnabled : false,
-            AdapterInstanceGuid: config.sourceAdapterInstanceGuid || '',
-            Configuration: config.sourceConfiguration || '',
-            // Copy all source properties
-            SourceReceiveFolder: config.sourceReceiveFolder || null,
-            SourceFileMask: config.sourceFileMask || '*.txt',
-            SourceBatchSize: config.sourceBatchSize || 100,
-            SourceFieldSeparator: config.sourceFieldSeparator || '║',
-            // CsvData excluded from JSON description (not part of interface configuration)
-            CsvAdapterType: config.csvAdapterType || 'FILE',
-            CsvPollingInterval: config.csvPollingInterval || 10,
-            SftpHost: config.sftpHost || null,
-            SftpPort: config.sftpPort || 22,
-            SftpUsername: config.sftpUsername || null,
-            SftpPassword: config.sftpPassword ? '***' : null,
-            SftpSshKey: config.sftpSshKey ? '***' : null,
-            SftpFolder: config.sftpFolder || null,
-            SftpFileMask: config.sftpFileMask || '*.txt',
-            SftpMaxConnectionPoolSize: config.sftpMaxConnectionPoolSize || 5,
-            SftpFileBufferSize: config.sftpFileBufferSize || 8192,
-            SqlServerName: config.sqlServerName || null,
-            SqlDatabaseName: config.sqlDatabaseName || null,
-            SqlUserName: config.sqlUserName || null,
-            SqlPassword: config.sqlPassword ? '***' : null,
-            SqlIntegratedSecurity: config.sqlIntegratedSecurity || false,
-            SqlResourceGroup: config.sqlResourceGroup || null,
-            SqlPollingStatement: config.sqlPollingStatement || null,
-            SqlPollingInterval: config.sqlPollingInterval || 60,
-            SqlTableName: config.sqlTableName || null,
-            SqlUseTransaction: config.sqlUseTransaction || false,
-            SqlBatchSize: config.sqlBatchSize || 1000,
-            SqlCommandTimeout: config.sqlCommandTimeout || 30,
-            SqlFailOnBadStatement: config.sqlFailOnBadStatement || false,
-            CreatedAt: config.createdAt || null,
-            UpdatedAt: config.updatedAt || null
+      // Normalize Sources from new structure (config.sources or config.Sources)
+      const sourcesData = config.Sources || config.sources || {};
+      if (sourcesData && Object.keys(sourcesData).length > 0) {
+        // Use the new hierarchical structure - normalize all properties to PascalCase
+        Object.keys(sourcesData).forEach(instanceName => {
+          const sourceInstance = sourcesData[instanceName];
+          structuredConfig.Sources[instanceName] = {
+            InstanceName: sourceInstance.InstanceName || sourceInstance.instanceName || instanceName,
+            AdapterName: sourceInstance.AdapterName || sourceInstance.adapterName || 'CSV',
+            IsEnabled: sourceInstance.IsEnabled !== undefined ? sourceInstance.IsEnabled : (sourceInstance.isEnabled !== undefined ? sourceInstance.isEnabled : false),
+            AdapterInstanceGuid: sourceInstance.AdapterInstanceGuid || sourceInstance.adapterInstanceGuid || '',
+            Configuration: sourceInstance.Configuration || sourceInstance.configuration || '',
+            // Copy all source properties - handle both camelCase and PascalCase
+            SourceReceiveFolder: sourceInstance.SourceReceiveFolder !== undefined ? sourceInstance.SourceReceiveFolder : (sourceInstance.sourceReceiveFolder !== undefined ? sourceInstance.sourceReceiveFolder : null),
+            SourceFileMask: sourceInstance.SourceFileMask || sourceInstance.sourceFileMask || '*.txt',
+            SourceBatchSize: sourceInstance.SourceBatchSize !== undefined ? sourceInstance.SourceBatchSize : (sourceInstance.sourceBatchSize !== undefined ? sourceInstance.sourceBatchSize : 100),
+            SourceFieldSeparator: sourceInstance.SourceFieldSeparator || sourceInstance.sourceFieldSeparator || '║',
+            // CsvAdapterType - MUST use the actual value from the source instance
+            CsvAdapterType: sourceInstance.CsvAdapterType || sourceInstance.csvAdapterType || (sourceInstance.adapterType || 'FILE'),
+            CsvPollingInterval: sourceInstance.CsvPollingInterval !== undefined ? sourceInstance.CsvPollingInterval : (sourceInstance.csvPollingInterval !== undefined ? sourceInstance.csvPollingInterval : 10),
+            SftpHost: sourceInstance.SftpHost !== undefined ? sourceInstance.SftpHost : (sourceInstance.sftpHost !== undefined ? sourceInstance.sftpHost : null),
+            SftpPort: sourceInstance.SftpPort !== undefined ? sourceInstance.SftpPort : (sourceInstance.sftpPort !== undefined ? sourceInstance.sftpPort : 22),
+            SftpUsername: sourceInstance.SftpUsername !== undefined ? sourceInstance.SftpUsername : (sourceInstance.sftpUsername !== undefined ? sourceInstance.sftpUsername : null),
+            SftpPassword: (sourceInstance.SftpPassword || sourceInstance.sftpPassword) ? '***' : null,
+            SftpSshKey: (sourceInstance.SftpSshKey || sourceInstance.sftpSshKey) ? '***' : null,
+            SftpFolder: sourceInstance.SftpFolder !== undefined ? sourceInstance.SftpFolder : (sourceInstance.sftpFolder !== undefined ? sourceInstance.sftpFolder : null),
+            SftpFileMask: sourceInstance.SftpFileMask || sourceInstance.sftpFileMask || '*.txt',
+            SftpMaxConnectionPoolSize: sourceInstance.SftpMaxConnectionPoolSize !== undefined ? sourceInstance.SftpMaxConnectionPoolSize : (sourceInstance.sftpMaxConnectionPoolSize !== undefined ? sourceInstance.sftpMaxConnectionPoolSize : 5),
+            SftpFileBufferSize: sourceInstance.SftpFileBufferSize !== undefined ? sourceInstance.SftpFileBufferSize : (sourceInstance.sftpFileBufferSize !== undefined ? sourceInstance.sftpFileBufferSize : 8192),
+            SqlServerName: sourceInstance.SqlServerName !== undefined ? sourceInstance.SqlServerName : (sourceInstance.sqlServerName !== undefined ? sourceInstance.sqlServerName : null),
+            SqlDatabaseName: sourceInstance.SqlDatabaseName !== undefined ? sourceInstance.SqlDatabaseName : (sourceInstance.sqlDatabaseName !== undefined ? sourceInstance.sqlDatabaseName : null),
+            SqlUserName: sourceInstance.SqlUserName !== undefined ? sourceInstance.SqlUserName : (sourceInstance.sqlUserName !== undefined ? sourceInstance.sqlUserName : null),
+            SqlPassword: (sourceInstance.SqlPassword || sourceInstance.sqlPassword) ? '***' : null,
+            SqlIntegratedSecurity: sourceInstance.SqlIntegratedSecurity !== undefined ? sourceInstance.SqlIntegratedSecurity : (sourceInstance.sqlIntegratedSecurity !== undefined ? sourceInstance.sqlIntegratedSecurity : false),
+            SqlResourceGroup: sourceInstance.SqlResourceGroup !== undefined ? sourceInstance.SqlResourceGroup : (sourceInstance.sqlResourceGroup !== undefined ? sourceInstance.sqlResourceGroup : null),
+            SqlPollingStatement: sourceInstance.SqlPollingStatement !== undefined ? sourceInstance.SqlPollingStatement : (sourceInstance.sqlPollingStatement !== undefined ? sourceInstance.sqlPollingStatement : null),
+            SqlPollingInterval: sourceInstance.SqlPollingInterval !== undefined ? sourceInstance.SqlPollingInterval : (sourceInstance.sqlPollingInterval !== undefined ? sourceInstance.sqlPollingInterval : 60),
+            SqlTableName: sourceInstance.SqlTableName !== undefined ? sourceInstance.SqlTableName : (sourceInstance.sqlTableName !== undefined ? sourceInstance.sqlTableName : null),
+            SqlUseTransaction: sourceInstance.SqlUseTransaction !== undefined ? sourceInstance.SqlUseTransaction : (sourceInstance.sqlUseTransaction !== undefined ? sourceInstance.sqlUseTransaction : false),
+            SqlBatchSize: sourceInstance.SqlBatchSize !== undefined ? sourceInstance.SqlBatchSize : (sourceInstance.sqlBatchSize !== undefined ? sourceInstance.sqlBatchSize : 1000),
+            SqlCommandTimeout: sourceInstance.SqlCommandTimeout !== undefined ? sourceInstance.SqlCommandTimeout : (sourceInstance.sqlCommandTimeout !== undefined ? sourceInstance.sqlCommandTimeout : 30),
+            SqlFailOnBadStatement: sourceInstance.SqlFailOnBadStatement !== undefined ? sourceInstance.SqlFailOnBadStatement : (sourceInstance.sqlFailOnBadStatement !== undefined ? sourceInstance.sqlFailOnBadStatement : false),
+            CreatedAt: sourceInstance.CreatedAt !== undefined ? sourceInstance.CreatedAt : (sourceInstance.createdAt !== undefined ? sourceInstance.createdAt : null),
+            UpdatedAt: sourceInstance.UpdatedAt !== undefined ? sourceInstance.UpdatedAt : (sourceInstance.updatedAt !== undefined ? sourceInstance.updatedAt : null)
           };
-        }
+        });
+      } else if (config.sourceAdapterName || config.sourceInstanceName) {
+        // Fallback to old structure for backward compatibility
+        const sourceInstanceName = config.sourceInstanceName || config.sourceAdapterName || 'Source';
+        structuredConfig.Sources[sourceInstanceName] = {
+          InstanceName: sourceInstanceName,
+          AdapterName: config.sourceAdapterName || 'CSV',
+          IsEnabled: config.sourceIsEnabled !== undefined ? config.sourceIsEnabled : false,
+          AdapterInstanceGuid: config.sourceAdapterInstanceGuid || '',
+          Configuration: config.sourceConfiguration || '',
+          // Copy all source properties
+          SourceReceiveFolder: config.sourceReceiveFolder || null,
+          SourceFileMask: config.sourceFileMask || '*.txt',
+          SourceBatchSize: config.sourceBatchSize || 100,
+          SourceFieldSeparator: config.sourceFieldSeparator || '║',
+          // CsvData excluded from JSON description (not part of interface configuration)
+          CsvAdapterType: config.csvAdapterType || 'FILE',
+          CsvPollingInterval: config.csvPollingInterval || 10,
+          SftpHost: config.sftpHost || null,
+          SftpPort: config.sftpPort || 22,
+          SftpUsername: config.sftpUsername || null,
+          SftpPassword: config.sftpPassword ? '***' : null,
+          SftpSshKey: config.sftpSshKey ? '***' : null,
+          SftpFolder: config.sftpFolder || null,
+          SftpFileMask: config.sftpFileMask || '*.txt',
+          SftpMaxConnectionPoolSize: config.sftpMaxConnectionPoolSize || 5,
+          SftpFileBufferSize: config.sftpFileBufferSize || 8192,
+          SqlServerName: config.sqlServerName || null,
+          SqlDatabaseName: config.sqlDatabaseName || null,
+          SqlUserName: config.sqlUserName || null,
+          SqlPassword: config.sqlPassword ? '***' : null,
+          SqlIntegratedSecurity: config.sqlIntegratedSecurity || false,
+          SqlResourceGroup: config.sqlResourceGroup || null,
+          SqlPollingStatement: config.sqlPollingStatement || null,
+          SqlPollingInterval: config.sqlPollingInterval || 60,
+          SqlTableName: config.sqlTableName || null,
+          SqlUseTransaction: config.sqlUseTransaction || false,
+          SqlBatchSize: config.sqlBatchSize || 1000,
+          SqlCommandTimeout: config.sqlCommandTimeout || 30,
+          SqlFailOnBadStatement: config.sqlFailOnBadStatement || false,
+          CreatedAt: config.createdAt || null,
+          UpdatedAt: config.updatedAt || null
+        };
       }
 
-      // Build Destinations from new structure or old structure
-      // Check both PascalCase and camelCase versions
-      const hasDestinations = (structuredConfig.Destinations && Object.keys(structuredConfig.Destinations).length > 0) ||
-                             (config.Destinations && Object.keys(config.Destinations).length > 0) ||
-                             (config.destinations && Object.keys(config.destinations).length > 0);
-      
-      if (!hasDestinations) {
+      // Normalize Destinations from new structure (config.destinations or config.Destinations)
+      const destinationsData = config.Destinations || config.destinations || {};
+      if (destinationsData && Object.keys(destinationsData).length > 0) {
+        // Use the new hierarchical structure - normalize all properties to PascalCase
+        Object.keys(destinationsData).forEach(instanceName => {
+          const destInstance = destinationsData[instanceName];
+          structuredConfig.Destinations[instanceName] = {
+            AdapterInstanceGuid: destInstance.AdapterInstanceGuid || destInstance.adapterInstanceGuid || '',
+            InstanceName: destInstance.InstanceName || destInstance.instanceName || instanceName,
+            AdapterName: destInstance.AdapterName || destInstance.adapterName || 'SqlServer',
+            IsEnabled: destInstance.IsEnabled !== undefined ? destInstance.IsEnabled : (destInstance.isEnabled !== undefined ? destInstance.isEnabled : false),
+            Configuration: destInstance.Configuration || destInstance.configuration || '',
+            // Copy all destination properties - handle both camelCase and PascalCase
+            DestinationReceiveFolder: destInstance.DestinationReceiveFolder !== undefined ? destInstance.DestinationReceiveFolder : (destInstance.destinationReceiveFolder !== undefined ? destInstance.destinationReceiveFolder : null),
+            DestinationFileMask: destInstance.DestinationFileMask || destInstance.destinationFileMask || '*.txt',
+            SqlServerName: destInstance.SqlServerName !== undefined ? destInstance.SqlServerName : (destInstance.sqlServerName !== undefined ? destInstance.sqlServerName : null),
+            SqlDatabaseName: destInstance.SqlDatabaseName !== undefined ? destInstance.SqlDatabaseName : (destInstance.sqlDatabaseName !== undefined ? destInstance.sqlDatabaseName : null),
+            SqlUserName: destInstance.SqlUserName !== undefined ? destInstance.SqlUserName : (destInstance.sqlUserName !== undefined ? destInstance.sqlUserName : null),
+            SqlPassword: (destInstance.SqlPassword || destInstance.sqlPassword) ? '***' : null,
+            SqlIntegratedSecurity: destInstance.SqlIntegratedSecurity !== undefined ? destInstance.SqlIntegratedSecurity : (destInstance.sqlIntegratedSecurity !== undefined ? destInstance.sqlIntegratedSecurity : false),
+            SqlResourceGroup: destInstance.SqlResourceGroup !== undefined ? destInstance.SqlResourceGroup : (destInstance.sqlResourceGroup !== undefined ? destInstance.sqlResourceGroup : null),
+            SqlTableName: destInstance.SqlTableName !== undefined ? destInstance.SqlTableName : (destInstance.sqlTableName !== undefined ? destInstance.sqlTableName : null),
+            SqlUseTransaction: destInstance.SqlUseTransaction !== undefined ? destInstance.SqlUseTransaction : (destInstance.sqlUseTransaction !== undefined ? destInstance.sqlUseTransaction : false),
+            SqlBatchSize: destInstance.SqlBatchSize !== undefined ? destInstance.SqlBatchSize : (destInstance.sqlBatchSize !== undefined ? destInstance.sqlBatchSize : 1000),
+            SqlCommandTimeout: destInstance.SqlCommandTimeout !== undefined ? destInstance.SqlCommandTimeout : (destInstance.sqlCommandTimeout !== undefined ? destInstance.sqlCommandTimeout : 30),
+            SqlFailOnBadStatement: destInstance.SqlFailOnBadStatement !== undefined ? destInstance.SqlFailOnBadStatement : (destInstance.sqlFailOnBadStatement !== undefined ? destInstance.sqlFailOnBadStatement : false),
+            CreatedAt: destInstance.CreatedAt !== undefined ? destInstance.CreatedAt : (destInstance.createdAt !== undefined ? destInstance.createdAt : null),
+            UpdatedAt: destInstance.UpdatedAt !== undefined ? destInstance.UpdatedAt : (destInstance.updatedAt !== undefined ? destInstance.updatedAt : null)
+          };
+        });
+      } else if (!structuredConfig.Destinations || Object.keys(structuredConfig.Destinations).length === 0) {
         structuredConfig.Destinations = {};
         
         // Try to use destinationAdapterInstances array first

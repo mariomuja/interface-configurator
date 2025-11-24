@@ -6,11 +6,21 @@
 }
 
 .csv-destination-section,
-.raw-csv-section,
-.sftp-section {
+.raw-csv-section {
   margin-top: 20px;
   padding: 15px;
   background-color: #f5f5f5;
+  border-radius: 4px;
+  grid-column: 1 / -1; /* Span both columns */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+}
+
+.sftp-section {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #ffffff;
   border-radius: 4px;
   grid-column: 1 / -1; /* Span both columns */
   display: grid;

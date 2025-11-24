@@ -185,6 +185,9 @@ import { Observable } from 'rxjs';
       transform-style: preserve-3d;
       perspective: 1000px;
       animation: frameGlow 3s ease-in-out infinite;
+      width: 100%;
+      min-width: 800px;
+      max-width: 100%;
     }
     
     @keyframes frameGlow {
@@ -230,6 +233,7 @@ import { Observable } from 'rxjs';
       white-space: nowrap;
       width: 100%;
       max-width: 100%;
+      min-width: 800px;
     }
     
     .concept-text {
