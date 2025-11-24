@@ -34,6 +34,24 @@
   <mat-icon matSuffix matTooltip="Defines how often this CSV adapter checks for new data. RAW: controls how often CsvData is inspected for changes. FILE/SFTP: controls how often the adapter polls the folder or SFTP server for new files. Default: 10 seconds." matTooltipPosition="left">help_outline</mat-icon>
 </mat-form-field>
 
+<mat-form-field appearance="outline" class="compact-field" *ngIf="adapterType === 'Source' && (csvAdapterType === 'FILE' || csvAdapterType === 'SFTP')" floatLabel="always">
+  <mat-label>Skip Header Lines</mat-label>
+  <input matInput class="compact-input" type="number" [(ngModel)]="csvSkipHeaderLines" min="0" />
+  <mat-icon matSuffix matTooltip="Number of lines to skip at the beginning of CSV files (e.g., header lines, comments). These lines will be removed before processing. Default: 0 (no lines skipped)." matTooltipPosition="left">help_outline</mat-icon>
+</mat-form-field>
+
+<mat-form-field appearance="outline" class="compact-field" *ngIf="adapterType === 'Source' && (csvAdapterType === 'FILE' || csvAdapterType === 'SFTP')" floatLabel="always">
+  <mat-label>Skip Footer Lines</mat-label>
+  <input matInput class="compact-input" type="number" [(ngModel)]="csvSkipFooterLines" min="0" />
+  <mat-icon matSuffix matTooltip="Number of lines to skip at the end of CSV files (e.g., summary rows, totals). These lines will be removed before processing. Default: 0 (no lines skipped)." matTooltipPosition="left">help_outline</mat-icon>
+</mat-form-field>
+
+<mat-form-field appearance="outline" class="compact-field" *ngIf="adapterType === 'Source' && (csvAdapterType === 'FILE' || csvAdapterType === 'SFTP')" floatLabel="always">
+  <mat-label>Quote Character</mat-label>
+  <input matInput class="compact-input" [(ngModel)]="csvQuoteCharacter" maxlength="1" />
+  <mat-icon matSuffix matTooltip="Character used to enclose CSV values (e.g., &quot; for double quotes, ' for single quotes). Leave empty if CSV values are not quoted. Default: &quot; (double quote)." matTooltipPosition="left">help_outline</mat-icon>
+</mat-form-field>
+
 <mat-form-field appearance="outline" class="compact-field" *ngIf="adapterType === 'Destination'" floatLabel="always">
   <mat-label>Field Separator</mat-label>
   <input matInput class="compact-input" [(ngModel)]="fieldSeparator" maxlength="10" />

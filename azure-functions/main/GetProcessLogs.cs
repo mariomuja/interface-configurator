@@ -10,15 +10,15 @@ using InterfaceConfigurator.Main.Helpers;
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
-/// HTTP endpoint to retrieve process logs from MessageBox database
+/// HTTP endpoint to retrieve process logs from InterfaceConfigDb database (formerly MessageBox)
 /// </summary>
 public class GetProcessLogsFunction
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<GetProcessLogsFunction> _logger;
 
     public GetProcessLogsFunction(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<GetProcessLogsFunction> logger)
     {
         _context = context;
@@ -46,7 +46,7 @@ public class GetProcessLogsFunction
                 var created = await _context.Database.EnsureCreatedAsync(context.CancellationToken);
                 if (created)
                 {
-                    _logger.LogInformation("MessageBox database and tables created automatically. Tables: Messages, MessageSubscriptions, ProcessLogs");
+                    _logger.LogInformation("InterfaceConfigDb database and tables created automatically. Tables: AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, InterfaceConfigurations");
                 }
             }
             catch (Exception ensureEx)

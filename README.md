@@ -119,11 +119,12 @@ The application uses a multi-platform infrastructure with a **configuration-base
 
 ## 📊 Complete Dataflow Diagram
 
-The following diagram illustrates the complete end-to-end dataflow through the system, showing how data moves from source systems through the MessageBox to destination systems:
+The following diagram illustrates the complete end-to-end dataflow through the system, showing how data moves from source systems through **Azure Service Bus** to destination systems, with **dynamic Container Apps** for each adapter instance:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                          COMPLETE SYSTEM DATAFLOW                                    │
+│                    (Service Bus + Dynamic Container Apps)                          │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────┐         ┌──────────────────┐         ┌──────────────────┐
@@ -137,84 +138,139 @@ The following diagram illustrates the complete end-to-end dataflow through the s
          │                            │                            │
          ▼                            ▼                            ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        SOURCE ADAPTER LAYER                                 │
+│              SOURCE ADAPTER INSTANCES (Container Apps)                     │
+│                    Dynamically Created on Configuration                     │
 │                                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                │
-│  │ CsvAdapter   │    │SqlServer     │    │ Future        │                │
-│  │              │    │Adapter       │    │ Adapters      │                │
-│  │ • RAW        │    │              │    │               │                │
-│  │ • FILE       │    │ • Polling    │    │ • JSON        │                │
-│  │ • SFTP       │    │ • Connection │    │ • SAP         │                │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘                │
-│         │                   │                    │                        │
-│         └───────────────────┴────────────────────┘                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  Container App: ca-{source-guid-1}                                  │  │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+│  │  │ CsvAdapter Instance                                           │  │  │
+│  │  │ • Reads CSV from Blob Storage                                 │  │  │
+│  │  │ • Debatches into individual records                          │  │  │
+│  │  │ • Publishes to Service Bus Topic                             │  │  │
+│  │  │ • Isolated: Own blob storage, own config                      │  │  │
+│  │  └──────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  Container App: ca-{source-guid-2}                                  │  │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+│  │  │ SqlServerAdapter Instance                                    │  │  │
+│  │  │ • Polls SQL Server tables                                   │  │  │
+│  │  │ • Debatches into individual records                         │  │  │
+│  │  │ • Publishes to Service Bus Topic                            │  │  │
+│  │  │ • Isolated: Own connection, own config                       │  │  │
+│  │  └──────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ✅ Benefits:                                                               │
+│  • No Logic Apps needed - Container Apps created automatically            │
+│  • Clean separation: Send and receive processes isolated                 │
+│  • Fault isolation: Errors don't affect other adapter instances            │
+│  • Performance isolation: Slow adapter doesn't block others                │
+│  • Dynamic creation: No deployment needed - created on configuration      │
 │                              │                                             │
-│                    ReadAsync() + Debatches                                 │
+│                    ReadAsync() + Debatches + Publish                        │
 │                              │                                             │
 └──────────────────────────────┼─────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         MESSAGEBOX (STAGING AREA)                          │
+│                    AZURE SERVICE BUS (Messaging Hub)                       │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │                    Messages Table                                   │  │
+│  │                    Service Bus Topics                                │  │
 │  │  ┌──────────────────────────────────────────────────────────────┐  │  │
-│  │  │ MessageId │ InterfaceName │ AdapterName │ MessageData │ Status│  │  │
-│  │  │ (GUID)    │ (String)      │ (String)    │ (JSON)      │(Enum) │  │  │
+│  │  │ Topic: {InterfaceName}                                         │  │  │
+│  │  │  ┌────────────────────────────────────────────────────────┐  │  │  │
+│  │  │  │ Message Properties:                                    │  │  │  │
+│  │  │  │ • MessageId (GUID)                                     │  │  │  │
+│  │  │  │ • InterfaceName                                        │  │  │  │
+│  │  │  │ • AdapterName                                          │  │  │  │
+│  │  │  │ • MessageData (JSON)                                   │  │  │  │
+│  │  │  │ • EnqueuedTime                                         │  │  │  │
+│  │  │  └────────────────────────────────────────────────────────┘  │  │  │
+│  │  │                                                              │  │  │
+│  │  │  MessageData Format:                                         │  │  │
+│  │  │  {                                                           │  │  │
+│  │  │    "headers": ["Column1", "Column2", ...],                  │  │  │
+│  │  │    "record": {"Column1": "Value1", "Column2": "Value2"}   │  │  │
+│  │  │  }                                                           │  │  │
 │  │  └──────────────────────────────────────────────────────────────┘  │  │
 │  │                                                                     │  │
-│  │  MessageData Format:                                                │  │
-│  │  {                                                                  │  │
-│  │    "headers": ["Column1", "Column2", ...],                         │  │
-│  │    "record": {"Column1": "Value1", "Column2": "Value2", ...}       │  │
-│  │  }                                                                  │  │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+│  │  │              Service Bus Subscriptions                        │  │  │
+│  │  │  ┌────────────────────────────────────────────────────────┐  │  │  │
+│  │  │  │ Subscription: {DestinationAdapterGuid}                 │  │  │  │
+│  │  │  │ • Filters messages by InterfaceName                     │  │  │  │
+│  │  │  │ • Each destination adapter has own subscription          │  │  │  │
+│  │  │  │ • Automatic message routing                             │  │  │  │
+│  │  │  │ • Dead-letter queue for failed messages                 │  │  │  │
+│  │  │  └────────────────────────────────────────────────────────┘  │  │  │
+│  │  └──────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                     │  │
+│  │  🚀 Service Bus Features:                                           │  │
+│  │  • Guaranteed Delivery: Messages persist until processed          │  │
+│  │  • At-Least-Once Delivery: Messages delivered reliably            │  │
+│  │  • Dead-Letter Queue: Failed messages automatically moved         │  │
+│  │  • Message Ordering: FIFO ordering per subscription               │  │
+│  │  • Filtering: Topic filters for message routing                   │  │
+│  │  • Scaling: Auto-scales to handle high throughput                 │  │
+│  │  • Durability: Messages survive system restarts                   │  │
+│  │  • Multiple Subscriptions: One topic, many subscribers           │  │
 │  └─────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │              MessageSubscriptions Table                              │  │
-│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
-│  │  │SubId│MessageId│SubscriberAdapter│Status│ProcessedAt│ErrorMsg│  │  │
-│  │  │(GUID│(GUID)   │(String)         │(Enum)│(DateTime) │(String)│  │  │
-│  │  └──────────────────────────────────────────────────────────────┘  │  │
-│  │                                                                     │  │
-│  │  Tracks which adapters have processed which messages                │  │
-│  └─────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │              AdapterInstances Table                                  │  │
+│  │              AdapterInstances Table (InterfaceConfigDb)              │  │
 │  │  ┌──────────────────────────────────────────────────────────────┐  │  │
 │  │  │InstanceGuid│InterfaceName│InstanceName│AdapterName│IsEnabled│  │  │
 │  │  │(GUID)      │(String)     │(String)    │(String)   │(Bool)   │  │  │
 │  │  └──────────────────────────────────────────────────────────────┘  │  │
 │  │                                                                     │  │
 │  │  Maintains metadata about adapter instances                        │  │
+│  │  Used to create Container Apps and Service Bus subscriptions      │  │
 │  └─────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  Event Queue (InMemoryEventQueue)                                           │
-│  • Triggers when messages are added                                         │
-│  • Notifies destination adapters                                            │
-│  • Enables event-driven processing                                          │
 └──────────────────────────────┬─────────────────────────────────────────────┘
                                │
-                               │ ReadPendingMessages()
-                               │ CreateSubscription()
+                               │ Subscribe() + Receive() + Complete()
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      DESTINATION ADAPTER LAYER                              │
+│           DESTINATION ADAPTER INSTANCES (Container Apps)                   │
+│                    Dynamically Created on Configuration                     │
 │                                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                │
-│  │ CsvAdapter   │    │SqlServer     │    │ Future        │                │
-│  │              │    │Adapter       │    │ Adapters      │                │
-│  │ • Write CSV  │    │              │    │               │                │
-│  │ • File Mask  │    │ • Write SQL  │    │ • JSON        │                │
-│  │ • Batch Size │    │ • Transactions│    │ • SAP         │                │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘                │
-│         │                   │                    │                        │
-│         └───────────────────┴────────────────────┘                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  Container App: ca-{dest-guid-1}                                    │  │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+│  │  │ SqlServerAdapter Instance                                     │  │  │
+│  │  │ • Subscribes to Service Bus Topic                             │  │  │
+│  │  │ • Receives messages from subscription                         │  │  │
+│  │  │ • Writes to SQL Server tables                                 │  │  │
+│  │  │ • Completes messages after successful write                   │  │  │
+│  │  │ • Isolated: Own connection, own config, own processing       │  │  │
+│  │  └──────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  Container App: ca-{dest-guid-2}                                    │  │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+│  │  │ CsvAdapter Instance (as Destination)                            │  │  │
+│  │  │ • Subscribes to Service Bus Topic                              │  │  │
+│  │  │ • Receives messages from subscription                          │  │  │
+│  │  │ • Writes CSV files to Blob Storage                             │  │  │
+│  │  │ • Completes messages after successful write                    │  │  │
+│  │  │ • Isolated: Own blob storage, own config                      │  │  │
+│  │  └──────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ✅ Benefits:                                                               │
+│  • No Logic Apps needed - Container Apps created automatically            │
+│  • Clean separation: Each adapter instance runs independently              │
+│  • Fault isolation: Error in one adapter doesn't affect others             │
+│  • Performance isolation: Slow adapter doesn't block others                │
+│  • Dynamic creation: No deployment needed - created on configuration       │
 │                              │                                             │
-│                    WriteAsync() + MarkSubscriptionProcessed()               │
+│                    ReceiveAsync() + WriteAsync() + Complete()               │
 │                              │                                             │
 └──────────────────────────────┼─────────────────────────────────────────────┘
                                │
@@ -228,24 +284,38 @@ The following diagram illustrates the complete end-to-end dataflow through the s
 └──────────────────┘         └──────────────────┘         └──────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    GUARANTEED DELIVERY CHECK                                │
+│                    GUARANTEED DELIVERY (Service Bus)                        │
 │                                                                             │
-│  After each subscription is marked "Processed":                             │
+│  Service Bus ensures guaranteed delivery:                                   │
 │                                                                             │
-│  1. Query MessageSubscriptions for all subscriptions of MessageId           │
-│  2. Check: Are ALL subscriptions "Processed"?                              │
-│     ├─ YES → Remove message from MessageBox ✅                              │
-│     └─ NO  → Keep message in MessageBox (waiting for remaining adapters)  │
+│  1. Message Published to Topic                                              │
+│     └─> Message persisted in Service Bus                                    │
+│                                                                             │
+│  2. Multiple Subscriptions Receive                                          │
+│     ├─> Subscription 1 (Destination Adapter 1) receives message            │
+│     ├─> Subscription 2 (Destination Adapter 2) receives message           │
+│     └─> Each subscription processes independently                           │
+│                                                                             │
+│  3. Message Completion                                                      │
+│     ├─> After successful processing: Complete() called                      │
+│     ├─> Message removed from subscription                                   │
+│     └─> Other subscriptions still have access to message                    │
+│                                                                             │
+│  4. Error Handling                                                          │
+│     ├─> If processing fails: Abandon() or DeadLetter() called              │
+│     ├─> Message moved to dead-letter queue                                  │
+│     └─> Can be reprocessed later                                            │
 │                                                                             │
 │  This ensures:                                                               │
-│  • No data loss until all destinations confirm                             │
+│  • No data loss - Messages persist until processed                          │
 │  • Multiple destinations can process independently                          │
 │  • Failed destinations don't block successful ones                          │
-│  • Complete audit trail of processing                                      │
+│  • Automatic retry via dead-letter queue                                    │
+│  • Complete audit trail via Service Bus metrics                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CONFIGURATION LAYER (Runtime)                             │
+│              CONFIGURATION LAYER (Runtime - No Deployment)                    │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐  │
 │  │         Interface Configuration (JSON in Blob Storage)              │  │
@@ -260,74 +330,132 @@ The following diagram illustrates the complete end-to-end dataflow through the s
 │  │  }                                                                  │  │
 │  └─────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
-│  • Loaded into memory cache on startup                                     │
-│  • Updated via API without redeployment                                    │
-│  • Controls adapter behavior and properties                                 │
-│  • Enables/disables adapters independently                                 │
+│  When user configures interface in UI:                                     │
+│                                                                             │
+│  1. Source Adapter Instance Created                                        │
+│     ├─> Container App created automatically (ca-{guid})                   │
+│     ├─> Blob storage created for adapter instance                         │
+│     ├─> Adapter config stored in blob (adapter-config.json)               │
+│     ├─> Service Bus Topic created (if not exists)                         │
+│     └─> Container App starts processing                                    │
+│                                                                             │
+│  2. Destination Adapter Instance Created                                   │
+│     ├─> Container App created automatically (ca-{guid})                    │
+│     ├─> Blob storage created for adapter instance                         │
+│     ├─> Adapter config stored in blob (adapter-config.json)               │
+│     ├─> Service Bus Subscription created                                   │
+│     └─> Container App starts processing                                    │
+│                                                                             │
+│  ✅ No Deployment Required:                                                │
+│  • Container Apps created dynamically via Azure Resource Manager API       │
+│  • No Logic Apps needed - Container Apps handle processing                │
+│  • Configuration changes update Container Apps automatically                │
+│  • Each adapter instance isolated in own Container App                    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Dataflow Steps
 
-1. **Source Adapter Processing** (Timer-Triggered Azure Function):
-   - Loads enabled interface configurations
-   - Instantiates source adapters based on configuration
+1. **Source Adapter Instance Creation** (On Configuration):
+   - User configures source adapter in UI
+   - **Container App created automatically** via Azure Resource Manager API
+   - Blob storage created for adapter instance
+   - Adapter configuration stored in blob (`adapter-config.json`)
+   - Service Bus Topic created (if not exists)
+   - Container App starts processing
+   - **No deployment needed** - created dynamically
+
+2. **Source Adapter Processing** (Container App):
+   - Container App reads adapter configuration from blob storage
+   - Instantiates source adapter based on configuration
    - Calls `ReadAsync()` to read data from source system
    - **Debatches** data: Each record becomes a separate message
-   - Writes messages to MessageBox (`Messages` table)
-   - Triggers events in Event Queue
+   - Publishes messages to Service Bus Topic
+   - Messages persist in Service Bus until processed
 
-2. **MessageBox Staging**:
-   - Stores each debatched record as a separate message
-   - Messages contain JSON data with headers and record values
-   - Status tracked: "Pending", "Processed", "Error"
-   - Event Queue notifies destination adapters
+3. **Service Bus Messaging**:
+   - Messages published to Topic named after InterfaceName
+   - Each message contains JSON data with headers and record values
+   - Service Bus ensures guaranteed delivery
+   - Multiple subscriptions can receive same message
+   - Dead-letter queue for failed messages
+   - Auto-scaling handles high throughput
 
-3. **Destination Adapter Processing** (Timer-Triggered Azure Function):
-   - Loads enabled interface configurations
-   - Instantiates destination adapters based on configuration
-   - Reads pending messages from MessageBox
-   - Creates subscriptions in `MessageSubscriptions` table
+4. **Destination Adapter Instance Creation** (On Configuration):
+   - User configures destination adapter in UI
+   - **Container App created automatically** via Azure Resource Manager API
+   - Blob storage created for adapter instance
+   - Adapter configuration stored in blob (`adapter-config.json`)
+   - Service Bus Subscription created for this adapter instance
+   - Container App starts processing
+   - **No deployment needed** - created dynamically
+
+5. **Destination Adapter Processing** (Container App):
+   - Container App reads adapter configuration from blob storage
+   - Subscribes to Service Bus Topic via Subscription
+   - Receives messages from Service Bus Subscription
    - Processes each message:
      - Extracts record from JSON
      - Validates and transforms data
      - Ensures destination structure exists
      - Writes to destination system
-   - Marks subscription as "Processed" or "Error"
+   - Completes message after successful processing
+   - Abandons or dead-letters message on error
 
-4. **Guaranteed Delivery Check**:
-   - After each subscription is processed, system checks:
-     - Are ALL subscriptions for this message "Processed"?
-     - If YES: Remove message from MessageBox
-     - If NO: Keep message (waiting for remaining adapters)
+6. **Guaranteed Delivery** (Service Bus):
+   - Service Bus ensures messages persist until processed
+   - Each subscription processes messages independently
+   - Failed messages moved to dead-letter queue
+   - Messages can be reprocessed from dead-letter queue
+   - Complete audit trail via Service Bus metrics
 
-5. **Multiple Destinations Support**:
+7. **Multiple Destinations Support**:
    - One source can feed multiple destinations
-   - Each destination creates its own subscription
-   - Messages remain until ALL destinations confirm processing
+   - Each destination has its own Subscription
+   - Each destination runs in its own Container App
+   - Messages delivered to all subscriptions independently
    - Failed destinations don't block successful ones
+   - Complete process isolation between adapter instances
 
-### Configuration-Based Architecture
+### Configuration-Based Architecture with Dynamic Container Apps
 
-The system uses a **configuration-based approach** where interfaces are defined by **what you want to connect**, not by writing custom code:
+The system uses a **configuration-based approach** where interfaces are defined by **what you want to connect**, not by writing custom code. **Container Apps are created dynamically** when you configure an interface:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Configuration Layer                       │
-│  "Connect CSV → SQL Server"  (Just tell it what to do)     │
+│  "Connect CSV → SQL Server"  (Just tell it what to do)       │
+│                                                              │
+│  User clicks "Save" in UI → Container Apps created          │
+│  automatically via Azure Resource Manager API                │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    MessageBox (Staging Area)                 │
-│  • Debatching: Each record = separate message               │
-│  • Event-driven: Triggers destination adapters              │
-│  • Guaranteed delivery: Data stays until all processed      │
+│              Source Container App Created                   │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ Container App: ca-{source-guid}                       │  │
+│  │ • Created automatically (no deployment)              │  │
+│  │ • Own blob storage for adapter instance                │  │
+│  │ • Adapter config: adapter-config.json                 │  │
+│  │ • Reads from source → Publishes to Service Bus        │  │
+│  └──────────────────────────────────────────────────────┘  │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Azure Service Bus                         │
+│  • Topic: {InterfaceName}                                    │
+│  • Debatching: Each record = separate message                │
+│  • Guaranteed delivery: Messages persist until processed    │
+│  • Multiple subscriptions: One topic, many subscribers      │
+│  • Dead-letter queue: Failed messages automatically moved   │
 └──────────────┬──────────────────────────┬───────────────────┘
                │                          │
         ┌──────▼──────┐          ┌────────▼────────┐
-        │   Source    │          │   Destination   │
-        │   Adapter   │          │    Adapter      │
+        │  Container  │          │   Container     │
+        │  App: ca-   │          │   App: ca-      │
+        │  {guid-1}   │          │   {guid-2}      │
         └──────┬──────┘          └────────┬────────┘
                │                          │
         ┌──────▼──────┐          ┌────────▼────────┐
@@ -339,6 +467,13 @@ The system uses a **configuration-based approach** where interfaces are defined 
         │ OR          │          │  OR             │
         │ Destination │          │  Source         │
         └─────────────┘          └─────────────────┘
+        
+✅ Benefits:
+• No Logic Apps needed - Container Apps handle processing
+• Clean separation: Send and receive processes isolated
+• Fault isolation: Errors don't affect other adapter instances
+• Performance isolation: Slow adapter doesn't block others
+• Dynamic creation: No deployment needed - created on configuration
 ```
 
 **Key Innovation: Universal Adapters**
@@ -362,194 +497,268 @@ Each adapter can be used as **both source and destination**:
 3. **SQL Server → SQL Server**: `SqlServerAdapter` (source) → MessageBox → `SqlServerAdapter` (destination)
 4. **Future: CSV → SAP**: `CsvAdapter` (source) → MessageBox → `SapAdapter` (destination) *(no changes to existing code)*
 
-### MessageBox: Guaranteed Delivery Pattern
+### Azure Service Bus: Guaranteed Delivery Pattern
 
-The **MessageBox** acts as a staging area (similar to Microsoft BizTalk Server) ensuring **guaranteed delivery**:
+**Azure Service Bus** acts as the messaging hub (replacing MessageBox) ensuring **guaranteed delivery** with enterprise-grade features:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      MessageBox Flow                        │
+│                    Service Bus Flow                          │
 └─────────────────────────────────────────────────────────────┘
 
-1. Source Adapter Reads Data
+1. Source Container App Reads Data
    └─> Debatches into individual records
-   └─> Each record = separate message in MessageBox
-   └─> Event triggered for each message
+   └─> Each record = separate message
+   └─> Publishes to Service Bus Topic
 
-2. Event Queue
-   └─> Destination adapters subscribe to messages
-   └─> Each adapter creates a subscription
+2. Service Bus Topic
+   └─> Messages persisted in Service Bus
+   └─> Multiple subscriptions can receive same message
+   └─> Automatic message routing
 
-3. Destination Adapter Processes
-   └─> Reads message from MessageBox
+3. Destination Container App Subscribes
+   └─> Creates Service Bus Subscription
+   └─> Receives messages from subscription
    └─> Processes record
-   └─> Marks subscription as "Processed"
+   └─> Completes message after successful processing
 
-4. Message Removal (Only After All Processed)
-   └─> System checks: Are ALL subscriptions processed?
-   └─> If YES: Message removed from MessageBox
-   └─> If NO: Message stays (guaranteed delivery)
+4. Error Handling
+   └─> If processing fails: Abandon() or DeadLetter()
+   └─> Message moved to dead-letter queue
+   └─> Can be reprocessed later
+
+5. Message Completion
+   └─> After successful processing: Complete() called
+   └─> Message removed from subscription
+   └─> Other subscriptions still have access
+   └─> Guaranteed delivery confirmed
+```
+
+### Dynamic Container App Creation
+
+**Container Apps are created automatically** when you configure an adapter instance - no deployment needed:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         Container App Creation Flow                          │
+└─────────────────────────────────────────────────────────────┘
+
+1. User Configures Adapter in UI
+   └─> Clicks "Save" button
+   └─> Backend receives configuration
+
+2. Container App Creation (Automatic)
+   ├─> Azure Resource Manager API called
+   ├─> Container App created: ca-{adapter-instance-guid}
+   ├─> Blob storage created for adapter instance
+   ├─> Adapter config stored: adapter-config.json
+   ├─> Environment variables configured
+   └─> Container App starts processing
+
+3. Service Bus Setup (Automatic)
+   ├─> Topic created: {InterfaceName}
+   ├─> Subscription created: {DestinationAdapterGuid}
+   └─> Connection string configured
+
+✅ No Deployment Required:
+• Container Apps created dynamically
+• No Logic Apps needed
+• Configuration changes update Container Apps automatically
+• Each adapter instance isolated in own Container App
 ```
 
 ### Detailed Architecture Flow
 
 Here's the complete end-to-end flow of how data moves through the system:
 
-#### Step 1: Source Adapter Reads and Debatches
+#### Step 1: Container App Creation & Source Processing
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Step 1: Source Processing               │
+│      Step 1: Container App Creation & Source Processing     │
 └─────────────────────────────────────────────────────────────┘
 
-Source Adapter (e.g., CsvAdapter)
+User Configures Source Adapter in UI
     │
-    ├─> Reads data from source (CSV file, SQL table, etc.)
-    │
-    ├─> Debatches: Splits batch into individual records
-    │   Example: 100 rows → 100 separate messages
-    │
-    └─> For each record:
+    └─> Backend creates Container App automatically
         │
-        ├─> Creates message in MessageBox
-        │   • MessageId (unique GUID)
-        │   • InterfaceName (e.g., "FromCsvToSqlServerExample")
-        │   • AdapterName (e.g., "CSV")
-        │   • AdapterType ("Source")
-        │   • MessageData (JSON: {"headers": [...], "record": {...}})
-        │   • Status ("Pending")
+        ├─> Container App: ca-{source-adapter-guid}
+        │   • Created via Azure Resource Manager API
+        │   • Blob storage created for adapter instance
+        │   • Adapter config stored: adapter-config.json
+        │   • Environment variables configured
+        │   • Container App starts processing
         │
-        └─> Triggers event in Event Queue
-            • MessageId
-            • InterfaceName
-            • EnqueuedAt timestamp
-```
-
-#### Step 2: Event-Driven Subscription
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Step 2: Event Queue & Subscription             │
-└─────────────────────────────────────────────────────────────┘
-
-Event Queue (InMemoryEventQueue)
-    │
-    ├─> Receives event for each new message
-    │   • MessageId
-    │   • InterfaceName
-    │
-    └─> Destination adapters poll/consume events
-        │
-        └─> For each destination adapter:
+        └─> Source Container App Processing
             │
-            ├─> Reads pending messages from MessageBox
-            │   • Filters by InterfaceName
-            │   • Status = "Pending"
+            ├─> Reads adapter configuration from blob
+            │   • Loads adapter-config.json
+            │   • Configures adapter instance
             │
-            └─> Creates subscription in MessageSubscriptions table
-                • MessageId
-                • SubscriberAdapterName (e.g., "SqlServer")
-                • Status ("Pending")
-                • InterfaceName
+            ├─> Reads data from source (CSV file, SQL table, etc.)
+            │
+            ├─> Debatches: Splits batch into individual records
+            │   Example: 100 rows → 100 separate messages
+            │
+            └─> For each record:
+                │
+                └─> Publishes message to Service Bus Topic
+                    • Topic: {InterfaceName}
+                    • MessageId (unique GUID)
+                    • MessageData (JSON: {"headers": [...], "record": {...}})
+                    • EnqueuedTime timestamp
+                    • Message persisted in Service Bus
 ```
 
-#### Step 3: Destination Adapter Processing
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│            Step 3: Destination Processing                   │
-└─────────────────────────────────────────────────────────────┘
-
-Destination Adapter (e.g., SqlServerAdapter)
-    │
-    ├─> Reads messages from MessageBox
-    │   • Filters by InterfaceName and Status="Pending"
-    │   • Orders by datetime_created (oldest first)
-    │
-    ├─> For each message:
-    │   │
-    │   ├─> Extracts single record from message
-    │   │   • Parses JSON: {"headers": [...], "record": {...}}
-    │   │
-    │   ├─> Processes record
-    │   │   • Validates data types
-    │   │   • Ensures destination structure
-    │   │   • Writes to destination (SQL table, CSV file, etc.)
-    │   │
-    │   └─> Marks subscription as "Processed"
-    │       • Updates MessageSubscriptions.Status = "Processed"
-    │       • Sets datetime_processed
-    │       • Adds ProcessingDetails
-    │
-    └─> If processing fails:
-        └─> Marks subscription as "Error"
-            • Updates MessageSubscriptions.Status = "Error"
-            • Sets ErrorMessage
-            • Message remains in MessageBox for retry
-```
-
-#### Step 4: Guaranteed Delivery Check
+#### Step 2: Service Bus Topic & Subscription
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│         Step 4: Message Removal (Guaranteed Delivery)        │
+│         Step 2: Service Bus Topic & Subscription            │
 └─────────────────────────────────────────────────────────────┘
 
-After each subscription is marked as "Processed":
+Service Bus Topic: {InterfaceName}
     │
-    ├─> System checks MessageSubscriptions table
-    │   • Query: All subscriptions for this MessageId
+    ├─> Messages published by source adapter
+    │   • Each message persisted in Service Bus
+    │   • Multiple subscriptions can receive same message
+    │   • Automatic message routing
     │
-    ├─> Evaluates: Are ALL subscriptions "Processed"?
-    │   │
-    │   ├─> YES (All processed):
-    │   │   │
-    │   │   └─> Removes message from MessageBox
-    │   │       • Message deleted from Messages table
-    │   │       • Guaranteed delivery confirmed
-    │   │
-    │   └─> NO (Some still pending):
-    │       │
-    │       └─> Message stays in MessageBox
-    │           • Status remains "Pending"
-    │           • Waiting for remaining adapters
-    │           • Guaranteed delivery in progress
+    └─> Service Bus Subscriptions Created
+        │
+        └─> For each destination adapter instance:
+            │
+            ├─> Subscription created: {DestinationAdapterGuid}
+            │   • Filters messages by InterfaceName
+            │   • Each destination has own subscription
+            │   • Messages delivered independently
+            │
+            └─> Container App subscribes to messages
+                • Receives messages from subscription
+                • Processes messages independently
+```
+
+#### Step 3: Destination Container App Processing
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│     Step 3: Destination Container App Processing            │
+└─────────────────────────────────────────────────────────────┘
+
+User Configures Destination Adapter in UI
+    │
+    └─> Backend creates Container App automatically
+        │
+        ├─> Container App: ca-{dest-adapter-guid}
+        │   • Created via Azure Resource Manager API
+        │   • Blob storage created for adapter instance
+        │   • Adapter config stored: adapter-config.json
+        │   • Service Bus Subscription created
+        │   • Container App starts processing
+        │
+        └─> Destination Container App Processing
+            │
+            ├─> Reads adapter configuration from blob
+            │   • Loads adapter-config.json
+            │   • Configures adapter instance
+            │
+            ├─> Subscribes to Service Bus Topic
+            │   • Receives messages from subscription
+            │   • Messages delivered independently
+            │
+            ├─> For each message:
+            │   │
+            │   ├─> Extracts single record from message
+            │   │   • Parses JSON: {"headers": [...], "record": {...}}
+            │   │
+            │   ├─> Processes record
+            │   │   • Validates data types
+            │   │   • Ensures destination structure
+            │   │   • Writes to destination (SQL table, CSV file, etc.)
+            │   │
+            │   └─> Completes message after successful processing
+            │       • Complete() called on Service Bus receiver
+            │       • Message removed from subscription
+            │       • Other subscriptions still have access
+            │
+            └─> If processing fails:
+                └─> Abandons or dead-letters message
+                    • Abandon() or DeadLetter() called
+                    • Message moved to dead-letter queue
+                    • Can be reprocessed later
+```
+
+#### Step 4: Guaranteed Delivery (Service Bus)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│      Step 4: Guaranteed Delivery (Service Bus)              │
+└─────────────────────────────────────────────────────────────┘
+
+Service Bus ensures guaranteed delivery:
+    │
+    ├─> Messages persist in Service Bus until processed
+    │   • Messages survive system restarts
+    │   • At-least-once delivery guaranteed
+    │
+    ├─> Multiple subscriptions process independently
+    │   • Each destination has own subscription
+    │   • Messages delivered to all subscriptions
+    │   • Failed destinations don't block successful ones
+    │
+    ├─> Message completion
+    │   • After successful processing: Complete() called
+    │   • Message removed from subscription
+    │   • Other subscriptions still have access
+    │
+    └─> Error handling
+        • Failed messages moved to dead-letter queue
+        • Can be reprocessed from dead-letter queue
+        • Complete audit trail via Service Bus metrics
 ```
 
 #### Complete Flow Example: CSV → SQL Server
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│         Example: CSV → SQL Server Integration               │
+│      Example: CSV → SQL Server Integration                  │
+│         (With Dynamic Container Apps)                        │
 └─────────────────────────────────────────────────────────────┘
 
-1. CSV file uploaded to Blob Storage
+1. User Configures Interface in UI
    │
-   └─> Azure Function triggered (Blob Trigger)
+   ├─> Source: CSV Adapter
+   │   └─> Container App created: ca-{csv-source-guid}
+   │       • Blob storage created
+   │       • Adapter config stored
+   │       • Service Bus Topic created: "FromCsvToSqlServerExample"
+   │       • Container App starts processing
+   │
+   └─> Destination: SQL Server Adapter
+       └─> Container App created: ca-{sql-dest-guid}
+           • Blob storage created
+           • Adapter config stored
+           • Service Bus Subscription created
+           • Container App starts processing
 
-2. CsvAdapter.ReadAsync() called
+2. CSV file uploaded to Blob Storage
    │
-   ├─> Reads CSV file (100 rows)
-   │
-   └─> Debatches: Creates 100 messages in MessageBox
+   └─> CSV Source Container App processes file
        │
-       └─> Each message:
-           • MessageId: {unique-guid}
-           • InterfaceName: "FromCsvToSqlServerExample"
-           • AdapterName: "CSV"
-           • AdapterType: "Source"
-           • MessageData: {"headers": ["Name", "Age"], "record": {"Name": "John", "Age": "30"}}
-           • Status: "Pending"
-           • Event enqueued
+       ├─> Reads CSV file (100 rows)
+       │
+       └─> Debatches: Publishes 100 messages to Service Bus Topic
+           │
+           └─> Each message:
+               • Topic: "FromCsvToSqlServerExample"
+               • MessageId: {unique-guid}
+               • MessageData: {"headers": ["Name", "Age"], "record": {"Name": "John", "Age": "30"}}
+               • EnqueuedTime timestamp
+               • Message persisted in Service Bus
 
-3. SqlServerAdapter.WriteAsync() called
+3. SQL Server Destination Container App subscribes
    │
-   ├─> Reads 100 pending messages from MessageBox
-   │
-   ├─> Creates 100 subscriptions in MessageSubscriptions
-   │   • MessageId: {message-guid}
-   │   • SubscriberAdapterName: "SqlServer"
-   │   • Status: "Pending"
+   ├─> Receives 100 messages from Service Bus Subscription
    │
    ├─> Processes each message:
    │   │
@@ -561,15 +770,16 @@ After each subscription is marked as "Processed":
    │   │
    │   ├─> Inserts row into SQL Server
    │   │
-   │   └─> Marks subscription as "Processed"
+   │   └─> Completes message after successful insert
+   │       • Complete() called on Service Bus receiver
+   │       • Message removed from subscription
    │
-   └─> After all 100 subscriptions processed:
+   └─> After all 100 messages processed:
        │
-       └─> System checks: All subscriptions = "Processed"?
-           │
-           └─> YES → Removes all 100 messages from MessageBox
-               • Guaranteed delivery confirmed
-               • No data loss
+       └─> All messages completed successfully
+           • Guaranteed delivery confirmed
+           • No data loss
+           • Complete audit trail via Service Bus metrics
 ```
 
 #### Multiple Destinations Example
@@ -577,43 +787,66 @@ After each subscription is marked as "Processed":
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │      Example: One Source → Multiple Destinations            │
+│              (With Container App Isolation)                │
 └─────────────────────────────────────────────────────────────┘
 
 Scenario: CSV → SQL Server AND CSV → JSON File
 
-1. CsvAdapter reads CSV (100 rows)
-   └─> Creates 100 messages in MessageBox
+1. CSV Source Container App reads CSV (100 rows)
+   └─> Publishes 100 messages to Service Bus Topic
+       • Topic: "FromCsvToSqlServerExample"
+       • Messages persisted in Service Bus
 
-2. SqlServerAdapter processes messages
-   ├─> Creates 100 subscriptions (SubscriberAdapterName: "SqlServer")
+2. SQL Server Destination Container App (ca-{sql-guid})
+   ├─> Subscribes to Service Bus Topic
+   ├─> Receives 100 messages from subscription
    ├─> Processes all 100 messages
-   └─> Marks all 100 subscriptions as "Processed"
+   └─> Completes all 100 messages after successful processing
+       • Messages removed from SQL Server subscription
+       • Other subscriptions still have access
 
-3. CsvAdapter (as destination) processes messages
-   ├─> Creates 100 subscriptions (SubscriberAdapterName: "CSV")
+3. CSV Destination Container App (ca-{csv-guid})
+   ├─> Subscribes to same Service Bus Topic
+   ├─> Receives 100 messages from subscription
    ├─> Processes all 100 messages
-   └─> Marks all 100 subscriptions as "Processed"
+   └─> Completes all 100 messages after successful processing
+       • Messages removed from CSV subscription
+       • SQL Server subscription already processed
 
-4. System checks MessageSubscriptions:
-   ├─> Message 1: SqlServer="Processed", CSV="Processed" → ✅ Remove
-   ├─> Message 2: SqlServer="Processed", CSV="Processed" → ✅ Remove
-   └─> ... (all 100 messages removed)
+4. Service Bus ensures delivery:
+   ├─> Each subscription processes independently
+   ├─> Messages delivered to all subscriptions
+   └─> All messages processed successfully ✅
 
-5. If SqlServerAdapter fails for Message 50:
-   ├─> Message 50: SqlServer="Error", CSV="Processed"
-   ├─> Message stays in MessageBox (guaranteed delivery)
+5. If SQL Server Container App fails for Message 50:
+   ├─> Message 50: SQL Server abandons/dead-letters message
+   ├─> CSV Container App still processes Message 50 successfully
+   ├─> Message moved to dead-letter queue for SQL Server
    ├─> CSV destination already processed (no data loss)
-   └─> SqlServerAdapter can retry Message 50 later
+   └─> SQL Server Container App can reprocess from dead-letter queue
 ```
 
-**Benefits of MessageBox:**
+**Benefits of Service Bus:**
 
-- ✅ **Guaranteed Delivery**: Data never lost—stays until all destinations confirm
-- ✅ **Multiple Destinations**: One source can feed multiple destinations
-- ✅ **Error Isolation**: If one destination fails, others still process
-- ✅ **Audit Trail**: Complete history of what was processed when
-- ✅ **Retry Capability**: Failed messages can be reprocessed
-- ✅ **Scalability**: Process messages independently and in parallel
+- ✅ **Guaranteed Delivery**: Messages persist until processed
+- ✅ **At-Least-Once Delivery**: Messages delivered reliably
+- ✅ **Multiple Destinations**: One topic, many subscriptions
+- ✅ **Error Isolation**: Failed destinations don't block successful ones
+- ✅ **Dead-Letter Queue**: Failed messages automatically moved
+- ✅ **Message Ordering**: FIFO ordering per subscription
+- ✅ **Auto-Scaling**: Handles high throughput automatically
+- ✅ **Durability**: Messages survive system restarts
+- ✅ **Complete Audit Trail**: Service Bus metrics track everything
+
+**Benefits of Dynamic Container Apps:**
+
+- ✅ **No Logic Apps Needed**: Container Apps handle processing
+- ✅ **Clean Separation**: Send and receive processes isolated
+- ✅ **Fault Isolation**: Errors don't affect other adapter instances
+- ✅ **Performance Isolation**: Slow adapter doesn't block others
+- ✅ **Dynamic Creation**: No deployment needed - created on configuration
+- ✅ **Independent Scaling**: Each Container App scales independently
+- ✅ **Resource Isolation**: Each adapter has own resources
 
 **Benefits of Configuration-Based Approach:**
 

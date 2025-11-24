@@ -18,12 +18,12 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 {
     private const string DefaultInterfaceName = "FromCsvToSqlServerExample";
     
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<InterfaceConfigurationServiceV2>? _logger;
     private readonly IServiceProvider? _serviceProvider;
 
     public InterfaceConfigurationServiceV2(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<InterfaceConfigurationServiceV2>? logger = null,
         IServiceProvider? serviceProvider = null)
     {
@@ -1085,6 +1085,45 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error updating destination adapter instance for '{InterfaceName}'", interfaceName);
+            throw;
+        }
+    }
+
+    public async Task UpdateSourceAdapterInstanceAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string? instanceName = null,
+        bool? isEnabled = null,
+        string? configuration = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
+            if (config != null)
+            {
+                var instance = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
+                if (instance != null)
+                {
+                    if (instanceName != null) instance.InstanceName = instanceName;
+                    if (isEnabled.HasValue) instance.IsEnabled = isEnabled.Value;
+                    if (configuration != null) instance.Configuration = configuration;
+                    instance.UpdatedAt = DateTime.UtcNow;
+                    await SaveConfigurationAsync(config, cancellationToken);
+                }
+                else
+                {
+                    throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
+                }
+            }
+            else
+            {
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error updating source adapter instance for '{InterfaceName}'", interfaceName);
             throw;
         }
     }

@@ -7,15 +7,15 @@ using InterfaceConfigurator.Main.Models;
 namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
-/// SQL Server-based logging service - logs are stored in MessageBox database
+/// SQL Server-based logging service - logs are stored in InterfaceConfigDb database (formerly MessageBox)
 /// </summary>
 public class SqlServerLoggingService : ILoggingService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<SqlServerLoggingService>? _logger;
 
     public SqlServerLoggingService(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<SqlServerLoggingService>? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

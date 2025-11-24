@@ -1034,7 +1034,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             if (_configurations.TryGetValue(interfaceName, out var config))
             {
-                config.SourceFieldSeparator = string.IsNullOrWhiteSpace(fieldSeparator) ? "║" : fieldSeparator.Trim();
+                config.SourceFieldSeparator = string.IsNullOrWhiteSpace(fieldSeparator) ? "‖" : fieldSeparator.Trim(); // Default: Double Vertical Line (U+2016)
                 config.UpdatedAt = DateTime.UtcNow;
                 _logger?.LogInformation("Field separator for interface '{InterfaceName}' updated to '{FieldSeparator}'", interfaceName, config.SourceFieldSeparator);
             }
@@ -1291,6 +1291,59 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         {
             _lock.Release();
         }
+    }
+
+    public async Task UpdateSourceAdapterInstanceAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string? instanceName = null,
+        bool? isEnabled = null,
+        string? configuration = null,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_configurations.TryGetValue(interfaceName, out var config))
+            {
+                if (config.Sources == null)
+                {
+                    config.Sources = new Dictionary<string, SourceAdapterInstance>();
+                }
+                
+                // Find source adapter instance by GUID
+                var instance = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
+                if (instance != null)
+                {
+                    if (instanceName != null) instance.InstanceName = instanceName.Trim();
+                    if (isEnabled.HasValue) instance.IsEnabled = isEnabled.Value;
+                    if (configuration != null) instance.Configuration = configuration;
+                    instance.UpdatedAt = DateTime.UtcNow;
+                    config.UpdatedAt = DateTime.UtcNow;
+                    
+                    _logger?.LogInformation("Updated source adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'", 
+                        instance.InstanceName, adapterInstanceGuid, interfaceName);
+                }
+                else
+                {
+                    _logger?.LogWarning("Source adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", 
+                        adapterInstanceGuid, interfaceName);
+                    throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("Interface configuration '{InterfaceName}' not found for updating source adapter instance", interfaceName);
+                throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        await SaveConfigurationsAsync(cancellationToken);
     }
 
     public async Task UpdateDestinationAdapterInstanceAsync(

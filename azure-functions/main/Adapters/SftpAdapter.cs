@@ -206,6 +206,9 @@ public class SftpAdapter : AdapterBase
         ICsvProcessingService csvProcessingService,
         string fieldSeparator,
         string? folder = null,
+        int skipHeaderLines = 0,
+        int skipFooterLines = 0,
+        char quoteCharacter = '"',
         CancellationToken cancellationToken = default)
     {
         var files = await ReadAllFilesAsync(folder, cancellationToken);
@@ -216,7 +219,7 @@ public class SftpAdapter : AdapterBase
         {
             try
             {
-                var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, cancellationToken);
+                var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, skipHeaderLines, skipFooterLines, quoteCharacter, cancellationToken);
 
                 _logger?.LogInformation("Successfully parsed CSV from SFTP file {FileName}: {HeaderCount} headers, {RecordCount} records",
                     fileName, headers.Count, records.Count);
@@ -251,6 +254,9 @@ public class SftpAdapter : AdapterBase
         ICsvProcessingService csvProcessingService,
         string fieldSeparator,
         string? folder = null,
+        int skipHeaderLines = 0,
+        int skipFooterLines = 0,
+        char quoteCharacter = '"',
         CancellationToken cancellationToken = default)
     {
         var files = await ReadAllFilesAsync(folder, cancellationToken);
@@ -262,7 +268,7 @@ public class SftpAdapter : AdapterBase
         {
             try
             {
-                var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, cancellationToken);
+                var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, skipHeaderLines, skipFooterLines, quoteCharacter, cancellationToken);
 
                 _logger?.LogInformation("Successfully parsed CSV from SFTP file {FileName}: {HeaderCount} headers, {RecordCount} records",
                     fileName, headers.Count, records.Count);

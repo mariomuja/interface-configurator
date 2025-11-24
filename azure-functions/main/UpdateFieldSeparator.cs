@@ -65,7 +65,7 @@ public class UpdateFieldSeparator
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
                 message = $"Field separator for interface '{request.InterfaceName}' updated to '{request.FieldSeparator ?? "║"}'",
                 interfaceName = request.InterfaceName,
-                fieldSeparator = request.FieldSeparator ?? "║"
+                fieldSeparator = request.FieldSeparator ?? "‖" // Default: Double Vertical Line (U+2016)
             }));
             return response;
         }

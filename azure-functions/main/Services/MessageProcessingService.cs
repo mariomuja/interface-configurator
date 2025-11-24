@@ -12,12 +12,12 @@ namespace InterfaceConfigurator.Main.Services;
 /// </summary>
 public class MessageProcessingService : IMessageProcessingService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly IAdapterSubscriptionService _subscriptionService;
     private readonly ILogger<MessageProcessingService>? _logger;
 
     public MessageProcessingService(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         IAdapterSubscriptionService subscriptionService,
         ILogger<MessageProcessingService>? logger = null)
     {

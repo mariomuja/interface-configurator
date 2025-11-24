@@ -31,6 +31,9 @@ public class CsvAdapter : AdapterBase
     private readonly string _fieldSeparator;
     private readonly string? _destinationReceiveFolder;
     private readonly string _destinationFileMask;
+    private readonly int _skipHeaderLines;
+    private readonly int _skipFooterLines;
+    private readonly char _quoteCharacter;
     private readonly ILogger<CsvAdapter>? _logger;
     
     // CSV Data property - can be set directly to trigger debatching
@@ -53,6 +56,7 @@ public class CsvAdapter : AdapterBase
         ICsvProcessingService csvProcessingService,
         IAdapterConfigurationService adapterConfig,
         BlobServiceClient blobServiceClient,
+        IServiceBusService? serviceBusService = null,
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
@@ -66,9 +70,13 @@ public class CsvAdapter : AdapterBase
         string? adapterType = null,
         SftpAdapter? sftpAdapter = null,
         FileAdapter? fileAdapter = null,
+        int skipHeaderLines = 0,
+        int skipFooterLines = 0,
+        char quoteCharacter = '"',
         string adapterRole = "Source",
         ILogger<CsvAdapter>? logger = null)
         : base(
+            serviceBusService: serviceBusService,
             messageBoxService: messageBoxService,
             subscriptionService: subscriptionService,
             interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
@@ -85,9 +93,12 @@ public class CsvAdapter : AdapterBase
             _messageBoxService != null, _interfaceName, _adapterInstanceGuid.HasValue ? _adapterInstanceGuid.Value.ToString() : "NULL");
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
-        _fieldSeparator = fieldSeparator ?? "║"; // Default: Box Drawing Double Vertical Line (U+2551)
+        _fieldSeparator = fieldSeparator ?? "‖"; // Default: Double Vertical Line (U+2016) - rarely used UTF character
         _destinationReceiveFolder = destinationReceiveFolder;
         _destinationFileMask = destinationFileMask ?? "*.txt";
+        _skipHeaderLines = skipHeaderLines;
+        _skipFooterLines = skipFooterLines;
+        _quoteCharacter = quoteCharacter;
         _logger = logger;
         
         // Adapter type and adapters
@@ -171,8 +182,8 @@ public class CsvAdapter : AdapterBase
                 // Continue with direct MessageBox processing below (if Source role)
             }
 
-            // Parse CSV using CsvProcessingService with configured field separator
-            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(_csvData, _fieldSeparator, cancellationToken);
+            // Parse CSV using CsvProcessingService with configured field separator and quote character
+            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(_csvData, _fieldSeparator, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
 
             _logger?.LogInformation("Successfully parsed CsvData: {HeaderCount} headers, {RecordCount} records",
                 headers.Count, records.Count);
@@ -346,9 +357,30 @@ public class CsvAdapter : AdapterBase
                 // Use source parameter as folder, or let SftpAdapter use its configured folder
                 var folder = !string.IsNullOrWhiteSpace(source) ? source : null;
                 
+                // Auto-detect delimiter from first file for SFTP adapter type
+                var detectedSeparator = _fieldSeparator;
+                if (string.IsNullOrWhiteSpace(_fieldSeparator) || _fieldSeparator == "‖")
+                {
+                    try
+                    {
+                        var files = await _sftpAdapter.ReadAllFilesAsync(folder, cancellationToken);
+                        if (files.Any())
+                        {
+                            var (_, firstFileContent) = files.First();
+                            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                            detectedSeparator = validationService.DetectDelimiter(firstFileContent, _fieldSeparator);
+                            _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from SFTP file for SFTP adapter", detectedSeparator);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Could not auto-detect delimiter from SFTP, using configured separator '{Separator}'", _fieldSeparator);
+                    }
+                }
+                
                 // Read CSV files and get successfully parsed files in one call to avoid reading files twice
                 var (headers, records, successfullyParsedFiles) = await _sftpAdapter.ReadCsvFilesWithContentAsync(
-                    _csvProcessingService, _fieldSeparator, folder, cancellationToken);
+                    _csvProcessingService, detectedSeparator, folder, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
                 
                 // Upload only successfully parsed files to csv-incoming folder for blob trigger processing
                 // This ensures consistency: only files that were successfully parsed are uploaded
@@ -370,7 +402,49 @@ public class CsvAdapter : AdapterBase
                 ? source
                 : _fileAdapter.BuildDefaultBlobSourcePath(_receiveFolder);
             
-            var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, _fieldSeparator, effectiveSource, cancellationToken);
+            // Auto-detect delimiter from file content for FILE adapter type
+            var detectedSeparator = _fieldSeparator;
+            if ((_adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase) || _adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase)) 
+                && (string.IsNullOrWhiteSpace(_fieldSeparator) || _fieldSeparator == "‖"))
+            {
+                // Read first file to detect delimiter
+                try
+                {
+                    var pathParts = effectiveSource.Split('/', 2);
+                    if (pathParts.Length == 2)
+                    {
+                        var containerName = pathParts[0];
+                        var blobPath = pathParts[1];
+                        var isFolder = blobPath.EndsWith("/") || (!blobPath.Contains(".") && !string.IsNullOrWhiteSpace(blobPath));
+                        
+                        if (isFolder || !string.IsNullOrWhiteSpace(_receiveFolder))
+                        {
+                            var filePaths = await _fileAdapter.ListFilesAsync(effectiveSource, cancellationToken);
+                            if (filePaths.Any())
+                            {
+                                var firstFilePath = $"{containerName}/{filePaths.First()}";
+                                var sampleContent = await _fileAdapter.ReadFileAsync(firstFilePath, cancellationToken);
+                                var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                                detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
+                                _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath} for FILE adapter", detectedSeparator, filePaths.First());
+                            }
+                        }
+                        else
+                        {
+                            var sampleContent = await _fileAdapter.ReadFileAsync(effectiveSource, cancellationToken);
+                            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                            detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
+                            _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source} for FILE adapter", detectedSeparator, effectiveSource);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Could not auto-detect delimiter, using configured separator '{Separator}'", _fieldSeparator);
+                }
+            }
+            
+            var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, detectedSeparator, effectiveSource, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
             
             // For FILE adapter type: Copy files to csv-incoming folder if reading from a different folder
             // This will trigger the blob trigger which processes the file

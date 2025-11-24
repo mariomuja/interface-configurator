@@ -93,7 +93,9 @@ public class AdapterFactory : IAdapterFactory
         var csvProcessingService = _serviceProvider.GetRequiredService<ICsvProcessingService>();
         var adapterConfig = _serviceProvider.GetRequiredService<IAdapterConfigurationService>();
         var blobServiceClient = _serviceProvider.GetRequiredService<Azure.Storage.Blobs.BlobServiceClient>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
+        var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
+        var interfaceConfigService = _serviceProvider.GetService<IInterfaceConfigService>();
+        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>(); // Deprecated - kept for backward compatibility
         var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<CsvAdapter>>();
 
@@ -115,6 +117,9 @@ public class AdapterFactory : IAdapterFactory
         string? fieldSeparator = config.SourceFieldSeparator; // Used for both source and destination
         string? destinationReceiveFolder = isSource ? null : config.DestinationReceiveFolder; // Only Destination adapters have destination receive folder
         string? destinationFileMask = isSource ? null : config.DestinationFileMask; // Only Destination adapters have destination file mask
+        int skipHeaderLines = isSource ? (config.CsvSkipHeaderLines ?? 0) : 0; // Only Source adapters have skip header lines
+        int skipFooterLines = isSource ? (config.CsvSkipFooterLines ?? 0) : 0; // Only Source adapters have skip footer lines
+        char quoteCharacter = isSource ? (config.CsvQuoteCharacter?[0] ?? '"') : '"'; // Quote character for CSV values
         
         // Get SFTP/adapter properties
         string? adapterType = isSource ? config.CsvAdapterType : null;
@@ -144,6 +149,22 @@ public class AdapterFactory : IAdapterFactory
             destinationFileMask = TryGetString("destinationFileMask") ?? destinationFileMask;
 
             adapterType = TryGetString("csvAdapterType") ?? TryGetString("adapterType") ?? adapterType;
+            
+            // Get skip header/footer lines from configDict
+            if (configDict.TryGetValue("csvSkipHeaderLines", out var skipHeaderElement) && skipHeaderElement.ValueKind == JsonValueKind.Number && skipHeaderElement.TryGetInt32(out var skipHeaderValue))
+            {
+                skipHeaderLines = skipHeaderValue;
+            }
+            if (configDict.TryGetValue("csvSkipFooterLines", out var skipFooterElement) && skipFooterElement.ValueKind == JsonValueKind.Number && skipFooterElement.TryGetInt32(out var skipFooterValue))
+            {
+                skipFooterLines = skipFooterValue;
+            }
+            // Get quote character from configDict
+            var quoteCharStr = TryGetString("csvQuoteCharacter");
+            if (!string.IsNullOrEmpty(quoteCharStr) && quoteCharStr.Length > 0)
+            {
+                quoteCharacter = quoteCharStr[0];
+            }
 
             if (adapterType != null && adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
             {
@@ -168,8 +189,10 @@ public class AdapterFactory : IAdapterFactory
             }
         }
 
-        // Ensure adapter instance exists in MessageBox
-        if (messageBoxService != null)
+        // Ensure adapter instance exists in InterfaceConfigDb (formerly MessageBox)
+        // Prefer IInterfaceConfigService, fallback to IMessageBoxService for backward compatibility
+        var configService = interfaceConfigService ?? (IInterfaceConfigService?)messageBoxService;
+        if (configService != null)
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
@@ -180,7 +203,7 @@ public class AdapterFactory : IAdapterFactory
             {
                 try
                 {
-                    await messageBoxService.EnsureAdapterInstanceAsync(
+                    await configService.EnsureAdapterInstanceAsync(
                         adapterInstanceGuid,
                         config.InterfaceName,
                         instanceName ?? (isSource ? "Source" : "Destination"),
@@ -276,6 +299,7 @@ public class AdapterFactory : IAdapterFactory
             csvProcessingService,
             adapterConfig,
             blobServiceClient,
+            serviceBusService,
             messageBoxService,
             subscriptionService,
             config.InterfaceName,
@@ -289,6 +313,9 @@ public class AdapterFactory : IAdapterFactory
             adapterType,
             sftpAdapter,
             fileAdapter,
+            skipHeaderLines,
+            skipFooterLines,
+            quoteCharacter,
             adapterRole,
             logger);
     }
@@ -298,7 +325,9 @@ public class AdapterFactory : IAdapterFactory
         var defaultContext = _serviceProvider.GetService<ApplicationDbContext>();
         var dynamicTableService = _serviceProvider.GetRequiredService<IDynamicTableService>();
         var dataService = _serviceProvider.GetRequiredService<IDataService>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
+        var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
+        var interfaceConfigService = _serviceProvider.GetService<IInterfaceConfigService>();
+        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>(); // Deprecated - kept for backward compatibility
         var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<SqlServerAdapter>>();
 
@@ -337,8 +366,10 @@ public class AdapterFactory : IAdapterFactory
         bool? failOnBadStatement = config.SqlFailOnBadStatement;
         var configService = _serviceProvider.GetService<IInterfaceConfigurationService>();
 
-        // Ensure adapter instance exists in MessageBox
-        if (messageBoxService != null)
+        // Ensure adapter instance exists in InterfaceConfigDb (formerly MessageBox)
+        // Prefer IInterfaceConfigService, fallback to IMessageBoxService for backward compatibility
+        var configService = interfaceConfigService ?? (IInterfaceConfigService?)messageBoxService;
+        if (configService != null)
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;
@@ -349,7 +380,7 @@ public class AdapterFactory : IAdapterFactory
             {
                 try
                 {
-                    await messageBoxService.EnsureAdapterInstanceAsync(
+                    await configService.EnsureAdapterInstanceAsync(
                         adapterInstanceGuid,
                         config.InterfaceName,
                         instanceName ?? (isSource ? "Source" : "Destination"),
@@ -412,6 +443,7 @@ public class AdapterFactory : IAdapterFactory
             defaultContext,
             dynamicTableService,
             dataService,
+            serviceBusService,
             messageBoxService,
             subscriptionService,
             config.InterfaceName,

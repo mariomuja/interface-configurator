@@ -36,10 +36,11 @@ var host = new HostBuilder()
                 // Enhanced with retry policy and connection pooling for resilience
                 var connectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog={sqlDatabase};Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
                 
-                // MessageBox database connection (separate database for staging/messaging)
-                // This database contains Messages, MessageSubscriptions, and ProcessLogs tables ONLY
+                // InterfaceConfigDb database connection (formerly MessageBox)
+                // This database contains InterfaceConfigurations, AdapterInstances, and ProcessLogs tables
                 // TransportData table is NOT created here - it belongs to the main application database
-                var messageBoxConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=MessageBox;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
+                // Note: Messaging is now handled via Azure Service Bus, not this database
+                var interfaceConfigConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=InterfaceConfigDb;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
                 
                 // Register DbContext for main application database (app-database)
                 // SqlServerAdapter uses this context to create/write to TransportData table
@@ -55,11 +56,11 @@ var host = new HostBuilder()
                         sqlOptions.CommandTimeout(60); // Increase timeout to accommodate retries
                     }));
                 
-                // Register MessageBoxDbContext for MessageBox database (separate database)
-                // Contains Messages, MessageSubscriptions, ProcessLogs - NOT TransportData
+                // Register InterfaceConfigDbContext for InterfaceConfigDb database (formerly MessageBox)
+                // Contains InterfaceConfigurations, AdapterInstances, ProcessLogs - NOT TransportData
                 // Enhanced with retry-on-failure for transient errors
-                services.AddDbContext<MessageBoxDbContext>(options =>
-                    options.UseSqlServer(messageBoxConnectionString, sqlOptions =>
+                services.AddDbContext<InterfaceConfigDbContext>(options =>
+                    options.UseSqlServer(interfaceConfigConnectionString, sqlOptions =>
                     {
                         // Enable retry on transient failures
                         sqlOptions.EnableRetryOnFailure(
@@ -70,7 +71,7 @@ var host = new HostBuilder()
                     }));
                 
                 // Ensure both databases and tables are created automatically on startup
-                services.AddHostedService<MessageBoxDatabaseInitializer>();
+                services.AddHostedService<InterfaceConfigDatabaseInitializer>();
                 services.AddHostedService<ApplicationDatabaseInitializer>();
             }
             
@@ -97,20 +98,104 @@ var host = new HostBuilder()
                 return service;
             });
             
-            // Register Interface Configuration Service (now using MessageBoxDbContext instead of Blob Storage)
+            // Register Interface Configuration Service (now using InterfaceConfigDbContext instead of Blob Storage)
             services.AddScoped<IInterfaceConfigurationService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var logger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationServiceV2>>();
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
-                    // Fallback to Blob Storage if MessageBox is not available
+                    // Fallback to Blob Storage if InterfaceConfigDb is not available
                     var blobServiceClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
                     var fallbackLogger = sp.GetService<ILogger<InterfaceConfigurator.Main.Services.InterfaceConfigurationService>>();
                     return new InterfaceConfigurator.Main.Services.InterfaceConfigurationService(blobServiceClient, fallbackLogger, sp);
                 }
-                return new InterfaceConfigurator.Main.Services.InterfaceConfigurationServiceV2(messageBoxContext, logger, sp);
+                return new InterfaceConfigurator.Main.Services.InterfaceConfigurationServiceV2(interfaceConfigContext, logger, sp);
             });
+            
+            // Register Interface Config Service (replaces IMessageBoxService for adapter instance management)
+            services.AddScoped<IInterfaceConfigService>(sp =>
+            {
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
+                var logger = sp.GetService<ILogger<InterfaceConfigService>>();
+                if (interfaceConfigContext == null)
+                {
+                    return null!;
+                }
+                return new InterfaceConfigService(interfaceConfigContext, logger);
+            });
+            
+            // Register Service Bus Lock Tracking Service
+            services.AddScoped<IServiceBusLockTrackingService>(sp =>
+            {
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
+                var logger = sp.GetService<ILogger<ServiceBusLockTrackingService>>();
+                if (interfaceConfigContext == null)
+                {
+                    return null!;
+                }
+                return new ServiceBusLockTrackingService(interfaceConfigContext, logger);
+            });
+            
+            // Register Service Bus Lock Renewal Background Service
+            services.AddHostedService<ServiceBusLockRenewalService>();
+            
+            // Register Service Bus Dead Letter Monitoring Background Service
+            services.AddHostedService<ServiceBusDeadLetterMonitoringService>();
+            
+            // Register Configuration Validation Service
+            services.AddSingleton<IConfigurationValidationService, ConfigurationValidationService>();
+            
+            // Register Retry Policy
+            services.AddSingleton<IRetryPolicy>(sp =>
+            {
+                var logger = sp.GetService<ILogger<ExponentialBackoffRetryPolicy>>();
+                return new ExponentialBackoffRetryPolicy(
+                    maxRetryAttempts: 3,
+                    baseDelay: TimeSpan.FromSeconds(1),
+                    maxDelay: TimeSpan.FromSeconds(30),
+                    logger: logger);
+            });
+            
+            // Register Rate Limiter
+            services.AddSingleton<IRateLimiter>(sp =>
+            {
+                var logger = sp.GetService<ILogger<TokenBucketRateLimiter>>();
+                var config = new RateLimitConfig
+                {
+                    MaxRequests = 100,
+                    TimeWindow = TimeSpan.FromMinutes(1),
+                    Identifier = "default"
+                };
+                return new TokenBucketRateLimiter(config, logger);
+            });
+            
+            // Register Batch Processing Service
+            services.AddSingleton<BatchProcessingService>(sp =>
+            {
+                var logger = sp.GetService<ILogger<BatchProcessingService>>();
+                return new BatchProcessingService(
+                    batchSize: 100,
+                    batchTimeout: TimeSpan.FromSeconds(5),
+                    logger: logger);
+            });
+            
+            // Register Cached Configuration Service
+            services.AddSingleton<CachedConfigurationService>(sp =>
+            {
+                var memoryCache = sp.GetRequiredService<IMemoryCache>();
+                var logger = sp.GetService<ILogger<CachedConfigurationService>>();
+                return new CachedConfigurationService(
+                    memoryCache,
+                    defaultCacheExpiration: TimeSpan.FromMinutes(15),
+                    logger: logger);
+            });
+            
+            // Register Memory Cache if not already registered
+            if (!services.Any(s => s.ServiceType == typeof(IMemoryCache)))
+            {
+                services.AddMemoryCache();
+            }
             
             // Register Adapter Factory
             services.AddScoped<IAdapterFactory, InterfaceConfigurator.Main.Services.AdapterFactory>();
@@ -122,40 +207,43 @@ var host = new HostBuilder()
             services.AddSingleton<IEventQueue, InMemoryEventQueue>();
             
             // Register Message Subscription Service (Legacy - kept for backward compatibility)
+            // Note: These services are deprecated - messaging is now handled via Service Bus
             services.AddScoped<IMessageSubscriptionService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var logger = sp.GetService<ILogger<MessageSubscriptionService>>();
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
                     return null!;
                 }
-                return new MessageSubscriptionService(messageBoxContext, logger);
+                return new MessageSubscriptionService(interfaceConfigContext, logger);
             });
             
             // Register Adapter Subscription Service (New: BizTalk-style subscriptions - filter criteria)
+            // Note: Deprecated - subscriptions are now managed via Service Bus
             services.AddScoped<IAdapterSubscriptionService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var logger = sp.GetService<ILogger<AdapterSubscriptionService>>();
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
                     return null!;
                 }
-                return new AdapterSubscriptionService(messageBoxContext, logger);
+                return new AdapterSubscriptionService(interfaceConfigContext, logger);
             });
             
             // Register Message Processing Service (New: Tracks message processing status)
+            // Note: Deprecated - message processing is now handled via Service Bus
             services.AddScoped<IMessageProcessingService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var subscriptionService = sp.GetService<IAdapterSubscriptionService>();
                 var logger = sp.GetService<ILogger<MessageProcessingService>>();
-                if (messageBoxContext == null || subscriptionService == null)
+                if (interfaceConfigContext == null || subscriptionService == null)
                 {
                     return null!;
                 }
-                return new MessageProcessingService(messageBoxContext, subscriptionService, logger);
+                return new MessageProcessingService(interfaceConfigContext, subscriptionService, logger);
             });
             
             // Register Service Bus Service (primary message communication)
@@ -171,7 +259,8 @@ var host = new HostBuilder()
                     return null!;
                 }
                 
-                return new ServiceBusService(connectionString, logger);
+                var serviceProvider = sp.GetService<IServiceProvider>();
+                return new ServiceBusService(connectionString, logger, serviceProvider);
             });
             
             // Register Service Bus Subscription Service (manages subscriptions for destination adapters)
@@ -190,22 +279,24 @@ var host = new HostBuilder()
                 return new ServiceBusSubscriptionService(connectionString, logger);
             });
             
-            // Register MessageBox Service (kept for backward compatibility during migration)
+            // Register MessageBox Service (deprecated - kept for backward compatibility during migration)
+            // Note: Messaging is now handled via Azure Service Bus
+            // This service is only kept for legacy code that hasn't been migrated yet
             services.AddScoped<IMessageBoxService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var eventQueue = sp.GetService<IEventQueue>();
                 var subscriptionService = sp.GetService<IMessageSubscriptionService>();
                 var logger = sp.GetService<ILogger<MessageBoxService>>();
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
-                    // Fallback to in-memory logging if MessageBox is not available
+                    // Fallback to in-memory logging if InterfaceConfigDb is not available
                     return null!;
                 }
-                return new MessageBoxService(messageBoxContext, eventQueue, subscriptionService, logger);
+                return new MessageBoxService(interfaceConfigContext, eventQueue, subscriptionService, logger);
             });
             
-            // Register SQL Server Logging Service (uses MessageBox database)
+            // Register SQL Server Logging Service (uses InterfaceConfigDb database)
             // Note: ILoggingService is now registered via FeatureFactory above
             // This registration is removed - the factory handles it
             
@@ -234,7 +325,7 @@ var host = new HostBuilder()
                 return new MetricsService(telemetryClient, logger);
             });
             
-            // Register Dead Letter Monitor (only if MessageBox is available)
+            // Register Dead Letter Monitor (deprecated - Service Bus handles dead letters)
             services.AddScoped<DeadLetterMonitor>(sp =>
             {
                 var messageBoxService = sp.GetService<IMessageBoxService>();
@@ -247,19 +338,19 @@ var host = new HostBuilder()
                 return new DeadLetterMonitor(messageBoxService, logger);
             });
             
-            // Register Processing Statistics Service (only if MessageBox is available)
+            // Register Processing Statistics Service (uses InterfaceConfigDb database)
             services.AddScoped<ProcessingStatisticsService>(sp =>
             {
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var logger = sp.GetService<ILogger<ProcessingStatisticsService>>();
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
-                    // Return a no-op implementation if MessageBox is not available
+                    // Return a no-op implementation if InterfaceConfigDb is not available
                     // Note: This might cause issues if the service is actually used, but allows startup
-                    logger?.LogWarning("MessageBoxDbContext is not available. ProcessingStatisticsService may not work correctly.");
+                    logger?.LogWarning("InterfaceConfigDbContext is not available. ProcessingStatisticsService may not work correctly.");
                     return null!; // Will need to handle null checks where this is used
                 }
-                return new ProcessingStatisticsService(messageBoxContext, logger);
+                return new ProcessingStatisticsService(interfaceConfigContext, logger);
             });
             
             // Register CSV Validation Service
@@ -310,11 +401,11 @@ var host = new HostBuilder()
             services.AddScoped<ILoggingService>(sp =>
             {
                 var featureRegistry = sp.GetRequiredService<IFeatureRegistry>();
-                var messageBoxContext = sp.GetService<MessageBoxDbContext>();
+                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
                 var logger = sp.GetService<ILogger<SqlServerLoggingService>>();
                 var loggerV2 = sp.GetService<ILogger<SqlServerLoggingServiceV2>>();
                 
-                if (messageBoxContext == null)
+                if (interfaceConfigContext == null)
                 {
                     var inMemoryLogger = sp.GetService<ILogger<InMemoryLoggingService>>();
                     return new InMemoryLoggingService(inMemoryLogger);
@@ -325,11 +416,11 @@ var host = new HostBuilder()
                 
                 if (isEnabled)
                 {
-                    return new SqlServerLoggingServiceV2(messageBoxContext, loggerV2);
+                    return new SqlServerLoggingServiceV2(interfaceConfigContext, loggerV2);
                 }
                 else
                 {
-                    return new SqlServerLoggingService(messageBoxContext, logger);
+                    return new SqlServerLoggingService(interfaceConfigContext, logger);
                 }
             });
             

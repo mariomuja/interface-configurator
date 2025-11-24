@@ -120,6 +120,8 @@ export interface AdapterInfo {
       width: 48px;
       height: 48px;
       object-fit: contain;
+      display: block;
+      margin: 0 auto;
     }
     
     .adapter-card h3 {
@@ -178,7 +180,8 @@ export class AdapterSelectDialogComponent {
     {
       name: 'SqlServer',
       alias: 'SQL Server',
-      icon: 'storage',
+      icon: '/assets/logos/sql-server.svg',
+      iconType: 'svg',
       description: 'Daten aus/in SQL Server Datenbanken',
       supportsSource: true,
       supportsDestination: true
@@ -186,7 +189,7 @@ export class AdapterSelectDialogComponent {
     {
       name: 'SAP',
       alias: 'SAP',
-      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiMwMDk5Q0MiLz4KPC9zdmc+',
+      icon: '/assets/logos/sap.svg',
       iconType: 'svg',
       description: 'IDOCs aus SAP abrufen oder an SAP senden',
       supportsSource: true,
@@ -195,7 +198,7 @@ export class AdapterSelectDialogComponent {
     {
       name: 'Dynamics365',
       alias: 'Dynamics 365',
-      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiMwMDc4RDQiLz4KPC9zdmc+',
+      icon: '/assets/logos/dynamics365.svg',
       iconType: 'svg',
       description: 'Daten aus/in Microsoft Dynamics 365',
       supportsSource: true,
@@ -204,7 +207,7 @@ export class AdapterSelectDialogComponent {
     {
       name: 'CRM',
       alias: 'Microsoft CRM',
-      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMkwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEyTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IiNGRjUwMDAiLz4KPC9zdmc+',
+      icon: '/assets/logos/crm.svg',
       iconType: 'svg',
       description: 'Daten aus/in Microsoft CRM',
       supportsSource: true,

@@ -34,6 +34,9 @@ export class CsvAdapterSettingsComponent extends BaseAdapterSettingsComponent im
   csvAdapterType: string = 'RAW';
   csvData: string = '';
   csvPollingInterval: number = 10;
+  csvSkipHeaderLines: number = 0;
+  csvSkipFooterLines: number = 0;
+  csvQuoteCharacter: string = '"';
   
   // SFTP Properties
   sftpHost: string = '';
@@ -67,6 +70,9 @@ export class CsvAdapterSettingsComponent extends BaseAdapterSettingsComponent im
     
     this.csvData = data.csvData || '';
     this.csvPollingInterval = data.csvPollingInterval ?? 10;
+    this.csvSkipHeaderLines = data.csvSkipHeaderLines ?? 0;
+    this.csvSkipFooterLines = data.csvSkipFooterLines ?? 0;
+    this.csvQuoteCharacter = data.csvQuoteCharacter ?? '"';
     
     // SFTP properties
     this.sftpHost = data.sftpHost || '';
@@ -91,6 +97,9 @@ export class CsvAdapterSettingsComponent extends BaseAdapterSettingsComponent im
       csvAdapterType: this.csvAdapterType || (this.adapterType === 'Destination' ? 'FILE' : 'RAW'),
       csvData: undefined, // CSV Data is now only shown in adapter card, not in settings dialog
       csvPollingInterval: this.adapterType === 'Source' ? (this.csvPollingInterval > 0 ? this.csvPollingInterval : 10) : undefined,
+      csvSkipHeaderLines: this.adapterType === 'Source' ? (this.csvSkipHeaderLines >= 0 ? this.csvSkipHeaderLines : 0) : undefined,
+      csvSkipFooterLines: this.adapterType === 'Source' ? (this.csvSkipFooterLines >= 0 ? this.csvSkipFooterLines : 0) : undefined,
+      csvQuoteCharacter: this.adapterType === 'Source' ? (this.csvQuoteCharacter || '"') : undefined,
       // SFTP properties
       sftpHost: this.showSftpProperties ? (this.sftpHost.trim() || '') : undefined,
       sftpPort: this.showSftpProperties ? (this.sftpPort > 0 ? this.sftpPort : 22) : undefined,

@@ -9,15 +9,15 @@ using InterfaceConfigurator.Main.Helpers;
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
-/// HTTP endpoint to clear process logs from MessageBox database
+/// HTTP endpoint to clear process logs from InterfaceConfigDb database (formerly MessageBox)
 /// </summary>
 public class ClearProcessLogsFunction
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<ClearProcessLogsFunction> _logger;
 
     public ClearProcessLogsFunction(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<ClearProcessLogsFunction> logger)
     {
         _context = context;
@@ -39,7 +39,7 @@ public class ClearProcessLogsFunction
 
         try
         {
-            // Delete all logs from MessageBox database
+            // Delete all logs from InterfaceConfigDb database
             var logs = await _context.ProcessLogs.ToListAsync();
             _context.ProcessLogs.RemoveRange(logs);
             await _context.SaveChangesAsync();

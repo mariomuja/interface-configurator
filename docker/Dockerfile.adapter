@@ -1,0 +1,38 @@
+# Generic Adapter Container
+# This container runs adapter instances based on configuration from adapter-config.json
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 8080
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy adapter runtime project (to be created)
+COPY ["adapter-runtime/adapter-runtime.csproj", "adapter-runtime/"]
+RUN dotnet restore "adapter-runtime/adapter-runtime.csproj"
+
+COPY . .
+WORKDIR "/src/adapter-runtime"
+RUN dotnet build "adapter-runtime.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "adapter-runtime.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+# Environment variables will be set by Container App Service
+# ADAPTER_INSTANCE_GUID - GUID of the adapter instance
+# ADAPTER_NAME - Name of the adapter (CSV, SqlServer, etc.)
+# ADAPTER_TYPE - Source or Destination
+# INTERFACE_NAME - Name of the interface
+# INSTANCE_NAME - Display name of the instance
+# BLOB_CONNECTION_STRING - Connection string to blob storage
+# BLOB_CONTAINER_NAME - Container name for adapter-config.json
+# ADAPTER_CONFIG_PATH - Path to config file (default: adapter-config.json)
+# AZURE_SERVICEBUS_CONNECTION_STRING - Service Bus connection string
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENTRYPOINT ["dotnet", "adapter-runtime.dll"]
+

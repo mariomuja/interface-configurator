@@ -264,17 +264,12 @@ resource serviceBusAuthRule 'Microsoft.ServiceBus/namespaces/authorizationRules@
 
 // Container App Environment for adapter instances
 // Each adapter instance runs in its own isolated container app
+// Log Analytics is disabled - using Azure's built-in logging instead
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: 'cae-adapter-instances'
   location: location
   properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: ''
-        sharedKey: ''
-      }
-    }
+    // appLogsConfiguration omitted - using Azure's default logging
   }
   tags: commonTags
 }

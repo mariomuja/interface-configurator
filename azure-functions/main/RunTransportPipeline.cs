@@ -77,7 +77,7 @@ public class RunTransportPipeline
 
             // Get source field separator from first source instance
             var firstSource = config.Sources.Values.FirstOrDefault();
-            var fieldSeparator = firstSource?.SourceFieldSeparator ?? "║";
+            var fieldSeparator = firstSource?.SourceFieldSeparator ?? "‖"; // Default: Double Vertical Line (U+2016)
             
             var csvContent = string.IsNullOrWhiteSpace(request.CsvContent)
                 ? SampleCsvGenerator.GenerateSampleCsv(fieldSeparator)

@@ -1,7 +1,7 @@
 -- Check MessageBox Database Data
 -- This script checks if data exists in the MessageBox tables
 
-USE [MessageBox]
+USE [InterfaceConfigDb]
 GO
 
 -- Check Messages table structure

@@ -7,14 +7,14 @@ namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for managing features and feature flags
-/// Now uses MessageBoxDbContext (moved from ApplicationDbContext)
+/// Now uses InterfaceConfigDbContext (moved from ApplicationDbContext, formerly MessageBoxDbContext)
 /// </summary>
 public class FeatureService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<FeatureService> _logger;
 
-    public FeatureService(MessageBoxDbContext context, ILogger<FeatureService> logger)
+    public FeatureService(InterfaceConfigDbContext context, ILogger<FeatureService> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

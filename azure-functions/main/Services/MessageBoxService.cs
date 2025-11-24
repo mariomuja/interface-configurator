@@ -11,18 +11,21 @@ namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for reading and writing messages to the MessageBox staging area
+/// DEPRECATED: Messaging is now handled via Azure Service Bus
+/// This service is kept for backward compatibility only
 /// Implements debatching: each record is stored as a separate message
 /// Triggers events when messages are added for event-driven processing
 /// </summary>
+[Obsolete("MessageBoxService is deprecated. Use IServiceBusService for messaging. This service is kept for backward compatibility only.")]
 public class MessageBoxService : IMessageBoxService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly IEventQueue? _eventQueue;
     private readonly IMessageSubscriptionService? _subscriptionService;
     private readonly ILogger<MessageBoxService>? _logger;
 
     public MessageBoxService(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         IEventQueue? eventQueue = null,
         IMessageSubscriptionService? subscriptionService = null,
         ILogger<MessageBoxService>? logger = null)

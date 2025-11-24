@@ -24,10 +24,10 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
   }
 }
 
-// MessageBox Database
-resource messageBoxDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
+// InterfaceConfigDb Database (formerly MessageBox)
+resource interfaceConfigDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
   parent: sqlServer
-  name: 'MessageBox'
+  name: 'InterfaceConfigDb'
   location: resourceGroup().location
   sku: {
     name: sqlSkuName

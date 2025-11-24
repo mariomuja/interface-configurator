@@ -18,18 +18,18 @@ namespace InterfaceConfigurator.Main;
 public class Diagnose
 {
     private readonly ApplicationDbContext? _applicationContext;
-    private readonly MessageBoxDbContext? _messageBoxContext;
+    private readonly InterfaceConfigDbContext? _interfaceConfigContext;
     private readonly BlobServiceClient? _blobServiceClient;
     private readonly ILogger<Diagnose> _logger;
 
     public Diagnose(
         ApplicationDbContext? applicationContext,
-        MessageBoxDbContext? messageBoxContext,
+        InterfaceConfigDbContext? interfaceConfigContext,
         BlobServiceClient? blobServiceClient,
         ILogger<Diagnose> logger)
     {
         _applicationContext = applicationContext;
-        _messageBoxContext = messageBoxContext;
+        _interfaceConfigContext = interfaceConfigContext;
         _blobServiceClient = blobServiceClient;
         _logger = logger;
     }
@@ -103,23 +103,23 @@ public class Diagnose
             overallStatus = "ERROR";
         }
 
-        // Check 2: MessageBox Database Connection
+        // Check 2: InterfaceConfigDb Database Connection (formerly MessageBox)
         totalChecks++;
         try
         {
-            if (_messageBoxContext == null)
+            if (_interfaceConfigContext == null)
             {
                 checks.Add(new DiagnosticCheck
                 {
-                    Name = "MessageBox Database Connection",
+                    Name = "InterfaceConfigDb Database Connection",
                     Status = "ERROR",
-                    Details = "MessageBoxDbContext is not configured"
+                    Details = "InterfaceConfigDbContext is not configured"
                 });
             }
             else
             {
                 // Get connection string details (without password)
-                var connectionString = _messageBoxContext.Database.GetConnectionString();
+                var connectionString = _interfaceConfigContext.Database.GetConnectionString();
                 var connectionDetails = "Unknown";
                 if (!string.IsNullOrEmpty(connectionString))
                 {
@@ -137,14 +137,14 @@ public class Diagnose
                     }
                 }
                 
-                var canConnect = await _messageBoxContext.Database.CanConnectAsync(context.CancellationToken);
+                var canConnect = await _interfaceConfigContext.Database.CanConnectAsync(context.CancellationToken);
                 if (canConnect)
                 {
                     checks.Add(new DiagnosticCheck
                     {
-                        Name = "MessageBox Database Connection",
+                        Name = "InterfaceConfigDb Database Connection",
                         Status = "OK",
-                        Details = $"Successfully connected to MessageBox database. {connectionDetails}"
+                        Details = $"Successfully connected to InterfaceConfigDb database. {connectionDetails}"
                     });
                     passedChecks++;
                 }
@@ -152,9 +152,9 @@ public class Diagnose
                 {
                     checks.Add(new DiagnosticCheck
                     {
-                        Name = "MessageBox Database Connection",
+                        Name = "InterfaceConfigDb Database Connection",
                         Status = "FAILED",
-                        Details = $"Cannot connect to MessageBox database. {connectionDetails}"
+                        Details = $"Cannot connect to InterfaceConfigDb database. {connectionDetails}"
                     });
                     overallStatus = "FAILED";
                 }
@@ -164,9 +164,9 @@ public class Diagnose
         {
             checks.Add(new DiagnosticCheck
             {
-                Name = "MessageBox Database Connection",
+                Name = "InterfaceConfigDb Database Connection",
                 Status = "ERROR",
-                Details = $"Error checking MessageBox database: {ex.Message}"
+                Details = $"Error checking InterfaceConfigDb database: {ex.Message}"
             });
             overallStatus = "ERROR";
         }
@@ -269,10 +269,10 @@ public class Diagnose
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AzureWebJobsStorage")))
             missingEnvVars.Add("AzureWebJobsStorage");
             
-        // Check if MessageBox database name is correct
+        // Check if InterfaceConfigDb database name is correct
         if (!string.IsNullOrEmpty(sqlDatabase) && !sqlDatabase.Equals("MessageBox", StringComparison.OrdinalIgnoreCase))
         {
-            envVarDetails.Add($"WARNING: AZURE_SQL_DATABASE is '{sqlDatabase}' but MessageBox uses 'MessageBox' database");
+            envVarDetails.Add($"WARNING: AZURE_SQL_DATABASE is '{sqlDatabase}' but InterfaceConfigDb uses 'InterfaceConfigDb' database");
         }
 
         if (missingEnvVars.Count == 0)
@@ -280,7 +280,7 @@ public class Diagnose
             var details = "All required environment variables are set. " + string.Join("; ", envVarDetails);
             if (!string.IsNullOrEmpty(sqlDatabase) && !sqlDatabase.Equals("MessageBox", StringComparison.OrdinalIgnoreCase))
             {
-                details += $". NOTE: MessageBox uses hardcoded database name 'MessageBox' (not '{sqlDatabase}')";
+                details += $". NOTE: InterfaceConfigDb uses hardcoded database name 'InterfaceConfigDb' (not '{sqlDatabase}')";
             }
             checks.Add(new DiagnosticCheck
             {
@@ -355,26 +355,26 @@ public class Diagnose
             });
         }
 
-        // Check 6: MessageBox Database Tables and Data
+        // Check 6: InterfaceConfigDb Database Tables and Data (formerly MessageBox)
         totalChecks++;
         try
         {
-            if (_messageBoxContext != null)
+            if (_interfaceConfigContext != null)
             {
-                var canConnect = await _messageBoxContext.Database.CanConnectAsync(context.CancellationToken);
+                var canConnect = await _interfaceConfigContext.Database.CanConnectAsync(context.CancellationToken);
                 if (canConnect)
                 {
-                    // Check if Messages table exists and get row count
+                    // Note: Messages table no longer exists - messaging is handled via Service Bus
                     try
                     {
-                        var messageCount = await _messageBoxContext.Messages.CountAsync(context.CancellationToken);
+                        var messageCount = 0; // Messages table removed
                         
                         // Check if ProcessLogs table exists and get row count
                         var processLogCount = 0;
                         var processLogsTableExists = false;
                         try
                         {
-                            processLogCount = await _messageBoxContext.ProcessLogs.CountAsync(context.CancellationToken);
+                            processLogCount = await _interfaceConfigContext.ProcessLogs.CountAsync(context.CancellationToken);
                             processLogsTableExists = true;
                         }
                         catch (Exception processLogEx)
@@ -387,7 +387,7 @@ public class Diagnose
                         var interfaceConfigsTableExists = false;
                         try
                         {
-                            interfaceConfigCount = await _messageBoxContext.InterfaceConfigurations.CountAsync(context.CancellationToken);
+                            interfaceConfigCount = await _interfaceConfigContext.InterfaceConfigurations.CountAsync(context.CancellationToken);
                             interfaceConfigsTableExists = true;
                         }
                         catch (Exception interfaceEx)
@@ -400,7 +400,7 @@ public class Diagnose
                         var adapterInstancesTableExists = false;
                         try
                         {
-                            adapterInstanceCount = await _messageBoxContext.AdapterInstances.CountAsync(context.CancellationToken);
+                            adapterInstanceCount = await _interfaceConfigContext.AdapterInstances.CountAsync(context.CancellationToken);
                             adapterInstancesTableExists = true;
                         }
                         catch (Exception adapterEx)
@@ -412,7 +412,7 @@ public class Diagnose
                         var hasAdapterInstanceGuidColumn = false;
                         try
                         {
-                            var columnCheck = await _messageBoxContext.Database.ExecuteSqlRawAsync(
+                            var columnCheck = await _interfaceConfigContext.Database.ExecuteSqlRawAsync(
                                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Messages' AND COLUMN_NAME = 'AdapterInstanceGuid'",
                                 context.CancellationToken);
                             hasAdapterInstanceGuidColumn = true;
@@ -452,7 +452,7 @@ public class Diagnose
                         var status = hasAdapterInstanceGuidColumn && processLogsTableExists ? "OK" : "WARNING";
                         checks.Add(new DiagnosticCheck
                         {
-                            Name = "MessageBox Database Tables",
+                            Name = "InterfaceConfigDb Database Tables",
                             Status = status,
                             Details = details
                         });
@@ -463,7 +463,7 @@ public class Diagnose
                     {
                         checks.Add(new DiagnosticCheck
                         {
-                            Name = "MessageBox Database Tables",
+                            Name = "InterfaceConfigDb Database Tables",
                             Status = "WARNING",
                             Details = $"Tables may need initialization. Error: {tableEx.Message}"
                         });

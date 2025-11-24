@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef, MatDialog, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -15,6 +15,8 @@ import { SapAdapterSettingsComponent } from '../adapter-settings/sap-adapter-set
 import { Dynamics365AdapterSettingsComponent } from '../adapter-settings/dynamics365-adapter-settings.component';
 import { CrmAdapterSettingsComponent } from '../adapter-settings/crm-adapter-settings.component';
 import { BaseAdapterSettingsComponent } from '../adapter-settings/base-adapter-settings.component';
+import { AdapterWizardComponent } from '../adapter-wizard/adapter-wizard.component';
+import { AdapterWizardData } from '../../models/adapter-wizard.model';
 
 export interface AdapterPropertiesData {
   adapterType: 'Source' | 'Destination';
@@ -40,6 +42,9 @@ export interface AdapterPropertiesData {
   sftpMaxConnectionPoolSize?: number;
   sftpFileBufferSize?: number;
   csvPollingInterval?: number; // Polling interval for CSV adapters
+  csvSkipHeaderLines?: number; // Number of lines to skip at the beginning of CSV files
+  csvSkipFooterLines?: number; // Number of lines to skip at the end of CSV files
+  csvQuoteCharacter?: string; // Quote character used to enclose CSV values
   // SQL Server properties
   sqlServerName?: string;
   sqlDatabaseName?: string;
@@ -119,7 +124,8 @@ export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
 
   constructor(
     public dialogRef: MatDialogRef<AdapterPropertiesDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: AdapterPropertiesData
+    @Inject(MAT_DIALOG_DATA) public data: AdapterPropertiesData,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -236,6 +242,81 @@ export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
 
   get dialogTitle(): string {
     return `${this.data.adapterType} Adapter Properties (${this.data.adapterName})`;
+  }
+
+  openWizard(): void {
+    // Collect current settings from adapter-specific component
+    const currentSettings = this.adapterSettingsComponent?.getSettings() || {};
+    
+    // Merge with common settings
+    const allCurrentSettings = {
+      instanceName: this.instanceName,
+      isEnabled: this.isEnabled,
+      ...currentSettings,
+      ...this.adapterSettings
+    };
+
+    const wizardData: AdapterWizardData = {
+      adapterName: this.data.adapterName,
+      adapterType: this.data.adapterType,
+      currentSettings: allCurrentSettings,
+      onSettingsUpdate: (settings: Record<string, any>) => {
+        // Update settings in the dialog
+        // First, update common settings
+        if (settings.instanceName !== undefined) {
+          this.instanceName = settings.instanceName;
+        }
+        if (settings.isEnabled !== undefined) {
+          this.isEnabled = settings.isEnabled;
+        }
+
+        // Then, update adapter-specific settings
+        if (this.adapterSettingsComponent) {
+          // Remove common settings before passing to adapter component
+          const adapterSettings = { ...settings };
+          delete adapterSettings.instanceName;
+          delete adapterSettings.isEnabled;
+          
+          // Initialize adapter settings component with new values
+          this.adapterSettingsComponent.initializeSettings({
+            ...this.data,
+            ...adapterSettings
+          });
+        }
+
+        // Also update SAP, Dynamics365, CRM settings if applicable
+        if (this.data.adapterName === 'SAP' && this.sapAdapterSettings) {
+          this.sapAdapterSettings.initializeSettings({
+            ...this.data,
+            ...settings
+          });
+        }
+        if (this.data.adapterName === 'Dynamics365' && this.dynamics365AdapterSettings) {
+          this.dynamics365AdapterSettings.initializeSettings({
+            ...this.data,
+            ...settings
+          });
+        }
+        if (this.data.adapterName === 'CRM' && this.crmAdapterSettings) {
+          this.crmAdapterSettings.initializeSettings({
+            ...this.data,
+            ...settings
+          });
+        }
+      }
+    };
+
+    const wizardDialogRef = this.dialog.open(AdapterWizardComponent, {
+      width: '800px',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      data: wizardData,
+      disableClose: false
+    });
+
+    wizardDialogRef.afterClosed().subscribe(result => {
+      // Wizard was closed, settings are already updated via onSettingsUpdate callback
+    });
   }
 }
 

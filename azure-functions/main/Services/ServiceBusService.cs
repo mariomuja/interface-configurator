@@ -3,8 +3,11 @@ using System.Text;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Core.Helpers;
 using CustomServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
+using System.Collections.Concurrent;
 
 namespace InterfaceConfigurator.Main.Services;
 
@@ -17,12 +20,21 @@ public class ServiceBusService : IServiceBusService
     private readonly ServiceBusClient _serviceBusClient;
     private readonly ILogger<ServiceBusService>? _logger;
     private readonly string _connectionString;
+    private readonly IServiceProvider? _serviceProvider;
     private const string TopicNamePrefix = "interface-";
     private const string SubscriptionNamePrefix = "destination-";
+    
+    // Store received messages with their receivers for completion/abandonment
+    // Key: messageId, Value: (receivedMessage, receiver, topicName, subscriptionName)
+    private readonly ConcurrentDictionary<string, (ServiceBusReceivedMessage Message, ServiceBusReceiver Receiver, string TopicName, string SubscriptionName)> _activeMessages = new();
+    
+    // Store receivers per subscription to reuse them
+    private readonly ConcurrentDictionary<string, ServiceBusReceiver> _receivers = new();
 
     public ServiceBusService(
         string connectionString,
-        ILogger<ServiceBusService>? logger = null)
+        ILogger<ServiceBusService>? logger = null,
+        IServiceProvider? serviceProvider = null)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -31,6 +43,7 @@ public class ServiceBusService : IServiceBusService
 
         _connectionString = connectionString;
         _logger = logger;
+        _serviceProvider = serviceProvider;
         _serviceBusClient = new ServiceBusClient(connectionString);
     }
 
@@ -124,87 +137,209 @@ public class ServiceBusService : IServiceBusService
         if (records == null)
             throw new ArgumentNullException(nameof(records));
 
+        // Use correlation ID for tracking
+        var correlationId = CorrelationIdHelper.Ensure();
+        CorrelationIdHelper.Set(correlationId);
+
         var messageIds = new List<string>();
 
         _logger?.LogInformation(
-            "Debatching {RecordCount} records into individual Service Bus messages: Interface={InterfaceName}, Adapter={AdapterName}, AdapterInstanceGuid={AdapterInstanceGuid}",
-            records.Count, interfaceName, adapterName, adapterInstanceGuid);
+            "[CorrelationId: {CorrelationId}] Debatching {RecordCount} records into individual Service Bus messages: Interface={InterfaceName}, Adapter={AdapterName}, AdapterInstanceGuid={AdapterInstanceGuid}",
+            correlationId, records.Count, interfaceName, adapterName, adapterInstanceGuid);
 
         // Create topic name
         var topicName = $"{TopicNamePrefix}{interfaceName.ToLowerInvariant()}";
         await using var sender = _serviceBusClient.CreateSender(topicName);
 
-        // Batch send messages for better performance
-        var batch = await sender.CreateMessageBatchAsync(cancellationToken);
-        var successCount = 0;
-        var errorCount = 0;
-
-        foreach (var record in records)
+        // Use batch processing service for efficient batch handling
+        // Note: Batch processing is integrated directly in SendBatchAsync method
+        // BatchProcessingService can be used for other batch operations if needed
+        if (batchProcessingService != null)
         {
-            try
+            // Process records in batches
+            var batches = records
+                .Select((record, index) => new { record, index })
+                .GroupBy(x => x.index / 100) // 100 records per batch
+                .Select(g => g.Select(x => x.record).ToList())
+                .ToList();
+
+            foreach (var batch in batches)
             {
-                // Serialize message data
-                var messageData = new
+                try
                 {
-                    headers = headers ?? new List<string>(),
-                    record = record
-                };
-                var messageDataJson = JsonSerializer.Serialize(messageData);
-
-                var messageId = Guid.NewGuid().ToString();
-                var serviceBusMessage = new Azure.Messaging.ServiceBus.ServiceBusMessage(messageDataJson)
-                {
-                    MessageId = messageId,
-                    Subject = adapterName,
-                    ContentType = "application/json"
-                };
-
-                // Add custom properties
-                serviceBusMessage.ApplicationProperties.Add("InterfaceName", interfaceName);
-                serviceBusMessage.ApplicationProperties.Add("AdapterName", adapterName);
-                serviceBusMessage.ApplicationProperties.Add("AdapterType", adapterType);
-                serviceBusMessage.ApplicationProperties.Add("AdapterInstanceGuid", adapterInstanceGuid.ToString());
-                serviceBusMessage.ApplicationProperties.Add("MessageHash", CalculateMessageHash(messageDataJson));
-
-                // Try to add to batch
-                if (!batch.TryAddMessage(serviceBusMessage))
-                {
-                    // Batch is full, send it and create a new one
-                    await sender.SendMessagesAsync(batch, cancellationToken);
-                    batch.Dispose();
-                    batch = await sender.CreateMessageBatchAsync(cancellationToken);
-                    
-                    // Add message to new batch
-                    if (!batch.TryAddMessage(serviceBusMessage))
-                    {
-                        throw new InvalidOperationException("Message is too large for Service Bus batch");
-                    }
+                    var batchMessageIds = await SendBatchAsync(sender, batch, headers, interfaceName, adapterName, adapterType, adapterInstanceGuid, correlationId, cancellationToken);
+                    messageIds.AddRange(batchMessageIds);
                 }
-
-                messageIds.Add(messageId);
-                successCount++;
-            }
-            catch (Exception ex)
-            {
-                errorCount++;
-                _logger?.LogError(ex,
-                    "Failed to add message to batch: Interface={InterfaceName}, Adapter={AdapterName}, RecordIndex={RecordIndex}",
-                    interfaceName, adapterName, successCount + errorCount);
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex,
+                        "[CorrelationId: {CorrelationId}] Failed to send batch: Interface={InterfaceName}, Adapter={AdapterName}",
+                        correlationId, interfaceName, adapterName);
+                    throw;
+                }
             }
         }
-
-        // Send remaining messages in batch
-        if (batch.Count > 0)
+        else
         {
-            await sender.SendMessagesAsync(batch, cancellationToken);
+            // Fallback to original batch logic
+            var batch = await sender.CreateMessageBatchAsync(cancellationToken);
+            var successCount = 0;
+            var errorCount = 0;
+
+            foreach (var record in records)
+            {
+                try
+                {
+                    var messageId = await CreateAndAddMessageToBatchAsync(batch, sender, record, headers, interfaceName, adapterName, adapterType, adapterInstanceGuid, cancellationToken);
+                    messageIds.Add(messageId);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    errorCount++;
+                    _logger?.LogError(ex,
+                        "[CorrelationId: {CorrelationId}] Failed to add message to batch: Interface={InterfaceName}, Adapter={AdapterName}, RecordIndex={RecordIndex}",
+                        correlationId, interfaceName, adapterName, successCount + errorCount);
+                }
+            }
+
+            // Send remaining messages in batch
+            if (batch.Count > 0)
+            {
+                await sender.SendMessagesAsync(batch, cancellationToken);
+            }
+            batch.Dispose();
         }
-        batch.Dispose();
 
         _logger?.LogInformation(
-            "Completed debatching: {TotalRecords} records, {SuccessCount} succeeded, {ErrorCount} failed",
-            records.Count, successCount, errorCount);
+            "[CorrelationId: {CorrelationId}] Completed debatching: {TotalRecords} records, {SuccessCount} succeeded",
+            correlationId, records.Count, messageIds.Count);
 
         return messageIds;
+    }
+
+    private async Task<List<string>> SendBatchAsync(
+        ServiceBusSender sender,
+        List<Dictionary<string, string>> batch,
+        List<string> headers,
+        string interfaceName,
+        string adapterName,
+        string adapterType,
+        Guid adapterInstanceGuid,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        var messageIds = new List<string>();
+        var serviceBusMessages = new List<Azure.Messaging.ServiceBus.ServiceBusMessage>();
+
+        foreach (var record in batch)
+        {
+            var messageData = new
+            {
+                headers = headers ?? new List<string>(),
+                record = record
+            };
+            var messageDataJson = JsonSerializer.Serialize(messageData);
+
+            var messageId = Guid.NewGuid().ToString();
+            var serviceBusMessage = new Azure.Messaging.ServiceBus.ServiceBusMessage(messageDataJson)
+            {
+                MessageId = messageId,
+                Subject = adapterName,
+                ContentType = "application/json"
+            };
+
+            // Add custom properties including correlation ID
+            serviceBusMessage.ApplicationProperties.Add("InterfaceName", interfaceName);
+            serviceBusMessage.ApplicationProperties.Add("AdapterName", adapterName);
+            serviceBusMessage.ApplicationProperties.Add("AdapterType", adapterType);
+            serviceBusMessage.ApplicationProperties.Add("AdapterInstanceGuid", adapterInstanceGuid.ToString());
+            serviceBusMessage.ApplicationProperties.Add("MessageHash", CalculateMessageHash(messageDataJson));
+            serviceBusMessage.ApplicationProperties.Add("CorrelationId", correlationId);
+
+            serviceBusMessages.Add(serviceBusMessage);
+            messageIds.Add(messageId);
+        }
+
+        // Send batch
+        var batchToSend = await sender.CreateMessageBatchAsync(cancellationToken);
+        foreach (var message in serviceBusMessages)
+        {
+            if (!batchToSend.TryAddMessage(message))
+            {
+                // Batch is full, send it and create a new one
+                await sender.SendMessagesAsync(batchToSend, cancellationToken);
+                batchToSend.Dispose();
+                batchToSend = await sender.CreateMessageBatchAsync(cancellationToken);
+                
+                if (!batchToSend.TryAddMessage(message))
+                {
+                    throw new InvalidOperationException("Message is too large for Service Bus batch");
+                }
+            }
+        }
+
+        if (batchToSend.Count > 0)
+        {
+            await sender.SendMessagesAsync(batchToSend, cancellationToken);
+        }
+        batchToSend.Dispose();
+
+        return messageIds;
+    }
+
+    private async Task<string> CreateAndAddMessageToBatchAsync(
+        ServiceBusMessageBatch batch,
+        ServiceBusSender sender,
+        Dictionary<string, string> record,
+        List<string> headers,
+        string interfaceName,
+        string adapterName,
+        string adapterType,
+        Guid adapterInstanceGuid,
+        CancellationToken cancellationToken)
+    {
+        var messageData = new
+        {
+            headers = headers ?? new List<string>(),
+            record = record
+        };
+        var messageDataJson = JsonSerializer.Serialize(messageData);
+
+        var messageId = Guid.NewGuid().ToString();
+        var correlationId = CorrelationIdHelper.Current ?? CorrelationIdHelper.Generate();
+        
+        var serviceBusMessage = new Azure.Messaging.ServiceBus.ServiceBusMessage(messageDataJson)
+        {
+            MessageId = messageId,
+            Subject = adapterName,
+            ContentType = "application/json"
+        };
+
+        // Add custom properties including correlation ID
+        serviceBusMessage.ApplicationProperties.Add("InterfaceName", interfaceName);
+        serviceBusMessage.ApplicationProperties.Add("AdapterName", adapterName);
+        serviceBusMessage.ApplicationProperties.Add("AdapterType", adapterType);
+        serviceBusMessage.ApplicationProperties.Add("AdapterInstanceGuid", adapterInstanceGuid.ToString());
+        serviceBusMessage.ApplicationProperties.Add("MessageHash", CalculateMessageHash(messageDataJson));
+        serviceBusMessage.ApplicationProperties.Add("CorrelationId", correlationId);
+
+        // Try to add to batch
+        if (!batch.TryAddMessage(serviceBusMessage))
+        {
+            // Batch is full, send it and create a new one
+            await sender.SendMessagesAsync(batch, cancellationToken);
+            batch.Dispose();
+            var newBatch = await sender.CreateMessageBatchAsync(cancellationToken);
+            
+            // Add message to new batch
+            if (!newBatch.TryAddMessage(serviceBusMessage))
+            {
+                throw new InvalidOperationException("Message is too large for Service Bus batch");
+            }
+        }
+
+        return messageId;
     }
 
     public async Task<List<CustomServiceBusMessage>> ReceiveMessagesAsync(
@@ -225,12 +360,16 @@ public class ServiceBusService : IServiceBusService
             // Create topic and subscription names
             var topicName = $"{TopicNamePrefix}{interfaceName.ToLowerInvariant()}";
             var subscriptionName = $"{SubscriptionNamePrefix}{destinationAdapterInstanceGuid.ToString().ToLowerInvariant()}";
+            var receiverKey = $"{topicName}/{subscriptionName}";
 
-            // Create receiver for the subscription
-            await using var receiver = _serviceBusClient.CreateReceiver(topicName, subscriptionName, new ServiceBusReceiverOptions
+            // Get or create receiver for this subscription (reuse receivers)
+            var receiver = _receivers.GetOrAdd(receiverKey, _ =>
             {
-                ReceiveMode = ServiceBusReceiveMode.PeekLock,
-                PrefetchCount = maxMessages
+                return _serviceBusClient.CreateReceiver(topicName, subscriptionName, new ServiceBusReceiverOptions
+                {
+                    ReceiveMode = ServiceBusReceiveMode.PeekLock,
+                    PrefetchCount = maxMessages
+                });
             });
 
             // Receive messages
@@ -248,6 +387,8 @@ public class ServiceBusService : IServiceBusService
                     if (messageData == null)
                     {
                         _logger?.LogWarning("Failed to deserialize message data: MessageId={MessageId}", sbMessage.MessageId);
+                        // Abandon invalid message
+                        await receiver.AbandonMessageAsync(sbMessage, cancellationToken: cancellationToken);
                         continue;
                     }
 
@@ -267,13 +408,48 @@ public class ServiceBusService : IServiceBusService
                         Properties = sbMessage.ApplicationProperties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
                     };
 
+                    // Store message with receiver for later completion/abandonment
+                    _activeMessages.TryAdd(sbMessage.MessageId, (sbMessage, receiver, topicName, subscriptionName));
+
+                    // Record lock in database for recovery (if lock tracking service is available)
+                    // This will be injected via dependency injection
+                    try
+                    {
+                        var lockTrackingService = _serviceProvider?.GetService<IServiceBusLockTrackingService>();
+                        if (lockTrackingService != null)
+                        {
+                            await lockTrackingService.RecordMessageLockAsync(
+                                sbMessage.MessageId,
+                                sbMessage.LockToken,
+                                topicName,
+                                subscriptionName,
+                                interfaceName,
+                                destinationAdapterInstanceGuid,
+                                sbMessage.LockedUntil.UtcDateTime,
+                                sbMessage.DeliveryCount,
+                                cancellationToken);
+                        }
+                    }
+                    catch (Exception lockEx)
+                    {
+                        _logger?.LogWarning(lockEx, "Failed to record lock for MessageId={MessageId}", sbMessage.MessageId);
+                        // Don't fail message processing if lock tracking fails
+                    }
+
                     result.Add(serviceBusMessage);
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Error processing received message: MessageId={MessageId}", sbMessage.MessageId);
                     // Abandon the message so it can be retried
-                    await receiver.AbandonMessageAsync(sbMessage, cancellationToken: cancellationToken);
+                    try
+                    {
+                        await receiver.AbandonMessageAsync(sbMessage, cancellationToken: cancellationToken);
+                    }
+                    catch (Exception abandonEx)
+                    {
+                        _logger?.LogError(abandonEx, "Failed to abandon message {MessageId}", sbMessage.MessageId);
+                    }
                 }
             }
 
@@ -297,10 +473,53 @@ public class ServiceBusService : IServiceBusService
         string lockToken,
         CancellationToken cancellationToken = default)
     {
-        // Note: Service Bus handles completion via the receiver, not by message ID
-        // This method signature is kept for compatibility but implementation would need receiver reference
-        _logger?.LogInformation("CompleteMessageAsync called: MessageId={MessageId}, LockToken={LockToken}", messageId, lockToken);
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(messageId))
+            throw new ArgumentException("Message ID cannot be empty", nameof(messageId));
+
+        try
+        {
+            if (_activeMessages.TryRemove(messageId, out var messageInfo))
+            {
+                var (sbMessage, receiver) = messageInfo;
+                
+                // Verify lock token matches
+                if (sbMessage.LockToken != lockToken)
+                {
+                    _logger?.LogWarning("Lock token mismatch for message {MessageId}. Expected: {Expected}, Got: {Actual}", 
+                        messageId, sbMessage.LockToken, lockToken);
+                }
+
+                await receiver.CompleteMessageAsync(sbMessage, cancellationToken);
+                
+                // Update lock status in database
+                try
+                {
+                    var lockTrackingService = _serviceProvider?.GetService<IServiceBusLockTrackingService>();
+                    if (lockTrackingService != null)
+                    {
+                        await lockTrackingService.UpdateLockStatusAsync(messageId, "Completed", "Message processed successfully", cancellationToken);
+                    }
+                }
+                catch (Exception lockEx)
+                {
+                    _logger?.LogWarning(lockEx, "Failed to update lock status for MessageId={MessageId}", messageId);
+                }
+                
+                _logger?.LogInformation("Successfully completed message {MessageId} in Service Bus", messageId);
+            }
+            else
+            {
+                _logger?.LogWarning("Message {MessageId} not found in active messages cache. It may have already been processed or expired.", messageId);
+                // Try to create a receiver and complete by lock token (fallback)
+                // Note: This requires knowing the topic and subscription, which we don't have here
+                // For now, log a warning - messages will be auto-completed when lock expires
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error completing message {MessageId} in Service Bus", messageId);
+            throw;
+        }
     }
 
     public async Task AbandonMessageAsync(
@@ -309,9 +528,56 @@ public class ServiceBusService : IServiceBusService
         Dictionary<string, object>? propertiesToModify = null,
         CancellationToken cancellationToken = default)
     {
-        // Note: Service Bus handles abandonment via the receiver
-        _logger?.LogInformation("AbandonMessageAsync called: MessageId={MessageId}, LockToken={LockToken}", messageId, lockToken);
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(messageId))
+            throw new ArgumentException("Message ID cannot be empty", nameof(messageId));
+
+        try
+        {
+            if (_activeMessages.TryGetValue(messageId, out var messageInfo))
+            {
+                var (sbMessage, receiver) = messageInfo;
+                
+                // Verify lock token matches
+                if (sbMessage.LockToken != lockToken)
+                {
+                    _logger?.LogWarning("Lock token mismatch for message {MessageId}. Expected: {Expected}, Got: {Actual}", 
+                        messageId, sbMessage.LockToken, lockToken);
+                }
+
+                await receiver.AbandonMessageAsync(sbMessage, propertiesToModify, cancellationToken);
+                
+                // Update lock status in database
+                try
+                {
+                    var lockTrackingService = _serviceProvider?.GetService<IServiceBusLockTrackingService>();
+                    if (lockTrackingService != null)
+                    {
+                        var reason = propertiesToModify?.ContainsKey("Reason") == true 
+                            ? propertiesToModify["Reason"].ToString() 
+                            : "Message abandoned for retry";
+                        await lockTrackingService.UpdateLockStatusAsync(messageId, "Abandoned", reason, cancellationToken);
+                    }
+                }
+                catch (Exception lockEx)
+                {
+                    _logger?.LogWarning(lockEx, "Failed to update lock status for MessageId={MessageId}", messageId);
+                }
+                
+                _logger?.LogInformation("Successfully abandoned message {MessageId} in Service Bus for retry", messageId);
+                
+                // Remove from cache after abandoning
+                _activeMessages.TryRemove(messageId, out _);
+            }
+            else
+            {
+                _logger?.LogWarning("Message {MessageId} not found in active messages cache. It may have already been processed.", messageId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error abandoning message {MessageId} in Service Bus", messageId);
+            throw;
+        }
     }
 
     public async Task DeadLetterMessageAsync(
@@ -320,9 +586,52 @@ public class ServiceBusService : IServiceBusService
         string reason,
         CancellationToken cancellationToken = default)
     {
-        // Note: Service Bus handles dead lettering via the receiver
-        _logger?.LogWarning("DeadLetterMessageAsync called: MessageId={MessageId}, LockToken={LockToken}, Reason={Reason}", messageId, lockToken, reason);
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(messageId))
+            throw new ArgumentException("Message ID cannot be empty", nameof(messageId));
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Reason cannot be empty", nameof(reason));
+
+        try
+        {
+            if (_activeMessages.TryRemove(messageId, out var messageInfo))
+            {
+                var (sbMessage, receiver) = messageInfo;
+                
+                // Verify lock token matches
+                if (sbMessage.LockToken != lockToken)
+                {
+                    _logger?.LogWarning("Lock token mismatch for message {MessageId}. Expected: {Expected}, Got: {Actual}", 
+                        messageId, sbMessage.LockToken, lockToken);
+                }
+
+                await receiver.DeadLetterMessageAsync(sbMessage, reason: reason, cancellationToken: cancellationToken);
+                
+                // Update lock status in database
+                try
+                {
+                    var lockTrackingService = _serviceProvider?.GetService<IServiceBusLockTrackingService>();
+                    if (lockTrackingService != null)
+                    {
+                        await lockTrackingService.UpdateLockStatusAsync(messageId, "DeadLettered", reason, cancellationToken);
+                    }
+                }
+                catch (Exception lockEx)
+                {
+                    _logger?.LogWarning(lockEx, "Failed to update lock status for MessageId={MessageId}", messageId);
+                }
+                
+                _logger?.LogWarning("Successfully dead lettered message {MessageId} in Service Bus. Reason: {Reason}", messageId, reason);
+            }
+            else
+            {
+                _logger?.LogWarning("Message {MessageId} not found in active messages cache. It may have already been processed.", messageId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error dead lettering message {MessageId} in Service Bus", messageId);
+            throw;
+        }
     }
 
     public async Task<int> GetMessageCountAsync(

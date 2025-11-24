@@ -9,10 +9,10 @@ namespace InterfaceConfigurator.Main.Services;
 /// </summary>
 public class ProcessingStatisticsService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger? _logger;
 
-    public ProcessingStatisticsService(MessageBoxDbContext context, ILogger? logger = null)
+    public ProcessingStatisticsService(InterfaceConfigDbContext context, ILogger? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger;

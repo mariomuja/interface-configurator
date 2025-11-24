@@ -14,11 +14,11 @@ namespace InterfaceConfigurator.Main;
 /// </summary>
 public class GetProcessingStatisticsFunction
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<GetProcessingStatisticsFunction> _logger;
 
     public GetProcessingStatisticsFunction(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<GetProcessingStatisticsFunction> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

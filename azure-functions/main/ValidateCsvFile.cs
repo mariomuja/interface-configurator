@@ -70,9 +70,12 @@ public class ValidateCsvFileFunction
             var downloadResult = await blobClient.DownloadContentAsync(context.CancellationToken);
             var csvContent = downloadResult.Value.Content.ToString();
 
+            // Get quote character from query parameters or use default
+            var quoteCharacter = queryParams.ContainsKey("quoteCharacter") ? queryParams["quoteCharacter"] : "\"";
+
             // Validate CSV
             var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
-            var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter);
+            var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter, quoteCharacter);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");

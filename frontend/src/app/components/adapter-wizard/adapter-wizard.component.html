@@ -1,0 +1,228 @@
+<h2 mat-dialog-title>
+  <mat-icon>wizard</mat-icon>
+  Konfigurations-Assistent: {{ data.adapterName }} {{ data.adapterType }}
+</h2>
+
+<mat-dialog-content>
+  <div class="wizard-container">
+    <!-- Progress Bar -->
+    <div class="wizard-progress">
+      <mat-progress-bar mode="determinate" [value]="progress"></mat-progress-bar>
+      <div class="progress-text">
+        Schritt {{ getCurrentVisibleStepIndex() + 1 }} von {{ getVisibleSteps().length }}
+      </div>
+    </div>
+
+    <!-- Current Step -->
+    <div class="wizard-step" *ngIf="currentStep">
+      <div class="step-header">
+        <h3 class="step-title">{{ currentStep.title }}</h3>
+        <p class="step-description">{{ currentStep.description }}</p>
+        <p class="step-help" *ngIf="currentStep.helpText">
+          <mat-icon>info</mat-icon>
+          {{ currentStep.helpText }}
+        </p>
+      </div>
+
+      <div class="step-content">
+        <!-- Text Input -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="currentStep.inputType === 'text'">
+          <mat-label>{{ currentStep.title }}</mat-label>
+          <input 
+            matInput 
+            [(ngModel)]="stepValues[currentStep.fieldName]" 
+            [placeholder]="currentStep.placeholder || ''"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required" />
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Password Input -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="currentStep.inputType === 'password'">
+          <mat-label>{{ currentStep.title }}</mat-label>
+          <input 
+            matInput 
+            type="password"
+            [(ngModel)]="stepValues[currentStep.fieldName]" 
+            [placeholder]="currentStep.placeholder || ''"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required" />
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Number Input -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="currentStep.inputType === 'number'">
+          <mat-label>{{ currentStep.title }}</mat-label>
+          <input 
+            matInput 
+            type="number"
+            [(ngModel)]="stepValues[currentStep.fieldName]" 
+            [placeholder]="currentStep.placeholder || ''"
+            [min]="currentStep.min"
+            [max]="currentStep.max"
+            [step]="currentStep.step || 1"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required" />
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Textarea Input -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="currentStep.inputType === 'textarea'">
+          <mat-label>{{ currentStep.title }}</mat-label>
+          <textarea 
+            matInput 
+            rows="6"
+            [(ngModel)]="stepValues[currentStep.fieldName]" 
+            [placeholder]="currentStep.placeholder || ''"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required"></textarea>
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Select Dropdown -->
+        <mat-form-field appearance="outline" class="full-width" *ngIf="currentStep.inputType === 'select'">
+          <mat-label>{{ currentStep.title }}</mat-label>
+          <mat-select 
+            [(ngModel)]="stepValues[currentStep.fieldName]"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required">
+            <mat-option *ngIf="!currentStep.required" [value]="null">
+              -- Bitte auswählen --
+            </mat-option>
+            <mat-option *ngFor="let option of getStepOptions(currentStep)" [value]="option.value">
+              {{ option.label }}
+              <span class="option-description" *ngIf="option.description"> - {{ option.description }}</span>
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix *ngIf="currentStep.fieldName === 'sqlServerName' && isLoadingServers">
+            <mat-spinner diameter="20"></mat-spinner>
+          </mat-icon>
+          <mat-icon matSuffix *ngIf="currentStep.fieldName === 'sapRfcFunctionModule' && isLoadingRfcs">
+            <mat-spinner diameter="20"></mat-spinner>
+          </mat-icon>
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Multiple Choice (Radio Buttons) -->
+        <div class="multichoice-container" *ngIf="currentStep.inputType === 'multichoice'">
+          <mat-radio-group 
+            [(ngModel)]="stepValues[currentStep.fieldName]"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            [required]="currentStep.required">
+            <mat-card class="choice-card" *ngFor="let option of currentStep.options" 
+                      [class.selected]="stepValues[currentStep.fieldName] === option.value"
+                      (click)="stepValues[currentStep.fieldName] = option.value; onValueChange(currentStep, option.value)">
+              <mat-radio-button [value]="option.value" class="choice-radio">
+                <div class="choice-content">
+                  <mat-icon *ngIf="option.icon" class="choice-icon">{{ option.icon }}</mat-icon>
+                  <div class="choice-text">
+                    <div class="choice-label">{{ option.label }}</div>
+                    <div class="choice-description" *ngIf="option.description">{{ option.description }}</div>
+                  </div>
+                </div>
+              </mat-radio-button>
+            </mat-card>
+          </mat-radio-group>
+          <mat-error *ngIf="getValidationError(currentStep.fieldName)" class="error-message">
+            {{ getValidationError(currentStep.fieldName) }}
+          </mat-error>
+        </div>
+
+        <!-- File Picker -->
+        <div class="filepicker-container" *ngIf="currentStep.inputType === 'filepicker'">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ currentStep.title }}</mat-label>
+            <input 
+              matInput 
+              [(ngModel)]="stepValues[currentStep.fieldName]" 
+              [placeholder]="currentStep.placeholder || ''"
+              (ngModelChange)="onValueChange(currentStep, $event)"
+              [required]="currentStep.required" />
+            <button 
+              mat-icon-button 
+              matSuffix 
+              (click)="openFilePicker(currentStep)"
+              matTooltip="Datei auswählen"
+              type="button">
+              <mat-icon>folder_open</mat-icon>
+            </button>
+            <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+              {{ getValidationError(currentStep.fieldName) }}
+            </mat-error>
+          </mat-form-field>
+          <div class="filepicker-help" *ngIf="currentStep.helpText">
+            <mat-icon>info</mat-icon>
+            {{ currentStep.helpText }}
+          </div>
+        </div>
+
+        <!-- Folder Picker (for Blob Storage paths) -->
+        <div class="folderpicker-container" *ngIf="currentStep.inputType === 'filepicker' && (currentStep.fieldName.includes('folder') || currentStep.fieldName.includes('path'))">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ currentStep.title }}</mat-label>
+            <input 
+              matInput 
+              [(ngModel)]="stepValues[currentStep.fieldName]" 
+              [placeholder]="currentStep.placeholder || ''"
+              (ngModelChange)="onValueChange(currentStep, $event)"
+              [required]="currentStep.required" />
+            <button 
+              mat-icon-button 
+              matSuffix 
+              (click)="openFolderPicker(currentStep)"
+              matTooltip="Ordnerpfad auswählen"
+              type="button">
+              <mat-icon>folder</mat-icon>
+            </button>
+            <mat-error *ngIf="getValidationError(currentStep.fieldName)">
+              {{ getValidationError(currentStep.fieldName) }}
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Toggle -->
+        <div class="toggle-container" *ngIf="currentStep.inputType === 'toggle'">
+          <mat-slide-toggle 
+            [(ngModel)]="stepValues[currentStep.fieldName]"
+            (ngModelChange)="onValueChange(currentStep, $event)"
+            color="primary">
+            {{ currentStep.title }}
+          </mat-slide-toggle>
+          <p class="toggle-description" *ngIf="currentStep.description">{{ currentStep.description }}</p>
+          <p class="toggle-help" *ngIf="currentStep.helpText">
+            <mat-icon>info</mat-icon>
+            {{ currentStep.helpText }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()" color="warn">
+    <mat-icon>close</mat-icon>
+    Abbrechen
+  </button>
+  <button mat-button (click)="goBack()" [disabled]="!canGoBack">
+    <mat-icon>arrow_back</mat-icon>
+    Zurück
+  </button>
+  <button mat-raised-button (click)="isLastStep ? saveAndClose() : goNext()" 
+          [disabled]="!canGoNext" 
+          color="primary">
+    <mat-icon>{{ isLastStep ? 'save' : 'arrow_forward' }}</mat-icon>
+    {{ isLastStep ? 'Speichern' : 'Weiter' }}
+  </button>
+</mat-dialog-actions>
+

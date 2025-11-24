@@ -60,7 +60,7 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
   @Output() explorerClick = new EventEmitter<void>(); // For opening blob container explorer dialog
   @Output() adapterTypeChangeClick = new EventEmitter<void>(); // For changing adapter type (Source only)
 
-  private readonly FIELD_SEPARATOR = '║';
+  private readonly FIELD_SEPARATOR = '‖'; // Double Vertical Line (U+2016) - rarely used UTF character
   private readonly COLUMN_COLORS = [
     '#1a237e', '#b71c1c', '#004d40', '#e65100', '#4a148c',
     '#006064', '#3e2723', '#1b5e20', '#880e4f', '#212121',
@@ -228,7 +228,7 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
       return '';
     }
 
-    const htmlLines = lines.map((line) => {
+    const htmlLines = lines.map((line, lineIndex) => {
       if (line.trim() === '') {
         return '<div><br></div>';
       }
@@ -239,7 +239,10 @@ export class AdapterCardComponent implements OnChanges, AfterViewInit {
         return `<span style="color:${color};">${sanitized}</span>`;
       });
       const separator = `<span style="color:#999;">${this.FIELD_SEPARATOR}</span>`;
-      return `<div>${cells.join(separator)}</div>`;
+      // Add alternating row background colors (even rows: light grey, odd rows: white)
+      const rowBgColor = lineIndex % 2 === 0 ? '#f5f5f5' : '#ffffff';
+      const rowStyle = `background-color:${rowBgColor}; padding: 2px 4px; margin: 1px 0; border-radius: 2px;`;
+      return `<div style="${rowStyle}">${cells.join(separator)}</div>`;
     });
 
     return htmlLines.join('');

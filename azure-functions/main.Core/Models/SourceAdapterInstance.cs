@@ -46,6 +46,22 @@ public class SourceAdapterInstance
 
     public int CsvPollingInterval { get; set; } = 10;
 
+    /// <summary>
+    /// Number of lines to skip at the beginning of CSV file (e.g., header lines, comments)
+    /// </summary>
+    public int CsvSkipHeaderLines { get; set; } = 0;
+
+    /// <summary>
+    /// Number of lines to skip at the end of CSV file (e.g., summary rows, totals)
+    /// </summary>
+    public int CsvSkipFooterLines { get; set; } = 0;
+
+    /// <summary>
+    /// Quote character used to enclose values in CSV (e.g., ", ', or empty if no quotes)
+    /// </summary>
+    [MaxLength(1)]
+    public string? CsvQuoteCharacter { get; set; } = "\""; // Default: double quote
+
     // SFTP Properties
     [MaxLength(500)]
     public string? SftpHost { get; set; }

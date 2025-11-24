@@ -11,15 +11,18 @@ public class AddDestinationAdapterInstance
 {
     private readonly IInterfaceConfigurationService _configService;
     private readonly IContainerAppService _containerAppService;
+    private readonly IServiceBusSubscriptionService _subscriptionService;
     private readonly ILogger<AddDestinationAdapterInstance> _logger;
 
     public AddDestinationAdapterInstance(
         IInterfaceConfigurationService configService,
         IContainerAppService containerAppService,
+        IServiceBusSubscriptionService subscriptionService,
         ILogger<AddDestinationAdapterInstance> logger)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _containerAppService = containerAppService ?? throw new ArgumentNullException(nameof(containerAppService));
+        _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -62,39 +65,105 @@ public class AddDestinationAdapterInstance
             _logger.LogInformation("Added destination adapter instance '{InstanceName}' ({AdapterName}) to interface '{InterfaceName}'", 
                 instance.InstanceName, instance.AdapterName, request.InterfaceName);
 
-            // Create container app for this adapter instance (fire and forget)
+            // Create Service Bus subscription for this destination adapter instance
             if (instance.AdapterInstanceGuid.HasValue)
             {
-                // Get full configuration to pass to container app
-                var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
-                var fullInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == instance.AdapterInstanceGuid.Value);
-                
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        _logger.LogInformation("Creating container app for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                        _logger.LogInformation("Creating Service Bus subscription for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                        await _subscriptionService.CreateSubscriptionAsync(
+                            request.InterfaceName,
+                            instance.AdapterInstanceGuid.Value,
+                            executionContext.CancellationToken);
+                        _logger.LogInformation("Service Bus subscription created successfully for adapter instance {Guid}", instance.AdapterInstanceGuid);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error creating Service Bus subscription for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                    }
+                }, CancellationToken.None);
+            }
+
+            // Create container app for this adapter instance
+            // IMPORTANT: Each adapter instance gets its own isolated container app
+            // Container app name is derived from adapterInstanceGuid: ca-{guid}
+            // This ensures complete process isolation between adapter instances
+            string? containerAppStatus = null;
+            string? containerAppError = null;
+            string? containerAppName = null;
+            
+            if (instance.AdapterInstanceGuid.HasValue)
+            {
+                try
+                {
+                    // Check if container app already exists (should not happen for new instances)
+                    var exists = await _containerAppService.ContainerAppExistsAsync(
+                        instance.AdapterInstanceGuid.Value,
+                        executionContext.CancellationToken);
+                    
+                    if (!exists)
+                    {
+                        // Get full configuration to pass to container app
+                        var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
+                        var fullInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == instance.AdapterInstanceGuid.Value);
+                        
+                        _logger.LogInformation(
+                            "Creating isolated container app for destination adapter instance {Guid} (InstanceName={InstanceName}, AdapterName={AdapterName})",
+                            instance.AdapterInstanceGuid, instance.InstanceName, instance.AdapterName);
+                        
                         var containerAppInfo = await _containerAppService.CreateContainerAppAsync(
                             instance.AdapterInstanceGuid.Value,
                             instance.AdapterName,
                             "Destination",
                             request.InterfaceName,
                             instance.InstanceName,
-                            fullInstance ?? instance, // Pass full instance configuration
+                            fullInstance ?? instance, // Pass full instance configuration with ALL settings
                             executionContext.CancellationToken);
-                        _logger.LogInformation("Container app created successfully: {Name}", containerAppInfo.ContainerAppName);
+                        
+                        containerAppStatus = "Created";
+                        containerAppName = containerAppInfo.ContainerAppName;
+                        _logger.LogInformation(
+                            "Container app created successfully for destination adapter instance {Guid}: ContainerApp={ContainerAppName}",
+                            instance.AdapterInstanceGuid, containerAppName);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogError(ex, "Error creating container app for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                        containerAppStatus = "AlreadyExists";
+                        containerAppName = _containerAppService.GetContainerAppName(instance.AdapterInstanceGuid.Value);
+                        _logger.LogWarning(
+                            "Container app already exists for destination adapter instance {Guid}: ContainerApp={ContainerAppName}",
+                            instance.AdapterInstanceGuid, containerAppName);
                     }
-                }, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    containerAppStatus = "Error";
+                    containerAppError = ex.Message;
+                    _logger.LogError(ex, "Error creating container app for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
+                    // Don't fail the entire operation - instance is created even if container app creation fails
+                }
             }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
-            await response.WriteStringAsync(JsonSerializer.Serialize(instance));
+            
+            // Include container app creation status in response
+            var responseData = new Dictionary<string, object>
+            {
+                ["adapterInstanceGuid"] = instance.AdapterInstanceGuid,
+                ["instanceName"] = instance.InstanceName,
+                ["adapterName"] = instance.AdapterName,
+                ["isEnabled"] = instance.IsEnabled,
+                ["configuration"] = instance.Configuration,
+                ["containerAppStatus"] = containerAppStatus ?? "NotCreated",
+                ["containerAppName"] = containerAppName ?? "",
+                ["containerAppError"] = containerAppError ?? ""
+            };
+            
+            await response.WriteStringAsync(JsonSerializer.Serialize(responseData));
             return response;
         }
         catch (Exception ex)

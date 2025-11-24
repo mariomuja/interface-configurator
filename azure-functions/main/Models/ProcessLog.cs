@@ -42,8 +42,9 @@ public class ProcessLog
     [Column("InterfaceName")]
     public string? InterfaceName { get; set; }
     
-    [Column("MessageId")]
-    public Guid? MessageId { get; set; }
+    // MessageId removed - Messages table no longer exists
+    // [Column("MessageId")]
+    // public Guid? MessageId { get; set; }
 }
 
 

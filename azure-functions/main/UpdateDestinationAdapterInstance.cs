@@ -66,35 +66,101 @@ public class UpdateDestinationAdapterInstance
             _logger.LogInformation("Updated destination adapter instance '{AdapterInstanceGuid}' in interface '{InterfaceName}'", 
                 request.AdapterInstanceGuid, request.InterfaceName);
 
-            // Update container app configuration (fire and forget)
-            _ = Task.Run(async () =>
+            // Update container app configuration synchronously with comprehensive error handling
+            string? containerAppStatus = null;
+            string? containerAppError = null;
+            string? containerAppName = null;
+            bool containerAppExists = false;
+            try
             {
-                try
+                // Check if container app exists first
+                containerAppExists = await _containerAppService.ContainerAppExistsAsync(
+                    request.AdapterInstanceGuid,
+                    executionContext.CancellationToken);
+
+                if (containerAppExists)
                 {
                     var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
                     var updatedInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == request.AdapterInstanceGuid);
                     if (updatedInstance != null)
                     {
+                        // Update container app configuration with ALL settings from the adapter instance
                         await _containerAppService.UpdateContainerAppConfigurationAsync(
                             request.AdapterInstanceGuid,
-                            updatedInstance,
+                            updatedInstance, // Pass the complete adapter instance with all properties
                             executionContext.CancellationToken);
-                        _logger.LogInformation("Container app configuration updated for adapter instance {Guid}", request.AdapterInstanceGuid);
+                        
+                        containerAppStatus = "Updated";
+                        containerAppName = _containerAppService.GetContainerAppName(request.AdapterInstanceGuid);
+                        _logger.LogInformation(
+                            "Container app configuration updated successfully for adapter instance {Guid}, ContainerApp={ContainerAppName}",
+                            request.AdapterInstanceGuid, containerAppName);
+                    }
+                    else
+                    {
+                        containerAppStatus = "Skipped";
+                        containerAppError = "Adapter instance not found in configuration after update";
+                        _logger.LogWarning("Adapter instance {Guid} not found in configuration after update", request.AdapterInstanceGuid);
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    _logger.LogError(ex, "Error updating container app configuration for adapter instance {Guid}", request.AdapterInstanceGuid);
+                    // Container app doesn't exist yet - try to create it
+                    _logger.LogInformation("Container app does not exist for adapter instance {Guid}, attempting to create it", request.AdapterInstanceGuid);
+                    try
+                    {
+                        var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
+                        var instance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == request.AdapterInstanceGuid);
+                        if (instance != null)
+                        {
+                            var containerAppInfo = await _containerAppService.CreateContainerAppAsync(
+                                request.AdapterInstanceGuid,
+                                instance.AdapterName,
+                                "Destination",
+                                request.InterfaceName,
+                                instance.InstanceName,
+                                instance, // Pass complete instance configuration
+                                executionContext.CancellationToken);
+                            
+                            containerAppStatus = "Created";
+                            containerAppName = containerAppInfo.ContainerAppName;
+                            _logger.LogInformation(
+                                "Container app created successfully for adapter instance {Guid}, ContainerApp={ContainerAppName}",
+                                request.AdapterInstanceGuid, containerAppName);
+                        }
+                        else
+                        {
+                            containerAppStatus = "NotCreated";
+                            containerAppError = "Adapter instance not found - cannot create container app";
+                            _logger.LogWarning("Adapter instance {Guid} not found - cannot create container app", request.AdapterInstanceGuid);
+                        }
+                    }
+                    catch (Exception createEx)
+                    {
+                        containerAppStatus = "CreateError";
+                        containerAppError = $"Failed to create container app: {createEx.Message}";
+                        _logger.LogError(createEx, "Error creating container app for adapter instance {Guid}", request.AdapterInstanceGuid);
+                    }
                 }
-            }, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                containerAppStatus = "Error";
+                containerAppError = $"Error updating container app: {ex.Message}";
+                _logger.LogError(ex, "Error updating container app configuration for adapter instance {Guid}", request.AdapterInstanceGuid);
+            }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
             CorsHelper.AddCorsHeaders(response);
             await response.WriteStringAsync(JsonSerializer.Serialize(new { 
-                message = $"Destination adapter instance '{request.AdapterInstanceGuid}' updated successfully. Container app configuration update initiated.",
+                message = $"Destination adapter instance '{request.AdapterInstanceGuid}' updated successfully.",
                 interfaceName = request.InterfaceName,
-                adapterInstanceGuid = request.AdapterInstanceGuid
+                adapterInstanceGuid = request.AdapterInstanceGuid,
+                containerAppStatus = containerAppStatus,
+                containerAppError = containerAppError,
+                containerAppName = containerAppName,
+                containerAppExists = containerAppExists
             }));
             return response;
         }

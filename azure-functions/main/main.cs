@@ -88,17 +88,34 @@ public class MainFunction
                     {
                         var downloadResult = await blobClient.DownloadContentAsync(context.CancellationToken);
                         var csvContent = downloadResult.Value.Content.ToString();
-                        var validationResult = validationService.ValidateCsv(csvContent);
+                        // Get quote character from configuration if available
+                        var quoteCharacter = Environment.GetEnvironmentVariable("CsvQuoteCharacter") ?? "\"";
+                        var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter: null, quoteCharacter: quoteCharacter);
                         
-                        if (!validationResult.IsValid)
+                        // Check if validation failed completely (e.g., binary file, no valid rows at all)
+                        // If only some rows are invalid, processing will continue and skip those rows
+                        var hasCriticalErrors = validationResult.Issues.Any(issue => 
+                            issue.Contains("binary") || 
+                            issue.Contains("no valid headers") || 
+                            issue.Contains("no valid rows") ||
+                            issue.Contains("All data rows have incorrect"));
+                        
+                        if (!validationResult.IsValid && hasCriticalErrors)
                         {
-                            _logger.LogWarning("CSV validation failed for {BlobName}. Issues: {Issues}", 
+                            _logger.LogWarning("CSV validation failed for {BlobName}. Critical issues: {Issues}", 
                                 blobName, string.Join("; ", validationResult.Issues));
                             
-                            // Move to error folder if validation fails
+                            // Move to error folder if validation fails completely
                             await MoveBlobToFolderAsync("csv-files", "csv-incoming", "csv-error", blobName, 
                                 $"Validation failed: {string.Join("; ", validationResult.Issues)}");
                             return; // Don't process invalid CSV
+                        }
+                        
+                        // Log warnings if there are non-critical issues (e.g., some rows will be skipped)
+                        if (validationResult.Issues.Any(issue => issue.Contains("will be skipped")))
+                        {
+                            _logger.LogWarning("CSV validation warnings for {BlobName}: {Issues}. Processing will continue with valid rows.", 
+                                blobName, string.Join("; ", validationResult.Issues.Where(i => i.Contains("will be skipped"))));
                         }
                         
                         _logger.LogInformation("CSV validation passed for {BlobName}. Encoding: {Encoding}, Delimiter: {Delimiter}, Columns: {ColumnCount}, Lines: {LineCount}",
@@ -297,6 +314,9 @@ public class MainFunction
             CsvData = sourceInstance.CsvData,
             CsvAdapterType = sourceInstance.CsvAdapterType,
             CsvPollingInterval = sourceInstance.CsvPollingInterval,
+            CsvSkipHeaderLines = sourceInstance.CsvSkipHeaderLines,
+            CsvSkipFooterLines = sourceInstance.CsvSkipFooterLines,
+            CsvQuoteCharacter = sourceInstance.CsvQuoteCharacter,
             SftpHost = sourceInstance.SftpHost,
             SftpPort = sourceInstance.SftpPort,
             SftpUsername = sourceInstance.SftpUsername,

@@ -15,10 +15,11 @@ public class MessageBoxDbContext : DbContext
     {
     }
 
-    public DbSet<MessageBoxMessage> Messages { get; set; }
-    public DbSet<MessageSubscription> MessageSubscriptions { get; set; } // Legacy - kept for backward compatibility
-    public DbSet<AdapterSubscription> AdapterSubscriptions { get; set; } // New: BizTalk-style subscriptions (filter criteria)
-    public DbSet<MessageProcessing> MessageProcessing { get; set; } // New: Tracks message processing status
+    // Messages and subscription tables removed - messaging is now handled via Azure Service Bus
+    // public DbSet<MessageBoxMessage> Messages { get; set; }
+    // public DbSet<MessageSubscription> MessageSubscriptions { get; set; }
+    // public DbSet<AdapterSubscription> AdapterSubscriptions { get; set; }
+    // public DbSet<MessageProcessing> MessageProcessing { get; set; }
     public DbSet<AdapterInstance> AdapterInstances { get; set; }
     public DbSet<Models.ProcessLog> ProcessLogs { get; set; }
     public DbSet<ProcessingStatistics> ProcessingStatistics { get; set; }
@@ -36,100 +37,8 @@ public class MessageBoxDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure MessageBoxMessage
-        modelBuilder.Entity<MessageBoxMessage>(entity =>
-        {
-            entity.HasKey(e => e.MessageId);
-            entity.Property(e => e.MessageId)
-                .HasColumnName("MessageId")
-                .HasDefaultValueSql("NEWID()")
-                .ValueGeneratedNever();
-            entity.Property(e => e.datetime_created)
-                .HasDefaultValueSql("GETUTCDATE()")
-                .IsRequired();
-            entity.HasIndex(e => e.InterfaceName).HasDatabaseName("IX_Messages_InterfaceName");
-            entity.HasIndex(e => e.AdapterName).HasDatabaseName("IX_Messages_AdapterName");
-            entity.HasIndex(e => e.AdapterType).HasDatabaseName("IX_Messages_AdapterType");
-            entity.HasIndex(e => e.Status).HasDatabaseName("IX_Messages_Status");
-            entity.HasIndex(e => e.datetime_created).HasDatabaseName("IX_Messages_datetime_created");
-            entity.HasIndex(e => new { e.Status, e.InterfaceName }).HasDatabaseName("IX_Messages_Status_InterfaceName");
-            entity.HasIndex(e => e.AdapterInstanceGuid).HasDatabaseName("IX_Messages_AdapterInstanceGuid");
-            // Unique index on MessageHash for idempotency (prevent duplicate messages)
-            // Note: This is a non-unique index to allow multiple messages with same hash if needed
-            // The idempotency check in code handles duplicate detection
-            entity.HasIndex(e => e.MessageHash).HasDatabaseName("IX_Messages_MessageHash");
-        });
-
-        // Configure MessageSubscription
-        modelBuilder.Entity<MessageSubscription>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                .HasColumnName("Id")
-                .ValueGeneratedOnAdd();
-            entity.Property(e => e.datetime_created)
-                .HasDefaultValueSql("GETUTCDATE()")
-                .IsRequired();
-            entity.HasIndex(e => e.MessageId).HasDatabaseName("IX_MessageSubscriptions_MessageId");
-            entity.HasIndex(e => new { e.MessageId, e.SubscriberAdapterName }).HasDatabaseName("IX_MessageSubscriptions_MessageId_Subscriber");
-            entity.HasIndex(e => e.Status).HasDatabaseName("IX_MessageSubscriptions_Status");
-        });
-
-        // Configure AdapterSubscription (New: BizTalk-style subscriptions - filter criteria)
-        modelBuilder.Entity<AdapterSubscription>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                .HasColumnName("Id")
-                .ValueGeneratedOnAdd();
-            entity.Property(e => e.AdapterInstanceGuid)
-                .IsRequired();
-            entity.Property(e => e.InterfaceName)
-                .IsRequired()
-                .HasMaxLength(200);
-            entity.Property(e => e.AdapterName)
-                .IsRequired()
-                .HasMaxLength(100);
-            entity.Property(e => e.IsEnabled)
-                .IsRequired()
-                .HasDefaultValue(true);
-            entity.Property(e => e.datetime_created)
-                .HasDefaultValueSql("GETUTCDATE()")
-                .IsRequired();
-            entity.HasIndex(e => e.AdapterInstanceGuid).HasDatabaseName("IX_AdapterSubscriptions_AdapterInstanceGuid");
-            entity.HasIndex(e => e.InterfaceName).HasDatabaseName("IX_AdapterSubscriptions_InterfaceName");
-            entity.HasIndex(e => new { e.AdapterInstanceGuid, e.InterfaceName }).HasDatabaseName("IX_AdapterSubscriptions_AdapterInstanceGuid_InterfaceName");
-            entity.HasIndex(e => e.IsEnabled).HasDatabaseName("IX_AdapterSubscriptions_IsEnabled");
-        });
-
-        // Configure MessageProcessing (New: Tracks message processing status)
-        modelBuilder.Entity<MessageProcessing>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id)
-                .HasColumnName("Id")
-                .ValueGeneratedOnAdd();
-            entity.Property(e => e.MessageId)
-                .IsRequired();
-            entity.Property(e => e.AdapterInstanceGuid)
-                .IsRequired();
-            entity.Property(e => e.InterfaceName)
-                .IsRequired()
-                .HasMaxLength(200);
-            entity.Property(e => e.AdapterName)
-                .IsRequired()
-                .HasMaxLength(100);
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(50);
-            entity.Property(e => e.datetime_created)
-                .HasDefaultValueSql("GETUTCDATE()")
-                .IsRequired();
-            entity.HasIndex(e => e.MessageId).HasDatabaseName("IX_MessageProcessing_MessageId");
-            entity.HasIndex(e => e.AdapterInstanceGuid).HasDatabaseName("IX_MessageProcessing_AdapterInstanceGuid");
-            entity.HasIndex(e => new { e.MessageId, e.AdapterInstanceGuid }).HasDatabaseName("IX_MessageProcessing_MessageId_AdapterInstanceGuid");
-            entity.HasIndex(e => e.Status).HasDatabaseName("IX_MessageProcessing_Status");
-        });
+        // Messages and subscription tables removed - messaging is now handled via Azure Service Bus
+        // Configuration for MessageBoxMessage, MessageSubscription, AdapterSubscription, and MessageProcessing removed
 
         // Configure AdapterInstance
         modelBuilder.Entity<AdapterInstance>(entity =>
@@ -160,7 +69,7 @@ public class MessageBoxDbContext : DbContext
             entity.HasIndex(e => e.datetime_created).HasDatabaseName("IX_ProcessLogs_datetime_created");
             entity.HasIndex(e => e.Level).HasDatabaseName("IX_ProcessLogs_Level");
             entity.HasIndex(e => e.InterfaceName).HasDatabaseName("IX_ProcessLogs_InterfaceName");
-            entity.HasIndex(e => e.MessageId).HasDatabaseName("IX_ProcessLogs_MessageId");
+            // MessageId index removed - Messages table no longer exists
         });
 
         // Configure ProcessingStatistics

@@ -1,8 +1,8 @@
 -- MessageBox Database Update Script
--- This script adds missing columns to existing Messages table
--- Run this if the Messages table already exists but is missing required columns
+-- NOTE: Messages table has been removed - messaging is now handled via Azure Service Bus
+-- This script is deprecated - use drop-message-subscription-tables.sql to remove existing tables
 
-USE [MessageBox]
+USE [InterfaceConfigDb]
 GO
 
 -- Add AdapterInstanceGuid column if it doesn't exist
@@ -119,6 +119,6 @@ BEGIN
 END
 GO
 
-PRINT 'MessageBox database update completed successfully';
+PRINT 'InterfaceConfigDb database update completed successfully';
 GO
 

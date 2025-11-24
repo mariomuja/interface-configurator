@@ -399,6 +399,22 @@ export class TransportService {
     });
   }
 
+  updateSourceAdapterInstance(
+    interfaceName: string,
+    adapterInstanceGuid: string,
+    instanceName?: string,
+    isEnabled?: boolean,
+    configuration?: string
+  ): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/UpdateSourceAdapterInstance`, {
+      interfaceName,
+      adapterInstanceGuid,
+      instanceName,
+      isEnabled,
+      configuration
+    });
+  }
+
   updateSqlTransactionProperties(
     interfaceName: string,
     useTransaction?: boolean,

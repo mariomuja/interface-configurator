@@ -27,6 +27,7 @@ import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.compone
 import { DiagnoseDialogComponent, DiagnoseDialogData } from '../diagnose-dialog/diagnose-dialog.component';
 import { AddInterfaceDialogComponent, AddInterfaceDialogData } from '../add-interface-dialog/add-interface-dialog.component';
 import { ServiceBusMessageDialogComponent } from '../service-bus-message-dialog/service-bus-message-dialog.component';
+import { ContainerAppProgressDialogComponent, ContainerAppProgressData } from '../container-app-progress-dialog/container-app-progress-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { ErrorTrackingService } from '../../services/error-tracking.service';
@@ -64,7 +65,8 @@ import { switchMap } from 'rxjs/operators';
     DestinationInstancesDialogComponent,
     BlobContainerExplorerDialogComponent,
     DiagnoseDialogComponent,
-    AddInterfaceDialogComponent
+    AddInterfaceDialogComponent,
+    ContainerAppProgressDialogComponent
   ],
   templateUrl: './transport.component.html',
   styleUrl: './transport.component.css'
@@ -170,7 +172,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   logDisplayedColumns: string[] = ['timestamp', 'level', 'component', 'message', 'details'];
 
   // Feature flag for Destination Adapter UI
-  isDestinationAdapterUIEnabled: boolean = false;
+  isDestinationAdapterUIEnabled: boolean = true; // Enable by default for SQL Server testing
 
   constructor(
     private transportService: TransportService,
@@ -537,19 +539,33 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const names = ['Max Mustermann', 'Anna Schmidt', 'Peter Müller', 'Lisa Weber', 'Thomas Fischer', 'Julia Wagner', 'Michael Schulz', 'Laura Becker', 'Daniel Koch', 'Sophie Richter'];
     const cities = ['Berlin', 'München', 'Hamburg', 'Köln', 'Frankfurt', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dortmund', 'Essen'];
     const domains = ['example.com', 'test.org', 'mail.net', 'company.io'];
+    const departments = ['IT', 'HR', 'Sales', 'Marketing', 'Finance', 'Operations', 'R&D', 'Support', 'Legal', 'Admin'];
+    const countries = ['Deutschland', 'Österreich', 'Schweiz', 'Frankreich', 'Italien', 'Spanien', 'Niederlande', 'Belgien', 'Polen', 'Tschechien'];
+    const products = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E', 'Product F', 'Product G', 'Product H', 'Product I', 'Product J'];
+    const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'Cancelled', 'Processing', 'Approved', 'Rejected', 'Draft', 'Published'];
 
-    // Generate ~100 rows with proper formatting
+    // Generate 100 rows with 10 columns
     for (let i = 1; i <= 100; i++) {
       const name = names[Math.floor(Math.random() * names.length)];
       const city = cities[Math.floor(Math.random() * cities.length)];
       const domain = domains[Math.floor(Math.random() * domains.length)];
+      const department = departments[Math.floor(Math.random() * departments.length)];
+      const country = countries[Math.floor(Math.random() * countries.length)];
+      const product = products[Math.floor(Math.random() * products.length)];
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      
       data.push({
         id: i,
         name: `${name} ${i}`,
         email: `user${i}@${domain}`,
         age: Math.floor(Math.random() * 40) + 20,
         city: city,
-        salary: Math.floor(Math.random() * 50000) + 30000
+        salary: Math.floor(Math.random() * 50000) + 30000,
+        department: department,
+        country: country,
+        product: product,
+        status: status,
+        registrationDate: new Date(2020 + Math.floor(Math.random() * 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString().split('T')[0]
       } as CsvRecord);
     }
     
@@ -3936,7 +3952,38 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (index >= 0) {
           this.destinationAdapterInstances[index] = createdInstance;
         }
-        this.snackBar.open(`Destination adapter "${instanceName}" added successfully`, 'OK', { duration: 3000 });
+        
+        // Show container app creation progress dialog if container app is being created
+        if (createdInstance.containerAppStatus && createdInstance.containerAppStatus !== 'NotCreated') {
+          const progressData: ContainerAppProgressData = {
+            adapterInstanceGuid: createdInstance.adapterInstanceGuid || adapterInstanceGuid,
+            adapterName: adapterName,
+            adapterType: 'Destination',
+            interfaceName: this.currentInterfaceName || this.DEFAULT_INTERFACE_NAME,
+            instanceName: instanceName
+          };
+          
+          const progressDialogRef = this.dialog.open(ContainerAppProgressDialogComponent, {
+            width: '600px',
+            disableClose: true,
+            data: progressData
+          });
+          
+          progressDialogRef.afterClosed().subscribe(result => {
+            if (result?.success) {
+              this.snackBar.open(`Container App für "${instanceName}" erfolgreich erstellt`, 'OK', { duration: 5000 });
+              // Verify container app status and settings
+              this.verifyContainerAppSettings(createdInstance.adapterInstanceGuid || adapterInstanceGuid, createdInstance);
+            } else if (result?.success === false) {
+              this.snackBar.open(`Container App Erstellung für "${instanceName}" fehlgeschlagen`, 'OK', { 
+                duration: 10000,
+                panelClass: ['error-snackbar']
+              });
+            }
+          });
+        } else {
+          this.snackBar.open(`Destination adapter "${instanceName}" added successfully`, 'OK', { duration: 3000 });
+        }
       },
       error: (error) => {
         console.error('Error adding destination adapter:', error);
@@ -3945,6 +3992,35 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           duration: 5000,
           panelClass: ['warning-snackbar']
         });
+      }
+    });
+  }
+
+  private verifyContainerAppSettings(adapterInstanceGuid: string, instance: any): void {
+    // Check container app status
+    this.transportService.getContainerAppStatus(adapterInstanceGuid).subscribe({
+      next: (status) => {
+        if (status.exists && status.status === 'Running') {
+          this.snackBar.open(`Container App Status: ${status.status} - Adapter ist einsatzbereit`, 'OK', { duration: 5000 });
+          
+          // Verify settings were forwarded to container app
+          // This would require checking the adapter-config.json in blob storage
+          // For now, we'll just log that verification should be done
+          console.log('Container App Settings Verification:', {
+            adapterInstanceGuid,
+            containerAppName: instance.containerAppName,
+            status: status.status,
+            message: 'Settings verification should check adapter-config.json in blob storage'
+          });
+        } else {
+          this.snackBar.open(`Container App Status: ${status.status || 'Unknown'}`, 'OK', { 
+            duration: 5000,
+            panelClass: ['warning-snackbar']
+          });
+        }
+      },
+      error: (error) => {
+        console.error('Error verifying container app status:', error);
       }
     });
   }
@@ -4335,10 +4411,48 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       properties.isEnabled !== undefined ? properties.isEnabled : instance.isEnabled,
       JSON.stringify(configuration)
     ).subscribe({
-      next: () => {
+      next: (response: any) => {
         // Reload from API to ensure consistency
         this.loadDestinationAdapterInstances();
-        this.snackBar.open('Destination adapter instance updated', 'OK', { duration: 3000 });
+        
+        // Show container app status feedback
+        if (response.containerAppStatus) {
+          const status = response.containerAppStatus;
+          const containerAppName = response.containerAppName || 'Container App';
+          
+          if (status === 'Updated') {
+            this.snackBar.open(
+              `✅ Destination adapter instance updated. Container app "${containerAppName}" configuration synced successfully.`,
+              'OK',
+              { duration: 5000, panelClass: ['success-snackbar'] }
+            );
+          } else if (status === 'Created') {
+            this.snackBar.open(
+              `✅ Destination adapter instance updated. Container app "${containerAppName}" created successfully.`,
+              'OK',
+              { duration: 5000, panelClass: ['success-snackbar'] }
+            );
+          } else if (status === 'Error' || status === 'CreateError') {
+            const errorMsg = response.containerAppError || 'Unknown error';
+            this.snackBar.open(
+              `⚠️ Adapter updated but container app sync failed: ${errorMsg}`,
+              'OK',
+              { duration: 10000, panelClass: ['warning-snackbar'] }
+            );
+            console.error('Container app sync error:', errorMsg);
+          } else if (status === 'Skipped' || status === 'NotCreated') {
+            const reason = response.containerAppError || 'Container app not found or not created';
+            this.snackBar.open(
+              `ℹ️ Adapter updated. Container app: ${reason}`,
+              'OK',
+              { duration: 5000, panelClass: ['info-snackbar'] }
+            );
+          } else {
+            this.snackBar.open('Destination adapter instance updated', 'OK', { duration: 3000 });
+          }
+        } else {
+          this.snackBar.open('Destination adapter instance updated', 'OK', { duration: 3000 });
+        }
       },
       error: (error) => {
         console.error('Error updating destination adapter instance:', error);
@@ -4378,8 +4492,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  // Use a seldom-used UTF-8 character as field separator: ║ (Box Drawing Double Vertical Line, U+2551)
-  private readonly FIELD_SEPARATOR = '║';
+  // Use a seldom-used UTF-8 character as field separator: ‖ (Double Vertical Line, U+2016)
+  private readonly FIELD_SEPARATOR = '‖';
 
   /**
    * Format CSV data as text (for display in Courier New)

@@ -12,11 +12,11 @@ namespace InterfaceConfigurator.Main.Services;
 /// </summary>
 public class AdapterSubscriptionService : IAdapterSubscriptionService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<AdapterSubscriptionService>? _logger;
 
     public AdapterSubscriptionService(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<AdapterSubscriptionService>? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

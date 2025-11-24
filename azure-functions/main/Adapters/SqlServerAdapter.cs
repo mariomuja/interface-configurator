@@ -57,6 +57,7 @@ public class SqlServerAdapter : AdapterBase
         ApplicationDbContext? context,
         IDynamicTableService dynamicTableService,
         IDataService dataService,
+        IServiceBusService? serviceBusService = null,
         IMessageBoxService? messageBoxService = null,
         IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
@@ -79,6 +80,7 @@ public class SqlServerAdapter : AdapterBase
         JQTransformationService? jqService = null,
         string? jqScriptFile = null)
         : base(
+            serviceBusService: serviceBusService,
             messageBoxService: messageBoxService,
             subscriptionService: subscriptionService,
             interfaceName: interfaceName ?? "FromCsvToSqlServerExample",

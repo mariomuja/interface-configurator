@@ -98,6 +98,15 @@ public class InterfaceConfiguration
     public int? CsvPollingInterval { get; set; }
 
     [Obsolete("Use Sources dictionary instead")]
+    public int? CsvSkipHeaderLines { get; set; }
+
+    [Obsolete("Use Sources dictionary instead")]
+    public int? CsvSkipFooterLines { get; set; }
+
+    [Obsolete("Use Sources dictionary instead")]
+    public string? CsvQuoteCharacter { get; set; }
+
+    [Obsolete("Use Sources dictionary instead")]
     public string? SftpHost { get; set; }
 
     [Obsolete("Use Sources dictionary instead")]

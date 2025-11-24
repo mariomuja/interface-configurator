@@ -9,14 +9,14 @@ namespace InterfaceConfigurator.Main.Services;
 
 /// <summary>
 /// Service for user authentication and authorization
-/// Now uses MessageBoxDbContext (moved from ApplicationDbContext)
+/// Now uses InterfaceConfigDbContext (moved from ApplicationDbContext, formerly MessageBoxDbContext)
 /// </summary>
 public class AuthService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<AuthService> _logger;
 
-    public AuthService(MessageBoxDbContext context, ILogger<AuthService> logger)
+    public AuthService(InterfaceConfigDbContext context, ILogger<AuthService> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

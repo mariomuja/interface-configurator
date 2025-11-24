@@ -135,9 +135,9 @@ resource "azurerm_mssql_database" "main" {
   }
 }
 
-# MessageBox Database - Staging area for all data
-resource "azurerm_mssql_database" "messagebox" {
-  name           = "MessageBox"
+# InterfaceConfigDb Database (formerly MessageBox) - Stores interface configurations, adapter instances, and process logs
+resource "azurerm_mssql_database" "interfaceconfig" {
+  name           = "InterfaceConfigDb"
   server_id      = azurerm_mssql_server.main.id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
   license_type   = var.sql_license_type
@@ -147,7 +147,7 @@ resource "azurerm_mssql_database" "messagebox" {
 
   tags = {
     Environment = var.environment
-    Purpose     = "MessageBox"
+    Purpose     = "InterfaceConfigDb"
   }
 }
 
@@ -285,11 +285,12 @@ resource "azurerm_linux_function_app" "main" {
 
 # Container App Environment for adapter instances
 # Each adapter instance runs in its own isolated container app
+# Log Analytics is disabled - using Azure's built-in logging instead
 resource "azurerm_container_app_environment" "adapter_instances" {
   name                       = "cae-adapter-instances"
   resource_group_name        = azurerm_resource_group.main.name
   location                   = azurerm_resource_group.main.location
-  log_analytics_workspace_id = null  # Can be configured if Log Analytics is needed
+  # log_analytics_workspace_id omitted - using Azure's default logging
 
   tags = {
     Environment = var.environment

@@ -34,33 +34,55 @@ public class CsvProcessingService : ICsvProcessingService
         return records;
     }
 
-    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersAsync(string csvContent, string? fieldSeparator = null, CancellationToken cancellationToken = default)
+    public async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersAsync(string csvContent, string? fieldSeparator = null, int skipHeaderLines = 0, int skipFooterLines = 0, char quoteCharacter = '"', CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(csvContent))
             return (new List<string>(), new List<Dictionary<string, string>>());
 
         var separator = !string.IsNullOrWhiteSpace(fieldSeparator) ? fieldSeparator : await GetFieldSeparatorAsync(cancellationToken);
 
+        // Remove header and footer lines if specified
+        if (skipHeaderLines > 0 || skipFooterLines > 0)
+        {
+            var lines = csvContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
+            var totalLines = lines.Count;
+            
+            // Remove footer lines first (from end)
+            if (skipFooterLines > 0 && totalLines > skipFooterLines)
+            {
+                lines.RemoveRange(totalLines - skipFooterLines, skipFooterLines);
+            }
+            
+            // Remove header lines (from beginning)
+            if (skipHeaderLines > 0 && lines.Count > skipHeaderLines)
+            {
+                lines.RemoveRange(0, skipHeaderLines);
+            }
+            
+            csvContent = string.Join("\n", lines);
+        }
+
         // Use streaming parsing for large files to reduce memory usage
         // For small files (< 1MB), use in-memory parsing for better performance
         if (csvContent.Length > 1024 * 1024) // 1MB threshold
         {
-            return await ParseCsvWithHeadersStreamingAsync(csvContent, separator, cancellationToken);
+            return await ParseCsvWithHeadersStreamingAsync(csvContent, separator, quoteCharacter, cancellationToken);
         }
         else
         {
-            return ParseCsvWithHeadersInMemory(csvContent, separator);
+            return ParseCsvWithHeadersInMemory(csvContent, separator, quoteCharacter);
         }
     }
 
     /// <summary>
     /// Parse CSV with streaming to reduce memory usage for large files
+    /// Invalid rows are skipped (not added to records) but processing continues
     /// </summary>
-    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersStreamingAsync(string csvContent, string separator, CancellationToken cancellationToken)
+    private async Task<(List<string> headers, List<Dictionary<string, string>> records)> ParseCsvWithHeadersStreamingAsync(string csvContent, string separator, char quoteCharacter, CancellationToken cancellationToken)
     {
         var headers = new List<string>();
         var records = new List<Dictionary<string, string>>();
-        var invalidRows = new List<(int lineNumber, int actualColumnCount)>();
+        var invalidRows = new List<(int lineNumber, int actualColumnCount, string? lineContent)>();
         
         using var reader = new StringReader(csvContent);
         
@@ -69,8 +91,8 @@ public class CsvProcessingService : ICsvProcessingService
         if (string.IsNullOrWhiteSpace(headerLine))
             return (new List<string>(), new List<Dictionary<string, string>>());
 
-        headers = ParseCsvLine(headerLine, separator)
-            .Select(h => h.Trim().Trim('"'))
+        headers = ParseCsvLine(headerLine, separator, quoteCharacter)
+            .Select(h => h.Trim().Trim(quoteCharacter))
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .ToList();
 
@@ -93,15 +115,19 @@ public class CsvProcessingService : ICsvProcessingService
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
-            var values = ParseCsvLine(line, separator)
-                .Select(v => v.Trim().Trim('"'))
+            var values = ParseCsvLine(line, separator, quoteCharacter)
+                .Select(v => v.Trim().Trim(quoteCharacter))
                 .ToArray();
 
             var actualColumnCount = values.Length;
             
             if (actualColumnCount != expectedColumnCount)
             {
-                invalidRows.Add((lineNumber, actualColumnCount));
+                // Skip invalid rows but continue processing - log for user awareness
+                var linePreview = line.Length > 100 ? line.Substring(0, 100) + "..." : line;
+                invalidRows.Add((lineNumber, actualColumnCount, linePreview));
+                _logger?.LogWarning("Skipping invalid CSV row at line {LineNumber}: Expected {ExpectedColumns} columns, found {ActualColumns} columns. Line preview: {LinePreview}",
+                    lineNumber, expectedColumnCount, actualColumnCount, linePreview);
                 lineNumber++;
                 continue; // Skip invalid rows but continue processing
             }
@@ -127,13 +153,15 @@ public class CsvProcessingService : ICsvProcessingService
             records.AddRange(chunk);
         }
 
-        // Throw exception if any rows have inconsistent column counts
+        // Log summary of skipped rows (but don't throw exception - processing continues)
         if (invalidRows.Any())
         {
-            var errorDetails = string.Join(", ", invalidRows.Take(10).Select(r => $"Line {r.lineNumber} has {r.actualColumnCount} columns"));
-            var errorMessage = $"CSV file has inconsistent column counts. Expected {expectedColumnCount} columns (based on header row), but found rows with different counts: {errorDetails}" +
-                (invalidRows.Count > 10 ? $" (and {invalidRows.Count - 10} more)" : "");
-            throw new InvalidDataException(errorMessage);
+            var skippedCount = invalidRows.Count;
+            var errorDetails = string.Join(", ", invalidRows.Take(10).Select(r => $"Line {r.lineNumber} ({r.actualColumnCount} columns)"));
+            var summaryMessage = $"CSV processing completed: {records.Count} valid rows processed, {skippedCount} invalid rows skipped. " +
+                $"Expected {expectedColumnCount} columns. Skipped rows: {errorDetails}" +
+                (skippedCount > 10 ? $" (and {skippedCount - 10} more)" : "");
+            _logger?.LogWarning(summaryMessage);
         }
 
         return (headers, records);
@@ -142,7 +170,7 @@ public class CsvProcessingService : ICsvProcessingService
     /// <summary>
     /// Parse CSV in memory for small files (faster for small files)
     /// </summary>
-    private (List<string> headers, List<Dictionary<string, string>> records) ParseCsvWithHeadersInMemory(string csvContent, string separator)
+    private (List<string> headers, List<Dictionary<string, string>> records) ParseCsvWithHeadersInMemory(string csvContent, string separator, char quoteCharacter)
     {
         var lines = csvContent
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -153,8 +181,8 @@ public class CsvProcessingService : ICsvProcessingService
             return (new List<string>(), new List<Dictionary<string, string>>());
 
         // First line is headers - extract them using configured separator
-        var headers = ParseCsvLine(lines[0], separator)
-            .Select(h => h.Trim().Trim('"'))
+        var headers = ParseCsvLine(lines[0], separator, quoteCharacter)
+            .Select(h => h.Trim().Trim(quoteCharacter))
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .ToList();
 
@@ -164,43 +192,48 @@ public class CsvProcessingService : ICsvProcessingService
             throw new InvalidOperationException("CSV file has no valid headers. Cannot determine expected column count.");
         }
 
-        // Validate column count consistency across all data rows
-        var invalidRows = new List<(int lineNumber, int actualColumnCount)>();
+        // Process data rows - skip invalid rows but continue processing
+        var invalidRows = new List<(int lineNumber, int actualColumnCount, string? lineContent)>();
+        var records = new List<Dictionary<string, string>>();
         
         for (int i = 1; i < lines.Count; i++)
         {
             var line = lines[i];
-            var values = ParseCsvLine(line, separator);
+            var values = ParseCsvLine(line, separator, quoteCharacter);
             var actualColumnCount = values.Count;
             
             if (actualColumnCount != expectedColumnCount)
             {
-                invalidRows.Add((i + 1, actualColumnCount)); // Line number is 1-based for user-friendly error messages
+                // Skip invalid rows but continue processing - log for user awareness
+                var linePreview = line.Length > 100 ? line.Substring(0, 100) + "..." : line;
+                invalidRows.Add((i + 1, actualColumnCount, linePreview)); // Line number is 1-based for user-friendly error messages
+                _logger?.LogWarning("Skipping invalid CSV row at line {LineNumber}: Expected {ExpectedColumns} columns, found {ActualColumns} columns. Line preview: {LinePreview}",
+                    i + 1, expectedColumnCount, actualColumnCount, linePreview);
+                continue; // Skip invalid rows but continue processing
             }
+
+            // Process valid row
+            var trimmedValues = values
+                .Select(v => v.Trim().Trim(quoteCharacter))
+                .ToArray();
+
+            var record = headers
+                .Select((header, index) => new { header, value = trimmedValues.Length > index ? trimmedValues[index] : string.Empty })
+                .ToDictionary(x => x.header, x => x.value);
+
+            records.Add(record);
         }
 
-        // Throw exception if any rows have inconsistent column counts
+        // Log summary of skipped rows (but don't throw exception - processing continues)
         if (invalidRows.Any())
         {
-            var errorDetails = string.Join(", ", invalidRows.Select(r => $"Line {r.lineNumber} has {r.actualColumnCount} columns"));
-            var errorMessage = $"CSV file has inconsistent column counts. Expected {expectedColumnCount} columns (based on header row), but found rows with different counts: {errorDetails}";
-            throw new InvalidDataException(errorMessage);
+            var skippedCount = invalidRows.Count;
+            var errorDetails = string.Join(", ", invalidRows.Take(10).Select(r => $"Line {r.lineNumber} ({r.actualColumnCount} columns)"));
+            var summaryMessage = $"CSV processing completed: {records.Count} valid rows processed, {skippedCount} invalid rows skipped. " +
+                $"Expected {expectedColumnCount} columns. Skipped rows: {errorDetails}" +
+                (skippedCount > 10 ? $" (and {skippedCount - 10} more)" : "");
+            _logger?.LogWarning(summaryMessage);
         }
-
-        // Remaining lines are data rows - skip first line (header)
-        var records = lines
-            .Skip(1)
-            .Select(line =>
-            {
-                var values = ParseCsvLine(line, separator)
-                    .Select(v => v.Trim().Trim('"'))
-                    .ToArray();
-
-                return headers
-                    .Select((header, index) => new { header, value = values.Length > index ? values[index] : string.Empty })
-                    .ToDictionary(x => x.header, x => x.value);
-            })
-            .ToList();
 
         return (headers, records);
     }
@@ -214,7 +247,7 @@ public class CsvProcessingService : ICsvProcessingService
     /// <summary>
     /// Parse a CSV line handling quoted values and custom field separator
     /// </summary>
-    private List<string> ParseCsvLine(string line, string separator)
+    private List<string> ParseCsvLine(string line, string separator, char quoteChar = '"')
     {
         var values = new List<string>();
         var current = new System.Text.StringBuilder();
@@ -225,12 +258,12 @@ public class CsvProcessingService : ICsvProcessingService
             var ch = line[i];
             var nextCh = i + 1 < line.Length ? line[i + 1] : '\0';
 
-            if (ch == '"')
+            if (ch == quoteChar)
             {
-                if (inQuotes && nextCh == '"')
+                if (inQuotes && nextCh == quoteChar)
                 {
-                    // Escaped quote
-                    current.Append('"');
+                    // Escaped quote (double quote)
+                    current.Append(quoteChar);
                     i++; // Skip next quote
                 }
                 else

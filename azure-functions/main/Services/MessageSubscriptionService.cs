@@ -11,11 +11,11 @@ namespace InterfaceConfigurator.Main.Services;
 /// </summary>
 public class MessageSubscriptionService : IMessageSubscriptionService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<MessageSubscriptionService>? _logger;
 
     public MessageSubscriptionService(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<MessageSubscriptionService>? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

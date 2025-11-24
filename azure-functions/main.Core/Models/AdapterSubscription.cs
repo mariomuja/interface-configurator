@@ -5,8 +5,8 @@ namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Defines subscription filters for destination adapters (BizTalk-style)
-/// A subscription specifies which messages from the MessageBox an adapter is interested in receiving
-/// This is a configuration that defines filter criteria, not a tracking record
+/// DEPRECATED: Subscriptions are now managed via Azure Service Bus
+/// This model is kept for backward compatibility only
 /// </summary>
 [Table("AdapterSubscriptions")]
 public class AdapterSubscription
@@ -50,9 +50,4 @@ public class AdapterSubscription
     [Column("datetime_updated", TypeName = "datetime2")]
     public DateTime? datetime_updated { get; set; }
 }
-
-
-
-
-
 

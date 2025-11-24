@@ -12,7 +12,7 @@ namespace InterfaceConfigurator.Main.Services;
 /// </summary>
 public class SqlServerLoggingServiceV2 : ILoggingService
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<SqlServerLoggingServiceV2>? _logger;
     private readonly System.Collections.Concurrent.ConcurrentQueue<ProcessLog> _logQueue;
     private readonly System.Threading.Timer? _flushTimer;
@@ -20,7 +20,7 @@ public class SqlServerLoggingServiceV2 : ILoggingService
     private const int FLUSH_INTERVAL_MS = 5000; // 5 seconds
 
     public SqlServerLoggingServiceV2(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         ILogger<SqlServerLoggingServiceV2>? logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

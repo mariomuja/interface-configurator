@@ -358,6 +358,9 @@ public class FileAdapter : AdapterBase
         ICsvProcessingService csvProcessingService,
         string fieldSeparator,
         string source,
+        int skipHeaderLines = 0,
+        int skipFooterLines = 0,
+        char quoteCharacter = '"',
         CancellationToken cancellationToken = default)
     {
         var (containerName, blobPath) = ParseBlobPath(source);
@@ -381,7 +384,16 @@ public class FileAdapter : AdapterBase
                     var fullPath = $"{containerName}/{filePath}";
                     var content = await ReadFileAsync(fullPath, cancellationToken);
 
-                    var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, cancellationToken);
+                    // Auto-detect delimiter from file content if FILE adapter type
+                    var detectedSeparator = fieldSeparator;
+                    if (string.IsNullOrWhiteSpace(fieldSeparator) || fieldSeparator == "‖")
+                    {
+                        var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                        detectedSeparator = validationService.DetectDelimiter(content, fieldSeparator);
+                        _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath}", detectedSeparator, filePath);
+                    }
+
+                    var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, detectedSeparator, skipHeaderLines, skipFooterLines, quoteCharacter, cancellationToken);
 
                     _logger?.LogInformation("Successfully parsed CSV from file {FilePath}: {HeaderCount} headers, {RecordCount} records",
                         filePath, headers.Count, records.Count);
@@ -409,7 +421,17 @@ public class FileAdapter : AdapterBase
         {
             // Process single file
             var content = await ReadFileAsync(source, cancellationToken);
-            var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, fieldSeparator, cancellationToken);
+            
+            // Auto-detect delimiter from file content if FILE adapter type
+            var detectedSeparator = fieldSeparator;
+            if (string.IsNullOrWhiteSpace(fieldSeparator) || fieldSeparator == "‖")
+            {
+                var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                detectedSeparator = validationService.DetectDelimiter(content, fieldSeparator);
+                _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source}", detectedSeparator, source);
+            }
+            
+            var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(content, detectedSeparator, skipHeaderLines, skipFooterLines, quoteCharacter, cancellationToken);
 
             _logger?.LogInformation("Successfully parsed CSV from {Source}: {HeaderCount} headers, {RecordCount} records",
                 source, headers.Count, records.Count);

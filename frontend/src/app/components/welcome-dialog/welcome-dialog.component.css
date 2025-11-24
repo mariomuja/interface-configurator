@@ -97,7 +97,8 @@
   color: #4caf50;
 }
 
-.messagebox-box {
+.messagebox-box,
+.servicebus-box {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   min-width: 120px;
@@ -106,9 +107,109 @@
   flex-shrink: 0;
 }
 
-.messagebox-box .box-header {
+.messagebox-box .box-header,
+.servicebus-box .box-header {
   color: white;
   border-bottom-color: rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.servicebus-box {
+  min-width: 140px;
+  max-width: 180px;
+}
+
+.box-header .subtitle {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.container-app-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  background: rgba(63, 81, 181, 0.1);
+  border-radius: 3px;
+  font-size: 9px;
+  margin-bottom: 4px;
+  color: #3f51b5;
+}
+
+.container-app-info .info-icon {
+  font-size: 12px;
+  width: 12px;
+  height: 12px;
+}
+
+.adapter-badge {
+  font-size: 8px;
+  background: rgba(63, 81, 181, 0.2);
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-family: monospace;
+  margin-left: auto;
+}
+
+.benefits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.benefit-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  padding: 2px 4px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 3px;
+  color: #4caf50;
+}
+
+.benefit-badge mat-icon {
+  font-size: 10px;
+  width: 10px;
+  height: 10px;
+}
+
+.servicebus-structure {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.servicebus-topic,
+.servicebus-subscriptions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  padding: 2px;
+}
+
+.servicebus-topic mat-icon,
+.servicebus-subscriptions mat-icon {
+  font-size: 12px;
+  width: 12px;
+  height: 12px;
+}
+
+.servicebus-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
 .destination-box .box-header {
@@ -318,7 +419,8 @@
     padding: 6px;
   }
 
-  .messagebox-box {
+  .messagebox-box,
+  .servicebus-box {
     min-width: 110px;
   }
 

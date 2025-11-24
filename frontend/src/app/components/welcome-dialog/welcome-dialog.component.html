@@ -11,7 +11,8 @@
         Interface Configurator is a <strong>configuration-based integration platform</strong> that allows you to 
         create data interfaces through a simple administration interface. Instead of writing custom code for each 
         integration, you configure source and destination adapters that independently transport data with 
-        <strong>guaranteed delivery</strong> through a message box.
+        <strong>guaranteed delivery</strong> through <strong>Azure Service Bus</strong>. Each adapter instance runs 
+        in its own <strong>Container App</strong>, created dynamically without deployment.
       </p>
     </div>
 
@@ -19,51 +20,105 @@
       <h2>Architecture & Data Flow</h2>
       <div class="diagram-container">
         <div class="data-flow-diagram">
-          <!-- Source Adapters -->
+          <!-- Source Adapter Instances (Container Apps) -->
           <div class="flow-box source-box">
-            <div class="box-header">Source Adapters</div>
+            <div class="box-header">
+              <mat-icon>cloud</mat-icon>
+              Source Adapter Instances
+              <span class="subtitle">(Container Apps)</span>
+            </div>
             <div class="box-content">
+              <div class="container-app-info">
+                <mat-icon class="info-icon">info</mat-icon>
+                <span class="info-text">Dynamically created on configuration</span>
+              </div>
               <div class="adapter-item">
                 <mat-icon>description</mat-icon>
-                <span>CSV</span>
+                <span>CSV Container App</span>
+                <span class="adapter-badge">ca-{guid}</span>
               </div>
               <div class="adapter-item">
                 <mat-icon>storage</mat-icon>
-                <span>SQL Server</span>
+                <span>SQL Server Container App</span>
+                <span class="adapter-badge">ca-{guid}</span>
               </div>
               <div class="adapter-item">
                 <mat-icon>cloud_upload</mat-icon>
-                <span>SFTP</span>
+                <span>SFTP Container App</span>
+                <span class="adapter-badge">ca-{guid}</span>
+              </div>
+              <div class="benefits-list">
+                <div class="benefit-badge">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>No Logic Apps needed</span>
+                </div>
+                <div class="benefit-badge">
+                  <mat-icon>security</mat-icon>
+                  <span>Clean separation</span>
+                </div>
+                <div class="benefit-badge">
+                  <mat-icon>block</mat-icon>
+                  <span>Fault isolation</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Arrow to MessageBox -->
+          <!-- Arrow to Service Bus -->
           <div class="arrow-container">
             <div class="arrow-symbol">→</div>
-            <div class="arrow-label">Debatch & Write</div>
+            <div class="arrow-label">Debatch & Publish</div>
           </div>
 
-          <!-- MessageBox -->
-          <div class="flow-box messagebox-box">
-            <div class="box-header">Message Box</div>
+          <!-- Azure Service Bus -->
+          <div class="flow-box servicebus-box">
+            <div class="box-header">
+              <mat-icon>hub</mat-icon>
+              Azure Service Bus
+            </div>
             <div class="box-content">
-              <div class="messagebox-features">
+              <div class="servicebus-structure">
+                <div class="servicebus-topic">
+                  <mat-icon>topic</mat-icon>
+                  <span>Topics: {InterfaceName}</span>
+                </div>
+                <div class="servicebus-subscriptions">
+                  <mat-icon>subscriptions</mat-icon>
+                  <span>Subscriptions: {DestinationAdapterGuid}</span>
+                </div>
+              </div>
+              <div class="servicebus-features">
                 <div class="feature-item">
                   <mat-icon>check_circle</mat-icon>
                   <span>Guaranteed Delivery</span>
                 </div>
                 <div class="feature-item">
                   <mat-icon>sync</mat-icon>
-                  <span>Retry Logic</span>
+                  <span>At-Least-Once Delivery</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>error</mat-icon>
+                  <span>Dead-Letter Queue</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>filter_list</mat-icon>
+                  <span>Message Filtering</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>trending_up</mat-icon>
+                  <span>Auto-Scaling</span>
                 </div>
                 <div class="feature-item">
                   <mat-icon>history</mat-icon>
-                  <span>Message History</span>
+                  <span>Message Ordering</span>
                 </div>
                 <div class="feature-item">
-                  <mat-icon>track_changes</mat-icon>
-                  <span>Status Tracking</span>
+                  <mat-icon>multiple_stop</mat-icon>
+                  <span>Multiple Subscriptions</span>
+                </div>
+                <div class="feature-item">
+                  <mat-icon>save</mat-icon>
+                  <span>Message Durability</span>
                 </div>
               </div>
             </div>
@@ -72,20 +127,48 @@
           <!-- Arrow to Destinations -->
           <div class="arrow-container">
             <div class="arrow-symbol">→</div>
-            <div class="arrow-label">Read & Process</div>
+            <div class="arrow-label">Subscribe & Process</div>
           </div>
 
-          <!-- Destination Adapters -->
+          <!-- Destination Adapter Instances (Container Apps) -->
           <div class="flow-box destination-box">
-            <div class="box-header">Destination Adapters</div>
+            <div class="box-header">
+              <mat-icon>cloud</mat-icon>
+              Destination Adapter Instances
+              <span class="subtitle">(Container Apps)</span>
+            </div>
             <div class="box-content">
-              <div class="adapter-item">
-                <mat-icon>description</mat-icon>
-                <span>CSV</span>
+              <div class="container-app-info">
+                <mat-icon class="info-icon">info</mat-icon>
+                <span class="info-text">Dynamically created on configuration</span>
               </div>
               <div class="adapter-item">
                 <mat-icon>storage</mat-icon>
-                <span>SQL Server</span>
+                <span>SQL Server Container App</span>
+                <span class="adapter-badge">ca-{guid}</span>
+              </div>
+              <div class="adapter-item">
+                <mat-icon>description</mat-icon>
+                <span>CSV Container App</span>
+                <span class="adapter-badge">ca-{guid}</span>
+              </div>
+              <div class="benefits-list">
+                <div class="benefit-badge">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>No Logic Apps needed</span>
+                </div>
+                <div class="benefit-badge">
+                  <mat-icon>security</mat-icon>
+                  <span>Clean separation</span>
+                </div>
+                <div class="benefit-badge">
+                  <mat-icon>block</mat-icon>
+                  <span>Fault isolation</span>
+                </div>
+                <div class="benefit-badge">
+                  <mat-icon>speed</mat-icon>
+                  <span>Performance isolation</span>
+                </div>
               </div>
             </div>
           </div>
@@ -109,7 +192,17 @@
         <div class="feature-card">
           <mat-icon class="feature-icon">verified</mat-icon>
           <h3>Guaranteed Delivery</h3>
-          <p>Message Box ensures reliable data transport with retry logic</p>
+          <p>Azure Service Bus ensures reliable data transport with retry logic and dead-letter queues</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">cloud</mat-icon>
+          <h3>Dynamic Container Apps</h3>
+          <p>Each adapter instance runs in its own Container App, created automatically without deployment</p>
+        </div>
+        <div class="feature-card">
+          <mat-icon class="feature-icon">security</mat-icon>
+          <h3>Process Isolation</h3>
+          <p>Send and receive processes are cleanly separated - errors and performance issues don't affect other adapters</p>
         </div>
         <div class="feature-card">
           <mat-icon class="feature-icon">scatter_plot</mat-icon>

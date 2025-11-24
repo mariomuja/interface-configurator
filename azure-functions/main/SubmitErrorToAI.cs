@@ -15,11 +15,11 @@ namespace InterfaceConfigurator.Main;
 public class SubmitErrorToAIFunction
 {
     private readonly ILogger<SubmitErrorToAIFunction> _logger;
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
 
     public SubmitErrorToAIFunction(
         ILogger<SubmitErrorToAIFunction> logger,
-        MessageBoxDbContext context)
+        InterfaceConfigDbContext context)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _context = context ?? throw new ArgumentNullException(nameof(context));

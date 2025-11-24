@@ -56,6 +56,11 @@ public interface IContainerAppService
     Task<bool> ContainerAppExistsAsync(
         Guid adapterInstanceGuid,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get container app name for an adapter instance GUID
+    /// </summary>
+    string GetContainerAppName(Guid adapterInstanceGuid);
 }
 
 /// <summary>

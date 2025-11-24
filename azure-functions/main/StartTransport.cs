@@ -181,7 +181,7 @@ public class StartTransport
 
     private string GenerateSampleCsvData()
     {
-        var fieldSeparator = Environment.GetEnvironmentVariable("CsvFieldSeparator") ?? "║";
+        var fieldSeparator = Environment.GetEnvironmentVariable("CsvFieldSeparator") ?? "‖"; // Default: Double Vertical Line (U+2016)
         var headers = new[] { "id", "name", "email", "age", "city", "salary" };
         var rows = new List<string> { string.Join(fieldSeparator, headers) };
 

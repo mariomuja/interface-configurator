@@ -87,15 +87,8 @@ if ($actionGroup -and $actionGroup -like "*Smart Detection*") {
     Write-Host "   Not found (already deleted)" -ForegroundColor Green
 }
 
-# 7. Log Analytics Workspace
-Write-Host "`n7. Checking Log Analytics Workspace..." -ForegroundColor Yellow
-$logAnalytics = az monitor log-analytics workspace show --resource-group $ResourceGroup --workspace-name "DefaultWorkspace-f1e8e2a3-2bf1-43f0-8f19-37abd624205c-CUS" --query "name" -o tsv 2>&1
-if ($logAnalytics) {
-    Write-Host "   Found: DefaultWorkspace-f1e8e2a3-2bf1-43f0-8f19-37abd624205c-CUS" -ForegroundColor Red
-    $resourcesToDelete += @{Type="LogAnalyticsWorkspace"; Name="DefaultWorkspace-f1e8e2a3-2bf1-43f0-8f19-37abd624205c-CUS"}
-} else {
-    Write-Host "   Not found (already deleted)" -ForegroundColor Green
-}
+# 7. Log Analytics Workspace - Removed (not needed)
+# Log Analytics workspace is no longer used - container apps use Azure's built-in logging
 
 # 8. Network Watcher
 Write-Host "`n8. Checking Network Watcher..." -ForegroundColor Yellow
@@ -151,9 +144,6 @@ foreach ($resource in $resourcesToDelete) {
             }
             "ActionGroup" {
                 az monitor action-group delete --resource-group $ResourceGroup --name $resource.Name --yes --output none 2>&1 | Out-Null
-            }
-            "LogAnalyticsWorkspace" {
-                az monitor log-analytics workspace delete --resource-group $ResourceGroup --workspace-name $resource.Name --yes --output none 2>&1 | Out-Null
             }
             "NetworkWatcher" {
                 az network watcher delete --resource-group $ResourceGroup --name $resource.Name --output none 2>&1 | Out-Null

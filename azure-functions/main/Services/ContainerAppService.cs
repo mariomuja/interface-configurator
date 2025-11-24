@@ -28,6 +28,7 @@ public class ContainerAppService : IContainerAppService
     private readonly string _registryServer;
     private readonly string _registryUsername;
     private readonly string _registryPassword;
+    private readonly string _serviceBusConnectionString;
 
     public ContainerAppService(
         ILogger<ContainerAppService> logger,
@@ -42,6 +43,8 @@ public class ContainerAppService : IContainerAppService
         _registryServer = _configuration["ContainerRegistryServer"] ?? "";
         _registryUsername = _configuration["ContainerRegistryUsername"] ?? "";
         _registryPassword = _configuration["ContainerRegistryPassword"] ?? "";
+        _serviceBusConnectionString = _configuration["ServiceBusConnectionString"] 
+            ?? _configuration["AZURE_SERVICEBUS_CONNECTION_STRING"] ?? "";
 
         // Initialize ARM client with managed identity or service principal
         try
@@ -73,9 +76,14 @@ public class ContainerAppService : IContainerAppService
 
         try
         {
+            // IMPORTANT: Each adapter instance gets its own isolated container app
+            // Container app name is derived from adapterInstanceGuid: ca-{guid}
+            // This ensures complete process isolation between adapter instances
+            var containerAppName = GetContainerAppNamePrivate(adapterInstanceGuid);
+            
             _logger.LogInformation(
-                "Creating container app for adapter instance: Guid={Guid}, Adapter={Adapter}, Type={Type}, Interface={Interface}",
-                adapterInstanceGuid, adapterName, adapterType, interfaceName);
+                "Creating isolated container app for adapter instance: Guid={Guid}, ContainerApp={ContainerAppName}, Adapter={Adapter}, Type={Type}, Interface={Interface}, InstanceName={InstanceName}",
+                adapterInstanceGuid, containerAppName, adapterName, adapterType, interfaceName, instanceName);
 
             var subscription = await _armClient.GetDefaultSubscriptionAsync(cancellationToken);
             var resourceGroup = await subscription.GetResourceGroupAsync(_resourceGroupName, cancellationToken);
@@ -100,8 +108,7 @@ public class ContainerAppService : IContainerAppService
             var environment = await GetOrCreateContainerAppEnvironmentAsync(
                 resourceGroup.Value, cancellationToken);
 
-            // Create container app
-            var containerAppName = GetContainerAppName(adapterInstanceGuid);
+            // Container app name already set above - each instance gets unique name based on GUID
             var containerAppData = new ContainerAppData(_location)
             {
                 ManagedEnvironmentId = environment.Id,
@@ -125,7 +132,8 @@ public class ContainerAppService : IContainerAppService
                     Secrets =
                     {
                         new ContainerAppSecret("registry-password", _registryPassword),
-                        new ContainerAppSecret("blob-connection-string", blobStorageInfo.ConnectionString)
+                        new ContainerAppSecret("blob-connection-string", blobStorageInfo.ConnectionString),
+                        new ContainerAppSecret("servicebus-connection-string", _serviceBusConnectionString)
                     }
                 },
                 Template = new ContainerAppTemplate
@@ -169,6 +177,10 @@ public class ContainerAppService : IContainerAppService
                                 new ContainerAppEnvironmentVariable("ADAPTER_CONFIG_PATH")
                                 {
                                     Value = "adapter-config.json"
+                                },
+                                new ContainerAppEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING")
+                                {
+                                    SecretRef = "servicebus-connection-string"
                                 }
                             },
                             Resources = new AppContainerResources
@@ -187,6 +199,16 @@ public class ContainerAppService : IContainerAppService
             };
 
             var containerAppCollection = environment.GetContainerApps();
+            
+            // Check if container app already exists (should not happen, but handle gracefully)
+            var existingContainerApp = await containerAppCollection.GetAsync(containerAppName, cancellationToken);
+            if (existingContainerApp.Value != null)
+            {
+                _logger.LogWarning(
+                    "Container app already exists for adapter instance {Guid}: ContainerApp={ContainerAppName}. Updating instead of creating.",
+                    adapterInstanceGuid, containerAppName);
+            }
+            
             var containerAppOperation = await containerAppCollection.CreateOrUpdateAsync(
                 WaitUntil.Started,
                 containerAppName,
@@ -194,8 +216,8 @@ public class ContainerAppService : IContainerAppService
                 cancellationToken);
 
             _logger.LogInformation(
-                "Container app creation initiated: Name={Name}, Guid={Guid}",
-                containerAppName, adapterInstanceGuid);
+                "Container app creation/update initiated: Name={Name}, Guid={Guid}, Adapter={Adapter}, Type={Type}, Interface={Interface}",
+                containerAppName, adapterInstanceGuid, adapterName, adapterType, interfaceName);
 
             return new ContainerAppInfo
             {
@@ -228,7 +250,7 @@ public class ContainerAppService : IContainerAppService
 
         try
         {
-            var containerAppName = GetContainerAppName(adapterInstanceGuid);
+            var containerAppName = GetContainerAppNamePrivate(adapterInstanceGuid);
             var subscription = await _armClient.GetDefaultSubscriptionAsync(cancellationToken);
             var resourceGroup = await subscription.GetResourceGroupAsync(_resourceGroupName, cancellationToken);
 
@@ -274,7 +296,7 @@ public class ContainerAppService : IContainerAppService
 
         try
         {
-            var containerAppName = GetContainerAppName(adapterInstanceGuid);
+            var containerAppName = GetContainerAppNamePrivate(adapterInstanceGuid);
             var subscription = await _armClient.GetDefaultSubscriptionAsync(cancellationToken);
             var resourceGroup = await subscription.GetResourceGroupAsync(_resourceGroupName, cancellationToken);
 
@@ -330,12 +352,17 @@ public class ContainerAppService : IContainerAppService
         return status.Exists;
     }
 
-    private string GetContainerAppName(Guid adapterInstanceGuid)
+    public string GetContainerAppName(Guid adapterInstanceGuid)
     {
         // Container app names must be lowercase, alphanumeric, and hyphens only
         // Max 32 characters
         var guidStr = adapterInstanceGuid.ToString("N");
         return $"ca-{guidStr.Substring(0, Math.Min(24, guidStr.Length))}";
+    }
+
+    private string GetContainerAppNamePrivate(Guid adapterInstanceGuid)
+    {
+        return GetContainerAppName(adapterInstanceGuid);
     }
 
     private string GetAdapterImage(string adapterName)
@@ -367,17 +394,10 @@ public class ContainerAppService : IContainerAppService
         }
 
         // Create environment if it doesn't exist
+        // Log Analytics is disabled - using Azure's built-in logging instead
         var environmentData = new ContainerAppManagedEnvironmentData(_location)
         {
-            AppLogsConfiguration = new ContainerAppLogsConfiguration
-            {
-                Destination = "log-analytics",
-                LogAnalyticsConfiguration = new ContainerAppLogAnalyticsConfiguration
-                {
-                    CustomerId = _configuration["LogAnalyticsWorkspaceId"] ?? "",
-                    SharedKey = _configuration["LogAnalyticsSharedKey"] ?? ""
-                }
-            }
+            // AppLogsConfiguration omitted - using Azure's default logging
         };
 
         var environmentOperation = await environmentCollection.CreateOrUpdateAsync(

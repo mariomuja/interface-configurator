@@ -1,0 +1,221 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Adapter Configuration Schema",
+  "description": "Schema for validating adapter instance configurations",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Schema version for compatibility checking",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0"
+    },
+    "adapterName": {
+      "type": "string",
+      "enum": ["CSV", "FILE", "SFTP", "SqlServer", "SAP", "Dynamics365", "CRM"],
+      "description": "Name of the adapter type"
+    },
+    "adapterType": {
+      "type": "string",
+      "enum": ["Source", "Destination"],
+      "description": "Type of adapter: Source or Destination"
+    },
+    "instanceName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Unique name for this adapter instance"
+    },
+    "isEnabled": {
+      "type": "boolean",
+      "description": "Whether the adapter instance is enabled"
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Adapter-specific configuration",
+      "oneOf": [
+        {
+          "title": "CSV Adapter Configuration",
+          "properties": {
+            "csvAdapterType": {
+              "type": "string",
+              "enum": ["RAW", "FILE", "SFTP"]
+            },
+            "fieldSeparator": {
+              "type": "string",
+              "maxLength": 5,
+              "default": "‖"
+            },
+            "csvData": {
+              "type": "string",
+              "description": "CSV data for RAW adapter type"
+            },
+            "receiveFolder": {
+              "type": "string",
+              "description": "Folder path for FILE/SFTP adapter types"
+            },
+            "fileMask": {
+              "type": "string",
+              "default": "*.txt"
+            },
+            "csvPollingInterval": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "batchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1000
+            },
+            "csvSkipHeaderLines": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "csvSkipFooterLines": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "csvQuoteCharacter": {
+              "type": "string",
+              "maxLength": 5,
+              "default": "\""
+            }
+          },
+          "required": ["csvAdapterType"]
+        },
+        {
+          "title": "SQL Server Adapter Configuration",
+          "properties": {
+            "sqlServerName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sqlDatabaseName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sqlUserName": {
+              "type": "string"
+            },
+            "sqlPassword": {
+              "type": "string"
+            },
+            "sqlTableName": {
+              "type": "string",
+              "default": "TransportData"
+            },
+            "sqlPollingStatement": {
+              "type": "string",
+              "description": "SQL SELECT statement for source adapters"
+            },
+            "sqlPollingInterval": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60
+            },
+            "sqlUseTransaction": {
+              "type": "boolean",
+              "default": false
+            },
+            "sqlBatchSize": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1000
+            }
+          },
+          "required": ["sqlServerName", "sqlDatabaseName"]
+        },
+        {
+          "title": "SAP Adapter Configuration",
+          "properties": {
+            "sapSystem": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "sapClient": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 999
+            },
+            "sapUsername": {
+              "type": "string"
+            },
+            "sapPassword": {
+              "type": "string"
+            },
+            "sapRfcFunction": {
+              "type": "string"
+            },
+            "sapPollingInterval": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60
+            }
+          },
+          "required": ["sapSystem", "sapClient"]
+        },
+        {
+          "title": "Dynamics 365 Adapter Configuration",
+          "properties": {
+            "d365InstanceUrl": {
+              "type": "string",
+              "pattern": "^https?://.*"
+            },
+            "d365TenantId": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "d365ClientId": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "d365ClientSecret": {
+              "type": "string"
+            },
+            "d365EntityName": {
+              "type": "string"
+            },
+            "d365PollingInterval": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60
+            }
+          },
+          "required": ["d365InstanceUrl", "d365TenantId", "d365ClientId", "d365ClientSecret"]
+        },
+        {
+          "title": "CRM Adapter Configuration",
+          "properties": {
+            "crmEndpointUrl": {
+              "type": "string",
+              "pattern": "^https?://.*"
+            },
+            "crmUsername": {
+              "type": "string"
+            },
+            "crmPassword": {
+              "type": "string"
+            },
+            "crmApiKey": {
+              "type": "string"
+            },
+            "crmEntityName": {
+              "type": "string"
+            },
+            "crmPollingInterval": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60
+            }
+          },
+          "required": ["crmEndpointUrl"]
+        }
+      ]
+    }
+  },
+  "required": ["adapterName", "adapterType", "instanceName", "isEnabled", "configuration"]
+}
+

@@ -8,18 +8,18 @@ namespace InterfaceConfigurator.Main.Core.Factories;
 /// <summary>
 /// Central registry for checking feature enablement status
 /// Uses caching to minimize database queries
-/// Now uses MessageBoxDbContext (moved from ApplicationDbContext)
+/// Now uses InterfaceConfigDbContext (moved from ApplicationDbContext, formerly MessageBoxDbContext)
 /// </summary>
 public class FeatureRegistry : IFeatureRegistry
 {
-    private readonly MessageBoxDbContext _context;
+    private readonly InterfaceConfigDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly ILogger<FeatureRegistry> _logger;
     private const string CACHE_KEY_ENABLED_FEATURES = "EnabledFeatures";
     private const int CACHE_DURATION_MINUTES = 5;
 
     public FeatureRegistry(
-        MessageBoxDbContext context,
+        InterfaceConfigDbContext context,
         IMemoryCache cache,
         ILogger<FeatureRegistry> logger)
     {

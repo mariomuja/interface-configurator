@@ -346,7 +346,7 @@ public class GetInterfaceConfiguration
             sourceProperties["receiveFolder"] = config.SourceReceiveFolder ?? string.Empty;
             sourceProperties["fileMask"] = config.SourceFileMask ?? "*.txt";
             sourceProperties["batchSize"] = config.SourceBatchSize;
-            sourceProperties["fieldSeparator"] = config.SourceFieldSeparator ?? "║";
+            sourceProperties["fieldSeparator"] = config.SourceFieldSeparator ?? "‖"; // Default: Double Vertical Line (U+2016)
             sourceProperties["csvAdapterType"] = config.CsvAdapterType ?? "RAW";
             sourceProperties["csvPollingInterval"] = config.CsvPollingInterval > 0 ? config.CsvPollingInterval : 10;
             
@@ -443,7 +443,7 @@ public class GetInterfaceConfiguration
                     GetStringValue(instanceConfig, "destination") ?? string.Empty;
                 destProperties["fileMask"] = GetStringValue(instanceConfig, "fileMask") ?? "*.txt";
                 destProperties["batchSize"] = GetIntValue(instanceConfig, "batchSize") ?? 100;
-                destProperties["fieldSeparator"] = GetStringValue(instanceConfig, "fieldSeparator") ?? "║";
+                destProperties["fieldSeparator"] = GetStringValue(instanceConfig, "fieldSeparator") ?? "‖"; // Default: Double Vertical Line (U+2016)
                 destProperties["destinationReceiveFolder"] = GetStringValue(instanceConfig, "destinationReceiveFolder") ?? 
                     GetStringValue(instanceConfig, "receiveFolder") ?? string.Empty;
                 destProperties["destinationFileMask"] = GetStringValue(instanceConfig, "destinationFileMask") ?? 

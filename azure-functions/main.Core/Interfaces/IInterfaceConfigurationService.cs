@@ -192,5 +192,16 @@ public interface IInterfaceConfigurationService
         string updateStatement,
         string deleteStatement,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update a source adapter instance.
+    /// </summary>
+    Task UpdateSourceAdapterInstanceAsync(
+        string interfaceName,
+        Guid adapterInstanceGuid,
+        string? instanceName = null,
+        bool? isEnabled = null,
+        string? configuration = null,
+        CancellationToken cancellationToken = default);
 }
 

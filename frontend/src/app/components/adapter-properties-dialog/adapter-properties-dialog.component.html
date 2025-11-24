@@ -1,6 +1,12 @@
 <h2 mat-dialog-title>
-  <mat-icon>settings</mat-icon>
-  {{ dialogTitle }}
+  <span style="display: flex; align-items: center; gap: 6px;">
+    <mat-icon>settings</mat-icon>
+    {{ dialogTitle }}
+  </span>
+  <a class="wizard-link" (click)="openWizard()" matTooltip="Konfigurations-Assistenten öffnen">
+    <mat-icon>wizard</mat-icon>
+    Assistent starten
+  </a>
 </h2>
 
 <mat-dialog-content>

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
 using InterfaceConfigurator.Main.Services;
 using InterfaceConfigurator.Main.Helpers;
+using Azure.Messaging.ServiceBus.Administration;
 
 namespace InterfaceConfigurator.Main;
 
@@ -17,18 +18,18 @@ namespace InterfaceConfigurator.Main;
 public class HealthCheck
 {
     private readonly ApplicationDbContext? _applicationContext;
-    private readonly MessageBoxDbContext? _messageBoxContext;
+    private readonly InterfaceConfigDbContext? _interfaceConfigContext;
     private readonly ILogger<HealthCheck> _logger;
     private readonly MetricsService? _metricsService;
 
     public HealthCheck(
         ApplicationDbContext? applicationContext,
-        MessageBoxDbContext? messageBoxContext,
+        InterfaceConfigDbContext? interfaceConfigContext,
         ILogger<HealthCheck> logger,
         MetricsService? metricsService = null)
     {
         _applicationContext = applicationContext;
-        _messageBoxContext = messageBoxContext;
+        _interfaceConfigContext = interfaceConfigContext;
         _logger = logger;
         _metricsService = metricsService;
     }
@@ -79,13 +80,13 @@ public class HealthCheck
             overallHealthy = false;
         }
 
-        // Check MessageBox Database
-        if (_messageBoxContext != null)
+        // Check InterfaceConfigDb Database (formerly MessageBox)
+        if (_interfaceConfigContext != null)
         {
-            var messageBoxCheck = await CheckDatabaseAsync(_messageBoxContext, "MessageBoxDatabase");
-            healthStatus.Checks.Add(messageBoxCheck);
-            _metricsService?.TrackHealthCheck("MessageBoxDatabase", messageBoxCheck.Status == "Healthy", messageBoxCheck.Message);
-            if (messageBoxCheck.Status != "Healthy")
+            var interfaceConfigCheck = await CheckDatabaseAsync(_interfaceConfigContext, "InterfaceConfigDatabase");
+            healthStatus.Checks.Add(interfaceConfigCheck);
+            _metricsService?.TrackHealthCheck("InterfaceConfigDatabase", interfaceConfigCheck.Status == "Healthy", interfaceConfigCheck.Message);
+            if (interfaceConfigCheck.Status != "Healthy")
             {
                 overallHealthy = false;
             }
@@ -94,9 +95,9 @@ public class HealthCheck
         {
             healthStatus.Checks.Add(new HealthCheckItem
             {
-                Name = "MessageBoxDatabase",
+                Name = "InterfaceConfigDatabase",
                 Status = "Unhealthy",
-                Message = "MessageBoxDbContext not configured"
+                Message = "InterfaceConfigDbContext not configured"
             });
             overallHealthy = false;
         }
@@ -120,6 +121,63 @@ public class HealthCheck
                 Name = "StorageAccount",
                 Status = "Degraded",
                 Message = "Storage connection string not configured"
+            });
+        }
+
+        // Check Service Bus (if configured)
+        var serviceBusConnectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString")
+            ?? Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING");
+        if (!string.IsNullOrEmpty(serviceBusConnectionString))
+        {
+            try
+            {
+                var serviceBusCheck = await CheckServiceBusAsync(serviceBusConnectionString);
+                healthStatus.Checks.Add(serviceBusCheck);
+                if (serviceBusCheck.Status != "Healthy")
+                {
+                    overallHealthy = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking Service Bus health");
+                healthStatus.Checks.Add(new HealthCheckItem
+                {
+                    Name = "ServiceBus",
+                    Status = "Unhealthy",
+                    Message = $"Service Bus check failed: {ex.Message}"
+                });
+                overallHealthy = false;
+            }
+        }
+        else
+        {
+            healthStatus.Checks.Add(new HealthCheckItem
+            {
+                Name = "ServiceBus",
+                Status = "Degraded",
+                Message = "Service Bus connection string not configured"
+            });
+        }
+
+        // Check Container Apps (sample check - checks if Container App Service is available)
+        try
+        {
+            var containerAppCheck = await CheckContainerAppsAsync();
+            healthStatus.Checks.Add(containerAppCheck);
+            if (containerAppCheck.Status == "Unhealthy")
+            {
+                overallHealthy = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking Container Apps health");
+            healthStatus.Checks.Add(new HealthCheckItem
+            {
+                Name = "ContainerApps",
+                Status = "Degraded",
+                Message = $"Container Apps check failed: {ex.Message}"
             });
         }
 
@@ -183,6 +241,76 @@ public class HealthCheck
         public string Status { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public List<HealthCheckItem> Checks { get; set; } = new();
+    }
+
+    private async Task<HealthCheckItem> CheckServiceBusAsync(string connectionString)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var adminClient = new Azure.Messaging.ServiceBus.Administration.ServiceBusAdministrationClient(connectionString);
+            
+            // Try to get namespace properties as a connectivity test
+            var namespaceProperties = await adminClient.GetNamespacePropertiesAsync(cts.Token);
+            
+            return new HealthCheckItem
+            {
+                Name = "ServiceBus",
+                Status = "Healthy",
+                Message = $"Service Bus namespace '{namespaceProperties.Value.Name}' is accessible"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HealthCheckItem
+            {
+                Name = "ServiceBus",
+                Status = "Unhealthy",
+                Message = $"Service Bus connectivity check failed: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<HealthCheckItem> CheckContainerAppsAsync()
+    {
+        try
+        {
+            // Check if Container App Service can be initialized
+            // This is a lightweight check - actual container app status is checked via GetContainerAppStatus endpoint
+            var resourceGroupName = Environment.GetEnvironmentVariable("ResourceGroupName") ?? "rg-interface-configurator";
+            var containerAppEnvironmentName = Environment.GetEnvironmentVariable("ContainerAppEnvironmentName") ?? "cae-adapter-instances";
+            
+            // Check if Azure credentials are available
+            var hasCredentials = Azure.Identity.DefaultAzureCredential.TryGetDefaultAzureCredential(out _);
+            
+            if (hasCredentials)
+            {
+                return new HealthCheckItem
+                {
+                    Name = "ContainerApps",
+                    Status = "Healthy",
+                    Message = $"Container App Service is available. Environment: {containerAppEnvironmentName}"
+                };
+            }
+            else
+            {
+                return new HealthCheckItem
+                {
+                    Name = "ContainerApps",
+                    Status = "Degraded",
+                    Message = "Azure credentials not available for Container App management"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            return new HealthCheckItem
+            {
+                Name = "ContainerApps",
+                Status = "Degraded",
+                Message = $"Container Apps check failed: {ex.Message}"
+            };
+        }
     }
 
     private class HealthCheckItem
