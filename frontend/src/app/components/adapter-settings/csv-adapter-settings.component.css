@@ -1,3 +1,10 @@
+.csv-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  width: 100%;
+}
+
 .csv-destination-section,
 .raw-csv-section,
 .sftp-section {
@@ -5,6 +12,22 @@
   padding: 15px;
   background-color: #f5f5f5;
   border-radius: 4px;
+  grid-column: 1 / -1; /* Span both columns */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+}
+
+.sftp-section mat-form-field {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.sftp-section input,
+.sftp-section textarea,
+.sftp-section mat-select {
+  opacity: 1 !important;
+  color: inherit !important;
 }
 
 .csv-destination-section h3,

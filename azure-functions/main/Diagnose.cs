@@ -369,6 +369,32 @@ public class Diagnose
                     {
                         var messageCount = await _messageBoxContext.Messages.CountAsync(context.CancellationToken);
                         
+                        // Check if ProcessLogs table exists and get row count
+                        var processLogCount = 0;
+                        var processLogsTableExists = false;
+                        try
+                        {
+                            processLogCount = await _messageBoxContext.ProcessLogs.CountAsync(context.CancellationToken);
+                            processLogsTableExists = true;
+                        }
+                        catch (Exception processLogEx)
+                        {
+                            processLogsTableExists = false;
+                        }
+                        
+                        // Check if InterfaceConfigurations table exists
+                        var interfaceConfigCount = 0;
+                        var interfaceConfigsTableExists = false;
+                        try
+                        {
+                            interfaceConfigCount = await _messageBoxContext.InterfaceConfigurations.CountAsync(context.CancellationToken);
+                            interfaceConfigsTableExists = true;
+                        }
+                        catch (Exception interfaceEx)
+                        {
+                            interfaceConfigsTableExists = false;
+                        }
+                        
                         // Check if AdapterInstances table exists (may not exist in older databases)
                         var adapterInstanceCount = 0;
                         var adapterInstancesTableExists = false;
@@ -379,7 +405,6 @@ public class Diagnose
                         }
                         catch (Exception adapterEx)
                         {
-                            // AdapterInstances table might not exist - that's OK, it will be created when needed
                             adapterInstancesTableExists = false;
                         }
                         
@@ -398,6 +423,18 @@ public class Diagnose
                         }
                         
                         var details = $"MessageBox tables exist. Messages: {messageCount}";
+                        if (processLogsTableExists)
+                        {
+                            details += $", ProcessLogs: {processLogCount}";
+                        }
+                        else
+                        {
+                            details += " (ProcessLogs table missing - logs may not be written)";
+                        }
+                        if (interfaceConfigsTableExists)
+                        {
+                            details += $", InterfaceConfigurations: {interfaceConfigCount}";
+                        }
                         if (adapterInstancesTableExists)
                         {
                             details += $", AdapterInstances: {adapterInstanceCount}";
@@ -412,7 +449,7 @@ public class Diagnose
                             details += " | WARNING: AdapterInstanceGuid column missing in Messages table!";
                         }
                         
-                        var status = hasAdapterInstanceGuidColumn ? "OK" : "WARNING";
+                        var status = hasAdapterInstanceGuidColumn && processLogsTableExists ? "OK" : "WARNING";
                         checks.Add(new DiagnosticCheck
                         {
                             Name = "MessageBox Database Tables",
@@ -424,7 +461,6 @@ public class Diagnose
                     }
                     catch (Exception tableEx)
                     {
-                        // Table might not exist yet or have wrong structure
                         checks.Add(new DiagnosticCheck
                         {
                             Name = "MessageBox Database Tables",

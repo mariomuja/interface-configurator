@@ -224,6 +224,58 @@ public class MessageBoxDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.HasIndex(e => e.CreatedAt).HasDatabaseName("IX_InterfaceConfigurations_CreatedAt");
+            
+            // Ignore Dictionary properties - they are not stored directly in the database
+            // Instead, SourceAdapterInstances and DestinationAdapterInstances are stored in separate tables
+            entity.Ignore(e => e.Sources);
+            entity.Ignore(e => e.Destinations);
+            
+            // Ignore all obsolete properties - they are not stored in the database
+            // These properties are only used for backward compatibility during migration
+#pragma warning disable CS0618 // Type or member is obsolete
+            entity.Ignore(e => e.SourceAdapterName);
+            entity.Ignore(e => e.SourceConfiguration);
+            entity.Ignore(e => e.DestinationAdapterName);
+            entity.Ignore(e => e.DestinationConfiguration);
+            entity.Ignore(e => e.SourceIsEnabled);
+            entity.Ignore(e => e.DestinationIsEnabled);
+            entity.Ignore(e => e.SourceInstanceName);
+            entity.Ignore(e => e.DestinationInstanceName);
+            entity.Ignore(e => e.SourceAdapterInstanceGuid);
+            entity.Ignore(e => e.DestinationAdapterInstanceGuid);
+            entity.Ignore(e => e.DestinationAdapterInstances);
+            entity.Ignore(e => e.SourceReceiveFolder);
+            entity.Ignore(e => e.SourceFileMask);
+            entity.Ignore(e => e.SourceBatchSize);
+            entity.Ignore(e => e.SourceFieldSeparator);
+            entity.Ignore(e => e.CsvData);
+            entity.Ignore(e => e.DestinationReceiveFolder);
+            entity.Ignore(e => e.DestinationFileMask);
+            entity.Ignore(e => e.CsvAdapterType);
+            entity.Ignore(e => e.CsvPollingInterval);
+            entity.Ignore(e => e.SftpHost);
+            entity.Ignore(e => e.SftpPort);
+            entity.Ignore(e => e.SftpUsername);
+            entity.Ignore(e => e.SftpPassword);
+            entity.Ignore(e => e.SftpSshKey);
+            entity.Ignore(e => e.SftpFolder);
+            entity.Ignore(e => e.SftpFileMask);
+            entity.Ignore(e => e.SftpMaxConnectionPoolSize);
+            entity.Ignore(e => e.SftpFileBufferSize);
+            entity.Ignore(e => e.SqlServerName);
+            entity.Ignore(e => e.SqlDatabaseName);
+            entity.Ignore(e => e.SqlUserName);
+            entity.Ignore(e => e.SqlPassword);
+            entity.Ignore(e => e.SqlIntegratedSecurity);
+            entity.Ignore(e => e.SqlResourceGroup);
+            entity.Ignore(e => e.SqlPollingStatement);
+            entity.Ignore(e => e.SqlPollingInterval);
+            entity.Ignore(e => e.SqlTableName);
+            entity.Ignore(e => e.SqlUseTransaction);
+            entity.Ignore(e => e.SqlBatchSize);
+            entity.Ignore(e => e.SqlCommandTimeout);
+            entity.Ignore(e => e.SqlFailOnBadStatement);
+#pragma warning restore CS0618
         });
 
         // Configure SourceAdapterInstance (moved from Blob Storage)

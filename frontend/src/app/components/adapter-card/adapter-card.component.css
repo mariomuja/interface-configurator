@@ -228,7 +228,8 @@ mat-slide-toggle {
 
 .data-card.adapter-disabled .settings-button,
 .data-card.adapter-disabled .restart-button,
-.data-card.adapter-disabled .explorer-button {
+.data-card.adapter-disabled .explorer-button,
+.data-card.adapter-disabled mat-slide-toggle {
   color: #757575 !important;
 }
 

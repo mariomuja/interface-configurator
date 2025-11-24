@@ -5,19 +5,24 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Helpers;
 using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Data;
 
 namespace InterfaceConfigurator.Main;
 
 /// <summary>
-/// HTTP endpoint to submit error reports for AI-powered automatic fixing
+/// HTTP endpoint to submit error reports - stores errors in ProcessLogs table
 /// </summary>
 public class SubmitErrorToAIFunction
 {
     private readonly ILogger<SubmitErrorToAIFunction> _logger;
+    private readonly MessageBoxDbContext _context;
 
-    public SubmitErrorToAIFunction(ILogger<SubmitErrorToAIFunction> logger)
+    public SubmitErrorToAIFunction(
+        ILogger<SubmitErrorToAIFunction> logger,
+        MessageBoxDbContext context)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
     [Function("SubmitErrorToAI")]
@@ -53,31 +58,66 @@ public class SubmitErrorToAIFunction
                     req, "body", "Invalid error report format");
             }
 
-            // Log the error report for AI processing
-            _logger.LogError(
-                "AI Error Report Received - ErrorId: {ErrorId}, Function: {FunctionName}, Component: {Component}, Message: {Message}",
-                errorReport.ErrorId,
-                errorReport.CurrentError?.FunctionName,
-                errorReport.CurrentError?.Component,
-                errorReport.CurrentError?.Error?.Message);
-
-            // Log full error report as JSON for AI to process
-            var errorReportJson = JsonSerializer.Serialize(errorReport, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            // Extract error information
+            var currentError = errorReport.CurrentError;
+            var errorMessage = currentError?.Error?.Message ?? "Unknown error";
+            var functionName = currentError?.FunctionName ?? "Unknown";
+            var component = currentError?.Component ?? "Unknown";
+            var stackTrace = currentError?.Stack ?? string.Empty;
             
-            _logger.LogInformation("Full Error Report:\n{ErrorReportJson}", errorReportJson);
+            // Create error details JSON
+            var errorDetails = JsonSerializer.Serialize(new
+            {
+                errorId = errorReport.ErrorId,
+                functionName = functionName,
+                component = component,
+                errorMessage = errorMessage,
+                stackTrace = stackTrace,
+                timestamp = DateTime.UtcNow,
+                applicationState = errorReport.ApplicationState,
+                functionCallHistory = errorReport.FunctionCallHistory?.Count ?? 0
+            }, new JsonSerializerOptions { WriteIndented = true });
 
-            // Store error report in a way that AI can access it
-            // Option 1: Save to blob storage for AI processing
-            await SaveErrorReportToBlobStorage(errorReport, errorReportJson);
+            // Truncate if too long
+            if (errorDetails.Length > 4000)
+            {
+                errorDetails = errorDetails.Substring(0, 4000) + "... [truncated]";
+            }
 
-            // Option 2: Create a GitHub issue (if GitHub integration is configured)
-            // await CreateGitHubIssue(errorReport);
+            // Store error in ProcessLogs table
+            var processLog = new ProcessLog
+            {
+                datetime_created = DateTime.UtcNow,
+                Level = "Error",
+                Message = $"Error Report: {errorMessage}",
+                Details = errorDetails,
+                Component = component.Length > 200 ? component.Substring(0, 200) : component,
+                InterfaceName = null, // Can be extracted from errorReport if available
+                MessageId = null
+            };
 
-            // Option 3: Send to an AI processing endpoint
-            // await SendToAIProcessingService(errorReport);
+            // Truncate Message if too long
+            if (processLog.Message.Length > 4000)
+            {
+                processLog.Message = processLog.Message.Substring(0, 4000) + "... [truncated]";
+            }
+
+            try
+            {
+                _context.ProcessLogs.Add(processLog);
+                await _context.SaveChangesAsync(context.CancellationToken);
+                
+                _logger.LogInformation(
+                    "Error report stored in ProcessLogs - ErrorId: {ErrorId}, Function: {FunctionName}, Component: {Component}",
+                    errorReport.ErrorId,
+                    functionName,
+                    component);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to store error report in ProcessLogs");
+                // Continue anyway - we still want to return success
+            }
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "application/json; charset=utf-8");
@@ -86,7 +126,7 @@ public class SubmitErrorToAIFunction
             var responseBody = new
             {
                 success = true,
-                message = "Error report received and queued for AI processing",
+                message = "Error report stored in ProcessLogs",
                 errorId = errorReport.ErrorId,
                 timestamp = DateTime.UtcNow
             };
@@ -102,19 +142,5 @@ public class SubmitErrorToAIFunction
         }
     }
 
-    private async Task SaveErrorReportToBlobStorage(ErrorReport errorReport, string jsonContent)
-    {
-        try
-        {
-            // This would require BlobServiceClient injection
-            // For now, we'll just log it
-            // TODO: Implement blob storage saving
-            _logger.LogInformation("Error report saved (simulated): {ErrorId}", errorReport.ErrorId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to save error report to blob storage");
-        }
-    }
 }
 

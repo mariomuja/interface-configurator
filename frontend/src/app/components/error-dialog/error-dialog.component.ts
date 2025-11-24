@@ -104,11 +104,6 @@ export interface ErrorDialogData {
         <mat-icon>download</mat-icon>
         Fehlerbericht herunterladen
       </button>
-      <button mat-button color="primary" (click)="submitToAI()" [disabled]="isSubmitting">
-        <mat-icon *ngIf="!isSubmitting">smart_toy</mat-icon>
-        <mat-spinner *ngIf="isSubmitting" diameter="20" style="display: inline-block;"></mat-spinner>
-        Fehler an AI zur Korrektur übergeben
-      </button>
       <button mat-button (click)="close()">Schließen</button>
     </mat-dialog-actions>
   `,
@@ -132,7 +127,6 @@ export class ErrorDialogComponent {
   functionName: string = '';
   component: string = '';
   errorReport: ErrorReport | null = null;
-  isSubmitting: boolean = false;
 
   constructor(
     public dialogRef: MatDialogRef<ErrorDialogComponent>,
@@ -219,49 +213,13 @@ export class ErrorDialogComponent {
     });
   }
 
-  submitToAI(): void {
-    if (!this.errorReport) {
-      this.snackBar.open('Kein Fehlerbericht verfügbar', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar']
-      });
-      return;
-    }
-
-    this.isSubmitting = true;
-
-    this.errorTrackingService.submitErrorToAI(this.errorReport).subscribe({
-      next: (response) => {
-        this.isSubmitting = false;
-        this.snackBar.open(
-          'Fehler wurde an AI übergeben. Die Korrektur wird automatisch durchgeführt.',
-          'OK',
-          {
-            duration: 5000,
-            panelClass: ['success-snackbar']
-          }
-        );
-        this.close();
-      },
-      error: (error) => {
-        this.isSubmitting = false;
-        console.error('Failed to submit error to AI:', error);
-        this.snackBar.open(
-          'Fehler beim Übergeben an AI. Bitte versuchen Sie es später erneut.',
-          'OK',
-          {
-            duration: 5000,
-            panelClass: ['error-snackbar']
-          }
-        );
-      }
-    });
-  }
 
   close(): void {
     this.dialogRef.close();
   }
 }
+
+
 
 
 

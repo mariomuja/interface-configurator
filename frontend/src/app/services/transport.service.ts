@@ -105,7 +105,7 @@ export class TransportService {
   }
 
   clearLogs(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/clear-logs`, {});
+    return this.http.post<{ message: string }>(`${this.apiUrl}/ClearProcessLogs`, {});
   }
 
   // Processing Statistics API

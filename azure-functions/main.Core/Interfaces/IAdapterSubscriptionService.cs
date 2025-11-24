@@ -63,3 +63,5 @@ public interface IAdapterSubscriptionService
 }
 
 
+
+

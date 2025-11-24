@@ -89,7 +89,7 @@ export class CsvAdapterSettingsComponent extends BaseAdapterSettingsComponent im
       destinationReceiveFolder: this.adapterType === 'Destination' ? (this.destinationReceiveFolder.trim() || '') : undefined,
       destinationFileMask: this.adapterType === 'Destination' ? (this.destinationFileMask.trim() || '*.txt') : undefined,
       csvAdapterType: this.csvAdapterType || (this.adapterType === 'Destination' ? 'FILE' : 'RAW'),
-      csvData: this.showRawProperties ? (this.csvData.trim() || '') : undefined,
+      csvData: undefined, // CSV Data is now only shown in adapter card, not in settings dialog
       csvPollingInterval: this.adapterType === 'Source' ? (this.csvPollingInterval > 0 ? this.csvPollingInterval : 10) : undefined,
       // SFTP properties
       sftpHost: this.showSftpProperties ? (this.sftpHost.trim() || '') : undefined,

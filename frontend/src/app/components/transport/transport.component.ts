@@ -23,6 +23,8 @@ import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from 
 import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
 import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData } from '../blob-container-explorer-dialog/blob-container-explorer-dialog.component';
 import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.component';
+import { DiagnoseDialogComponent, DiagnoseDialogData } from '../diagnose-dialog/diagnose-dialog.component';
+import { AddInterfaceDialogComponent, AddInterfaceDialogData } from '../add-interface-dialog/add-interface-dialog.component';
 import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { ErrorTrackingService } from '../../services/error-tracking.service';
@@ -65,7 +67,9 @@ interface MessageBoxTableRow {
     MatCheckboxModule,
     AdapterCardComponent,
     DestinationInstancesDialogComponent,
-    BlobContainerExplorerDialogComponent
+    BlobContainerExplorerDialogComponent,
+    DiagnoseDialogComponent,
+    AddInterfaceDialogComponent
   ],
   templateUrl: './transport.component.html',
   styleUrl: './transport.component.css'
@@ -1420,30 +1424,40 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   runDiagnostics(): void {
-    this.isDiagnosing = true;
-    this.diagnosticsResult = null;
+    // Open diagnose dialog
+    const dialogData: DiagnoseDialogData = { result: null };
+    const dialogRef = this.dialog.open<DiagnoseDialogComponent, DiagnoseDialogData>(DiagnoseDialogComponent, {
+      width: '90%',
+      maxWidth: '800px',
+      maxHeight: '90vh',
+      data: dialogData
+    });
     
+    this.isDiagnosing = true;
+    
+    // Start diagnose immediately
     this.transportService.diagnose().subscribe({
       next: (result) => {
-        this.diagnosticsResult = result;
         this.isDiagnosing = false;
         
-        // Show summary in snackbar
-        const summary = result.summary;
-        const message = `Diagnose abgeschlossen: ${summary.passed}/${summary.totalChecks} Checks erfolgreich`;
-        this.snackBar.open(message, 'OK', { duration: 5000 });
+        // Update dialog with result
+        dialogData.result = result;
+        const instance = dialogRef.componentInstance;
+        if (instance) {
+          instance.data = dialogData;
+          instance.isLoading = false;
+        }
         
         // Log details to console
         console.log('Diagnostics Result:', result);
       },
       error: (error) => {
         console.error('Error running diagnostics:', error);
-        console.error('Full error object:', JSON.stringify(error, null, 2));
         this.isDiagnosing = false;
+        dialogRef.close();
         
-        // Extract detailed error message with all available information
+        // Extract detailed error message
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler bei der Diagnose');
-        
         this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
       }
     });
@@ -1952,7 +1966,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           let refreshedGuid: string | undefined;
 
           if (adapterType === 'Source') {
-            refreshedGuid = config.sourceAdapterInstanceGuid;
+            // Try new structure first (sources dictionary)
+            if (config.sources && Object.keys(config.sources).length > 0) {
+              const sourceInstance = Object.values(config.sources)[0] as any;
+              refreshedGuid = sourceInstance?.adapterInstanceGuid;
+            }
+            // Fallback to old structure
+            if (!refreshedGuid) {
+              refreshedGuid = config.sourceAdapterInstanceGuid;
+            }
             if (refreshedGuid) {
               this.sourceAdapterInstanceGuid = refreshedGuid;
             }
@@ -2933,7 +2955,14 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.csvPollingInterval = config.csvPollingInterval ?? 10;
     this.destinationReceiveFolder = config.destinationReceiveFolder || this.destinationReceiveFolder;
     this.destinationFileMask = config.destinationFileMask || this.destinationFileMask;
-    this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
+    // Try new structure first (sources dictionary)
+    if (config.sources && Object.keys(config.sources).length > 0) {
+      const sourceInstance = Object.values(config.sources)[0] as any;
+      this.sourceAdapterInstanceGuid = sourceInstance?.adapterInstanceGuid || '';
+    } else {
+      // Fallback to old structure
+      this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
+    }
     this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
     
     // If source adapter is enabled but GUID is missing, reload configuration from API
@@ -2996,64 +3025,54 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openAddInterfaceDialog(): void {
-    // Simple prompt for now - can be replaced with a proper dialog component
-    const interfaceName = prompt('Enter interface name:');
-    if (interfaceName === null) {
-      // User cancelled the dialog
-      return;
-    }
-
-    const trimmedName = interfaceName.trim();
-    if (!trimmedName) {
-      this.snackBar.open('Interface name cannot be empty.', 'OK', { duration: 3000 });
-      return;
-    }
-    if (trimmedName.length < 5) {
-      this.snackBar.open('Interface name must be at least 5 characters long.', 'OK', { duration: 3000 });
-      return;
-    }
+    const existingNames = this.interfaceConfigurations.map(c => c.interfaceName || '').filter(n => n);
     
-    // Check if name already exists
-    if (this.interfaceConfigurations.some(
-      c => c.interfaceName?.toLowerCase() === trimmedName.toLowerCase()
-    )) {
-      this.snackBar.open('Interface name already exists', 'OK', { duration: 3000 });
-      return;
-    }
+    const dialogData: AddInterfaceDialogData = { existingNames };
+    const dialogRef = this.dialog.open<AddInterfaceDialogComponent, AddInterfaceDialogData, string>(AddInterfaceDialogComponent, {
+      width: '500px',
+      data: dialogData
+    });
 
-    // Create new interface configuration
-    this.transportService.createInterfaceConfiguration({
-      interfaceName: trimmedName,
-      sourceAdapterName: 'CSV',
-      destinationAdapterName: 'SqlServer'
-    }).subscribe({
-      next: () => {
-        // Optimistically add placeholder so it appears immediately
-        const placeholderConfig = {
-          interfaceName: trimmedName,
-          sourceAdapterName: 'CSV',
-          destinationAdapterName: 'SqlServer',
-          sourceInstanceName: 'Source',
-          destinationInstanceName: 'Destination',
-          sourceIsEnabled: false,
-          destinationIsEnabled: false,
-          _isPlaceholder: true
-        };
-        this.interfaceConfigurations = [
-          ...this.interfaceConfigurations.filter(c => c.interfaceName !== trimmedName),
-          placeholderConfig
-        ].sort((a, b) => a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' }));
-        this.currentInterfaceName = trimmedName;
-        this.selectedInterfaceConfig = null;
-        
-        this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
-        this.loadInterfaceConfigurations();
-      },
-      error: (error) => {
-        console.error('Error creating interface:', error);
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Interfaces');
-        this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
+    dialogRef.afterClosed().subscribe((interfaceName: string | undefined) => {
+      if (!interfaceName) {
+        // User cancelled the dialog
+        return;
       }
+
+      // Create new interface configuration
+      this.transportService.createInterfaceConfiguration({
+        interfaceName: interfaceName,
+        sourceAdapterName: 'CSV',
+        destinationAdapterName: 'SqlServer'
+      }).subscribe({
+        next: () => {
+          // Optimistically add placeholder so it appears immediately
+          const placeholderConfig = {
+            interfaceName: interfaceName,
+            sourceAdapterName: 'CSV',
+            destinationAdapterName: 'SqlServer',
+            sourceInstanceName: 'Source',
+            destinationInstanceName: 'Destination',
+            sourceIsEnabled: false,
+            destinationIsEnabled: false,
+            _isPlaceholder: true
+          };
+          this.interfaceConfigurations = [
+            ...this.interfaceConfigurations.filter(c => c.interfaceName !== interfaceName),
+            placeholderConfig
+          ].sort((a, b) => a.interfaceName.localeCompare(b.interfaceName, undefined, { sensitivity: 'base' }));
+          this.currentInterfaceName = interfaceName;
+          this.selectedInterfaceConfig = null;
+          
+          this.snackBar.open('Interface created successfully', 'OK', { duration: 3000 });
+          this.loadInterfaceConfigurations();
+        },
+        error: (error) => {
+          console.error('Error creating interface:', error);
+          const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Erstellen des Interfaces');
+          this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
+        }
+      });
     });
   }
 

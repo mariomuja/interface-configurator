@@ -61,9 +61,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
     {
         try
         {
+            // Load all interface configurations (without Sources/Destinations - they are loaded separately)
             var configs = await _context.InterfaceConfigurations
-                .Include(c => c.Sources)
-                .Include(c => c.Destinations)
                 .ToListAsync(cancellationToken);
 
             var result = new List<InterfaceConfiguration>();
@@ -317,36 +316,72 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         if (config == null)
             return null;
 
-        // Note: In a full implementation, we would need InterfaceName as a foreign key in SourceAdapterInstances and DestinationAdapterInstances
-        // For now, we load all and filter by matching GUIDs from the configuration's Sources/Destinations dictionaries
-        // This is a simplified approach - in production, add InterfaceName property to adapter instance models
-        
+        // Initialize Sources and Destinations dictionaries (they are ignored by EF)
+        config.Sources = new Dictionary<string, SourceAdapterInstance>();
+        config.Destinations = new Dictionary<string, DestinationAdapterInstance>();
+
         // Load all SourceAdapterInstances and DestinationAdapterInstances
         // In a real implementation, these would be filtered by InterfaceName via foreign key
+        // For now, we'll try to find adapter instances that belong to this interface
+        // Since we don't have a foreign key, we'll load all and try to match by InterfaceName stored in a property
+        // For the default interface, we'll create default instances if none exist
+        
         var allSources = await _context.SourceAdapterInstances.ToListAsync(cancellationToken);
         var allDestinations = await _context.DestinationAdapterInstances.ToListAsync(cancellationToken);
 
-        // Reconstruct Sources and Destinations dictionaries
-        // For now, we'll use the first source/destination found (simplified)
-        // In production, this should use proper foreign key relationships
-        config.Sources = allSources
-            .Where(s => config.Sources.Values.Any(cs => cs.AdapterInstanceGuid == s.AdapterInstanceGuid))
-            .ToDictionary(s => s.InstanceName, s => s);
+        // For now, we'll use a simple approach: if this is the default interface and no sources/destinations exist,
+        // create them. Otherwise, try to match existing ones.
+        // In production, add InterfaceName property to SourceAdapterInstance and DestinationAdapterInstance models
         
-        // If no sources found, create default
-        if (config.Sources.Count == 0 && allSources.Count > 0)
+        if (interfaceName == DefaultInterfaceName)
         {
-            config.Sources = allSources.Take(1).ToDictionary(s => s.InstanceName, s => s);
-        }
+            // For default interface, ensure we have at least one source and destination
+            if (allSources.Count == 0)
+            {
+                var defaultSource = CreateDefaultSourceInstance(config);
+                config.Sources[defaultSource.InstanceName] = defaultSource;
+            }
+            else
+            {
+                // Use the first source found (in production, filter by InterfaceName)
+                var source = allSources.FirstOrDefault();
+                if (source != null)
+                {
+                    config.Sources[source.InstanceName] = source;
+                }
+            }
 
-        config.Destinations = allDestinations
-            .Where(d => config.Destinations.Values.Any(cd => cd.AdapterInstanceGuid == d.AdapterInstanceGuid))
-            .ToDictionary(d => d.InstanceName, d => d);
-        
-        // If no destinations found, create default
-        if (config.Destinations.Count == 0 && allDestinations.Count > 0)
+            if (allDestinations.Count == 0)
+            {
+                var defaultDest = CreateDefaultDestinationInstance(config);
+                config.Destinations[defaultDest.InstanceName] = defaultDest;
+            }
+            else
+            {
+                // Use the first destination found (in production, filter by InterfaceName)
+                var dest = allDestinations.FirstOrDefault();
+                if (dest != null)
+                {
+                    config.Destinations[dest.InstanceName] = dest;
+                }
+            }
+        }
+        else
         {
-            config.Destinations = allDestinations.Take(1).ToDictionary(d => d.InstanceName, d => d);
+            // For non-default interfaces, try to find matching adapter instances
+            // In production, this would use a foreign key relationship
+            var matchingSources = allSources.Take(1).ToList();
+            var matchingDestinations = allDestinations.Take(1).ToList();
+
+            foreach (var source in matchingSources)
+            {
+                config.Sources[source.InstanceName] = source;
+            }
+
+            foreach (var dest in matchingDestinations)
+            {
+                config.Destinations[dest.InstanceName] = dest;
+            }
         }
 
         return config;

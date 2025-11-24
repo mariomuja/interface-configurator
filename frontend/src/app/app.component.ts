@@ -229,7 +229,7 @@ import { Observable } from 'rxjs';
       overflow: hidden;
       white-space: nowrap;
       width: 100%;
-      max-width: 1200px;
+      max-width: 100%;
     }
     
     .concept-text {

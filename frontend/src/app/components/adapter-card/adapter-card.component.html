@@ -46,7 +46,7 @@
                           [(ngModel)]="isEnabled" 
                           (ngModelChange)="onEnabledChange()"
                           color="primary"
-                          [disabled]="isDisabled"
+                          [disabled]="false"
                           [matTooltip]="adapterType === 'Source' ? 'Enable or disable this source adapter instance' : 'Enable or disable this destination adapter instance'">
         </mat-slide-toggle>
         

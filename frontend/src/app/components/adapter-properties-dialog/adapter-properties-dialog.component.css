@@ -21,10 +21,35 @@ mat-dialog-content {
 }
 
 .dialog-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
   padding: 4px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.dialog-content > * {
+  min-width: 0; /* Prevent grid overflow */
+}
+
+.dialog-content app-csv-adapter-settings,
+.dialog-content app-sql-server-adapter-settings,
+.dialog-content app-sap-adapter-settings,
+.dialog-content app-dynamics365-adapter-settings,
+.dialog-content app-crm-adapter-settings {
+  grid-column: 1 / -1; /* Span both columns */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+}
+
+.dialog-content app-csv-adapter-settings > *,
+.dialog-content app-sql-server-adapter-settings > *,
+.dialog-content app-sap-adapter-settings > *,
+.dialog-content app-dynamics365-adapter-settings > *,
+.dialog-content app-crm-adapter-settings > * {
+  min-width: 0;
 }
 
 .full-width {
