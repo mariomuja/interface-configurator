@@ -43,8 +43,16 @@ import { Observable } from 'rxjs';
             <span class="app-version" *ngIf="versionString$ | async as version">{{ version }}</span>
           </div>
           <div class="description-row">
-            <p class="app-description">There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.</p>
-            <span class="app-description-right">Your additional text here</span>
+            <div class="epic-message-card" aria-label="Interface Configurator value proposition">
+              <div class="epic-message-track">
+                <span class="epic-message">
+                  There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.
+                </span>
+                <span class="epic-message duplicate">
+                  There's much more happening here behind this simple example. 4 weeks to implement a new data transport? Eliminate the need to IMPLEMENT interfaces. Instead CONFIGURE them. Same codebase and quality for all interfaces.
+                </span>
+              </div>
+            </div>
           </div>
           <div class="concept-banner">
             <div class="concept-frame">
@@ -157,31 +165,46 @@ import { Observable } from 'rxjs';
     }
     
     .description-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
       width: 100%;
       margin-bottom: 2px;
     }
     
-    .app-description {
-      font-size: 10px;
-      line-height: 1.2;
-      color: rgba(255, 255, 255, 0.9);
-      margin: 0;
-      text-align: left;
-      flex: 1 1 auto;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      white-space: normal;
+    .epic-message-card {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+      padding: 2px 6px;
+      background: rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      min-height: 20px;
     }
     
-    .app-description-right {
+    .epic-message-track {
+      display: flex;
+      width: max-content;
+      animation: marquee 18s linear infinite;
+      gap: 32px;
+    }
+    
+    .epic-message {
       font-size: 10px;
-      line-height: 1.2;
-      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.1;
+      color: rgba(255, 255, 255, 0.92);
       white-space: nowrap;
-      flex: 0 0 auto;
+      letter-spacing: 0.02em;
+    }
+    
+    .epic-message.duplicate {
+      padding-left: 32px;
+    }
+    
+    @keyframes marquee {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
     }
     
     .concept-banner {
@@ -194,7 +217,7 @@ import { Observable } from 'rxjs';
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-radius: 6px;
-      padding: 4px 12px;
+      padding: 3px 10px;
       position: relative;
       overflow: visible;
       box-shadow: 

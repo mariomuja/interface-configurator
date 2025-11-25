@@ -5,6 +5,7 @@ using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Data;
 using System.Text.Json;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 
 #pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility migration
@@ -21,6 +22,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
     private readonly InterfaceConfigDbContext _context;
     private readonly ILogger<InterfaceConfigurationServiceV2>? _logger;
     private readonly IServiceProvider? _serviceProvider;
+    private bool _isInitialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     public InterfaceConfigurationServiceV2(
         InterfaceConfigDbContext context,
@@ -170,34 +173,56 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        if (_isInitialized)
+        {
+            return;
+        }
+
+        await _initLock.WaitAsync(cancellationToken);
         try
         {
-            // Ensure database and tables exist
-            await _context.Database.EnsureCreatedAsync(cancellationToken);
-
-            // Create default configuration if none exists
-            var existingConfig = await _context.InterfaceConfigurations
-                .FirstOrDefaultAsync(c => c.InterfaceName == DefaultInterfaceName, cancellationToken);
-
-            if (existingConfig == null)
+            if (_isInitialized)
             {
-                var defaultConfiguration = CreateDefaultInterfaceConfiguration();
-                await SaveConfigurationAsync(defaultConfiguration, cancellationToken);
-                _logger?.LogInformation("Created default interface configuration '{InterfaceName}'", DefaultInterfaceName);
+                return;
             }
 
-            // Ensure Service Bus subscriptions exist for all enabled destination adapter instances
-            await EnsureServiceBusSubscriptionsForEnabledInstancesAsync(cancellationToken);
+            try
+            {
+                // Ensure database and tables exist
+                await _context.Database.EnsureCreatedAsync(cancellationToken);
+
+                // Create default configuration if none exists
+                var existingConfig = await _context.InterfaceConfigurations
+                    .FirstOrDefaultAsync(c => c.InterfaceName == DefaultInterfaceName, cancellationToken);
+
+                if (existingConfig == null)
+                {
+                    var defaultConfiguration = CreateDefaultInterfaceConfiguration();
+                    await SaveConfigurationAsync(defaultConfiguration, cancellationToken);
+                    _logger?.LogInformation("Created default interface configuration '{InterfaceName}'", DefaultInterfaceName);
+                }
+
+                // Ensure Service Bus subscriptions exist for all enabled destination adapter instances
+                await EnsureServiceBusSubscriptionsForEnabledInstancesAsync(cancellationToken);
+
+                _isInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error initializing interface configuration service");
+                throw;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            _logger?.LogError(ex, "Error initializing interface configuration service");
-            throw;
+            _initLock.Release();
         }
     }
 
     public async Task<List<InterfaceConfiguration>> GetAllConfigurationsAsync(CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             // Load all interface configurations (without Sources/Destinations - they are loaded separately)
@@ -225,6 +250,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task<InterfaceConfiguration?> GetConfigurationAsync(string interfaceName, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             return await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -238,6 +265,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task<List<InterfaceConfiguration>> GetEnabledSourceConfigurationsAsync(CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var allConfigs = await GetAllConfigurationsAsync(cancellationToken);
@@ -254,6 +283,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task<List<InterfaceConfiguration>> GetEnabledDestinationConfigurationsAsync(CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var allConfigs = await GetAllConfigurationsAsync(cancellationToken);
@@ -270,6 +301,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task SaveConfigurationAsync(InterfaceConfiguration configuration, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var existing = await _context.InterfaceConfigurations
@@ -340,6 +373,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task DeleteConfigurationAsync(string interfaceName, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await _context.InterfaceConfigurations
@@ -372,6 +407,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task SetSourceEnabledAsync(string interfaceName, bool enabled, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -393,6 +430,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task SetDestinationEnabledAsync(string interfaceName, bool enabled, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -610,6 +649,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
     // Additional methods required by IInterfaceConfigurationService interface
     public async Task UpdateInterfaceNameAsync(string oldInterfaceName, string newInterfaceName, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(oldInterfaceName, cancellationToken);
@@ -634,6 +675,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateInstanceNameAsync(string interfaceName, string instanceType, string instanceName, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -669,6 +712,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateReceiveFolderAsync(string interfaceName, string receiveFolder, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -694,6 +739,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateFileMaskAsync(string interfaceName, string fileMask, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -719,6 +766,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateBatchSizeAsync(string interfaceName, int batchSize, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -752,6 +801,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string? resourceGroup,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -795,6 +846,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         int? pollingInterval,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -821,6 +874,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateCsvPollingIntervalAsync(string interfaceName, int pollingInterval, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -846,6 +901,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateFieldSeparatorAsync(string interfaceName, string fieldSeparator, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -871,6 +928,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateCsvDataAsync(string interfaceName, string? csvData, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -896,6 +955,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateDestinationReceiveFolderAsync(string interfaceName, string destinationReceiveFolder, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -921,6 +982,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task UpdateDestinationFileMaskAsync(string interfaceName, string destinationFileMask, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -946,6 +1009,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task<List<DestinationAdapterInstance>> GetDestinationAdapterInstancesAsync(string interfaceName, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -969,6 +1034,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string configuration,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1002,6 +1069,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
     public async Task RemoveDestinationAdapterInstanceAsync(string interfaceName, Guid adapterInstanceGuid, CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1041,6 +1110,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string? configuration = null,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1097,6 +1168,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string? configuration = null,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1134,6 +1207,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         int? batchSize = null,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1164,6 +1239,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string jqScriptFile,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1201,6 +1278,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         Guid? sourceAdapterSubscription,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
@@ -1240,6 +1319,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         string deleteStatement,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(cancellationToken);
+
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);

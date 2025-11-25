@@ -244,6 +244,14 @@ public class CsvProcessingService : ICsvProcessingService
         return ParseCsvWithHeadersAsync(csvContent).GetAwaiter().GetResult();
     }
 
+    async Task<(List<string> headers, List<Dictionary<string, string>> records)> ICsvProcessingService.ParseCsvWithHeadersAsync(
+        string csvContent,
+        string? fieldSeparator,
+        CancellationToken cancellationToken)
+    {
+        return await ParseCsvWithHeadersAsync(csvContent, fieldSeparator, 0, 0, '"', cancellationToken);
+    }
+
     /// <summary>
     /// Parse a CSV line handling quoted values and custom field separator
     /// </summary>
