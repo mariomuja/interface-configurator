@@ -67,11 +67,20 @@ Nach dem Setup sollten folgende Komponenten laufen:
 Der automatische Start funktioniert über:
 
 - **Startup-Shortcut**: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\minime-mcp-server.lnk`
+- **oder** geplante Aufgabe `minime-mcp-server-startup` (falls mit Admin-Rechten erstellt)
 - **Startup-Script**: `C:\Users\mario\minime-mcp\install\start-minime-on-boot.ps1`
 
-Dieses Script startet beim Windows-Login:
-1. Docker Container `minimemcp`
-2. MCP Proxy auf Port 8001
+### Was das neue Autostart-Script erledigt
+
+1. **Docker Desktop prüfen**  
+   - Startet den Windows-Dienst `com.docker.service`, falls vorhanden  
+   - Startet alternativ `Docker Desktop.exe`, falls der Dienst nicht verfügbar ist
+2. **Wartet auf Docker Engine** (Health-Check via `docker version`)
+3. **Container `minimemcp` starten** und Status erneut prüfen
+4. **MCP Proxy starten** via `start-mcp-proxy.ps1` samt Health-Check `http://localhost:8001/health`
+5. **Logging**: Alle Aktionen landen in `%LOCALAPPDATA%\minime-mcp\startup.log`
+
+Damit stehen nach jedem Rechner-Neustart automatisch Docker, Container und Proxy bereit, bevor Cursor gestartet wird.
 
 ## Troubleshooting
 

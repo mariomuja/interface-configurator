@@ -33,7 +33,7 @@
             [(ngModel)]="stepValues[currentStep.fieldName]" 
             [placeholder]="currentStep.placeholder || ''"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required" />
+            [required]="currentStep.required ?? false" />
           <mat-error *ngIf="getValidationError(currentStep.fieldName)">
             {{ getValidationError(currentStep.fieldName) }}
           </mat-error>
@@ -48,7 +48,7 @@
             [(ngModel)]="stepValues[currentStep.fieldName]" 
             [placeholder]="currentStep.placeholder || ''"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required" />
+            [required]="currentStep.required ?? false" />
           <mat-error *ngIf="getValidationError(currentStep.fieldName)">
             {{ getValidationError(currentStep.fieldName) }}
           </mat-error>
@@ -62,11 +62,11 @@
             type="number"
             [(ngModel)]="stepValues[currentStep.fieldName]" 
             [placeholder]="currentStep.placeholder || ''"
-            [min]="currentStep.min"
-            [max]="currentStep.max"
+            [min]="currentStep.min ?? null"
+            [max]="currentStep.max ?? null"
             [step]="currentStep.step || 1"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required" />
+            [required]="currentStep.required ?? false" />
           <mat-error *ngIf="getValidationError(currentStep.fieldName)">
             {{ getValidationError(currentStep.fieldName) }}
           </mat-error>
@@ -81,7 +81,7 @@
             [(ngModel)]="stepValues[currentStep.fieldName]" 
             [placeholder]="currentStep.placeholder || ''"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required"></textarea>
+            [required]="currentStep.required ?? false"></textarea>
           <mat-error *ngIf="getValidationError(currentStep.fieldName)">
             {{ getValidationError(currentStep.fieldName) }}
           </mat-error>
@@ -93,7 +93,7 @@
           <mat-select 
             [(ngModel)]="stepValues[currentStep.fieldName]"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required">
+              [required]="currentStep.required ?? false">
             <mat-option *ngIf="!currentStep.required" [value]="null">
               -- Bitte auswählen --
             </mat-option>
@@ -118,7 +118,7 @@
           <mat-radio-group 
             [(ngModel)]="stepValues[currentStep.fieldName]"
             (ngModelChange)="onValueChange(currentStep, $event)"
-            [required]="currentStep.required">
+              [required]="currentStep.required ?? false">
             <mat-card class="choice-card" *ngFor="let option of currentStep.options" 
                       [class.selected]="stepValues[currentStep.fieldName] === option.value"
                       (click)="stepValues[currentStep.fieldName] = option.value; onValueChange(currentStep, option.value)">
@@ -147,7 +147,7 @@
               [(ngModel)]="stepValues[currentStep.fieldName]" 
               [placeholder]="currentStep.placeholder || ''"
               (ngModelChange)="onValueChange(currentStep, $event)"
-              [required]="currentStep.required" />
+              [required]="currentStep.required ?? false" />
             <button 
               mat-icon-button 
               matSuffix 
@@ -175,7 +175,7 @@
               [(ngModel)]="stepValues[currentStep.fieldName]" 
               [placeholder]="currentStep.placeholder || ''"
               (ngModelChange)="onValueChange(currentStep, $event)"
-              [required]="currentStep.required" />
+              [required]="currentStep.required ?? false" />
             <button 
               mat-icon-button 
               matSuffix 

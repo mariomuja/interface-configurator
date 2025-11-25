@@ -9,11 +9,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { AdapterWizardData, WizardStep, WizardOption, AdapterWizardConfig } from '../../models/adapter-wizard.model';
+import { AdapterWizardData, WizardStep, WizardOption, AdapterWizardConfig, AdapterWizardValues } from '../../models/adapter-wizard.model';
 import { TransportService } from '../../services/transport.service';
 
 @Component({
@@ -42,7 +43,7 @@ import { TransportService } from '../../services/transport.service';
 export class AdapterWizardComponent implements OnInit, OnDestroy {
   currentStepIndex: number = 0;
   wizardConfig: AdapterWizardConfig | null = null;
-  stepValues: Record<string, any> = {};
+  stepValues: AdapterWizardValues = {};
   availableServers: string[] = [];
   availableRfcs: string[] = [];
   isLoadingServers: boolean = false;

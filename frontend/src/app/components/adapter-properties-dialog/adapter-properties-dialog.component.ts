@@ -263,19 +263,19 @@ export class AdapterPropertiesDialogComponent implements OnInit, AfterViewInit {
       onSettingsUpdate: (settings: Record<string, any>) => {
         // Update settings in the dialog
         // First, update common settings
-        if (settings.instanceName !== undefined) {
-          this.instanceName = settings.instanceName;
+        if (settings['instanceName'] !== undefined) {
+          this.instanceName = settings['instanceName'];
         }
-        if (settings.isEnabled !== undefined) {
-          this.isEnabled = settings.isEnabled;
+        if (settings['isEnabled'] !== undefined) {
+          this.isEnabled = settings['isEnabled'];
         }
 
         // Then, update adapter-specific settings
         if (this.adapterSettingsComponent) {
           // Remove common settings before passing to adapter component
           const adapterSettings = { ...settings };
-          delete adapterSettings.instanceName;
-          delete adapterSettings.isEnabled;
+          delete adapterSettings['instanceName'];
+          delete adapterSettings['isEnabled'];
           
           // Initialize adapter settings component with new values
           this.adapterSettingsComponent.initializeSettings({

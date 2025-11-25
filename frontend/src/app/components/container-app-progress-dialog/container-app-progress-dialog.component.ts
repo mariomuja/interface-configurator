@@ -397,7 +397,7 @@ export class ContainerAppProgressDialogComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getStepIcon(status: ProgressStep['status']): string {
+  public getStepIcon(status: ProgressStep['status']): string {
     switch (status) {
       case 'completed':
         return 'check_circle';
@@ -410,7 +410,7 @@ export class ContainerAppProgressDialogComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getStepIconClass(status: ProgressStep['status']): string {
+  public getStepIconClass(status: ProgressStep['status']): string {
     switch (status) {
       case 'completed':
         return 'step-icon-completed';
