@@ -79,7 +79,7 @@ public class UploadTestCsv
                 fileName = fileName,
                 blobPath = blobPath,
                 recordCount = 5,
-                message = "Test CSV file uploaded successfully. Blob trigger should process it automatically."
+                message = "Test CSV file uploaded successfully. Container app will process it via ProcessFilesFromIncomingAsync."
             };
 
             var response = req.CreateResponse(HttpStatusCode.OK);

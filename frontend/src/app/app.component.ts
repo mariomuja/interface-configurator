@@ -215,26 +215,27 @@ import { Observable } from 'rxjs';
     
     .concept-banner {
       width: 100%;
-      margin-top: 2px;
+      margin-top: 1px;
       overflow: visible;
     }
     
     .concept-frame {
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 6px;
-      padding: 3px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      padding: 2px 6px;
       position: relative;
       overflow: visible;
       box-shadow: 
-        0 2px 8px rgba(0, 0, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+        0 1px 4px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
       transform-style: preserve-3d;
       perspective: 1000px;
       animation: frameGlow 3s ease-in-out infinite;
       width: 100%;
       max-width: 100%;
+      line-height: 0;
+      min-height: 18px;
     }
     
     @keyframes frameGlow {
@@ -285,12 +286,12 @@ import { Observable } from 'rxjs';
     }
     
     .concept-text {
-      font-size: 10px;
-      line-height: 1.1;
+      font-size: 9px;
+      line-height: 1.05;
       color: rgba(255, 255, 255, 0.95);
       display: inline;
       animation: textScroll 0.5s ease-in-out;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
       white-space: normal;
       word-wrap: break-word;
       overflow-wrap: break-word;

@@ -10,24 +10,26 @@ namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// Timer-triggered function that processes enabled Destination adapters
-/// Each Destination adapter reads from MessageBox and writes to its destination
+/// Each Destination adapter reads from Service Bus and writes to its destination
+/// 
+/// NOTE: This function may be obsolete if all adapters run in container apps.
+/// Container apps process data directly. This function may still be used for:
+/// - Adapters that don't have container apps yet
+/// - Fallback processing
 /// </summary>
 public class DestinationAdapterFunction
 {
     private readonly IInterfaceConfigurationService _configService;
     private readonly IAdapterFactory _adapterFactory;
-    private readonly IMessageBoxService _messageBoxService;
     private readonly ILogger<DestinationAdapterFunction> _logger;
 
     public DestinationAdapterFunction(
         IInterfaceConfigurationService configService,
         IAdapterFactory adapterFactory,
-        IMessageBoxService messageBoxService,
         ILogger<DestinationAdapterFunction> logger)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _adapterFactory = adapterFactory ?? throw new ArgumentNullException(nameof(adapterFactory));
-        _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -40,13 +42,6 @@ public class DestinationAdapterFunction
 
         try
         {
-            // Release stale locks first (messages locked longer than timeout)
-            var staleLocksReleased = await _messageBoxService.ReleaseStaleLocksAsync(lockTimeoutMinutes: 5, context.CancellationToken);
-            if (staleLocksReleased > 0)
-            {
-                _logger.LogInformation("Released {Count} stale message locks", staleLocksReleased);
-            }
-
             // Get all enabled interface configurations (for background processing)
             var configurations = await _configService.GetEnabledDestinationConfigurationsAsync(context.CancellationToken);
 
@@ -150,19 +145,8 @@ public class DestinationAdapterFunction
                 return;
             }
 
-            // Read pending messages from MessageBox for this interface
-            // All destination instances subscribe to the same MessageBox data
-            var messages = await _messageBoxService.ReadMessagesAsync(interfaceConfig.InterfaceName, "Pending", cancellationToken);
-
-            if (!messages.Any())
-            {
-                _logger.LogDebug("No pending messages found for interface '{InterfaceName}' (instance '{InstanceName}')", 
-                    interfaceConfig.InterfaceName, instance.InstanceName);
-                return;
-            }
-
-            _logger.LogInformation("Found {MessageCount} pending messages for interface '{InterfaceName}' (instance '{InstanceName}')", 
-                messages.Count, interfaceConfig.InterfaceName, instance.InstanceName);
+            // Note: Adapters now read directly from Service Bus in their WriteAsync methods
+            // No need to pre-fetch messages here - the adapter will handle Service Bus reading
 
             // Create a temporary InterfaceConfiguration for this instance to pass to adapter factory
             var instanceConfig = new InterfaceConfiguration
@@ -203,8 +187,8 @@ public class DestinationAdapterFunction
                     $"The WriteAsync functionality has not been implemented for this adapter.");
             }
 
-            // Write to destination (adapter will read from MessageBox, write to destination, and mark subscription as processed)
-            // The adapter's WriteAsync method handles reading from MessageBox internally
+            // Write to destination (adapter will read from Service Bus, write to destination, and mark messages as processed)
+            // The adapter's WriteAsync method handles reading from Service Bus internally
             await adapter.WriteAsync(destination, new List<string>(), new List<Dictionary<string, string>>(), cancellationToken);
 
             _logger.LogInformation(

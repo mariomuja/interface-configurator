@@ -69,15 +69,15 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "⚠️  Warning: $sqlcmdResult" -ForegroundColor Yellow
 }
 
-# Initialize MessageBox database
-Write-Host "`n[4/4] Initializing MessageBox database..." -ForegroundColor Yellow
+# Initialize InterfaceConfigDb (formerly MessageBox) database
+Write-Host "`n[4/4] Initializing InterfaceConfigDb database..." -ForegroundColor Yellow
 $initMessageBoxScript = Get-Content -Path "terraform\init-messagebox-database.sql" -Raw
 $initMessageBoxScript | Out-File -FilePath "$env:TEMP\init-messagebox-database.sql" -Encoding UTF8
-Write-Host "Running initialization script on MessageBox database..." -ForegroundColor Gray
+Write-Host "Running initialization script on InterfaceConfigDb..." -ForegroundColor Gray
 
-$sqlcmdResult = sqlcmd -S $sqlServer -d "MessageBox" -U $SqlAdminLogin -P $SqlAdminPassword -i "$env:TEMP\init-messagebox-database.sql" 2>&1
+$sqlcmdResult = sqlcmd -S $sqlServer -d "InterfaceConfigDb" -U $SqlAdminLogin -P $SqlAdminPassword -i "$env:TEMP\init-messagebox-database.sql" 2>&1
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ MessageBox database initialized successfully" -ForegroundColor Green
+    Write-Host "✅ InterfaceConfigDb initialized successfully" -ForegroundColor Green
 } else {
     Write-Host "⚠️  Warning: $sqlcmdResult" -ForegroundColor Yellow
 }
@@ -169,6 +169,6 @@ if ($LASTEXITCODE -eq 0) {
 
 Write-Host "`n=== Initialization Complete! ===" -ForegroundColor Green
 Write-Host "✅ app-database initialized" -ForegroundColor Green
-Write-Host "✅ MessageBox database initialized" -ForegroundColor Green
+Write-Host "✅ InterfaceConfigDb initialized" -ForegroundColor Green
 Write-Host "✅ Demo interface configuration restored" -ForegroundColor Green
 

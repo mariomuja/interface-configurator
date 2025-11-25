@@ -633,34 +633,6 @@
     ]
   },
   {
-    "name": "InitializeMessageBox",
-    "scriptFile": "main.dll",
-    "entryPoint": "InterfaceConfigurator.Main.InitializeMessageBoxFunction.Run",
-    "language": "dotnet-isolated",
-    "properties": {
-      "IsCodeless": false
-    },
-    "bindings": [
-      {
-        "name": "req",
-        "direction": "In",
-        "type": "httpTrigger",
-        "authLevel": "Anonymous",
-        "methods": [
-          "post",
-          "options"
-        ],
-        "route": "InitializeMessageBox",
-        "properties": {}
-      },
-      {
-        "name": "$return",
-        "type": "http",
-        "direction": "Out"
-      }
-    ]
-  },
-  {
     "name": "Login",
     "scriptFile": "main.dll",
     "entryPoint": "InterfaceConfigurator.Main.LoginFunction.Run",
@@ -685,27 +657,6 @@
         "name": "$return",
         "type": "http",
         "direction": "Out"
-      }
-    ]
-  },
-  {
-    "name": "Main",
-    "scriptFile": "main.dll",
-    "entryPoint": "InterfaceConfigurator.Main.MainFunction.Run",
-    "language": "dotnet-isolated",
-    "properties": {
-      "IsCodeless": false
-    },
-    "bindings": [
-      {
-        "name": "blobStream",
-        "direction": "In",
-        "type": "blobTrigger",
-        "path": "csv-files/csv-incoming/{name}",
-        "connection": "MainStorageConnection",
-        "properties": {
-          "supportsDeferredBinding": "True"
-        }
       }
     ]
   },
@@ -886,34 +837,6 @@
           "options"
         ],
         "route": "SubmitErrorToAI",
-        "properties": {}
-      },
-      {
-        "name": "$return",
-        "type": "http",
-        "direction": "Out"
-      }
-    ]
-  },
-  {
-    "name": "TestBlobTriggerLogic",
-    "scriptFile": "main.dll",
-    "entryPoint": "InterfaceConfigurator.Main.TestBlobTriggerLogic.Run",
-    "language": "dotnet-isolated",
-    "properties": {
-      "IsCodeless": false
-    },
-    "bindings": [
-      {
-        "name": "req",
-        "direction": "In",
-        "type": "httpTrigger",
-        "authLevel": "Anonymous",
-        "methods": [
-          "get",
-          "options"
-        ],
-        "route": "test-blob-trigger-logic",
         "properties": {}
       },
       {

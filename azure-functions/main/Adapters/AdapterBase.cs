@@ -4,13 +4,14 @@ using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Services;
 using System.Text.Json;
+using Azure.Storage.Blobs;
 using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Main.Adapters;
 
 /// <summary>
-/// Base class for all adapters providing common MessageBox functionality
-/// Handles reading from and writing to MessageBox for Source and Destination roles
+/// Base class for all adapters providing common Service Bus functionality
+/// Handles reading from and writing to Service Bus for Source and Destination roles
 /// </summary>
 public abstract class AdapterBase : IAdapter
 {
@@ -21,10 +22,8 @@ public abstract class AdapterBase : IAdapter
     public abstract bool SupportsWrite { get; }
     public string AdapterRole { get; protected set; }
 
-    // Common Service Bus-related fields (replaces MessageBox)
+    // Common Service Bus-related fields
     protected readonly IServiceBusService? _serviceBusService;
-    protected readonly IMessageBoxService? _messageBoxService; // Kept for backward compatibility during migration
-    protected readonly IMessageSubscriptionService? _subscriptionService;
     protected readonly string? _interfaceName;
     protected readonly Guid? _adapterInstanceGuid;
     protected readonly int _batchSize;
@@ -36,8 +35,6 @@ public abstract class AdapterBase : IAdapter
 
     protected AdapterBase(
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null, // Kept for backward compatibility
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         int batchSize = 1000,
@@ -47,8 +44,6 @@ public abstract class AdapterBase : IAdapter
         string? jqScriptFile = null)
     {
         _serviceBusService = serviceBusService;
-        _messageBoxService = messageBoxService; // Kept for backward compatibility
-        _subscriptionService = subscriptionService;
         _interfaceName = interfaceName;
         _adapterInstanceGuid = adapterInstanceGuid;
         _batchSize = batchSize;
@@ -116,17 +111,6 @@ public abstract class AdapterBase : IAdapter
             messageIds.Count, _interfaceName);
     }
 
-    /// <summary>
-    /// Legacy method name - redirects to WriteRecordsToServiceBusAsync
-    /// </summary>
-    [Obsolete("Use WriteRecordsToServiceBusAsync instead")]
-    protected Task WriteRecordsToMessageBoxAsync(
-        List<string> headers,
-        List<Dictionary<string, string>> records,
-        CancellationToken cancellationToken = default)
-    {
-        return WriteRecordsToServiceBusAsync(headers, records, cancellationToken);
-    }
 
     /// <summary>
     /// Reads messages from Service Bus and extracts records (for Destination adapters)
@@ -311,33 +295,6 @@ public abstract class AdapterBase : IAdapter
         return (processedHeaders, processedRecords, processedMessages);
     }
 
-    /// <summary>
-    /// Legacy method name - redirects to ReadMessagesFromServiceBusAsync
-    /// </summary>
-    [Obsolete("Use ReadMessagesFromServiceBusAsync instead")]
-    protected async Task<(List<string> headers, List<Dictionary<string, string>> records, List<MessageBoxMessage> processedMessages)?> ReadMessagesFromMessageBoxAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var result = await ReadMessagesFromServiceBusAsync(cancellationToken);
-        if (result == null)
-        {
-            return null;
-        }
-
-        // Convert ServiceBusMessage list to MessageBoxMessage list for backward compatibility
-        // Note: This is a compatibility shim - actual MessageBoxMessage objects won't exist
-        var messageBoxMessages = result.Value.processedMessages.Select(m => new MessageBoxMessage
-        {
-            MessageId = Guid.Parse(m.MessageId),
-            InterfaceName = m.InterfaceName,
-            AdapterName = m.AdapterName,
-            AdapterType = m.AdapterType,
-            AdapterInstanceGuid = m.AdapterInstanceGuid,
-            datetime_created = m.EnqueuedTime
-        }).ToList();
-
-        return (result.Value.headers, result.Value.records, messageBoxMessages);
-    }
 
     /// <summary>
     /// Marks messages as processed after successful write operation (for Destination adapters)
@@ -396,33 +353,178 @@ public abstract class AdapterBase : IAdapter
     }
 
     /// <summary>
-    /// Legacy overload for MessageBox compatibility - redirects to Service Bus version
+    /// Logs detailed processing state with full exception information
     /// </summary>
-    [Obsolete("Use MarkMessagesAsProcessedAsync with ServiceBusMessage list instead")]
-    protected async Task MarkMessagesAsProcessedAsync(
-        List<MessageBoxMessage> processedMessages,
-        string successMessage,
-        CancellationToken cancellationToken = default)
+    protected void LogProcessingState(
+        string step,
+        string state,
+        string? details = null,
+        Exception? exception = null)
     {
-        // Convert MessageBoxMessage to ServiceBusMessage for compatibility
-        if (processedMessages == null || processedMessages.Count == 0)
+        if (_logger == null) return;
+
+        var logMessage = $"[{step}] State: {state}";
+        if (!string.IsNullOrWhiteSpace(details))
         {
-            return;
+            logMessage += $", Details: {details}";
         }
 
-        var serviceBusMessages = processedMessages.Select(m => new ServiceBusMessage
+        if (exception != null)
         {
-            MessageId = m.MessageId.ToString(),
-            InterfaceName = m.InterfaceName,
-            AdapterName = m.AdapterName,
-            AdapterType = m.AdapterType,
-            AdapterInstanceGuid = m.AdapterInstanceGuid,
-            EnqueuedTime = m.datetime_created,
-            LockToken = string.Empty // MessageBox doesn't have lock tokens
-        }).ToList();
+            logMessage += $", Exception: {exception.GetType().Name}: {exception.Message}";
+            
+            if (exception.InnerException != null)
+            {
+                logMessage += $", InnerException: {exception.InnerException.GetType().Name}: {exception.InnerException.Message}";
+            }
 
-        await MarkMessagesAsProcessedAsync(serviceBusMessages, successMessage, cancellationToken);
+            logMessage += $", StackTrace: {exception.StackTrace}";
+            
+            _logger.LogError(exception, logMessage);
+        }
+        else
+        {
+            _logger.LogInformation(logMessage);
+        }
     }
+
+    /// <summary>
+    /// Moves a blob file from one folder to another within the same container
+    /// Used for moving files between incoming, processed, and error folders
+    /// </summary>
+    protected async Task MoveBlobFileAsync(
+        BlobServiceClient blobServiceClient,
+        string containerName,
+        string sourcePath,
+        string destinationFolder,
+        CancellationToken cancellationToken = default)
+    {
+        if (blobServiceClient == null)
+        {
+            LogProcessingState("MoveBlobFile", "Error", "BlobServiceClient is null");
+            throw new ArgumentNullException(nameof(blobServiceClient));
+        }
+
+        try
+        {
+            LogProcessingState("MoveBlobFile", "Starting", $"Container: {containerName}, Source: {sourcePath}, Destination: {destinationFolder}");
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            
+            // Ensure destination folder exists (create placeholder if needed)
+            var destinationPlaceholder = $"{destinationFolder.TrimEnd('/')}/.folder-initialized";
+            var placeholderBlob = containerClient.GetBlobClient(destinationPlaceholder);
+            if (!await placeholderBlob.ExistsAsync(cancellationToken))
+            {
+                await placeholderBlob.UploadAsync(
+                    new BinaryData($"Folder initialized at {DateTime.UtcNow:O}"),
+                    cancellationToken);
+                LogProcessingState("MoveBlobFile", "FolderCreated", $"Destination folder: {destinationFolder}");
+            }
+
+            var sourceBlob = containerClient.GetBlobClient(sourcePath);
+            if (!await sourceBlob.ExistsAsync(cancellationToken))
+            {
+                LogProcessingState("MoveBlobFile", "Error", $"Source file does not exist: {sourcePath}");
+                throw new FileNotFoundException($"Source file does not exist: {sourcePath}");
+            }
+
+            // Extract filename from source path
+            var fileName = sourcePath.Contains('/') ? sourcePath.Substring(sourcePath.LastIndexOf('/') + 1) : sourcePath;
+            var destinationPath = $"{destinationFolder.TrimEnd('/')}/{fileName}";
+
+            // Copy blob to destination
+            var destinationBlob = containerClient.GetBlobClient(destinationPath);
+            var copyOperation = await destinationBlob.StartCopyFromUriAsync(sourceBlob.Uri, cancellationToken: cancellationToken);
+            
+            // Wait for copy to complete
+            var properties = await destinationBlob.GetPropertiesAsync(cancellationToken: cancellationToken);
+            while (properties.Value.CopyStatus == Azure.Storage.Blobs.Models.CopyStatus.Pending)
+            {
+                await Task.Delay(100, cancellationToken);
+                properties = await destinationBlob.GetPropertiesAsync(cancellationToken: cancellationToken);
+            }
+
+            if (properties.Value.CopyStatus != Azure.Storage.Blobs.Models.CopyStatus.Success)
+            {
+                LogProcessingState("MoveBlobFile", "Error", $"Copy failed with status: {properties.Value.CopyStatus}");
+                throw new InvalidOperationException($"Failed to copy blob: {properties.Value.CopyStatus}");
+            }
+
+            // Delete source blob after successful copy
+            await sourceBlob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            
+            LogProcessingState("MoveBlobFile", "Completed", $"File moved from {sourcePath} to {destinationPath}");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("MoveBlobFile", "Error", $"Failed to move file from {sourcePath} to {destinationFolder}", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Writes records to Service Bus with debatching (one message per record)
+    /// This is the preferred method for Source adapters that process files
+    /// </summary>
+    protected async Task<int> WriteRecordsToServiceBusWithDebatchingAsync(
+        List<string> headers,
+        List<Dictionary<string, string>> records,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AdapterRole.Equals("Source", StringComparison.OrdinalIgnoreCase))
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return 0;
+        }
+
+        if (_serviceBusService == null)
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Error", "ServiceBusService is not available");
+            throw new InvalidOperationException("ServiceBusService is required for Source adapters");
+        }
+
+        if (string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Skipped", 
+                $"InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return 0;
+        }
+
+        if (records == null || records.Count == 0)
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Skipped", "No records to send");
+            return 0;
+        }
+
+        try
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Starting", 
+                $"Interface={_interfaceName}, AdapterInstanceGuid={_adapterInstanceGuid.Value}, TotalRecords={records.Count}");
+
+            // Send all records to Service Bus (batched internally, but each record becomes a separate message)
+            var messageIds = await _serviceBusService.SendMessagesAsync(
+                _interfaceName!,
+                AdapterName,
+                "Source",
+                _adapterInstanceGuid.Value,
+                headers,
+                records,
+                cancellationToken);
+
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Completed", 
+                $"Successfully sent {messageIds.Count} messages to Service Bus");
+
+            return messageIds.Count;
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("WriteRecordsToServiceBusWithDebatching", "Error", 
+                $"Failed to send {records.Count} records to Service Bus", ex);
+            throw;
+        }
+    }
+
 }
 
 

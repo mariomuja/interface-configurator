@@ -58,8 +58,6 @@ public class SqlServerAdapter : AdapterBase
         IDynamicTableService dynamicTableService,
         IDataService dataService,
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         string? connectionString = null,
@@ -81,8 +79,6 @@ public class SqlServerAdapter : AdapterBase
         string? jqScriptFile = null)
         : base(
             serviceBusService: serviceBusService,
-            messageBoxService: messageBoxService,
-            subscriptionService: subscriptionService,
             interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
@@ -238,8 +234,8 @@ public class SqlServerAdapter : AdapterBase
 
             _logger?.LogInformation("Successfully read {RecordCount} records from SQL Server table: {Source}", records.Count, source);
 
-            // Write to MessageBox if AdapterRole is "Source"
-            await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
+            // Write to Service Bus if AdapterRole is "Source"
+            await WriteRecordsToServiceBusAsync(headers, records, cancellationToken);
 
             return (headers, records);
         }

@@ -57,8 +57,6 @@ public class CsvAdapter : AdapterBase
         IAdapterConfigurationService adapterConfig,
         BlobServiceClient blobServiceClient,
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         string? receiveFolder = null,
@@ -77,8 +75,6 @@ public class CsvAdapter : AdapterBase
         ILogger<CsvAdapter>? logger = null)
         : base(
             serviceBusService: serviceBusService,
-            messageBoxService: messageBoxService,
-            subscriptionService: subscriptionService,
             interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
@@ -89,8 +85,6 @@ public class CsvAdapter : AdapterBase
         _adapterConfig = adapterConfig ?? throw new ArgumentNullException(nameof(adapterConfig));
         _blobServiceClient = blobServiceClient ?? throw new ArgumentNullException(nameof(blobServiceClient));
         
-        _logger?.LogInformation("DEBUG CsvAdapter constructor: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}",
-            _messageBoxService != null, _interfaceName, _adapterInstanceGuid.HasValue ? _adapterInstanceGuid.Value.ToString() : "NULL");
         _receiveFolder = receiveFolder;
         _fileMask = fileMask ?? "*.txt";
         _fieldSeparator = fieldSeparator ?? "‖"; // Default: Double Vertical Line (U+2016) - rarely used UTF character
@@ -134,8 +128,8 @@ public class CsvAdapter : AdapterBase
                 {
                     try
                     {
-                        // Always process directly to MessageBox first, regardless of adapter type
-                        // For RAW adapter type, also upload to csv-incoming for blob trigger processing
+                        // Always process directly to Service Bus first, regardless of adapter type
+                        // For RAW adapter type, also upload to csv-incoming for container app processing
                         await ProcessCsvDataAsync(CancellationToken.None);
                     }
                     catch (Exception ex)
@@ -148,8 +142,195 @@ public class CsvAdapter : AdapterBase
     }
 
     /// <summary>
-    /// Processes the CsvData property by parsing it and debatching to MessageBox
-    /// For RAW adapter type: Creates a file from CsvData and uploads it to csv-incoming folder
+    /// Processes files from the incoming folder: reads in chunks, debatches to single records, sends to Service Bus
+    /// Moves files to processed/error folders based on success/failure
+    /// This is the main processing method for Source adapters that should NOT rely on blob triggers
+    /// </summary>
+    public async Task ProcessFilesFromIncomingAsync(
+        string containerName,
+        CancellationToken cancellationToken = default)
+    {
+        if (AdapterRole != "Source")
+        {
+            LogProcessingState("ProcessFilesFromIncoming", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return;
+        }
+
+        if (_fileAdapter == null)
+        {
+            LogProcessingState("ProcessFilesFromIncoming", "Error", "FileAdapter is required");
+            throw new InvalidOperationException("FileAdapter is required for processing files");
+        }
+
+        if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("ProcessFilesFromIncoming", "Error", 
+                $"ServiceBusService={_serviceBusService != null}, InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return;
+        }
+
+        try
+        {
+            LogProcessingState("ProcessFilesFromIncoming", "Starting", 
+                $"Container: {containerName}, Interface: {_interfaceName}, AdapterInstanceGuid: {_adapterInstanceGuid.Value}");
+
+            // Ensure folders exist
+            await EnsureStandardFoldersExistAsync(containerName, cancellationToken);
+
+            // List files in incoming folder
+            var incomingFolder = $"{containerName}/incoming/";
+            var files = await _fileAdapter.ListFilesAsync(incomingFolder, cancellationToken);
+            
+            if (files == null || files.Count == 0)
+            {
+                LogProcessingState("ProcessFilesFromIncoming", "NoFiles", "No files found in incoming folder");
+                return;
+            }
+
+            LogProcessingState("ProcessFilesFromIncoming", "FilesFound", $"Found {files.Count} file(s) to process");
+
+            // Process each file
+            foreach (var filePath in files)
+            {
+                var fullFilePath = $"{containerName}/{filePath}";
+                await ProcessSingleFileAsync(fullFilePath, containerName, cancellationToken);
+            }
+
+            LogProcessingState("ProcessFilesFromIncoming", "Completed", $"Processed {files.Count} file(s)");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessFilesFromIncoming", "Error", "Failed to process files from incoming folder", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes a single file: reads in chunks, debatches, sends to Service Bus, moves file
+    /// </summary>
+    private async Task ProcessSingleFileAsync(
+        string filePath,
+        string containerName,
+        CancellationToken cancellationToken)
+    {
+        var fileName = filePath.Contains('/') ? filePath.Substring(filePath.LastIndexOf('/') + 1) : filePath;
+        
+        try
+        {
+            LogProcessingState("ProcessSingleFile", "Starting", $"File: {fileName}");
+
+            // Step 1: Read file content
+            LogProcessingState("ProcessSingleFile", "ReadingFile", $"Reading content from {filePath}");
+            var fileContent = await _fileAdapter.ReadFileAsync(filePath, cancellationToken);
+            LogProcessingState("ProcessSingleFile", "FileRead", $"Read {fileContent.Length} characters from {fileName}");
+
+            // Step 2: Parse CSV in chunks and debatch
+            LogProcessingState("ProcessSingleFile", "ParsingCSV", "Parsing CSV content with headers");
+            var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(
+                fileContent, 
+                _fieldSeparator, 
+                _skipHeaderLines, 
+                _skipFooterLines, 
+                _quoteCharacter, 
+                cancellationToken);
+            
+            LogProcessingState("ProcessSingleFile", "CSVParsed", 
+                $"Parsed {headers.Count} headers and {records.Count} records from {fileName}");
+
+            if (records.Count == 0)
+            {
+                LogProcessingState("ProcessSingleFile", "NoRecords", $"No records found in {fileName}, moving to processed");
+                await MoveBlobFileAsync(_blobServiceClient, containerName, filePath, "processed", cancellationToken);
+                return;
+            }
+
+            // Step 3: Send records to Service Bus (debatching - one message per record)
+            LogProcessingState("ProcessSingleFile", "SendingToServiceBus", 
+                $"Sending {records.Count} records to Service Bus (debatching to individual messages)");
+            
+            var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+            
+            LogProcessingState("ProcessSingleFile", "ServiceBusSent", 
+                $"Successfully sent {messagesSent} messages to Service Bus for {fileName}");
+
+            // Step 4: Move file to processed folder
+            LogProcessingState("ProcessSingleFile", "MovingToProcessed", $"Moving {fileName} to processed folder");
+            await MoveBlobFileAsync(_blobServiceClient, containerName, filePath, "processed", cancellationToken);
+            
+            LogProcessingState("ProcessSingleFile", "Completed", 
+                $"Successfully processed {fileName}: {records.Count} records sent to Service Bus");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessSingleFile", "Error", 
+                $"Failed to process {fileName}", ex);
+            
+            // Move file to error folder
+            try
+            {
+                LogProcessingState("ProcessSingleFile", "MovingToError", $"Moving {fileName} to error folder due to error");
+                await MoveBlobFileAsync(_blobServiceClient, containerName, filePath, "error", cancellationToken);
+            }
+            catch (Exception moveEx)
+            {
+                LogProcessingState("ProcessSingleFile", "MoveErrorFailed", 
+                    $"Failed to move {fileName} to error folder", moveEx);
+            }
+            
+            throw; // Re-throw to allow caller to handle
+        }
+    }
+
+    /// <summary>
+    /// Ensures standard folders (incoming, processed, error) exist in the container
+    /// </summary>
+    private async Task EnsureStandardFoldersExistAsync(
+        string containerName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            LogProcessingState("EnsureStandardFolders", "Starting", $"Container: {containerName}");
+
+            var folders = new[] { "incoming", "processed", "error" };
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+            foreach (var folder in folders)
+            {
+                try
+                {
+                    var placeholderPath = $"{folder}/.folder-initialized";
+                    var placeholderBlob = containerClient.GetBlobClient(placeholderPath);
+
+                    if (!await placeholderBlob.ExistsAsync(cancellationToken))
+                    {
+                        await placeholderBlob.UploadAsync(
+                            new BinaryData($"Folder initialized at {DateTime.UtcNow:O}"),
+                            cancellationToken);
+                        LogProcessingState("EnsureStandardFolders", "FolderCreated", $"Created folder: {folder}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogProcessingState("EnsureStandardFolders", "FolderError", 
+                        $"Error creating folder {folder}", ex);
+                }
+            }
+
+            LogProcessingState("EnsureStandardFolders", "Completed", "All standard folders verified");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("EnsureStandardFolders", "Error", 
+                "Failed to ensure standard folders exist", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes the CsvData property by parsing it and debatching to Service Bus
+    /// For RAW adapter type: Creates a file from CsvData and uploads it to incoming folder
     /// </summary>
     public async Task ProcessCsvDataAsync(CancellationToken cancellationToken = default)
     {
@@ -164,22 +345,28 @@ public class CsvAdapter : AdapterBase
             _logger?.LogInformation("Processing CsvData property: Interface={InterfaceName}, AdapterInstanceGuid={AdapterInstanceGuid}, AdapterType={AdapterType}, DataLength={DataLength}",
                 _interfaceName, _adapterInstanceGuid, _adapterType, _csvData.Length);
 
-            // Check MessageBox conditions first
-            if (_messageBoxService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+            // Check Service Bus conditions first
+            if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
             {
-                _logger?.LogWarning("Cannot process CsvData: MessageBoxService={HasMessageBoxService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
-                    _messageBoxService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
+                _logger?.LogWarning("Cannot process CsvData: ServiceBusService={HasServiceBusService}, InterfaceName={InterfaceName}, AdapterInstanceGuid={HasAdapterInstanceGuid}",
+                    _serviceBusService != null, _interfaceName ?? "NULL", _adapterInstanceGuid.HasValue);
                 return;
             }
 
-            // For RAW adapter type: Also upload to csv-incoming for blob trigger processing
-            // But still process directly to MessageBox first (if AdapterRole is Source)
+            // For RAW adapter type: Upload to incoming folder, then process it
             if (_adapterType.Equals("RAW", StringComparison.OrdinalIgnoreCase))
             {
-                _logger?.LogInformation("RAW adapter type detected. Uploading to csv-incoming AND processing directly to MessageBox.");
-                // Upload to csv-incoming (will trigger blob trigger as backup)
-                _ = Task.Run(async () => await UploadCsvDataToIncomingAsync(cancellationToken));
-                // Continue with direct MessageBox processing below (if Source role)
+                LogProcessingState("ProcessCsvData", "RAWAdapter", "Uploading CsvData to incoming folder");
+                var containerName = "csv-files";
+                var uploadedFileName = await UploadCsvDataToIncomingAsync(cancellationToken);
+                
+                if (!string.IsNullOrWhiteSpace(uploadedFileName))
+                {
+                    // Process the uploaded file from incoming folder
+                    var filePath = $"{containerName}/incoming/{uploadedFileName}";
+                    await ProcessSingleFileAsync(filePath, containerName, cancellationToken);
+                    return; // File processing handles Service Bus sending
+                }
             }
 
             // Parse CSV using CsvProcessingService with configured field separator and quote character
@@ -188,8 +375,8 @@ public class CsvAdapter : AdapterBase
             _logger?.LogInformation("Successfully parsed CsvData: {HeaderCount} headers, {RecordCount} records",
                 headers.Count, records.Count);
 
-            // Write to MessageBox if AdapterRole is "Source"
-            await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
+            // Write to Service Bus if AdapterRole is "Source" (with debatching)
+            await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -277,46 +464,50 @@ public class CsvAdapter : AdapterBase
     }
 
     /// <summary>
-    /// Uploads CsvData to csv-incoming folder in blob storage
-    /// This will trigger the blob trigger which processes the file
+    /// Uploads CsvData to incoming folder in blob storage
+    /// Returns the uploaded file name
     /// </summary>
-    private async Task UploadCsvDataToIncomingAsync(CancellationToken cancellationToken)
+    private async Task<string> UploadCsvDataToIncomingAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_csvData))
         {
-            _logger?.LogWarning("CsvData is empty, cannot upload to csv-incoming");
-            return;
+            LogProcessingState("UploadCsvDataToIncoming", "Skipped", "CsvData is empty");
+            return string.Empty;
         }
 
         try
         {
+            LogProcessingState("UploadCsvDataToIncoming", "Starting", $"DataLength={_csvData.Length}");
+
             if (_fileAdapter == null)
             {
-                throw new InvalidOperationException("FileAdapter is required for uploading CsvData to csv-incoming");
+                LogProcessingState("UploadCsvDataToIncoming", "Error", "FileAdapter is required");
+                throw new InvalidOperationException("FileAdapter is required for uploading CsvData to incoming folder");
             }
 
-            // Ensure CSV folders exist before uploading
-            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-incoming", cancellationToken);
-            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-processed", cancellationToken);
-            await _fileAdapter.EnsureFolderExistsAsync("csv-files", "csv-error", cancellationToken);
+            var containerName = "csv-files";
+            
+            // Ensure standard folders exist (incoming, processed, error)
+            await EnsureStandardFoldersExistAsync(containerName, cancellationToken);
 
             // Generate unique filename: transport-{year}_{month}_{day}_{hour}_{minute}_{second}_{milliseconds}.csv
             var now = DateTime.UtcNow;
             var fileName = $"transport-{now:yyyy}_{now:MM}_{now:dd}_{now:HH}_{now:mm}_{now:ss}_{now:fff}.csv";
-            var blobPath = $"csv-files/csv-incoming/{fileName}";
+            var blobPath = $"{containerName}/incoming/{fileName}";
             
-            // Upload CSV data to csv-incoming folder
+            LogProcessingState("UploadCsvDataToIncoming", "Uploading", $"File: {fileName}, Path: {blobPath}");
+            
+            // Upload CSV data to incoming folder
             await _fileAdapter.WriteFileAsync(blobPath, _csvData, cancellationToken);
 
-            _logger?.LogInformation("Successfully uploaded CsvData to csv-incoming folder: {FileName}, DataLength={DataLength}",
-                fileName, _csvData.Length);
+            LogProcessingState("UploadCsvDataToIncoming", "Completed", 
+                $"Successfully uploaded {fileName} to incoming folder, DataLength={_csvData.Length}");
             
-            // Clean up old files in csv-incoming folder (keep only 10 most recent)
-            await _fileAdapter.CleanupOldFilesAsync("csv-files", "csv-incoming", maxFiles: 10, cancellationToken);
+            return fileName;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error uploading CsvData to csv-incoming folder");
+            LogProcessingState("UploadCsvDataToIncoming", "Error", "Failed to upload CsvData to incoming folder", ex);
             throw;
         }
     }
@@ -337,7 +528,7 @@ public class CsvAdapter : AdapterBase
             if (isRawAdapter && !hasExplicitSource)
             {
                 await ProcessCsvDataAsync(cancellationToken);
-                return (new List<string>(), new List<Dictionary<string, string>>()); // Blob trigger will process uploaded file
+                return (new List<string>(), new List<Dictionary<string, string>>()); // Container app will process uploaded file
             }
 
             // Treat RAW adapters with an explicit source path like FILE adapters (blob content already exists)
@@ -382,7 +573,7 @@ public class CsvAdapter : AdapterBase
                 var (headers, records, successfullyParsedFiles) = await _sftpAdapter.ReadCsvFilesWithContentAsync(
                     _csvProcessingService, detectedSeparator, folder, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
                 
-                // Upload only successfully parsed files to csv-incoming folder for blob trigger processing
+                // Upload only successfully parsed files to csv-incoming folder for container app processing
                 // This ensures consistency: only files that were successfully parsed are uploaded
                 foreach (var (fileName, content) in successfullyParsedFiles)
                 {
@@ -447,7 +638,7 @@ public class CsvAdapter : AdapterBase
             var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, detectedSeparator, effectiveSource, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
             
             // For FILE adapter type: Copy files to csv-incoming folder if reading from a different folder
-            // This will trigger the blob trigger which processes the file
+            // Files in csv-incoming are processed by container apps via ProcessFilesFromIncomingAsync
             var pathParts = effectiveSource.Split('/', 2);
             if (pathParts.Length == 2)
             {
@@ -470,10 +661,10 @@ public class CsvAdapter : AdapterBase
                 }
             }
             
-            // Write to MessageBox if conditions are met
-            if (_messageBoxService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue && csvRecords.Count > 0)
+            // Write to Service Bus if conditions are met
+            if (_serviceBusService != null && !string.IsNullOrWhiteSpace(_interfaceName) && _adapterInstanceGuid.HasValue && csvRecords.Count > 0)
             {
-                await WriteRecordsToMessageBoxAsync(csvHeaders, csvRecords, cancellationToken);
+                await WriteRecordsToServiceBusAsync(csvHeaders, csvRecords, cancellationToken);
             }
             
             return (csvHeaders, csvRecords);
@@ -485,7 +676,6 @@ public class CsvAdapter : AdapterBase
         }
     }
 
-    // WriteRecordsToMessageBoxAsync moved to AdapterBase.WriteRecordsToMessageBoxAsync
 
     // BuildDefaultBlobSourcePath removed - now handled by FileAdapter.BuildDefaultBlobSourcePath
     // ReadFromBlobStorageAsync removed - now handled by FileAdapter.ReadCsvFilesAsync
@@ -713,7 +903,7 @@ public class CsvAdapter : AdapterBase
 
     /// <summary>
     /// Uploads a file (from SFTP or other source) to csv-incoming folder in blob storage
-    /// This will trigger the blob trigger which processes the file
+    /// Files in csv-incoming are processed by container apps via ProcessFilesFromIncomingAsync
     /// </summary>
     private async Task UploadFileToIncomingAsync(string csvContent, string originalFileName, CancellationToken cancellationToken)
     {
@@ -752,7 +942,7 @@ public class CsvAdapter : AdapterBase
 
     /// <summary>
     /// Copies a file from blob storage to csv-incoming folder
-    /// This will trigger the blob trigger which processes the file
+    /// Files in csv-incoming are processed by container apps via ProcessFilesFromIncomingAsync
     /// </summary>
     private async Task CopyFileToIncomingAsync(string csvContent, string sourceBlobPath, CancellationToken cancellationToken)
     {

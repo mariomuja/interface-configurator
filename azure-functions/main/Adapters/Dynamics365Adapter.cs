@@ -37,8 +37,6 @@ public class Dynamics365Adapter : HttpClientAdapterBase
 
     public Dynamics365Adapter(
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         int batchSize = 100,
@@ -56,7 +54,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
         int pageSize = 50,
         bool useBatch = true,
         HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, null, null, httpClient)
     {
         _tenantId = tenantId;
         _clientId = clientId;
@@ -214,17 +212,86 @@ public class Dynamics365Adapter : HttpClientAdapterBase
 
             _logger?.LogInformation("Dynamics 365 Adapter (Source): Read {Count} records", records.Count);
 
-            // Write to MessageBox if used as source
-            if (AdapterRole == "Source" && _messageBoxService != null && records.Count > 0)
+            // Write to Service Bus if used as source (with debatching - one message per record)
+            if (AdapterRole == "Source" && records.Count > 0)
             {
-                await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
+                LogProcessingState("Dynamics365Adapter.ReadAsync", "SendingToServiceBus", 
+                    $"Sending {records.Count} Dynamics 365 records to Service Bus (debatching to individual messages)");
+                
+                var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+                
+                LogProcessingState("Dynamics365Adapter.ReadAsync", "ServiceBusSent", 
+                    $"Successfully sent {messagesSent} messages to Service Bus for {records.Count} Dynamics 365 records");
             }
 
             return (headers, records);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Dynamics 365 Adapter (Source): Error reading from Dynamics 365");
+            LogProcessingState("Dynamics365Adapter.ReadAsync", "Error", 
+                "Failed to read and process data from Dynamics 365", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes data from Dynamics 365 directly within the container app
+    /// Reads entity records, debatches to single records, sends to Service Bus
+    /// This method ensures all work is done in the container app, not via blob triggers
+    /// </summary>
+    public async Task ProcessDataFromDynamics365Async(CancellationToken cancellationToken = default)
+    {
+        if (AdapterRole != "Source")
+        {
+            LogProcessingState("ProcessDataFromDynamics365", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return;
+        }
+
+        if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("ProcessDataFromDynamics365", "Error", 
+                $"ServiceBusService={_serviceBusService != null}, InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_instanceUrl) || string.IsNullOrEmpty(_entityName))
+        {
+            LogProcessingState("ProcessDataFromDynamics365", "Error", 
+                "InstanceUrl or EntityName is not configured");
+            throw new InvalidOperationException("Dynamics 365 InstanceUrl and EntityName are required");
+        }
+
+        try
+        {
+            LogProcessingState("ProcessDataFromDynamics365", "Starting", 
+                $"Interface: {_interfaceName}, AdapterInstanceGuid: {_adapterInstanceGuid.Value}, Entity: {_entityName}");
+
+            // Read data from Dynamics 365
+            var (headers, records) = await ReadAsync(string.Empty, cancellationToken);
+
+            if (records == null || records.Count == 0)
+            {
+                LogProcessingState("ProcessDataFromDynamics365", "NoRecords", 
+                    $"No records found in Dynamics 365 entity {_entityName}");
+                return;
+            }
+
+            LogProcessingState("ProcessDataFromDynamics365", "DataRead", 
+                $"Read {records.Count} records from Dynamics 365 entity {_entityName}, {headers.Count} headers");
+
+            // Debatch and send to Service Bus (one message per record)
+            LogProcessingState("ProcessDataFromDynamics365", "Debatching", 
+                $"Debatching {records.Count} Dynamics 365 records to individual Service Bus messages");
+            
+            var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+            
+            LogProcessingState("ProcessDataFromDynamics365", "Completed", 
+                $"Successfully processed {records.Count} Dynamics 365 records, sent {messagesSent} messages to Service Bus");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessDataFromDynamics365", "Error", 
+                "Failed to process data from Dynamics 365", ex);
             throw;
         }
     }
@@ -232,7 +299,7 @@ public class Dynamics365Adapter : HttpClientAdapterBase
     /// <summary>
     /// Writes data to Dynamics 365 (Destination role) via OData Web API
     /// Supports batch requests for better performance
-    /// Reads from MessageBox if used as Destination adapter
+    /// Reads from Service Bus if used as Destination adapter
     /// </summary>
     public override async Task WriteAsync(
         string destination, 
@@ -263,18 +330,18 @@ public class Dynamics365Adapter : HttpClientAdapterBase
             else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
             {
                 // No messages found, but continue to fallback: use provided records if available
-                _logger?.LogWarning("No messages found in MessageBox. Will use provided records if available.");
+                _logger?.LogWarning("No messages found in Service Bus. Will use provided records if available.");
             }
             
-            // If no messages were read from MessageBox, use provided records (fallback for direct calls)
-            // This allows adapters to work both ways: via MessageBox (timer-based) or direct (blob trigger)
+            // If no messages were read from Service Bus, use provided records (fallback for direct calls)
+            // This allows adapters to work both ways: via Service Bus (timer-based) or direct (blob trigger)
             if (records == null || records.Count == 0)
             {
-                _logger?.LogInformation("No records from MessageBox and no records provided. Nothing to write.");
+                _logger?.LogInformation("No records from Service Bus and no records provided. Nothing to write.");
                 return;
             }
             
-            // Validate headers and records if not reading from MessageBox
+            // Validate headers and records if not reading from Service Bus
             if (headers == null || headers.Count == 0)
             {
                 // Extract headers from first record if not provided
@@ -313,8 +380,8 @@ public class Dynamics365Adapter : HttpClientAdapterBase
 
             _logger?.LogInformation("Dynamics 365 Adapter (Destination): Successfully wrote {Count} records", records.Count);
 
-            // Mark messages as processed if they came from MessageBox
-            if (processedMessages != null && processedMessages.Count > 0 && _messageBoxService != null)
+            // Mark messages as processed if they came from Service Bus
+            if (processedMessages != null && processedMessages.Count > 0)
             {
                 await MarkMessagesAsProcessedAsync(processedMessages, $"Successfully wrote {records.Count} records to Dynamics 365", cancellationToken);
             }

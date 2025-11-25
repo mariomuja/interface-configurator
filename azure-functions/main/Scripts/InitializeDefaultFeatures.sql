@@ -317,6 +317,56 @@ BEGIN
 END
 GO
 
+-- Feature 5: Enhanced Data Service (controls IDataService factory rollout)
+IF NOT EXISTS (SELECT * FROM Features WHERE FeatureNumber = 5)
+BEGIN
+    INSERT INTO Features (
+        FeatureNumber, Title, Description, DetailedDescription,
+        Category, Priority, IsEnabled, ImplementedDate
+    )
+    VALUES (
+        5,
+        'Enhanced Data Service',
+        'Schaltet über die FeatureFactory auf DataServiceAdapterV2 um',
+        'Aktiviert die neue Datenservice-Implementierung, sobald Feature #5 eingeschaltet wird. Solange das Feature deaktiviert ist, liefert die Factory weiterhin den Legacy-Adapter, sodass trunk-based development ohne Regressionen möglich ist.',
+        'Backend',
+        'Medium',
+        0,
+        GETUTCDATE()
+    );
+    PRINT 'Feature #5: Enhanced Data Service erstellt';
+END
+ELSE
+BEGIN
+    PRINT 'Feature #5: Enhanced Data Service bereits vorhanden';
+END
+GO
+
+-- Feature 6: Enhanced Logging Service (controls SqlServerLoggingServiceV2 rollout)
+IF NOT EXISTS (SELECT * FROM Features WHERE FeatureNumber = 6)
+BEGIN
+    INSERT INTO Features (
+        FeatureNumber, Title, Description, DetailedDescription,
+        Category, Priority, IsEnabled, ImplementedDate
+    )
+    VALUES (
+        6,
+        'Enhanced Logging Service',
+        'Schaltet das Logging auf SqlServerLoggingServiceV2 um sobald Feature #6 aktiv ist',
+        'Ermöglicht die sichere Einführung des neuen Logging-Stacks über ein Feature Flag. Wird das Feature deaktiviert, verwendet die Factory weiterhin den bestehenden Logger.',
+        'Infrastructure',
+        'Medium',
+        0,
+        GETUTCDATE()
+    );
+    PRINT 'Feature #6: Enhanced Logging Service erstellt';
+END
+ELSE
+BEGIN
+    PRINT 'Feature #6: Enhanced Logging Service bereits vorhanden';
+END
+GO
+
 PRINT 'Feature-Initialisierung abgeschlossen';
 GO
 

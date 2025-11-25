@@ -39,8 +39,8 @@ public class SftpAdapter : AdapterBase
         string host,
         int port,
         string username,
+        IServiceBusService? serviceBusService = null,
         string adapterRole = "Source",
-        IMessageBoxService? messageBoxService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         string? password = null,
@@ -52,8 +52,7 @@ public class SftpAdapter : AdapterBase
         int? batchSize = null,
         ILogger<SftpAdapter>? logger = null)
         : base(
-            messageBoxService: messageBoxService,
-            subscriptionService: null,
+            serviceBusService: serviceBusService,
             interfaceName: interfaceName,
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
@@ -311,8 +310,144 @@ public class SftpAdapter : AdapterBase
     }
 
     /// <summary>
+    /// Processes files from SFTP server directly within the container app
+    /// Reads files, parses CSV, debatches to single records, sends to Service Bus
+    /// This method ensures all work is done in the container app, not via blob triggers
+    /// </summary>
+    public async Task ProcessFilesFromSftpAsync(
+        ICsvProcessingService csvProcessingService,
+        string fieldSeparator,
+        int skipHeaderLines = 0,
+        int skipFooterLines = 0,
+        char quoteCharacter = '"',
+        string? folder = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (AdapterRole != "Source")
+        {
+            LogProcessingState("ProcessFilesFromSftp", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return;
+        }
+
+        if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("ProcessFilesFromSftp", "Error", 
+                $"ServiceBusService={_serviceBusService != null}, InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return;
+        }
+
+        try
+        {
+            var targetFolder = !string.IsNullOrWhiteSpace(folder) ? folder : _folder;
+            if (string.IsNullOrWhiteSpace(targetFolder))
+            {
+                LogProcessingState("ProcessFilesFromSftp", "Error", "SFTP folder must be specified");
+                throw new InvalidOperationException("SFTP folder must be specified either in configuration or as parameter");
+            }
+
+            LogProcessingState("ProcessFilesFromSftp", "Starting", 
+                $"Interface: {_interfaceName}, AdapterInstanceGuid: {_adapterInstanceGuid.Value}, SFTP Folder: {targetFolder}, FileMask: {_fileMask}");
+
+            // List files from SFTP server
+            LogProcessingState("ProcessFilesFromSftp", "ListingFiles", $"Listing files from SFTP folder: {targetFolder}");
+            var fileNames = await ListFilesAsync(targetFolder, cancellationToken);
+
+            if (fileNames == null || fileNames.Count == 0)
+            {
+                LogProcessingState("ProcessFilesFromSftp", "NoFiles", $"No files found in SFTP folder: {targetFolder}");
+                return;
+            }
+
+            LogProcessingState("ProcessFilesFromSftp", "FilesFound", $"Found {fileNames.Count} file(s) to process");
+
+            // Ensure folder path ends with /
+            if (!targetFolder.EndsWith("/"))
+                targetFolder += "/";
+
+            // Process each file
+            var allHeaders = new List<string>();
+            var allRecords = new List<Dictionary<string, string>>();
+            var processedFiles = 0;
+            var failedFiles = 0;
+
+            foreach (var fileName in fileNames)
+            {
+                try
+                {
+                    var filePath = targetFolder + fileName;
+                    LogProcessingState("ProcessFilesFromSftp", "ReadingFile", $"Reading file: {fileName} from SFTP");
+
+                    // Read file content
+                    var fileContent = await ReadFileAsync(filePath, cancellationToken);
+                    LogProcessingState("ProcessFilesFromSftp", "FileRead", $"Read {fileContent.Length} characters from {fileName}");
+
+                    // Parse CSV
+                    LogProcessingState("ProcessFilesFromSftp", "ParsingCSV", $"Parsing CSV content from {fileName}");
+                    var (headers, records) = await csvProcessingService.ParseCsvWithHeadersAsync(
+                        fileContent, 
+                        fieldSeparator, 
+                        skipHeaderLines, 
+                        skipFooterLines, 
+                        quoteCharacter, 
+                        cancellationToken);
+
+                    LogProcessingState("ProcessFilesFromSftp", "CSVParsed", 
+                        $"Parsed {headers.Count} headers and {records.Count} records from {fileName}");
+
+                    // Use headers from first file, or merge if different
+                    if (allHeaders.Count == 0)
+                    {
+                        allHeaders = headers;
+                    }
+                    else if (!headers.SequenceEqual(allHeaders))
+                    {
+                        LogProcessingState("ProcessFilesFromSftp", "HeaderMismatch", 
+                            $"Headers differ between files. Using headers from first file. File: {fileName}");
+                    }
+
+                    allRecords.AddRange(records);
+                    processedFiles++;
+
+                    LogProcessingState("ProcessFilesFromSftp", "FileProcessed", 
+                        $"Successfully processed {fileName}: {records.Count} records");
+                }
+                catch (Exception ex)
+                {
+                    failedFiles++;
+                    LogProcessingState("ProcessFilesFromSftp", "FileError", 
+                        $"Failed to process file {fileName} from SFTP", ex);
+                    // Continue with next file
+                }
+            }
+
+            if (allRecords.Count == 0)
+            {
+                LogProcessingState("ProcessFilesFromSftp", "NoRecords", 
+                    $"No records found in {processedFiles} processed file(s), {failedFiles} failed file(s)");
+                return;
+            }
+
+            // Debatch and send to Service Bus (one message per record)
+            LogProcessingState("ProcessFilesFromSftp", "Debatching", 
+                $"Debatching {allRecords.Count} records from {processedFiles} file(s) to individual Service Bus messages");
+            
+            var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(allHeaders, allRecords, cancellationToken);
+            
+            LogProcessingState("ProcessFilesFromSftp", "Completed", 
+                $"Successfully processed {processedFiles} file(s) from SFTP, {failedFiles} failed, " +
+                $"sent {messagesSent} messages to Service Bus for {allRecords.Count} records");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessFilesFromSftp", "Error", 
+                "Failed to process files from SFTP server", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// IAdapter.WriteAsync implementation - writes data to SFTP server
-    /// When AdapterRole is "Destination", reads messages from MessageBox first
+    /// When AdapterRole is "Destination", reads messages from Service Bus first
     /// </summary>
     public override async Task WriteAsync(string destination, List<string> headers, List<Dictionary<string, string>> records, CancellationToken cancellationToken = default)
     {
@@ -372,9 +507,11 @@ public class SftpAdapter : AdapterBase
             
             _logger?.LogInformation("Successfully wrote {RecordCount} records to SFTP: {FullPath}", records?.Count ?? 0, fullPath);
             
-            // Mark messages as processed if they came from MessageBox
+            // Mark messages as processed if they came from Service Bus
             if (processedMessages != null && processedMessages.Count > 0)
             {
+                LogProcessingState("SftpAdapter.WriteAsync", "MarkingProcessed", 
+                    $"Marking {processedMessages.Count} messages as processed after writing to SFTP");
                 await MarkMessagesAsProcessedAsync(processedMessages, $"Written to SFTP destination: {fullPath}", cancellationToken);
             }
         }

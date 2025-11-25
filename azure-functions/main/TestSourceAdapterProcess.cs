@@ -111,7 +111,7 @@ public class TestSourceAdapterProcess
                                         instanceName = sourceInstance.InstanceName,
                                         adapterType = adapterType,
                                         success = true,
-                                        message = "CsvData set on adapter. File should be uploaded to csv-incoming and processed via blob trigger. Check Application Insights logs."
+                                        message = "CsvData set on adapter. File should be uploaded to csv-incoming and processed by container app. Check Application Insights logs."
                                     });
                                 }
                                 else

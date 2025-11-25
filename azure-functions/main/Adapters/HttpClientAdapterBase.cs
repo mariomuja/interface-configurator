@@ -22,8 +22,6 @@ public abstract class HttpClientAdapterBase : AdapterBase
 
     protected HttpClientAdapterBase(
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         int batchSize = 1000,
@@ -32,7 +30,7 @@ public abstract class HttpClientAdapterBase : AdapterBase
         HttpClient? httpClient = null,
         JQTransformationService? jqService = null,
         string? jqScriptFile = null)
-        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile)
     {
         if (httpClient != null)
         {

@@ -29,9 +29,8 @@ public class FileAdapter : AdapterBase
 
     public FileAdapter(
         BlobServiceClient blobServiceClient,
+        IServiceBusService? serviceBusService = null,
         string adapterRole = "Source",
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         string? receiveFolder = null,
@@ -41,8 +40,7 @@ public class FileAdapter : AdapterBase
         int? batchSize = null,
         ILogger<FileAdapter>? logger = null)
         : base(
-            messageBoxService: messageBoxService,
-            subscriptionService: subscriptionService,
+            serviceBusService: serviceBusService,
             interfaceName: interfaceName,
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
@@ -440,8 +438,8 @@ public class FileAdapter : AdapterBase
             allRecords = records;
         }
 
-        // Write to MessageBox if AdapterRole is "Source"
-        await WriteRecordsToMessageBoxAsync(allHeaders, allRecords, cancellationToken);
+        // Write to Service Bus if AdapterRole is "Source"
+        await WriteRecordsToServiceBusAsync(allHeaders, allRecords, cancellationToken);
 
         return (allHeaders, allRecords);
     }

@@ -222,46 +222,6 @@ var host = new HostBuilder()
             // Register Event Queue (in-memory)
             services.AddSingleton<IEventQueue, InMemoryEventQueue>();
             
-            // Register Message Subscription Service (Legacy - kept for backward compatibility)
-            // Note: These services are deprecated - messaging is now handled via Service Bus
-            services.AddScoped<IMessageSubscriptionService>(sp =>
-            {
-                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
-                var logger = sp.GetService<ILogger<MessageSubscriptionService>>();
-                if (interfaceConfigContext == null)
-                {
-                    return null!;
-                }
-                return new MessageSubscriptionService(interfaceConfigContext, logger);
-            });
-            
-            // Register Adapter Subscription Service (New: BizTalk-style subscriptions - filter criteria)
-            // Note: Deprecated - subscriptions are now managed via Service Bus
-            services.AddScoped<IAdapterSubscriptionService>(sp =>
-            {
-                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
-                var logger = sp.GetService<ILogger<AdapterSubscriptionService>>();
-                if (interfaceConfigContext == null)
-                {
-                    return null!;
-                }
-                return new AdapterSubscriptionService(interfaceConfigContext, logger);
-            });
-            
-            // Register Message Processing Service (New: Tracks message processing status)
-            // Note: Deprecated - message processing is now handled via Service Bus
-            services.AddScoped<IMessageProcessingService>(sp =>
-            {
-                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
-                var subscriptionService = sp.GetService<IAdapterSubscriptionService>();
-                var logger = sp.GetService<ILogger<MessageProcessingService>>();
-                if (interfaceConfigContext == null || subscriptionService == null)
-                {
-                    return null!;
-                }
-                return new MessageProcessingService(interfaceConfigContext, subscriptionService, logger);
-            });
-            
             // Register Service Bus Service (primary message communication)
             services.AddScoped<IServiceBusService>(sp =>
             {
@@ -295,23 +255,6 @@ var host = new HostBuilder()
                 return new ServiceBusSubscriptionService(connectionString, logger);
             });
             
-            // Register MessageBox Service (deprecated - kept for backward compatibility during migration)
-            // Note: Messaging is now handled via Azure Service Bus
-            // This service is only kept for legacy code that hasn't been migrated yet
-            services.AddScoped<IMessageBoxService>(sp =>
-            {
-                var interfaceConfigContext = sp.GetService<InterfaceConfigDbContext>();
-                var eventQueue = sp.GetService<IEventQueue>();
-                var subscriptionService = sp.GetService<IMessageSubscriptionService>();
-                var logger = sp.GetService<ILogger<MessageBoxService>>();
-                if (interfaceConfigContext == null)
-                {
-                    // Fallback to in-memory logging if InterfaceConfigDb is not available
-                    return null!;
-                }
-                return new MessageBoxService(interfaceConfigContext, eventQueue, subscriptionService, logger);
-            });
-            
             // Register SQL Server Logging Service (uses InterfaceConfigDb database)
             // Note: ILoggingService is now registered via FeatureFactory above
             // This registration is removed - the factory handles it
@@ -339,19 +282,6 @@ var host = new HostBuilder()
                 }
                 var logger = sp.GetService<ILogger<MetricsService>>();
                 return new MetricsService(telemetryClient, logger);
-            });
-            
-            // Register Dead Letter Monitor (deprecated - Service Bus handles dead letters)
-            services.AddScoped<DeadLetterMonitor>(sp =>
-            {
-                var messageBoxService = sp.GetService<IMessageBoxService>();
-                var logger = sp.GetService<ILogger<DeadLetterMonitor>>();
-                if (messageBoxService == null)
-                {
-                    // Return a no-op implementation if MessageBox is not available
-                    return new DeadLetterMonitor(null!, logger);
-                }
-                return new DeadLetterMonitor(messageBoxService, logger);
             });
             
             // Register Processing Statistics Service (uses InterfaceConfigDb database)
@@ -462,8 +392,7 @@ var host = new HostBuilder()
             {
                 var csvProcessingService = sp.GetRequiredService<ICsvProcessingService>();
                 var adapterConfig = sp.GetRequiredService<IAdapterConfigurationService>();
-                var messageBoxService = sp.GetService<IMessageBoxService>();
-                var subscriptionService = sp.GetService<IMessageSubscriptionService>();
+                var serviceBusService = sp.GetService<IServiceBusService>();
                 var logger = sp.GetService<ILogger<CsvAdapter>>();
                 var blobClient = sp.GetService<Azure.Storage.Blobs.BlobServiceClient>();
                 if (blobClient == null)
@@ -474,10 +403,9 @@ var host = new HostBuilder()
                 // Create FileAdapter for default FILE adapter type
                 var fileLogger = sp.GetService<ILogger<FileAdapter>>();
                 var fileAdapter = new FileAdapter(
-                    blobServiceClient,
+                    blobClient,
+                    serviceBusService: serviceBusService,
                     adapterRole: "Source",
-                    messageBoxService: messageBoxService,
-                    subscriptionService: subscriptionService,
                     interfaceName: "FromCsvToSqlServerExample",
                     adapterInstanceGuid: null,
                     receiveFolder: null,
@@ -491,8 +419,7 @@ var host = new HostBuilder()
                     csvProcessingService: csvProcessingService, 
                     adapterConfig: adapterConfig, 
                     blobServiceClient: blobClient, 
-                    messageBoxService: messageBoxService, 
-                    subscriptionService: subscriptionService, 
+                    serviceBusService: serviceBusService,
                     interfaceName: "FromCsvToSqlServerExample", 
                     adapterInstanceGuid: null,
                     receiveFolder: null,
@@ -514,8 +441,7 @@ var host = new HostBuilder()
                 var context = sp.GetService<ApplicationDbContext>();
                 var dynamicTableService = sp.GetRequiredService<IDynamicTableService>();
                 var dataService = sp.GetRequiredService<IDataService>();
-                var messageBoxService = sp.GetService<IMessageBoxService>();
-                var subscriptionService = sp.GetService<IMessageSubscriptionService>();
+                var serviceBusService = sp.GetService<IServiceBusService>();
                 var logger = sp.GetService<ILogger<SqlServerAdapter>>();
                 if (context == null)
                 {
@@ -523,7 +449,7 @@ var host = new HostBuilder()
                     // Still allow registration - will fail when actually used
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(context, dynamicTableService, dataService, messageBoxService, subscriptionService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
+                return new SqlServerAdapter(context, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
             });
             
         }

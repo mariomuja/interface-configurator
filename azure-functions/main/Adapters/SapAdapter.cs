@@ -50,8 +50,6 @@ public class SapAdapter : HttpClientAdapterBase
 
     public SapAdapter(
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         int batchSize = 100,
@@ -81,7 +79,7 @@ public class SapAdapter : HttpClientAdapterBase
         bool sapUseOData = false,
         bool sapUseRestApi = false,
         HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, httpClient)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, null, null, httpClient)
     {
         _sapApplicationServer = sapApplicationServer;
         _sapSystemNumber = sapSystemNumber;
@@ -183,17 +181,78 @@ public class SapAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("SAP Adapter (Source): Read {Count} records", records.Count);
 
-            // Write to MessageBox if used as source
-            if (AdapterRole == "Source" && _messageBoxService != null && records.Count > 0)
+            // Write to Service Bus if used as source (with debatching - one message per record)
+            if (AdapterRole == "Source" && records.Count > 0)
             {
-                await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
+                LogProcessingState("SapAdapter.ReadAsync", "SendingToServiceBus", 
+                    $"Sending {records.Count} IDOC records to Service Bus (debatching to individual messages)");
+                
+                var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+                
+                LogProcessingState("SapAdapter.ReadAsync", "ServiceBusSent", 
+                    $"Successfully sent {messagesSent} messages to Service Bus for {records.Count} IDOC records");
             }
 
             return (headers, records);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "SAP Adapter (Source): Error reading data from SAP");
+            LogProcessingState("SapAdapter.ReadAsync", "Error", 
+                "Failed to read and process IDOCs from SAP", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes IDOCs from SAP directly within the container app
+    /// Reads IDOCs, debatches to single records, sends to Service Bus
+    /// This method ensures all work is done in the container app, not via blob triggers
+    /// </summary>
+    public async Task ProcessIdocsFromSapAsync(CancellationToken cancellationToken = default)
+    {
+        if (AdapterRole != "Source")
+        {
+            LogProcessingState("ProcessIdocsFromSap", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return;
+        }
+
+        if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("ProcessIdocsFromSap", "Error", 
+                $"ServiceBusService={_serviceBusService != null}, InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return;
+        }
+
+        try
+        {
+            LogProcessingState("ProcessIdocsFromSap", "Starting", 
+                $"Interface: {_interfaceName}, AdapterInstanceGuid: {_adapterInstanceGuid.Value}, IDOCType: {_sapIdocType}");
+
+            // Read IDOCs from SAP
+            var (headers, records) = await ReadAsync(string.Empty, cancellationToken);
+
+            if (records == null || records.Count == 0)
+            {
+                LogProcessingState("ProcessIdocsFromSap", "NoRecords", "No IDOC records found in SAP");
+                return;
+            }
+
+            LogProcessingState("ProcessIdocsFromSap", "IdocsRead", 
+                $"Read {records.Count} IDOC records from SAP, {headers.Count} headers");
+
+            // Debatch and send to Service Bus (one message per record)
+            LogProcessingState("ProcessIdocsFromSap", "Debatching", 
+                $"Debatching {records.Count} IDOC records to individual Service Bus messages");
+            
+            var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+            
+            LogProcessingState("ProcessIdocsFromSap", "Completed", 
+                $"Successfully processed {records.Count} IDOC records, sent {messagesSent} messages to Service Bus");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessIdocsFromSap", "Error", 
+                "Failed to process IDOCs from SAP", ex);
             throw;
         }
     }
@@ -418,7 +477,7 @@ public class SapAdapter : HttpClientAdapterBase
     /// <summary>
     /// Sends IDOCs/data to SAP (Destination role)
     /// Supports OData, REST API, and RFC Gateway
-    /// Reads from MessageBox if used as Destination adapter
+    /// Reads from Service Bus if used as Destination adapter
     /// </summary>
     public override async Task WriteAsync(
         string destination, 
@@ -445,18 +504,18 @@ public class SapAdapter : HttpClientAdapterBase
             else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
             {
                 // No messages found, but continue to fallback: use provided records if available
-                _logger?.LogWarning("No messages found in MessageBox. Will use provided records if available.");
+                _logger?.LogWarning("No messages found in Service Bus. Will use provided records if available.");
             }
             
-            // If no messages were read from MessageBox, use provided records (fallback for direct calls)
-            // This allows adapters to work both ways: via MessageBox (timer-based) or direct (blob trigger)
+            // If no messages were read from Service Bus, use provided records (fallback for direct calls)
+            // This allows adapters to work both ways: via Service Bus (timer-based) or direct (blob trigger)
             if (records == null || records.Count == 0)
             {
-                _logger?.LogInformation("No records from MessageBox and no records provided. Nothing to write.");
+                _logger?.LogInformation("No records from Service Bus and no records provided. Nothing to write.");
                 return;
             }
             
-            // Validate headers and records if not reading from MessageBox
+            // Validate headers and records if not reading from Service Bus
             if (headers == null || headers.Count == 0)
             {
                 // Extract headers from first record if not provided
@@ -492,8 +551,8 @@ public class SapAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("SAP Adapter (Destination): Successfully sent {Count} records to SAP", records.Count);
 
-            // Mark messages as processed if they came from MessageBox
-            if (processedMessages != null && processedMessages.Count > 0 && _messageBoxService != null)
+            // Mark messages as processed if they came from Service Bus
+            if (processedMessages != null && processedMessages.Count > 0)
             {
                 await MarkMessagesAsProcessedAsync(processedMessages, $"Successfully sent {records.Count} records to SAP", cancellationToken);
             }

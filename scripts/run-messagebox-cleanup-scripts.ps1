@@ -1,4 +1,4 @@
-# Run MessageBox Database Cleanup Scripts
+# Run InterfaceConfigDb Database Cleanup Scripts
 # Script 1: Drop message and subscription tables
 # Script 2: Remove MessageId column from ProcessLogs table
 
@@ -7,10 +7,10 @@ param(
     [string]$SqlServerName = "sql-main-database",
     [string]$SqlAdminLogin = "sqladmin",
     [string]$SqlAdminPassword = "",
-    [string]$SqlDatabase = "MessageBox"
+    [string]$SqlDatabase = "InterfaceConfigDb"
 )
 
-Write-Host "`n=== Running MessageBox Database Cleanup Scripts ===" -ForegroundColor Cyan
+Write-Host "`n=== Running InterfaceConfigDb Cleanup Scripts ===" -ForegroundColor Cyan
 
 # Get SQL Server FQDN
 Write-Host "`n[1/3] Getting SQL Server information..." -ForegroundColor Yellow

@@ -95,8 +95,6 @@ public class AdapterFactory : IAdapterFactory
         var blobServiceClient = _serviceProvider.GetRequiredService<Azure.Storage.Blobs.BlobServiceClient>();
         var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
         var interfaceConfigService = _serviceProvider.GetService<IInterfaceConfigService>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>(); // Deprecated - kept for backward compatibility
-        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<CsvAdapter>>();
 
         // Get adapter instance GUID, receive folder, file mask, batch size, field separator, and destination properties
@@ -189,9 +187,8 @@ public class AdapterFactory : IAdapterFactory
             }
         }
 
-        // Ensure adapter instance exists in InterfaceConfigDb (formerly MessageBox)
-        // Prefer IInterfaceConfigService, fallback to IMessageBoxService for backward compatibility
-        var configService = interfaceConfigService ?? (IInterfaceConfigService?)messageBoxService;
+        // Ensure adapter instance exists in InterfaceConfigDb
+        var configService = interfaceConfigService;
         if (configService != null)
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
@@ -235,7 +232,7 @@ public class AdapterFactory : IAdapterFactory
                 sftpPort ?? 22,
                 sftpUsername!,
                 adapterRole: sftpAdapterRole,
-                messageBoxService: messageBoxService,
+                serviceBusService: serviceBusService,
                 interfaceName: config.InterfaceName,
                 adapterInstanceGuid: adapterInstanceGuid,
                 password: sftpPassword,
@@ -257,8 +254,7 @@ public class AdapterFactory : IAdapterFactory
             fileAdapter = new FileAdapter(
                 blobServiceClient,
                 adapterRole: fileAdapterRole,
-                messageBoxService: messageBoxService,
-                subscriptionService: subscriptionService,
+                serviceBusService: serviceBusService,
                 interfaceName: config.InterfaceName,
                 adapterInstanceGuid: adapterInstanceGuid,
                 receiveFolder: receiveFolder,
@@ -281,7 +277,7 @@ public class AdapterFactory : IAdapterFactory
                 sftpPort ?? 22,
                 sftpUsername!,
                 adapterRole: "Source",
-                messageBoxService: messageBoxService,
+                serviceBusService: serviceBusService,
                 interfaceName: config.InterfaceName,
                 adapterInstanceGuid: adapterInstanceGuid,
                 password: sftpPassword,
@@ -300,8 +296,6 @@ public class AdapterFactory : IAdapterFactory
             adapterConfig,
             blobServiceClient,
             serviceBusService,
-            messageBoxService,
-            subscriptionService,
             config.InterfaceName,
             adapterInstanceGuid,
             receiveFolder,
@@ -366,9 +360,8 @@ public class AdapterFactory : IAdapterFactory
         bool? failOnBadStatement = config.SqlFailOnBadStatement;
         var configService = _serviceProvider.GetService<IInterfaceConfigurationService>();
 
-        // Ensure adapter instance exists in InterfaceConfigDb (formerly MessageBox)
-        // Prefer IInterfaceConfigService, fallback to IMessageBoxService for backward compatibility
-        var configService = interfaceConfigService ?? (IInterfaceConfigService?)messageBoxService;
+        // Ensure adapter instance exists in InterfaceConfigDb
+        var configService = interfaceConfigService;
         if (configService != null)
         {
             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;
@@ -444,8 +437,6 @@ public class AdapterFactory : IAdapterFactory
             dynamicTableService,
             dataService,
             serviceBusService,
-            messageBoxService,
-            subscriptionService,
             config.InterfaceName,
             adapterInstanceGuid,
             connectionString,
@@ -470,8 +461,6 @@ public class AdapterFactory : IAdapterFactory
     private SapAdapter CreateSapAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
         var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
-        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<SapAdapter>>();
 
         SourceAdapterInstance? sourceInstance = null;
@@ -522,8 +511,6 @@ public class AdapterFactory : IAdapterFactory
 
         return new SapAdapter(
             serviceBusService,
-            messageBoxService,
-            subscriptionService,
             config.InterfaceName,
             adapterInstanceGuid,
             sapBatchSize,
@@ -556,8 +543,6 @@ public class AdapterFactory : IAdapterFactory
     private Dynamics365Adapter CreateDynamics365Adapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
         var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
-        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<Dynamics365Adapter>>();
 
         // Get adapter instance from Sources or Destinations dictionary
@@ -591,8 +576,6 @@ public class AdapterFactory : IAdapterFactory
 
         return new Dynamics365Adapter(
             serviceBusService,
-            messageBoxService,
-            subscriptionService,
             config.InterfaceName,
             adapterInstanceGuid,
             batchSize,
@@ -613,8 +596,6 @@ public class AdapterFactory : IAdapterFactory
     private CrmAdapter CreateCrmAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
     {
         var serviceBusService = _serviceProvider.GetService<IServiceBusService>();
-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>();
-        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();
         var logger = _serviceProvider.GetService<ILogger<CrmAdapter>>();
 
         // Get adapter instance from Sources or Destinations dictionary
@@ -646,8 +627,6 @@ public class AdapterFactory : IAdapterFactory
 
         return new CrmAdapter(
             serviceBusService,
-            messageBoxService,
-            subscriptionService,
             config.InterfaceName,
             adapterInstanceGuid,
             batchSize,

@@ -36,8 +36,6 @@ public class CrmAdapter : HttpClientAdapterBase
 
     public CrmAdapter(
         IServiceBusService? serviceBusService = null,
-        IMessageBoxService? messageBoxService = null,
-        IMessageSubscriptionService? subscriptionService = null,
         string? interfaceName = null,
         Guid? adapterInstanceGuid = null,
         int batchSize = 100,
@@ -53,7 +51,7 @@ public class CrmAdapter : HttpClientAdapterBase
         int adapterBatchSize = 100,
         bool useBatch = true,
         HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, messageBoxService, subscriptionService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, null, null, httpClient)
     {
         _organizationUrl = organizationUrl;
         _username = username;
@@ -231,17 +229,86 @@ public class CrmAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("CRM Adapter (Source): Read {Count} records", records.Count);
 
-            // Write to MessageBox if used as source
-            if (AdapterRole == "Source" && _messageBoxService != null && records.Count > 0)
+            // Write to Service Bus if used as source (with debatching - one message per record)
+            if (AdapterRole == "Source" && records.Count > 0)
             {
-                await WriteRecordsToMessageBoxAsync(headers, records, cancellationToken);
+                LogProcessingState("CrmAdapter.ReadAsync", "SendingToServiceBus", 
+                    $"Sending {records.Count} CRM records to Service Bus (debatching to individual messages)");
+                
+                var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+                
+                LogProcessingState("CrmAdapter.ReadAsync", "ServiceBusSent", 
+                    $"Successfully sent {messagesSent} messages to Service Bus for {records.Count} CRM records");
             }
 
             return (headers, records);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "CRM Adapter (Source): Error reading from Microsoft CRM");
+            LogProcessingState("CrmAdapter.ReadAsync", "Error", 
+                "Failed to read and process data from Microsoft CRM", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes data from Microsoft CRM directly within the container app
+    /// Reads entity records, debatches to single records, sends to Service Bus
+    /// This method ensures all work is done in the container app, not via blob triggers
+    /// </summary>
+    public async Task ProcessDataFromCrmAsync(CancellationToken cancellationToken = default)
+    {
+        if (AdapterRole != "Source")
+        {
+            LogProcessingState("ProcessDataFromCrm", "Skipped", $"AdapterRole is {AdapterRole}, not Source");
+            return;
+        }
+
+        if (_serviceBusService == null || string.IsNullOrWhiteSpace(_interfaceName) || !_adapterInstanceGuid.HasValue)
+        {
+            LogProcessingState("ProcessDataFromCrm", "Error", 
+                $"ServiceBusService={_serviceBusService != null}, InterfaceName={_interfaceName ?? "NULL"}, AdapterInstanceGuid={_adapterInstanceGuid.HasValue}");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_organizationUrl) || string.IsNullOrEmpty(_entityName))
+        {
+            LogProcessingState("ProcessDataFromCrm", "Error", 
+                "OrganizationUrl or EntityName is not configured");
+            throw new InvalidOperationException("CRM OrganizationUrl and EntityName are required");
+        }
+
+        try
+        {
+            LogProcessingState("ProcessDataFromCrm", "Starting", 
+                $"Interface: {_interfaceName}, AdapterInstanceGuid: {_adapterInstanceGuid.Value}, Entity: {_entityName}");
+
+            // Read data from Microsoft CRM
+            var (headers, records) = await ReadAsync(string.Empty, cancellationToken);
+
+            if (records == null || records.Count == 0)
+            {
+                LogProcessingState("ProcessDataFromCrm", "NoRecords", 
+                    $"No records found in CRM entity {_entityName}");
+                return;
+            }
+
+            LogProcessingState("ProcessDataFromCrm", "DataRead", 
+                $"Read {records.Count} records from CRM entity {_entityName}, {headers.Count} headers");
+
+            // Debatch and send to Service Bus (one message per record)
+            LogProcessingState("ProcessDataFromCrm", "Debatching", 
+                $"Debatching {records.Count} CRM records to individual Service Bus messages");
+            
+            var messagesSent = await WriteRecordsToServiceBusWithDebatchingAsync(headers, records, cancellationToken);
+            
+            LogProcessingState("ProcessDataFromCrm", "Completed", 
+                $"Successfully processed {records.Count} CRM records, sent {messagesSent} messages to Service Bus");
+        }
+        catch (Exception ex)
+        {
+            LogProcessingState("ProcessDataFromCrm", "Error", 
+                "Failed to process data from Microsoft CRM", ex);
             throw;
         }
     }
@@ -249,7 +316,7 @@ public class CrmAdapter : HttpClientAdapterBase
     /// <summary>
     /// Writes data to Microsoft CRM (Destination role) via Web API
     /// Supports ExecuteMultiple for batch operations (recommended by Microsoft)
-    /// Reads from MessageBox if used as Destination adapter
+    /// Reads from Service Bus if used as Destination adapter
     /// </summary>
     public override async Task WriteAsync(
         string destination, 
@@ -280,18 +347,18 @@ public class CrmAdapter : HttpClientAdapterBase
             else if (AdapterRole.Equals("Destination", StringComparison.OrdinalIgnoreCase))
             {
                 // No messages found, but continue to fallback: use provided records if available
-                _logger?.LogWarning("No messages found in MessageBox. Will use provided records if available.");
+                _logger?.LogWarning("No messages found in Service Bus. Will use provided records if available.");
             }
             
-            // If no messages were read from MessageBox, use provided records (fallback for direct calls)
-            // This allows adapters to work both ways: via MessageBox (timer-based) or direct (blob trigger)
+            // If no messages were read from Service Bus, use provided records (fallback for direct calls)
+            // This allows adapters to work both ways: via Service Bus (timer-based) or direct (blob trigger)
             if (records == null || records.Count == 0)
             {
-                _logger?.LogInformation("No records from MessageBox and no records provided. Nothing to write.");
+                _logger?.LogInformation("No records from Service Bus and no records provided. Nothing to write.");
                 return;
             }
             
-            // Validate headers and records if not reading from MessageBox
+            // Validate headers and records if not reading from Service Bus
             if (headers == null || headers.Count == 0)
             {
                 // Extract headers from first record if not provided
@@ -329,8 +396,8 @@ public class CrmAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("CRM Adapter (Destination): Successfully wrote {Count} records", records.Count);
 
-            // Mark messages as processed if they came from MessageBox
-            if (processedMessages != null && processedMessages.Count > 0 && _messageBoxService != null)
+            // Mark messages as processed if they came from Service Bus
+            if (processedMessages != null && processedMessages.Count > 0)
             {
                 await MarkMessagesAsProcessedAsync(processedMessages, $"Successfully wrote {records.Count} records to Microsoft CRM", cancellationToken);
             }

@@ -12,7 +12,14 @@ namespace InterfaceConfigurator.Main;
 
 /// <summary>
 /// Timer-triggered function that processes enabled Source adapters
-/// Each Source adapter reads from its source and writes to MessageBox
+/// Each Source adapter reads from its source and writes to Service Bus
+/// 
+/// NOTE: This function may be obsolete if all adapters run in container apps.
+/// Container apps process data directly using methods like ProcessFilesFromIncomingAsync,
+/// ProcessDataFromSapAsync, etc. This function may still be used for:
+/// - Adapters that don't have container apps yet
+/// - SQL Server adapters with polling statements
+/// - Fallback processing
 /// </summary>
 public class SourceAdapterFunction
 {
@@ -201,14 +208,14 @@ public class SourceAdapterFunction
                     if (csvSourceAdapter is CsvAdapter csvAdapter)
                     {
                         csvAdapter.CsvData = sourceInstance.CsvData; // This will trigger upload to csv-incoming
-                        _logger.LogInformation("CsvData set on adapter, file will be uploaded to csv-incoming and processed via blob trigger");
+                        _logger.LogInformation("CsvData set on adapter, file will be uploaded to csv-incoming and processed by container app");
                         if (!string.IsNullOrEmpty(currentHash))
                         {
                             _lastCsvDataHashes[hashKey] = currentHash;
                         }
                     }
                     UpdatePollTime();
-                    return; // File processing happens via blob trigger
+                    return; // File processing happens in container app via ProcessFilesFromIncomingAsync
                 }
             }
 
@@ -236,8 +243,9 @@ public class SourceAdapterFunction
                 
                 // For FILE adapter type: Poll folder and copy files to csv-incoming
                 // For SFTP adapter type: Read from SFTP and upload files to csv-incoming
-                // Note: In Azure Blob Storage, new files in csv-incoming trigger BlobTrigger automatically
-                // This timer function will process files from other folders and copy them to csv-incoming
+                // Note: Files in csv-incoming are processed by container apps via ProcessFilesFromIncomingAsync
+                // This timer function may process files from other folders and copy them to csv-incoming
+                // (if container apps are not yet deployed for this adapter instance)
                 source = sourceInstance.SourceReceiveFolder;
                 _logger.LogInformation("Using ReceiveFolder as source: {Source}", source);
             }
@@ -272,11 +280,11 @@ public class SourceAdapterFunction
                     $"The ReadAsync functionality has not been implemented for this adapter.");
             }
 
-            // Read from source (adapter will automatically debatch and write to MessageBox)
+            // Read from source (adapter will automatically debatch and write to Service Bus)
             var (headers, records) = await adapter.ReadAsync(source, cancellationToken);
 
             _logger.LogInformation(
-                "Successfully processed source instance '{InstanceName}' for interface '{InterfaceName}': {RecordCount} records read and written to MessageBox",
+                "Successfully processed source instance '{InstanceName}' for interface '{InterfaceName}': {RecordCount} records read and written to Service Bus",
                 sourceInstance.InstanceName, config.InterfaceName, records.Count);
 
             UpdatePollTime();
