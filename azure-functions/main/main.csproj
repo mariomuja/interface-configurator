@@ -34,7 +34,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\main.Core\main.Core.csproj" />
+    <ProjectReference Include="..\..\main.Core\main.Core.csproj" />
+    <ProjectReference Include="..\..\adapters\adapters.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

@@ -5,7 +5,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
-using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Adapters;
 using System.Text.Json;
 
 namespace InterfaceConfigurator.Main;

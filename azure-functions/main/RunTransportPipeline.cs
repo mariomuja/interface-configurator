@@ -9,7 +9,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
-using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Adapters;
 using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;

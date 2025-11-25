@@ -4,9 +4,11 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main", "main\main.csproj", "{C3D7B9B6-5110-359F-2AE5-BAB6DD2C5537}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core", "main.Core\main.Core.csproj", "{54510603-F244-E839-A630-504B21FAE5C3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core", "..\main.Core\main.Core.csproj", "{54510603-F244-E839-A630-504B21FAE5C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core.Tests", "main.Core.Tests\main.Core.Tests.csproj", "{E55750E5-90BB-6A20-F599-2D5C51D2086B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "main.Core.Tests", "..\tests\main.Core.Tests\main.Core.Tests.csproj", "{E55750E5-90BB-6A20-F599-2D5C51D2086B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "adapters", "..\adapters\adapters.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "main", "main", "{4ED84258-AC28-DE93-F274-79AADBA57FF4}"
 EndProject
@@ -40,6 +42,10 @@ Global
 		{E55750E5-90BB-6A20-F599-2D5C51D2086B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E55750E5-90BB-6A20-F599-2D5C51D2086B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E55750E5-90BB-6A20-F599-2D5C51D2086B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99BDC92F-65E8-3668-3FDD-488E03B3E40C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99BDC92F-65E8-3668-3FDD-488E03B3E40C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99BDC92F-65E8-3668-3FDD-488E03B3E40C}.Release|Any CPU.ActiveCfg = Release|Any CPU

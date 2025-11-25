@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Memory;
-using InterfaceConfigurator.Main.Adapters;
+using InterfaceConfigurator.Adapters;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Core.Factories;

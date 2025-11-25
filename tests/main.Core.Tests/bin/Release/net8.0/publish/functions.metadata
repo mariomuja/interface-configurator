@@ -1,0 +1,23 @@
+[
+  {
+    "name": "ProcessCsvBlobTrigger",
+    "scriptFile": "ProcessCsvBlobTrigger.dll",
+    "entryPoint": "ProcessCsvBlobTrigger.ProcessCsvBlobTriggerFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "blobContent",
+        "direction": "In",
+        "type": "blobTrigger",
+        "path": "csv-uploads/{name}",
+        "connection": "AzureWebJobsStorage",
+        "properties": {
+          "supportsDeferredBinding": "True"
+        }
+      }
+    ]
+  }
+]
