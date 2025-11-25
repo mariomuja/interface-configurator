@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Azure.Messaging.ServiceBus;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Interfaces;
 
 namespace InterfaceConfigurator.Main.Services;
 

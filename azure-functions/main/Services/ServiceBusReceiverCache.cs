@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Logging;
-using InterfaceConfigurator.Main.Core.Interfaces;
+using InterfaceConfigurator.Main.Interfaces;
 using InterfaceConfigurator.Main.Core.Helpers;
 
 namespace InterfaceConfigurator.Main.Services;
@@ -203,4 +203,5 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
         }
     }
 }
+
 

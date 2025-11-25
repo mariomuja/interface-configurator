@@ -1,6 +1,4 @@
-using Azure.Messaging.ServiceBus;
-
-namespace InterfaceConfigurator.Main.Core.Interfaces;
+namespace InterfaceConfigurator.Main.Interfaces;
 
 /// <summary>
 /// Service for caching and managing Service Bus receiver instances
@@ -15,7 +13,7 @@ public interface IServiceBusReceiverCache
     /// <param name="subscriptionName">Subscription name</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>ServiceBusReceiver instance</returns>
-    Task<ServiceBusReceiver> GetOrCreateReceiverAsync(
+    Task<Azure.Messaging.ServiceBus.ServiceBusReceiver> GetOrCreateReceiverAsync(
         string topicName,
         string subscriptionName,
         CancellationToken cancellationToken = default);
