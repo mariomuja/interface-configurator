@@ -31,7 +31,7 @@ export interface Feature {
   providedIn: 'root'
 })
 export class FeatureService {
-  private readonly API_URL = 'https://func-integration-main.azurewebsites.net/api';
+  private readonly apiUrl = this.getApiUrl();
 
   constructor(
     private http: HttpClient,
@@ -40,13 +40,13 @@ export class FeatureService {
 
   getFeatures(): Observable<Feature[]> {
     const headers = this.authService.getAuthHeaders();
-    return this.http.get<Feature[]>(`${this.API_URL}/GetFeatures`, { headers });
+    return this.http.get<Feature[]>(`${this.apiUrl}/GetFeatures`, { headers });
   }
 
   toggleFeature(featureId: number): Observable<{ success: boolean }> {
     const headers = this.authService.getAuthHeaders();
     return this.http.post<{ success: boolean }>(
-      `${this.API_URL}/ToggleFeature`,
+      `${this.apiUrl}/ToggleFeature`,
       { featureId },
       { headers }
     );
@@ -55,10 +55,63 @@ export class FeatureService {
   updateTestComment(featureId: number, testComment: string): Observable<{ success: boolean }> {
     const headers = this.authService.getAuthHeaders();
     return this.http.post<{ success: boolean }>(
-      `${this.API_URL}/UpdateFeatureTestComment`,
+      `${this.apiUrl}/UpdateFeatureTestComment`,
       { featureId, testComment },
       { headers }
     );
+  }
+
+  private getApiUrl(): string {
+    const configured = this.normalizeBaseUrl(this.readGlobalApiBaseUrl());
+    if (configured) {
+      return configured;
+    }
+
+    if (typeof window !== 'undefined') {
+      const localOverride = this.normalizeBaseUrl(
+        window.localStorage?.getItem('interfaceConfigurator.apiBaseUrl') ?? undefined
+      );
+      if (localOverride) {
+        return localOverride;
+      }
+
+      const hostname = window.location.hostname.toLowerCase();
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:7071/api';
+      }
+
+      return `${window.location.origin.replace(/\/$/, '')}/api`;
+    }
+
+    return 'https://func-integration-main.azurewebsites.net/api';
+  }
+
+  private readGlobalApiBaseUrl(): string | undefined {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const globalWindow = window as any;
+    return (
+      globalWindow.INTERFACE_CONFIGURATOR_API_BASE_URL ??
+      globalWindow.__interfaceConfiguratorApiBaseUrl ??
+      globalWindow.__interfaceConfigurator?.apiBaseUrl ??
+      globalWindow.__env?.API_BASE_URL ??
+      globalWindow.__env?.apiBaseUrl
+    );
+  }
+
+  private normalizeBaseUrl(url?: string): string | undefined {
+    if (!url) {
+      return undefined;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    return trimmed.replace(/\/+$/, '');
   }
 }
 

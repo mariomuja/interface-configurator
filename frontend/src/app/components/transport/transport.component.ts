@@ -164,6 +164,126 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.interfaceConfigurations.find(c => c.interfaceName === name);
   }
   
+  private findSourceInstance(
+    config: any,
+    options?: { adapterInstanceGuid?: string; instanceName?: string }
+  ): any {
+    if (!config || !config.sources) {
+      return null;
+    }
+    
+    const sources = config.sources;
+    const isArray = Array.isArray(sources);
+    const lookup = isArray ? undefined : sources;
+    const entries: any[] = isArray ? sources : Object.values(sources);
+    
+    const guidCandidates = [
+      options?.adapterInstanceGuid,
+      config?.sourceAdapterInstanceGuid,
+      this.sourceAdapterInstanceGuid
+    ].filter((value): value is string => !!value && value.length > 0);
+    
+    for (const guid of guidCandidates) {
+      if (!guid) continue;
+      if (lookup && lookup[guid]) {
+        return lookup[guid];
+      }
+      const matchByGuid = entries.find(entry => entry?.adapterInstanceGuid === guid);
+      if (matchByGuid) {
+        return matchByGuid;
+      }
+    }
+    
+    const nameCandidates = [
+      options?.instanceName,
+      config?.sourceInstanceName,
+      this.sourceInstanceName
+    ].filter((value): value is string => !!value && value.length > 0);
+    
+    for (const name of nameCandidates) {
+      if (!name) continue;
+      if (lookup && lookup[name]) {
+        return lookup[name];
+      }
+      const matchByName = entries.find(entry => entry?.instanceName === name);
+      if (matchByName) {
+        return matchByName;
+      }
+    }
+    
+    return entries.length > 0 ? entries[0] : null;
+  }
+  
+  private getEffectiveSourceEnabled(
+    config?: any,
+    options?: { adapterInstanceGuid?: string; instanceName?: string }
+  ): boolean | undefined {
+    if (!config) {
+      return undefined;
+    }
+    
+    const sourceInstance = this.findSourceInstance(config, options);
+    if (sourceInstance) {
+      if (sourceInstance.isEnabled !== undefined) {
+        return sourceInstance.isEnabled;
+      }
+      if (sourceInstance.IsEnabled !== undefined) {
+        return sourceInstance.IsEnabled;
+      }
+    }
+    
+    if (config.sourceIsEnabled !== undefined) {
+      return config.sourceIsEnabled;
+    }
+    if (config.SourceIsEnabled !== undefined) {
+      return config.SourceIsEnabled;
+    }
+    
+    return undefined;
+  }
+  
+  private applyEnabledStateToSourceConfig(
+    config: any,
+    enabled: boolean,
+    options?: { adapterInstanceGuid?: string; instanceName?: string }
+  ): void {
+    if (!config) {
+      return;
+    }
+    
+    config.sourceIsEnabled = enabled;
+    if (config.SourceIsEnabled !== undefined) {
+      config.SourceIsEnabled = enabled;
+    }
+    
+    const sourceInstance = this.findSourceInstance(config, options);
+    if (sourceInstance) {
+      sourceInstance.isEnabled = enabled;
+      if (sourceInstance.IsEnabled !== undefined) {
+        sourceInstance.IsEnabled = enabled;
+      }
+    }
+  }
+  
+  private shouldIncludeSqlProperties(adapterName?: string): boolean {
+    return (adapterName || '').toLowerCase() === 'sqlserver';
+  }
+
+  private assignWhenPresent(target: any, key: string, value: any): void {
+    if (value !== undefined && value !== null) {
+      target[key] = value;
+    }
+  }
+  
+  private getFirstDefined<T>(...values: Array<T | undefined | null>): T | undefined {
+    for (const value of values) {
+      if (value !== undefined && value !== null) {
+        return value;
+      }
+    }
+    return undefined;
+  }
+  
   // Track if table exists (based on whether we have columns loaded)
   tableExists: boolean = false;
 
@@ -1253,7 +1373,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Check if adapters are enabled - do NOT automatically enable them
     // User must explicitly enable adapters via settings dialog
-    const sourceWasEnabledBeforeStart = activeConfig.sourceIsEnabled ?? false;
+    const sourceWasEnabledBeforeStart = this.getEffectiveSourceEnabled(activeConfig, {
+      adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+      instanceName: this.sourceInstanceName
+    }) ?? false;
     const destinationWasEnabledBeforeStart = activeConfig.destinationIsEnabled ?? false;
 
     // Only start transport if both source and destination are enabled
@@ -1296,8 +1419,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (config.sourceAdapterName !== 'CSV' || !config.sourceIsEnabled) {
-      if (!config.sourceIsEnabled) {
+    const sourceEnabled = this.getEffectiveSourceEnabled(config, {
+      adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+      instanceName: this.sourceInstanceName
+    }) ?? false;
+    if (config.sourceAdapterName !== 'CSV' || !sourceEnabled) {
+      if (!sourceEnabled) {
         this.autoStartedInterfaces.delete(targetInterface);
       }
       return;
@@ -1501,7 +1628,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     const defaultConfig = this.interfaceConfigurations.find(c => c.interfaceName === this.DEFAULT_INTERFACE_NAME);
     return {
       exists: !!defaultConfig,
-      sourceEnabled: defaultConfig?.sourceIsEnabled ?? false,
+      sourceEnabled: this.getEffectiveSourceEnabled(defaultConfig) ?? false,
       destinationEnabled: defaultConfig?.destinationIsEnabled ?? false
     };
   }
@@ -1620,7 +1747,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Get the current config to restore on error
     const activeConfig = this.getInterfaceConfig(activeInterfaceName);
-    const previousEnabledValue = activeConfig?.sourceIsEnabled ?? this.sourceIsEnabled;
+    const previousEnabledValue = this.getEffectiveSourceEnabled(activeConfig, {
+      adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+      instanceName: this.sourceInstanceName
+    });
     const enabledValueToSave = this.sourceIsEnabled;
     
     // Record when we're saving
@@ -1631,12 +1761,18 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       next: () => {
         // Update local cache immediately so dialog reads correct value if reopened
         if (activeConfig) {
-          activeConfig.sourceIsEnabled = enabledValueToSave;
+          this.applyEnabledStateToSourceConfig(activeConfig, enabledValueToSave, {
+            adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+            instanceName: this.sourceInstanceName
+          });
         }
         // Also update the interfaceConfigurations array cache
         const configIndex = this.interfaceConfigurations.findIndex(c => c.interfaceName === activeInterfaceName);
         if (configIndex >= 0) {
-          this.interfaceConfigurations[configIndex].sourceIsEnabled = enabledValueToSave;
+          this.applyEnabledStateToSourceConfig(this.interfaceConfigurations[configIndex], enabledValueToSave, {
+            adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+            instanceName: this.sourceInstanceName
+          });
         }
         // Ensure local state matches what we just saved
         this.sourceIsEnabled = enabledValueToSave;
@@ -1655,14 +1791,22 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           setTimeout(() => {
             const reloadedConfig = this.getInterfaceConfig(activeInterfaceName);
             if (reloadedConfig) {
-              // Always use the value we just saved, not what backend returned
-              // This ensures consistency even if backend hasn't persisted yet
-              if (reloadedConfig.sourceIsEnabled !== savedEnabledState) {
-                console.log(`Restoring saved sourceIsEnabled value: ${savedEnabledState} (backend had: ${reloadedConfig.sourceIsEnabled})`);
-                reloadedConfig.sourceIsEnabled = savedEnabledState;
+              const reloadedEnabled = this.getEffectiveSourceEnabled(reloadedConfig, {
+                adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+                instanceName: this.sourceInstanceName
+              });
+              if (reloadedEnabled !== savedEnabledState) {
+                console.log(`Restoring saved sourceIsEnabled value: ${savedEnabledState} (backend had: ${reloadedEnabled})`);
+                this.applyEnabledStateToSourceConfig(reloadedConfig, savedEnabledState, {
+                  adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+                  instanceName: this.sourceInstanceName
+                });
                 const configIndex = this.interfaceConfigurations.findIndex(c => c.interfaceName === activeInterfaceName);
                 if (configIndex >= 0) {
-                  this.interfaceConfigurations[configIndex].sourceIsEnabled = savedEnabledState;
+                  this.applyEnabledStateToSourceConfig(this.interfaceConfigurations[configIndex], savedEnabledState, {
+                    adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+                    instanceName: this.sourceInstanceName
+                  });
                 }
               }
             }
@@ -1670,7 +1814,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         }, 2000);
         
         this.snackBar.open(
-          `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${enabledValueToSave ? 'Die CSV-Daten werden verarbeitet, wenn auch der Destination-Adapter aktiviert ist.' : 'Der Prozess stoppt sofort.'}`,
+          `Source adapter ${enabledValueToSave ? 'aktiviert' : 'deaktiviert'}. ${
+            enabledValueToSave
+              ? 'CSV-Daten werden nun unabhängig vom Destination-Adapter in der eigenen Container App verarbeitet und an den Service Bus übergeben. Aktivieren Sie einen Destination-Adapter nur, wenn Sie die Nachrichten weiterverarbeiten möchten.'
+              : 'Der Prozess stoppt sofort.'
+          }`,
           'OK',
           { duration: 5000 }
         );
@@ -1685,9 +1833,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler beim Aktivieren/Deaktivieren des Source-Adapters');
         this.showErrorMessageWithCopy(detailedMessage, { duration: 10000 });
         // Restore previous value
-        this.sourceIsEnabled = previousEnabledValue;
+        const valueToRestore = previousEnabledValue !== undefined ? previousEnabledValue : !enabledValueToSave;
+        this.sourceIsEnabled = valueToRestore;
         if (activeConfig) {
-          activeConfig.sourceIsEnabled = previousEnabledValue;
+          this.applyEnabledStateToSourceConfig(activeConfig, valueToRestore, {
+            adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+            instanceName: this.sourceInstanceName
+          });
+        }
+        const configIndex = this.interfaceConfigurations.findIndex(c => c.interfaceName === activeInterfaceName);
+        if (configIndex >= 0) {
+          this.applyEnabledStateToSourceConfig(this.interfaceConfigurations[configIndex], valueToRestore, {
+            adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+            instanceName: this.sourceInstanceName
+          });
         }
       }
     });
@@ -2089,14 +2248,17 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
             this.interfaceConfigurations.push(freshConfig);
           }
           
-          // Sync local state from fresh config
-          // Use explicit check for undefined - false is a valid value!
-          // IMPORTANT: Always use the value from backend, even if it's false
-          // Check both direct property and hierarchical structure
-          if (freshConfig.sourceIsEnabled !== undefined) {
-            this.sourceIsEnabled = freshConfig.sourceIsEnabled;
-          } else if (freshConfig.sources?.[this.sourceAdapterName]?.isEnabled !== undefined) {
-            this.sourceIsEnabled = freshConfig.sources[this.sourceAdapterName].isEnabled;
+          // Sync local state from fresh config (use adapter instance properties as source of truth)
+          const sourceInstanceFromConfig = this.findSourceInstance(freshConfig, {
+            adapterInstanceGuid: freshConfig?.sourceAdapterInstanceGuid,
+            instanceName: freshConfig?.sourceInstanceName
+          });
+          const enabledFromConfig = this.getEffectiveSourceEnabled(freshConfig, {
+            adapterInstanceGuid: sourceInstanceFromConfig?.adapterInstanceGuid,
+            instanceName: sourceInstanceFromConfig?.instanceName
+          });
+          if (enabledFromConfig !== undefined) {
+            this.sourceIsEnabled = enabledFromConfig;
           }
           this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
           this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
@@ -2105,6 +2267,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
           this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
           this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+          if (sourceInstanceFromConfig?.adapterInstanceGuid) {
+            this.sourceAdapterInstanceGuid = sourceInstanceFromConfig.adapterInstanceGuid;
+          }
           
           console.log('After sync - this.sourceIsEnabled:', this.sourceIsEnabled);
           console.log('Opening dialog with freshConfig:', freshConfig);
@@ -2135,21 +2300,23 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     console.log('openSourceAdapterSettingsDialog - isEnabled from sources:', activeConfig?.sources?.[this.sourceAdapterName]?.isEnabled);
     console.log('openSourceAdapterSettingsDialog - sourceIsEnabled local:', this.sourceIsEnabled);
     
+    const sourceInstance = this.findSourceInstance(activeConfig, {
+      adapterInstanceGuid: this.sourceAdapterInstanceGuid || activeConfig?.sourceAdapterInstanceGuid,
+      instanceName: activeConfig?.sourceInstanceName || this.sourceInstanceName
+    });
+    const resolvedInstanceName = sourceInstance?.instanceName !== undefined
+      ? sourceInstance.instanceName
+      : (activeConfig?.sourceInstanceName !== undefined ? activeConfig.sourceInstanceName : this.sourceInstanceName);
+    const resolvedIsEnabled = this.getEffectiveSourceEnabled(activeConfig, {
+      adapterInstanceGuid: sourceInstance?.adapterInstanceGuid,
+      instanceName: sourceInstance?.instanceName
+    });
+    
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
       adapterName: this.sourceAdapterName,
-      // Always read from config (backend) - use explicit undefined check
-      instanceName: activeConfig?.sourceInstanceName !== undefined ? activeConfig.sourceInstanceName : this.sourceInstanceName,
-      // Read isEnabled from config (backend) - use explicit boolean check
-      // If config exists, use its value (even if false). Only fallback to local state if config is null/undefined
-      // IMPORTANT: Check both sourceIsEnabled directly and in the sources hierarchy
-      isEnabled: activeConfig !== null && activeConfig !== undefined 
-        ? (activeConfig.sourceIsEnabled !== undefined 
-            ? activeConfig.sourceIsEnabled 
-            : (activeConfig.sources?.[this.sourceAdapterName]?.isEnabled !== undefined
-                ? activeConfig.sources[this.sourceAdapterName].isEnabled
-                : false))
-        : this.sourceIsEnabled,
+      instanceName: resolvedInstanceName,
+      isEnabled: resolvedIsEnabled !== undefined ? resolvedIsEnabled : this.sourceIsEnabled,
       // Use explicit undefined checks - empty string is a valid value!
       receiveFolder: activeConfig?.sourceReceiveFolder !== undefined ? activeConfig.sourceReceiveFolder : this.sourceReceiveFolder,
       fileMask: activeConfig?.sourceFileMask !== undefined ? activeConfig.sourceFileMask : this.sourceFileMask,
@@ -2187,7 +2354,9 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       sqlPollingInterval: this.sqlPollingInterval,
       sqlUseTransaction: this.sqlUseTransaction,
       sqlBatchSize: this.sqlBatchSize,
-      adapterInstanceGuid: activeConfig?.sourceAdapterInstanceGuid !== undefined ? activeConfig.sourceAdapterInstanceGuid : this.sourceAdapterInstanceGuid
+      adapterInstanceGuid: sourceInstance?.adapterInstanceGuid !== undefined
+        ? sourceInstance.adapterInstanceGuid
+        : (activeConfig?.sourceAdapterInstanceGuid !== undefined ? activeConfig.sourceAdapterInstanceGuid : this.sourceAdapterInstanceGuid)
     };
 
     console.log('openSourceAdapterSettingsDialog - dialogData.isEnabled:', dialogData.isEnabled);
@@ -2355,7 +2524,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.sourceIsEnabled = savedEnabledState; // Preserve the saved enabled state
                 // Also update the cache to reflect the saved enabled state
                 if (index >= 0) {
-                  this.interfaceConfigurations[index].sourceIsEnabled = savedEnabledState;
+                  this.applyEnabledStateToSourceConfig(this.interfaceConfigurations[index], savedEnabledState, {
+                    adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+                    instanceName: this.sourceInstanceName
+                  });
+                } else {
+                  this.applyEnabledStateToSourceConfig(freshConfig, savedEnabledState, {
+                    adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+                    instanceName: this.sourceInstanceName
+                  });
                 }
                 this.sourceInstanceName = freshConfig.sourceInstanceName || this.sourceInstanceName;
                 this.sourceReceiveFolder = freshConfig.sourceReceiveFolder || this.sourceReceiveFolder;
@@ -2363,7 +2540,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.sourceBatchSize = freshConfig.sourceBatchSize ?? this.sourceBatchSize;
                 this.sourceFieldSeparator = freshConfig.sourceFieldSeparator || this.sourceFieldSeparator;
                 this.csvPollingInterval = freshConfig.csvPollingInterval ?? this.csvPollingInterval;
-                this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid;
+                const refreshedInstance = this.findSourceInstance(freshConfig, {
+                  adapterInstanceGuid: freshConfig?.sourceAdapterInstanceGuid,
+                  instanceName: freshConfig?.sourceInstanceName
+                });
+                if (refreshedInstance?.adapterInstanceGuid) {
+                  this.sourceAdapterInstanceGuid = refreshedInstance.adapterInstanceGuid;
+                } else if (freshConfig.sourceAdapterInstanceGuid) {
+                  this.sourceAdapterInstanceGuid = freshConfig.sourceAdapterInstanceGuid;
+                }
                 
                 // Always sync CSV data with backend (backend is source of truth)
                 // Sample data is only initialized ONCE when CSV adapter instance is first created
@@ -2391,7 +2576,10 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           const savedEnabledState = this.sourceIsEnabled;
           const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
           if (index >= 0) {
-            this.interfaceConfigurations[index].sourceIsEnabled = savedEnabledState;
+            this.applyEnabledStateToSourceConfig(this.interfaceConfigurations[index], savedEnabledState, {
+              adapterInstanceGuid: this.sourceAdapterInstanceGuid,
+              instanceName: this.sourceInstanceName
+            });
           }
         }
       }
@@ -2905,21 +3093,20 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sourceInstanceName = config.sourceInstanceName || this.sourceInstanceName;
     this.destinationInstanceName = config.destinationInstanceName || this.destinationInstanceName;
     
+    const primarySourceInstance = this.findSourceInstance(config, {
+      adapterInstanceGuid: config?.sourceAdapterInstanceGuid || this.sourceAdapterInstanceGuid,
+      instanceName: config?.sourceInstanceName || this.sourceInstanceName
+    });
+    
     // Preserve enabled state if we just saved it (within last 5 seconds)
     const wasRecentlySaved = this.lastEnabledSaveTime[config.interfaceName] && 
       (Date.now() - this.lastEnabledSaveTime[config.interfaceName]) < 5000;
     if (!wasRecentlySaved) {
-      // Check both sourceIsEnabled directly and in Sources hierarchy
-      let enabledFromConfig = false;
-      if (config.sourceIsEnabled !== undefined) {
-        enabledFromConfig = config.sourceIsEnabled;
-      } else if (config.sources?.[this.sourceInstanceName]?.isEnabled !== undefined) {
-        enabledFromConfig = config.sources[this.sourceInstanceName].isEnabled;
-      } else if (config.sources && Object.keys(config.sources).length > 0) {
-        const firstSource = Object.values(config.sources)[0] as any;
-        enabledFromConfig = firstSource?.isEnabled ?? false;
-      }
-      this.sourceIsEnabled = enabledFromConfig;
+      const enabledFromConfig = this.getEffectiveSourceEnabled(config, {
+        adapterInstanceGuid: primarySourceInstance?.adapterInstanceGuid,
+        instanceName: primarySourceInstance?.instanceName
+      });
+      this.sourceIsEnabled = enabledFromConfig !== undefined ? enabledFromConfig : false;
     }
     this.destinationIsEnabled = config.destinationIsEnabled ?? this.destinationIsEnabled;
     this.sourceAdapterName = (config.sourceAdapterName === 'SqlServer' ? 'SqlServer' : 'CSV') as 'CSV' | 'SqlServer';
@@ -2930,13 +3117,11 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.csvPollingInterval = config.csvPollingInterval ?? 10;
     this.destinationReceiveFolder = config.destinationReceiveFolder || this.destinationReceiveFolder;
     this.destinationFileMask = config.destinationFileMask || this.destinationFileMask;
-    // Try new structure first (sources dictionary)
-    if (config.sources && Object.keys(config.sources).length > 0) {
-      const sourceInstance = Object.values(config.sources)[0] as any;
-      this.sourceAdapterInstanceGuid = sourceInstance?.adapterInstanceGuid || '';
-    } else {
+    if (primarySourceInstance?.adapterInstanceGuid) {
+      this.sourceAdapterInstanceGuid = primarySourceInstance.adapterInstanceGuid;
+    } else if (config.sourceAdapterInstanceGuid) {
       // Fallback to old structure
-      this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid || '';
+      this.sourceAdapterInstanceGuid = config.sourceAdapterInstanceGuid;
     }
     this.destinationAdapterInstanceGuid = config.destinationAdapterInstanceGuid || '';
     
@@ -3483,88 +3668,100 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Use the new hierarchical structure - normalize all properties to PascalCase
         Object.keys(sourcesData).forEach(instanceName => {
           const sourceInstance = sourcesData[instanceName];
-          structuredConfig.Sources[instanceName] = {
+          const adapterName = (sourceInstance.AdapterName || sourceInstance.adapterName || 'CSV').toString();
+          const normalizedSource: any = {
             InstanceName: sourceInstance.InstanceName || sourceInstance.instanceName || instanceName,
-            AdapterName: sourceInstance.AdapterName || sourceInstance.adapterName || 'CSV',
+            AdapterName: adapterName,
             IsEnabled: sourceInstance.IsEnabled !== undefined ? sourceInstance.IsEnabled : (sourceInstance.isEnabled !== undefined ? sourceInstance.isEnabled : false),
             AdapterInstanceGuid: sourceInstance.AdapterInstanceGuid || sourceInstance.adapterInstanceGuid || '',
-            Configuration: sourceInstance.Configuration || sourceInstance.configuration || '',
-            // Copy all source properties - handle both camelCase and PascalCase
-            SourceReceiveFolder: sourceInstance.SourceReceiveFolder !== undefined ? sourceInstance.SourceReceiveFolder : (sourceInstance.sourceReceiveFolder !== undefined ? sourceInstance.sourceReceiveFolder : null),
-            SourceFileMask: sourceInstance.SourceFileMask || sourceInstance.sourceFileMask || '*.txt',
-            SourceBatchSize: sourceInstance.SourceBatchSize !== undefined ? sourceInstance.SourceBatchSize : (sourceInstance.sourceBatchSize !== undefined ? sourceInstance.sourceBatchSize : 100),
-            SourceFieldSeparator: sourceInstance.SourceFieldSeparator || sourceInstance.sourceFieldSeparator || '║',
-            // CsvAdapterType - MUST use the actual value from the source instance
-            CsvAdapterType: sourceInstance.CsvAdapterType || sourceInstance.csvAdapterType || (sourceInstance.adapterType || 'FILE'),
-            CsvPollingInterval: sourceInstance.CsvPollingInterval !== undefined ? sourceInstance.CsvPollingInterval : (sourceInstance.csvPollingInterval !== undefined ? sourceInstance.csvPollingInterval : 10),
-            SftpHost: sourceInstance.SftpHost !== undefined ? sourceInstance.SftpHost : (sourceInstance.sftpHost !== undefined ? sourceInstance.sftpHost : null),
-            SftpPort: sourceInstance.SftpPort !== undefined ? sourceInstance.SftpPort : (sourceInstance.sftpPort !== undefined ? sourceInstance.sftpPort : 22),
-            SftpUsername: sourceInstance.SftpUsername !== undefined ? sourceInstance.SftpUsername : (sourceInstance.sftpUsername !== undefined ? sourceInstance.sftpUsername : null),
-            SftpPassword: (sourceInstance.SftpPassword || sourceInstance.sftpPassword) ? '***' : null,
-            SftpSshKey: (sourceInstance.SftpSshKey || sourceInstance.sftpSshKey) ? '***' : null,
-            SftpFolder: sourceInstance.SftpFolder !== undefined ? sourceInstance.SftpFolder : (sourceInstance.sftpFolder !== undefined ? sourceInstance.sftpFolder : null),
-            SftpFileMask: sourceInstance.SftpFileMask || sourceInstance.sftpFileMask || '*.txt',
-            SftpMaxConnectionPoolSize: sourceInstance.SftpMaxConnectionPoolSize !== undefined ? sourceInstance.SftpMaxConnectionPoolSize : (sourceInstance.sftpMaxConnectionPoolSize !== undefined ? sourceInstance.sftpMaxConnectionPoolSize : 5),
-            SftpFileBufferSize: sourceInstance.SftpFileBufferSize !== undefined ? sourceInstance.SftpFileBufferSize : (sourceInstance.sftpFileBufferSize !== undefined ? sourceInstance.sftpFileBufferSize : 8192),
-            SqlServerName: sourceInstance.SqlServerName !== undefined ? sourceInstance.SqlServerName : (sourceInstance.sqlServerName !== undefined ? sourceInstance.sqlServerName : null),
-            SqlDatabaseName: sourceInstance.SqlDatabaseName !== undefined ? sourceInstance.SqlDatabaseName : (sourceInstance.sqlDatabaseName !== undefined ? sourceInstance.sqlDatabaseName : null),
-            SqlUserName: sourceInstance.SqlUserName !== undefined ? sourceInstance.SqlUserName : (sourceInstance.sqlUserName !== undefined ? sourceInstance.sqlUserName : null),
-            SqlPassword: (sourceInstance.SqlPassword || sourceInstance.sqlPassword) ? '***' : null,
-            SqlIntegratedSecurity: sourceInstance.SqlIntegratedSecurity !== undefined ? sourceInstance.SqlIntegratedSecurity : (sourceInstance.sqlIntegratedSecurity !== undefined ? sourceInstance.sqlIntegratedSecurity : false),
-            SqlResourceGroup: sourceInstance.SqlResourceGroup !== undefined ? sourceInstance.SqlResourceGroup : (sourceInstance.sqlResourceGroup !== undefined ? sourceInstance.sqlResourceGroup : null),
-            SqlPollingStatement: sourceInstance.SqlPollingStatement !== undefined ? sourceInstance.SqlPollingStatement : (sourceInstance.sqlPollingStatement !== undefined ? sourceInstance.sqlPollingStatement : null),
-            SqlPollingInterval: sourceInstance.SqlPollingInterval !== undefined ? sourceInstance.SqlPollingInterval : (sourceInstance.sqlPollingInterval !== undefined ? sourceInstance.sqlPollingInterval : 60),
-            SqlTableName: sourceInstance.SqlTableName !== undefined ? sourceInstance.SqlTableName : (sourceInstance.sqlTableName !== undefined ? sourceInstance.sqlTableName : null),
-            SqlUseTransaction: sourceInstance.SqlUseTransaction !== undefined ? sourceInstance.SqlUseTransaction : (sourceInstance.sqlUseTransaction !== undefined ? sourceInstance.sqlUseTransaction : false),
-            SqlBatchSize: sourceInstance.SqlBatchSize !== undefined ? sourceInstance.SqlBatchSize : (sourceInstance.sqlBatchSize !== undefined ? sourceInstance.sqlBatchSize : 1000),
-            SqlCommandTimeout: sourceInstance.SqlCommandTimeout !== undefined ? sourceInstance.SqlCommandTimeout : (sourceInstance.sqlCommandTimeout !== undefined ? sourceInstance.sqlCommandTimeout : 30),
-            SqlFailOnBadStatement: sourceInstance.SqlFailOnBadStatement !== undefined ? sourceInstance.SqlFailOnBadStatement : (sourceInstance.sqlFailOnBadStatement !== undefined ? sourceInstance.sqlFailOnBadStatement : false),
-            CreatedAt: sourceInstance.CreatedAt !== undefined ? sourceInstance.CreatedAt : (sourceInstance.createdAt !== undefined ? sourceInstance.createdAt : null),
-            UpdatedAt: sourceInstance.UpdatedAt !== undefined ? sourceInstance.UpdatedAt : (sourceInstance.updatedAt !== undefined ? sourceInstance.updatedAt : null)
+            Configuration: this.getFirstDefined(sourceInstance.Configuration, sourceInstance.configuration, '')
           };
+
+          this.assignWhenPresent(normalizedSource, 'SourceReceiveFolder', this.getFirstDefined(sourceInstance.SourceReceiveFolder, sourceInstance.sourceReceiveFolder));
+          this.assignWhenPresent(normalizedSource, 'SourceFileMask', this.getFirstDefined(sourceInstance.SourceFileMask, sourceInstance.sourceFileMask));
+          this.assignWhenPresent(normalizedSource, 'SourceBatchSize', this.getFirstDefined(sourceInstance.SourceBatchSize, sourceInstance.sourceBatchSize));
+          this.assignWhenPresent(normalizedSource, 'SourceFieldSeparator', this.getFirstDefined(sourceInstance.SourceFieldSeparator, sourceInstance.sourceFieldSeparator));
+          this.assignWhenPresent(normalizedSource, 'CsvAdapterType', this.getFirstDefined(sourceInstance.CsvAdapterType, sourceInstance.csvAdapterType, sourceInstance.adapterType));
+          this.assignWhenPresent(normalizedSource, 'CsvPollingInterval', this.getFirstDefined(sourceInstance.CsvPollingInterval, sourceInstance.csvPollingInterval));
+          this.assignWhenPresent(normalizedSource, 'SftpHost', this.getFirstDefined(sourceInstance.SftpHost, sourceInstance.sftpHost));
+          this.assignWhenPresent(normalizedSource, 'SftpPort', this.getFirstDefined(sourceInstance.SftpPort, sourceInstance.sftpPort));
+          this.assignWhenPresent(normalizedSource, 'SftpUsername', this.getFirstDefined(sourceInstance.SftpUsername, sourceInstance.sftpUsername));
+          this.assignWhenPresent(normalizedSource, 'SftpPassword', (sourceInstance.SftpPassword || sourceInstance.sftpPassword) ? '***' : undefined);
+          this.assignWhenPresent(normalizedSource, 'SftpSshKey', (sourceInstance.SftpSshKey || sourceInstance.sftpSshKey) ? '***' : undefined);
+          this.assignWhenPresent(normalizedSource, 'SftpFolder', this.getFirstDefined(sourceInstance.SftpFolder, sourceInstance.sftpFolder));
+          this.assignWhenPresent(normalizedSource, 'SftpFileMask', this.getFirstDefined(sourceInstance.SftpFileMask, sourceInstance.sftpFileMask));
+          this.assignWhenPresent(normalizedSource, 'SftpMaxConnectionPoolSize', this.getFirstDefined(sourceInstance.SftpMaxConnectionPoolSize, sourceInstance.sftpMaxConnectionPoolSize));
+          this.assignWhenPresent(normalizedSource, 'SftpFileBufferSize', this.getFirstDefined(sourceInstance.SftpFileBufferSize, sourceInstance.sftpFileBufferSize));
+
+          if (this.shouldIncludeSqlProperties(adapterName)) {
+            this.assignWhenPresent(normalizedSource, 'SqlServerName', this.getFirstDefined(sourceInstance.SqlServerName, sourceInstance.sqlServerName));
+            this.assignWhenPresent(normalizedSource, 'SqlDatabaseName', this.getFirstDefined(sourceInstance.SqlDatabaseName, sourceInstance.sqlDatabaseName));
+            this.assignWhenPresent(normalizedSource, 'SqlUserName', this.getFirstDefined(sourceInstance.SqlUserName, sourceInstance.sqlUserName));
+            this.assignWhenPresent(normalizedSource, 'SqlPassword', (sourceInstance.SqlPassword || sourceInstance.sqlPassword) ? '***' : undefined);
+            this.assignWhenPresent(normalizedSource, 'SqlIntegratedSecurity', this.getFirstDefined(sourceInstance.SqlIntegratedSecurity, sourceInstance.sqlIntegratedSecurity));
+            this.assignWhenPresent(normalizedSource, 'SqlResourceGroup', this.getFirstDefined(sourceInstance.SqlResourceGroup, sourceInstance.sqlResourceGroup));
+            this.assignWhenPresent(normalizedSource, 'SqlPollingStatement', this.getFirstDefined(sourceInstance.SqlPollingStatement, sourceInstance.sqlPollingStatement));
+            this.assignWhenPresent(normalizedSource, 'SqlPollingInterval', this.getFirstDefined(sourceInstance.SqlPollingInterval, sourceInstance.sqlPollingInterval));
+            this.assignWhenPresent(normalizedSource, 'SqlTableName', this.getFirstDefined(sourceInstance.SqlTableName, sourceInstance.sqlTableName));
+            this.assignWhenPresent(normalizedSource, 'SqlUseTransaction', this.getFirstDefined(sourceInstance.SqlUseTransaction, sourceInstance.sqlUseTransaction));
+            this.assignWhenPresent(normalizedSource, 'SqlBatchSize', this.getFirstDefined(sourceInstance.SqlBatchSize, sourceInstance.sqlBatchSize));
+            this.assignWhenPresent(normalizedSource, 'SqlCommandTimeout', this.getFirstDefined(sourceInstance.SqlCommandTimeout, sourceInstance.sqlCommandTimeout));
+            this.assignWhenPresent(normalizedSource, 'SqlFailOnBadStatement', this.getFirstDefined(sourceInstance.SqlFailOnBadStatement, sourceInstance.sqlFailOnBadStatement));
+          }
+
+          this.assignWhenPresent(normalizedSource, 'CreatedAt', this.getFirstDefined(sourceInstance.CreatedAt, sourceInstance.createdAt));
+          this.assignWhenPresent(normalizedSource, 'UpdatedAt', this.getFirstDefined(sourceInstance.UpdatedAt, sourceInstance.updatedAt));
+
+          structuredConfig.Sources[instanceName] = normalizedSource;
         });
       } else if (config.sourceAdapterName || config.sourceInstanceName) {
         // Fallback to old structure for backward compatibility
         const sourceInstanceName = config.sourceInstanceName || config.sourceAdapterName || 'Source';
-        structuredConfig.Sources[sourceInstanceName] = {
+        const adapterName = (config.sourceAdapterName || 'CSV').toString();
+        const fallbackSource: any = {
           InstanceName: sourceInstanceName,
-          AdapterName: config.sourceAdapterName || 'CSV',
-          IsEnabled: config.sourceIsEnabled !== undefined ? config.sourceIsEnabled : false,
+          AdapterName: adapterName,
+          IsEnabled: this.getEffectiveSourceEnabled(config) ?? false,
           AdapterInstanceGuid: config.sourceAdapterInstanceGuid || '',
-          Configuration: config.sourceConfiguration || '',
-          // Copy all source properties
-          SourceReceiveFolder: config.sourceReceiveFolder || null,
-          SourceFileMask: config.sourceFileMask || '*.txt',
-          SourceBatchSize: config.sourceBatchSize || 100,
-          SourceFieldSeparator: config.sourceFieldSeparator || '║',
-          // CsvData excluded from JSON description (not part of interface configuration)
-          CsvAdapterType: config.csvAdapterType || 'FILE',
-          CsvPollingInterval: config.csvPollingInterval || 10,
-          SftpHost: config.sftpHost || null,
-          SftpPort: config.sftpPort || 22,
-          SftpUsername: config.sftpUsername || null,
-          SftpPassword: config.sftpPassword ? '***' : null,
-          SftpSshKey: config.sftpSshKey ? '***' : null,
-          SftpFolder: config.sftpFolder || null,
-          SftpFileMask: config.sftpFileMask || '*.txt',
-          SftpMaxConnectionPoolSize: config.sftpMaxConnectionPoolSize || 5,
-          SftpFileBufferSize: config.sftpFileBufferSize || 8192,
-          SqlServerName: config.sqlServerName || null,
-          SqlDatabaseName: config.sqlDatabaseName || null,
-          SqlUserName: config.sqlUserName || null,
-          SqlPassword: config.sqlPassword ? '***' : null,
-          SqlIntegratedSecurity: config.sqlIntegratedSecurity || false,
-          SqlResourceGroup: config.sqlResourceGroup || null,
-          SqlPollingStatement: config.sqlPollingStatement || null,
-          SqlPollingInterval: config.sqlPollingInterval || 60,
-          SqlTableName: config.sqlTableName || null,
-          SqlUseTransaction: config.sqlUseTransaction || false,
-          SqlBatchSize: config.sqlBatchSize || 1000,
-          SqlCommandTimeout: config.sqlCommandTimeout || 30,
-          SqlFailOnBadStatement: config.sqlFailOnBadStatement || false,
-          CreatedAt: config.createdAt || null,
-          UpdatedAt: config.updatedAt || null
+          Configuration: config.sourceConfiguration || ''
         };
+
+        this.assignWhenPresent(fallbackSource, 'SourceReceiveFolder', config.sourceReceiveFolder);
+        this.assignWhenPresent(fallbackSource, 'SourceFileMask', config.sourceFileMask);
+        this.assignWhenPresent(fallbackSource, 'SourceBatchSize', config.sourceBatchSize);
+        this.assignWhenPresent(fallbackSource, 'SourceFieldSeparator', config.sourceFieldSeparator);
+        this.assignWhenPresent(fallbackSource, 'CsvAdapterType', config.csvAdapterType);
+        this.assignWhenPresent(fallbackSource, 'CsvPollingInterval', config.csvPollingInterval);
+        this.assignWhenPresent(fallbackSource, 'SftpHost', config.sftpHost);
+        this.assignWhenPresent(fallbackSource, 'SftpPort', config.sftpPort);
+        this.assignWhenPresent(fallbackSource, 'SftpUsername', config.sftpUsername);
+        this.assignWhenPresent(fallbackSource, 'SftpPassword', config.sftpPassword ? '***' : undefined);
+        this.assignWhenPresent(fallbackSource, 'SftpSshKey', config.sftpSshKey ? '***' : undefined);
+        this.assignWhenPresent(fallbackSource, 'SftpFolder', config.sftpFolder);
+        this.assignWhenPresent(fallbackSource, 'SftpFileMask', config.sftpFileMask);
+        this.assignWhenPresent(fallbackSource, 'SftpMaxConnectionPoolSize', config.sftpMaxConnectionPoolSize);
+        this.assignWhenPresent(fallbackSource, 'SftpFileBufferSize', config.sftpFileBufferSize);
+
+        if (this.shouldIncludeSqlProperties(adapterName)) {
+          this.assignWhenPresent(fallbackSource, 'SqlServerName', config.sqlServerName);
+          this.assignWhenPresent(fallbackSource, 'SqlDatabaseName', config.sqlDatabaseName);
+          this.assignWhenPresent(fallbackSource, 'SqlUserName', config.sqlUserName);
+          this.assignWhenPresent(fallbackSource, 'SqlPassword', config.sqlPassword ? '***' : undefined);
+          this.assignWhenPresent(fallbackSource, 'SqlIntegratedSecurity', config.sqlIntegratedSecurity);
+          this.assignWhenPresent(fallbackSource, 'SqlResourceGroup', config.sqlResourceGroup);
+          this.assignWhenPresent(fallbackSource, 'SqlPollingStatement', config.sqlPollingStatement);
+          this.assignWhenPresent(fallbackSource, 'SqlPollingInterval', config.sqlPollingInterval);
+          this.assignWhenPresent(fallbackSource, 'SqlTableName', config.sqlTableName);
+          this.assignWhenPresent(fallbackSource, 'SqlUseTransaction', config.sqlUseTransaction);
+          this.assignWhenPresent(fallbackSource, 'SqlBatchSize', config.sqlBatchSize);
+          this.assignWhenPresent(fallbackSource, 'SqlCommandTimeout', config.sqlCommandTimeout);
+          this.assignWhenPresent(fallbackSource, 'SqlFailOnBadStatement', config.sqlFailOnBadStatement);
+        }
+
+        this.assignWhenPresent(fallbackSource, 'CreatedAt', config.createdAt);
+        this.assignWhenPresent(fallbackSource, 'UpdatedAt', config.updatedAt);
+
+        structuredConfig.Sources[sourceInstanceName] = fallbackSource;
       }
 
       // Normalize Destinations from new structure (config.destinations or config.Destinations)
@@ -3573,29 +3770,36 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         // Use the new hierarchical structure - normalize all properties to PascalCase
         Object.keys(destinationsData).forEach(instanceName => {
           const destInstance = destinationsData[instanceName];
-          structuredConfig.Destinations[instanceName] = {
+          const adapterName = (destInstance.AdapterName || destInstance.adapterName || 'SqlServer').toString();
+          const normalizedDestination: any = {
             AdapterInstanceGuid: destInstance.AdapterInstanceGuid || destInstance.adapterInstanceGuid || '',
             InstanceName: destInstance.InstanceName || destInstance.instanceName || instanceName,
-            AdapterName: destInstance.AdapterName || destInstance.adapterName || 'SqlServer',
+            AdapterName: adapterName,
             IsEnabled: destInstance.IsEnabled !== undefined ? destInstance.IsEnabled : (destInstance.isEnabled !== undefined ? destInstance.isEnabled : false),
-            Configuration: destInstance.Configuration || destInstance.configuration || '',
-            // Copy all destination properties - handle both camelCase and PascalCase
-            DestinationReceiveFolder: destInstance.DestinationReceiveFolder !== undefined ? destInstance.DestinationReceiveFolder : (destInstance.destinationReceiveFolder !== undefined ? destInstance.destinationReceiveFolder : null),
-            DestinationFileMask: destInstance.DestinationFileMask || destInstance.destinationFileMask || '*.txt',
-            SqlServerName: destInstance.SqlServerName !== undefined ? destInstance.SqlServerName : (destInstance.sqlServerName !== undefined ? destInstance.sqlServerName : null),
-            SqlDatabaseName: destInstance.SqlDatabaseName !== undefined ? destInstance.SqlDatabaseName : (destInstance.sqlDatabaseName !== undefined ? destInstance.sqlDatabaseName : null),
-            SqlUserName: destInstance.SqlUserName !== undefined ? destInstance.SqlUserName : (destInstance.sqlUserName !== undefined ? destInstance.sqlUserName : null),
-            SqlPassword: (destInstance.SqlPassword || destInstance.sqlPassword) ? '***' : null,
-            SqlIntegratedSecurity: destInstance.SqlIntegratedSecurity !== undefined ? destInstance.SqlIntegratedSecurity : (destInstance.sqlIntegratedSecurity !== undefined ? destInstance.sqlIntegratedSecurity : false),
-            SqlResourceGroup: destInstance.SqlResourceGroup !== undefined ? destInstance.SqlResourceGroup : (destInstance.sqlResourceGroup !== undefined ? destInstance.sqlResourceGroup : null),
-            SqlTableName: destInstance.SqlTableName !== undefined ? destInstance.SqlTableName : (destInstance.sqlTableName !== undefined ? destInstance.sqlTableName : null),
-            SqlUseTransaction: destInstance.SqlUseTransaction !== undefined ? destInstance.SqlUseTransaction : (destInstance.sqlUseTransaction !== undefined ? destInstance.sqlUseTransaction : false),
-            SqlBatchSize: destInstance.SqlBatchSize !== undefined ? destInstance.SqlBatchSize : (destInstance.sqlBatchSize !== undefined ? destInstance.sqlBatchSize : 1000),
-            SqlCommandTimeout: destInstance.SqlCommandTimeout !== undefined ? destInstance.SqlCommandTimeout : (destInstance.sqlCommandTimeout !== undefined ? destInstance.sqlCommandTimeout : 30),
-            SqlFailOnBadStatement: destInstance.SqlFailOnBadStatement !== undefined ? destInstance.SqlFailOnBadStatement : (destInstance.sqlFailOnBadStatement !== undefined ? destInstance.sqlFailOnBadStatement : false),
-            CreatedAt: destInstance.CreatedAt !== undefined ? destInstance.CreatedAt : (destInstance.createdAt !== undefined ? destInstance.createdAt : null),
-            UpdatedAt: destInstance.UpdatedAt !== undefined ? destInstance.UpdatedAt : (destInstance.updatedAt !== undefined ? destInstance.updatedAt : null)
+            Configuration: this.getFirstDefined(destInstance.Configuration, destInstance.configuration, '')
           };
+
+          this.assignWhenPresent(normalizedDestination, 'DestinationReceiveFolder', this.getFirstDefined(destInstance.DestinationReceiveFolder, destInstance.destinationReceiveFolder));
+          this.assignWhenPresent(normalizedDestination, 'DestinationFileMask', this.getFirstDefined(destInstance.DestinationFileMask, destInstance.destinationFileMask));
+
+          if (this.shouldIncludeSqlProperties(adapterName)) {
+            this.assignWhenPresent(normalizedDestination, 'SqlServerName', this.getFirstDefined(destInstance.SqlServerName, destInstance.sqlServerName));
+            this.assignWhenPresent(normalizedDestination, 'SqlDatabaseName', this.getFirstDefined(destInstance.SqlDatabaseName, destInstance.sqlDatabaseName));
+            this.assignWhenPresent(normalizedDestination, 'SqlUserName', this.getFirstDefined(destInstance.SqlUserName, destInstance.sqlUserName));
+            this.assignWhenPresent(normalizedDestination, 'SqlPassword', (destInstance.SqlPassword || destInstance.sqlPassword) ? '***' : undefined);
+            this.assignWhenPresent(normalizedDestination, 'SqlIntegratedSecurity', this.getFirstDefined(destInstance.SqlIntegratedSecurity, destInstance.sqlIntegratedSecurity));
+            this.assignWhenPresent(normalizedDestination, 'SqlResourceGroup', this.getFirstDefined(destInstance.SqlResourceGroup, destInstance.sqlResourceGroup));
+            this.assignWhenPresent(normalizedDestination, 'SqlTableName', this.getFirstDefined(destInstance.SqlTableName, destInstance.sqlTableName));
+            this.assignWhenPresent(normalizedDestination, 'SqlUseTransaction', this.getFirstDefined(destInstance.SqlUseTransaction, destInstance.sqlUseTransaction));
+            this.assignWhenPresent(normalizedDestination, 'SqlBatchSize', this.getFirstDefined(destInstance.SqlBatchSize, destInstance.sqlBatchSize));
+            this.assignWhenPresent(normalizedDestination, 'SqlCommandTimeout', this.getFirstDefined(destInstance.SqlCommandTimeout, destInstance.sqlCommandTimeout));
+            this.assignWhenPresent(normalizedDestination, 'SqlFailOnBadStatement', this.getFirstDefined(destInstance.SqlFailOnBadStatement, destInstance.sqlFailOnBadStatement));
+          }
+
+          this.assignWhenPresent(normalizedDestination, 'CreatedAt', this.getFirstDefined(destInstance.CreatedAt, destInstance.createdAt));
+          this.assignWhenPresent(normalizedDestination, 'UpdatedAt', this.getFirstDefined(destInstance.UpdatedAt, destInstance.updatedAt));
+
+          structuredConfig.Destinations[instanceName] = normalizedDestination;
         });
       } else if (!structuredConfig.Destinations || Object.keys(structuredConfig.Destinations).length === 0) {
         structuredConfig.Destinations = {};
@@ -3608,55 +3812,71 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         if (destinationInstances.length > 0) {
           destinationInstances.forEach((instance: any) => {
             const instanceName = instance.instanceName || 'Destination';
-            structuredConfig.Destinations[instanceName] = {
+            const adapterName = (instance.adapterName || 'SqlServer').toString();
+            const localDestination: any = {
               AdapterInstanceGuid: instance.adapterInstanceGuid || '',
               InstanceName: instanceName,
-              AdapterName: instance.adapterName || 'SqlServer',
+              AdapterName: adapterName,
               IsEnabled: instance.isEnabled !== undefined ? instance.isEnabled : false,
-              Configuration: instance.configuration || '',
-              // Copy all destination properties
-              DestinationReceiveFolder: instance.destinationReceiveFolder || null,
-              DestinationFileMask: instance.destinationFileMask || '*.txt',
-              SqlServerName: instance.sqlServerName || config.sqlServerName || null,
-              SqlDatabaseName: instance.sqlDatabaseName || config.sqlDatabaseName || null,
-              SqlUserName: instance.sqlUserName || config.sqlUserName || null,
-              SqlPassword: instance.sqlPassword ? '***' : (config.sqlPassword ? '***' : null),
-              SqlIntegratedSecurity: instance.sqlIntegratedSecurity !== undefined ? instance.sqlIntegratedSecurity : (config.sqlIntegratedSecurity || false),
-              SqlResourceGroup: instance.sqlResourceGroup || config.sqlResourceGroup || null,
-              SqlTableName: instance.sqlTableName || config.sqlTableName || null,
-              SqlUseTransaction: instance.sqlUseTransaction !== undefined ? instance.sqlUseTransaction : (config.sqlUseTransaction || false),
-              SqlBatchSize: instance.sqlBatchSize !== undefined ? instance.sqlBatchSize : (config.sqlBatchSize || 1000),
-              SqlCommandTimeout: instance.sqlCommandTimeout || config.sqlCommandTimeout || 30,
-              SqlFailOnBadStatement: instance.sqlFailOnBadStatement !== undefined ? instance.sqlFailOnBadStatement : (config.sqlFailOnBadStatement || false),
-              CreatedAt: instance.createdAt || config.createdAt || null,
-              UpdatedAt: instance.updatedAt || config.updatedAt || null
+              Configuration: instance.configuration || ''
             };
+
+            this.assignWhenPresent(localDestination, 'DestinationReceiveFolder', instance.destinationReceiveFolder);
+            this.assignWhenPresent(localDestination, 'DestinationFileMask', instance.destinationFileMask);
+
+            if (this.shouldIncludeSqlProperties(adapterName)) {
+              this.assignWhenPresent(localDestination, 'SqlServerName', this.getFirstDefined(instance.sqlServerName, config.sqlServerName));
+              this.assignWhenPresent(localDestination, 'SqlDatabaseName', this.getFirstDefined(instance.sqlDatabaseName, config.sqlDatabaseName));
+              this.assignWhenPresent(localDestination, 'SqlUserName', this.getFirstDefined(instance.sqlUserName, config.sqlUserName));
+              const passwordMask = instance.sqlPassword || config.sqlPassword ? '***' : undefined;
+              this.assignWhenPresent(localDestination, 'SqlPassword', passwordMask);
+              this.assignWhenPresent(localDestination, 'SqlIntegratedSecurity', this.getFirstDefined(instance.sqlIntegratedSecurity, config.sqlIntegratedSecurity));
+              this.assignWhenPresent(localDestination, 'SqlResourceGroup', this.getFirstDefined(instance.sqlResourceGroup, config.sqlResourceGroup));
+              this.assignWhenPresent(localDestination, 'SqlTableName', this.getFirstDefined(instance.sqlTableName, config.sqlTableName));
+              this.assignWhenPresent(localDestination, 'SqlUseTransaction', this.getFirstDefined(instance.sqlUseTransaction, config.sqlUseTransaction));
+              this.assignWhenPresent(localDestination, 'SqlBatchSize', this.getFirstDefined(instance.sqlBatchSize, config.sqlBatchSize));
+              this.assignWhenPresent(localDestination, 'SqlCommandTimeout', this.getFirstDefined(instance.sqlCommandTimeout, config.sqlCommandTimeout));
+              this.assignWhenPresent(localDestination, 'SqlFailOnBadStatement', this.getFirstDefined(instance.sqlFailOnBadStatement, config.sqlFailOnBadStatement));
+            }
+
+            this.assignWhenPresent(localDestination, 'CreatedAt', this.getFirstDefined(instance.createdAt, config.createdAt));
+            this.assignWhenPresent(localDestination, 'UpdatedAt', this.getFirstDefined(instance.updatedAt, config.updatedAt));
+
+            structuredConfig.Destinations[instanceName] = localDestination;
           });
         } else if (config.destinationAdapterName || config.destinationInstanceName) {
           // Fallback to old structure
           const destInstanceName = config.destinationInstanceName || config.destinationAdapterName || 'Destination';
-          structuredConfig.Destinations[destInstanceName] = {
+          const adapterName = (config.destinationAdapterName || 'SqlServer').toString();
+          const fallbackDestination: any = {
             AdapterInstanceGuid: config.destinationAdapterInstanceGuid || '',
             InstanceName: destInstanceName,
-            AdapterName: config.destinationAdapterName || 'SqlServer',
+            AdapterName: adapterName,
             IsEnabled: config.destinationIsEnabled !== undefined ? config.destinationIsEnabled : false,
-            Configuration: config.destinationConfiguration || '',
-            DestinationReceiveFolder: config.destinationReceiveFolder || null,
-            DestinationFileMask: config.destinationFileMask || '*.txt',
-            SqlServerName: config.sqlServerName || null,
-            SqlDatabaseName: config.sqlDatabaseName || null,
-            SqlUserName: config.sqlUserName || null,
-            SqlPassword: config.sqlPassword ? '***' : null,
-            SqlIntegratedSecurity: config.sqlIntegratedSecurity || false,
-            SqlResourceGroup: config.sqlResourceGroup || null,
-            SqlTableName: config.sqlTableName || null,
-            SqlUseTransaction: config.sqlUseTransaction || false,
-            SqlBatchSize: config.sqlBatchSize || 1000,
-            SqlCommandTimeout: config.sqlCommandTimeout || 30,
-            SqlFailOnBadStatement: config.sqlFailOnBadStatement || false,
-            CreatedAt: config.createdAt || null,
-            UpdatedAt: config.updatedAt || null
+            Configuration: config.destinationConfiguration || ''
           };
+
+          this.assignWhenPresent(fallbackDestination, 'DestinationReceiveFolder', config.destinationReceiveFolder);
+          this.assignWhenPresent(fallbackDestination, 'DestinationFileMask', config.destinationFileMask);
+
+          if (this.shouldIncludeSqlProperties(adapterName)) {
+            this.assignWhenPresent(fallbackDestination, 'SqlServerName', config.sqlServerName);
+            this.assignWhenPresent(fallbackDestination, 'SqlDatabaseName', config.sqlDatabaseName);
+            this.assignWhenPresent(fallbackDestination, 'SqlUserName', config.sqlUserName);
+            this.assignWhenPresent(fallbackDestination, 'SqlPassword', config.sqlPassword ? '***' : undefined);
+            this.assignWhenPresent(fallbackDestination, 'SqlIntegratedSecurity', config.sqlIntegratedSecurity);
+            this.assignWhenPresent(fallbackDestination, 'SqlResourceGroup', config.sqlResourceGroup);
+            this.assignWhenPresent(fallbackDestination, 'SqlTableName', config.sqlTableName);
+            this.assignWhenPresent(fallbackDestination, 'SqlUseTransaction', config.sqlUseTransaction);
+            this.assignWhenPresent(fallbackDestination, 'SqlBatchSize', config.sqlBatchSize);
+            this.assignWhenPresent(fallbackDestination, 'SqlCommandTimeout', config.sqlCommandTimeout);
+            this.assignWhenPresent(fallbackDestination, 'SqlFailOnBadStatement', config.sqlFailOnBadStatement);
+          }
+
+          this.assignWhenPresent(fallbackDestination, 'CreatedAt', config.createdAt);
+          this.assignWhenPresent(fallbackDestination, 'UpdatedAt', config.updatedAt);
+
+          structuredConfig.Destinations[destInstanceName] = fallbackDestination;
         }
       }
       
@@ -3833,7 +4053,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       width: '800px',
       maxWidth: '90vw',
       data: {
-        adapterType: 'Source' as const
+        adapterType: 'Source' as const,
+        currentAdapterName: this.sourceAdapterName
       } as AdapterSelectData
     });
 

@@ -172,11 +172,12 @@ import { Observable } from 'rxjs';
     .epic-message-card {
       width: 100%;
       border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 4px;
-      padding: 2px 6px;
+      border-radius: 3px;
+      padding: 1px 4px;
       background: rgba(0, 0, 0, 0.25);
       overflow: hidden;
-      min-height: 20px;
+      min-height: 16px;
+      line-height: 0;
     }
     
     .epic-message-track {
@@ -184,14 +185,19 @@ import { Observable } from 'rxjs';
       width: max-content;
       animation: marquee 18s linear infinite;
       gap: 32px;
+      align-items: center;
     }
     
     .epic-message {
-      font-size: 10px;
-      line-height: 1.1;
+      font-size: 9px;
+      line-height: 1;
       color: rgba(255, 255, 255, 0.92);
       white-space: nowrap;
       letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      padding: 0;
+      margin: 0;
     }
     
     .epic-message.duplicate {

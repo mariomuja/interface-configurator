@@ -8,6 +8,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 export interface AdapterSelectData {
   adapterType: 'Source' | 'Destination';
+  currentAdapterName?: string;
 }
 
 export interface AdapterInfo {
@@ -51,6 +52,10 @@ export interface AdapterInfo {
                 <img *ngIf="adapter.iconType === 'svg'" [src]="adapter.icon" [alt]="adapter.alias + ' icon'" class="large-icon-img">
               </div>
               <h3>{{ adapter.alias }}</h3>
+              <div class="adapter-status" *ngIf="adapter.name === data.currentAdapterName">
+                <mat-icon>check_circle</mat-icon>
+                Aktuell ausgewählt
+              </div>
               <p class="adapter-description">{{ adapter.description }}</p>
             </mat-card-content>
           </mat-card>
@@ -128,6 +133,16 @@ export interface AdapterInfo {
       margin: 0 0 8px 0;
       text-align: center;
       font-size: 16px;
+    }
+    
+    .adapter-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 12px;
+      color: #2e7d32;
+      margin-bottom: 6px;
     }
     
     .adapter-description {
@@ -224,7 +239,9 @@ export class AdapterSelectDialogComponent {
   constructor(
     public dialogRef: MatDialogRef<AdapterSelectDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: AdapterSelectData
-  ) {}
+  ) {
+    this.selectedAdapter = data.currentAdapterName ?? null;
+  }
 
   selectAdapter(adapter: AdapterInfo): void {
     this.selectedAdapter = adapter.name;
