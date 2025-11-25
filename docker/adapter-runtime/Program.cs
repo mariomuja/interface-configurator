@@ -8,7 +8,7 @@ namespace AdapterRuntime;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
         
@@ -28,7 +28,8 @@ public class Program
         var adapterConfigPath = Environment.GetEnvironmentVariable("ADAPTER_CONFIG_PATH") ?? "adapter-config.json";
         var serviceBusConnectionString = Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING") ?? "";
         
-        var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
+        var serviceProvider = builder.Services.BuildServiceProvider();
+        var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
         
         logger.LogInformation("Adapter Runtime starting...");
         logger.LogInformation("Adapter Instance GUID: {Guid}", adapterInstanceGuid);
@@ -52,6 +53,8 @@ public class Program
                     var configJson = response.Value.Content.ToString();
                     logger.LogInformation("Loaded adapter configuration from {Path}", adapterConfigPath);
                     logger.LogDebug("Configuration: {Config}", configJson);
+                    
+                    // TODO: Parse configuration and initialize adapter based on adapterName
                 }
                 else
                 {
@@ -74,7 +77,7 @@ public class Program
         logger.LogInformation("Adapter Runtime ready. Waiting for configuration updates...");
         
         var host = builder.Build();
-        host.Run();
+        await host.RunAsync();
     }
 }
 
