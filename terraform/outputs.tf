@@ -41,6 +41,17 @@ output "sql_connection_string" {
   sensitive   = true
 }
 
+output "interface_config_database_name" {
+  description = "Name of the InterfaceConfigDb database (formerly MessageBox)"
+  value       = azurerm_mssql_database.interfaceconfig.name
+}
+
+output "interface_config_database_connection_string" {
+  description = "InterfaceConfigDb connection string"
+  value       = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.interfaceconfig.name};Persist Security Info=False;User ID=${var.sql_admin_login};Password=${var.sql_admin_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  sensitive   = true
+}
+
 # Backend API runs on Vercel Serverless Functions, not Azure App Service
 # output "backend_app_service_name" {
 #   description = "Name of the backend App Service"

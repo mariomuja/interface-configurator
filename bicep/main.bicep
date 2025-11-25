@@ -201,10 +201,27 @@ resource sqlFirewallRuleCurrentIp 'Microsoft.Sql/servers/firewallRules@2023-05-0
   }
 }
 
-// Azure SQL Database
+// Azure SQL Database (Main Application Database)
 resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
   parent: sqlServer
   name: sqlDatabaseName
+  location: sqlLocation != '' ? sqlLocation : location
+  sku: {
+    name: sqlSkuName
+  }
+  properties: {
+    collation: 'SQL_Latin1_General_CP1_CI_AS'
+    licenseType: sqlLicenseType
+    maxSizeBytes: sqlMaxSizeGb * 1024 * 1024 * 1024 // Convert GB to bytes
+    zoneRedundant: sqlZoneRedundant
+  }
+  tags: commonTags
+}
+
+// InterfaceConfigDb Database (formerly MessageBox) - Stores interface configurations, adapter instances, and process logs
+resource interfaceConfigDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
+  parent: sqlServer
+  name: 'InterfaceConfigDb'
   location: sqlLocation != '' ? sqlLocation : location
   sku: {
     name: sqlSkuName
@@ -412,6 +429,8 @@ output sqlServerName string = sqlServer.name
 output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output sqlDatabaseName string = sqlDatabase.name
 output sqlConnectionString string = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Initial Catalog=${sqlDatabaseName};Persist Security Info=False;User ID=${sqlAdminLogin};Password=${sqlAdminPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
+output interfaceConfigDatabaseName string = interfaceConfigDatabase.name
+output interfaceConfigDatabaseConnectionString string = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Initial Catalog=${interfaceConfigDatabase.name};Persist Security Info=False;User ID=${sqlAdminLogin};Password=${sqlAdminPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
 output functionAppName string = enableFunctionApp && functionApp != null ? functionApp.name : ''
 output functionAppUrl string = enableFunctionApp && functionApp != null ? 'https://${functionApp.properties.defaultHostName}' : ''
 output functionsStorageAccountName string = functionsStorageAccount.name
