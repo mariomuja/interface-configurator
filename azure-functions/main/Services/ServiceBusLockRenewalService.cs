@@ -11,22 +11,23 @@ namespace InterfaceConfigurator.Main.Services;
 /// <summary>
 /// Background service that periodically renews Service Bus message locks to prevent expiration
 /// Runs every 30 seconds to renew locks that are about to expire
+/// Uses cached receiver instances for efficient lock renewal
 /// </summary>
 public class ServiceBusLockRenewalService : BackgroundService
 {
     private readonly IServiceBusLockTrackingService _lockTrackingService;
-    private readonly IServiceBusService _serviceBusService;
+    private readonly IServiceBusReceiverCache _receiverCache;
     private readonly ILogger<ServiceBusLockRenewalService> _logger;
     private readonly TimeSpan _renewalThreshold = TimeSpan.FromSeconds(30); // Renew locks 30 seconds before expiration
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(30); // Check every 30 seconds
 
     public ServiceBusLockRenewalService(
         IServiceBusLockTrackingService lockTrackingService,
-        IServiceBusService serviceBusService,
+        IServiceBusReceiverCache receiverCache,
         ILogger<ServiceBusLockRenewalService> logger)
     {
         _lockTrackingService = lockTrackingService ?? throw new ArgumentNullException(nameof(lockTrackingService));
-        _serviceBusService = serviceBusService ?? throw new ArgumentNullException(nameof(serviceBusService));
+        _receiverCache = receiverCache ?? throw new ArgumentNullException(nameof(receiverCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -79,34 +80,67 @@ public class ServiceBusLockRenewalService : BackgroundService
 
                 try
                 {
-                    // Note: Service Bus SDK doesn't provide a direct RenewMessageLockAsync method
-                    // We need to use the receiver to renew locks
-                    // For now, we'll update the database record and log
-                    // In a production scenario, you'd need to maintain receiver instances or recreate them
-                    
+                    // Renew locks using cached receiver instances
                     foreach (var lockRecord in locks)
                     {
-                        // Calculate new expiration (Service Bus locks are typically 60 seconds)
-                        var newExpiresAt = DateTime.UtcNow.AddSeconds(60);
-                        
-                        // Update database record
-                        var renewed = await _lockTrackingService.RenewLockAsync(lockRecord.MessageId, newExpiresAt, cancellationToken);
-                        
-                        if (renewed)
+                        try
                         {
-                            _logger.LogDebug("Renewed lock: MessageId={MessageId}, Topic={Topic}, Subscription={Subscription}", 
-                                lockRecord.MessageId, topicName, subscriptionName);
+                            // Renew the actual Service Bus lock using cached receiver
+                            var newExpiration = await _receiverCache.RenewMessageLockAsync(
+                                topicName,
+                                subscriptionName,
+                                lockRecord.LockToken,
+                                cancellationToken);
+
+                            if (newExpiration.HasValue)
+                            {
+                                // Update database record with new expiration time
+                                var renewed = await _lockTrackingService.RenewLockAsync(
+                                    lockRecord.MessageId,
+                                    newExpiration.Value.UtcDateTime,
+                                    cancellationToken);
+
+                                if (renewed)
+                                {
+                                    _logger.LogDebug(
+                                        "Successfully renewed lock: MessageId={MessageId}, Topic={Topic}, Subscription={Subscription}, NewExpiration={NewExpiration}",
+                                        lockRecord.MessageId, topicName, subscriptionName, newExpiration.Value);
+                                }
+                                else
+                                {
+                                    _logger.LogWarning(
+                                        "Lock renewed in Service Bus but database update failed: MessageId={MessageId}",
+                                        lockRecord.MessageId);
+                                }
+                            }
+                            else
+                            {
+                                // Lock was lost or expired
+                                _logger.LogWarning(
+                                    "Failed to renew lock (lock lost or expired): MessageId={MessageId}, Topic={Topic}, Subscription={Subscription}",
+                                    lockRecord.MessageId, topicName, subscriptionName);
+
+                                // Update database to mark lock as expired
+                                await _lockTrackingService.UpdateLockStatusAsync(
+                                    lockRecord.MessageId,
+                                    "Expired",
+                                    "Lock renewal failed - lock lost or expired",
+                                    cancellationToken);
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            _logger.LogWarning("Failed to renew lock: MessageId={MessageId} (lock may have been completed)", 
-                                lockRecord.MessageId);
+                            _logger.LogError(ex,
+                                "Error renewing lock for MessageId={MessageId}, Topic={Topic}, Subscription={Subscription}",
+                                lockRecord.MessageId, topicName, subscriptionName);
+
+                            // Continue with next lock instead of failing entire batch
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error renewing locks for Topic={Topic}, Subscription={Subscription}", 
+                    _logger.LogError(ex, "Error renewing locks for Topic={Topic}, Subscription={Subscription}",
                         topicName, subscriptionName);
                 }
             }

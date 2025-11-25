@@ -137,6 +137,22 @@ var host = new HostBuilder()
                 return new ServiceBusLockTrackingService(interfaceConfigContext, logger);
             });
             
+            // Register Service Bus Receiver Cache for efficient lock renewal
+            services.AddSingleton<IServiceBusReceiverCache>(sp =>
+            {
+                var serviceBusConnectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString")
+                    ?? Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING") ?? string.Empty;
+                
+                if (string.IsNullOrWhiteSpace(serviceBusConnectionString))
+                {
+                    throw new InvalidOperationException("Service Bus connection string is required for receiver cache");
+                }
+                
+                var serviceBusClient = new Azure.Messaging.ServiceBus.ServiceBusClient(serviceBusConnectionString);
+                var logger = sp.GetService<ILogger<ServiceBusReceiverCache>>();
+                return new ServiceBusReceiverCache(serviceBusClient, logger);
+            });
+            
             // Register Service Bus Lock Renewal Background Service
             services.AddHostedService<ServiceBusLockRenewalService>();
             
