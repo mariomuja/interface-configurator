@@ -72,14 +72,16 @@ public class CsvAdapter : AdapterBase
         int skipFooterLines = 0,
         char quoteCharacter = '"',
         string adapterRole = "Source",
-        ILogger<CsvAdapter>? logger = null)
+        ILogger<CsvAdapter>? logger = null,
+        ProcessingStatisticsService? statisticsService = null)
         : base(
             serviceBusService: serviceBusService,
             interfaceName: interfaceName ?? "FromCsvToSqlServerExample",
             adapterInstanceGuid: adapterInstanceGuid,
             batchSize: batchSize ?? 1000,
             adapterRole: adapterRole,
-            logger: logger)
+            logger: logger,
+            statisticsService: statisticsService)
     {
         _csvProcessingService = csvProcessingService ?? throw new ArgumentNullException(nameof(csvProcessingService));
         _adapterConfig = adapterConfig ?? throw new ArgumentNullException(nameof(adapterConfig));
@@ -558,7 +560,7 @@ public class CsvAdapter : AdapterBase
                         if (files.Any())
                         {
                             var (_, firstFileContent) = files.First();
-                            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                            var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
                             detectedSeparator = validationService.DetectDelimiter(firstFileContent, _fieldSeparator);
                             _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from SFTP file for SFTP adapter", detectedSeparator);
                         }
@@ -615,7 +617,7 @@ public class CsvAdapter : AdapterBase
                             {
                                 var firstFilePath = $"{containerName}/{filePaths.First()}";
                                 var sampleContent = await _fileAdapter.ReadFileAsync(firstFilePath, cancellationToken);
-                                var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                                var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
                                 detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
                                 _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath} for FILE adapter", detectedSeparator, filePaths.First());
                             }
@@ -623,7 +625,7 @@ public class CsvAdapter : AdapterBase
                         else
                         {
                             var sampleContent = await _fileAdapter.ReadFileAsync(effectiveSource, cancellationToken);
-                            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                            var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
                             detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
                             _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source} for FILE adapter", detectedSeparator, effectiveSource);
                         }
@@ -768,10 +770,55 @@ public class CsvAdapter : AdapterBase
             }
 
             // Upload to blob storage
-            var content = Encoding.UTF8.GetBytes(csvContent.ToString());
-            await blobClient.UploadAsync(new BinaryData(content), overwrite: true, cancellationToken);
+            var startTime = DateTime.UtcNow;
+            var rowsProcessed = records?.Count ?? 0;
+            var rowsSucceeded = 0;
+            var rowsFailed = 0;
+            string? sourceFile = null;
 
-            _logger?.LogInformation("Successfully wrote CSV to {Destination}: {RecordCount} records", destination, records?.Count ?? 0);
+            try
+            {
+                var content = Encoding.UTF8.GetBytes(csvContent.ToString());
+                await blobClient.UploadAsync(new BinaryData(content), overwrite: true, cancellationToken);
+                rowsSucceeded = rowsProcessed;
+                _logger?.LogInformation("Successfully wrote CSV to {Destination}: {RecordCount} records", destination, records?.Count ?? 0);
+            }
+            catch
+            {
+                rowsFailed = rowsProcessed;
+                rowsSucceeded = 0;
+                throw;
+            }
+            finally
+            {
+                // Record processing statistics
+                try
+                {
+                    var duration = DateTime.UtcNow - startTime;
+                    if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                    {
+                        await _statisticsService.RecordProcessingStatsAsync(
+                            _interfaceName,
+                            rowsProcessed,
+                            rowsSucceeded,
+                            rowsFailed,
+                            duration,
+                            sourceFile: sourceFile,
+                            adapterType: AdapterRole,
+                            adapterName: AdapterName,
+                            adapterInstanceGuid: _adapterInstanceGuid,
+                            sourceName: null,
+                            destinationName: destination,
+                            batchSize: _batchSize,
+                            useTransaction: null,
+                            cancellationToken);
+                    }
+                }
+                catch (Exception statsEx)
+                {
+                    _logger?.LogWarning(statsEx, "Failed to record processing statistics");
+                }
+            }
 
             // Mark messages as processed if they came from MessageBox
             if (processedMessages != null && processedMessages.Count > 0)

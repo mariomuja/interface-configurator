@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace InterfaceConfigurator.Main.Core.Models;
 
 /// <summary>
 /// Configuration for an interface (Source -> Destination mapping)
 /// </summary>
+[Table("Interfaces")]
 public class InterfaceConfiguration
 {
     [Required]

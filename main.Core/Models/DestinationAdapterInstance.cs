@@ -181,9 +181,9 @@ public class DestinationAdapterInstance
 
     /// <summary>
     /// GUID of the source adapter instance whose data this destination adapter subscribes to
-    /// This creates a subscription in the MessageBox
+    /// This creates a subscription in the InterfaceConfigDb
     /// </summary>
-    public Guid? SourceAdapterSubscription { get; set; }
+    public Guid? SourceAdapterGuid { get; set; }
 
     // SQL Server Adapter Custom Statement Properties
     /// <summary>

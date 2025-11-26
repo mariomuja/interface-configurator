@@ -4,6 +4,16 @@
 
 This document describes how the system ensures that **each adapter instance gets its own isolated container app**, providing complete process isolation between adapter instances.
 
+## Why the Azure Function App Still Matters
+
+Even though adapters now run inside Azure Container Apps, the Azure Function App remains the **control plane** for the platform:
+
+- **Configuration API surface** – All UI flows and automation call Function App endpoints (`CreateInterfaceConfiguration`, `UpdateSourceAdapterInstance`, `ToggleInterfaceConfiguration`, etc.) to create/update adapter metadata, toggle enablement, and validate settings.
+- **Container-app orchestration** – The Function App provisions blob storage, secrets, and Service Bus subscriptions, and it creates/updates/deletes the per-adapter container apps (`CreateContainerAppAsync`, `DeleteContainerApp`). Without these triggers, container apps would never be instantiated or cleaned up.
+- **Central diagnostics & governance** – Endpoints such as `GetContainerAppStatus`, `GetProcessLogs`, `Diagnose`, and `HealthCheck` expose state to the frontend, enforce auth/CORS, and provide auditing. Container apps focus purely on adapter workloads and do not host these APIs.
+
+In short, container apps execute the adapters, but the Function App orchestrates their lifecycle and serves as the single entry point for configuration and monitoring.
+
 ## Isolation Mechanism
 
 ### Unique Container App per Instance

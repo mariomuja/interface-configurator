@@ -749,8 +749,8 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     dest.UpdatedAt = DateTime.UtcNow;
                     
                     // Automatically create subscription when destination adapter is enabled
-                    // and has a SourceAdapterSubscription configured
-                    if (enabled && !wasEnabled && dest.SourceAdapterSubscription.HasValue)
+                    // and has a SourceAdapterGuid configured
+                    if (enabled && !wasEnabled && dest.SourceAdapterGuid.HasValue)
                     {
                         // Create subscription asynchronously (fire and forget)
                         _ = Task.Run(async () =>
@@ -1222,6 +1222,11 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                 {
                     config.DestinationAdapterInstances = new List<DestinationAdapterInstance>();
                 }
+
+                // If the interface already has a source adapter instance, link this destination to it
+                Guid? sourceGuid = config.Sources != null
+                    ? config.Sources.Values.FirstOrDefault()?.AdapterInstanceGuid
+                    : null;
                 
                 var newInstance = new DestinationAdapterInstance
                 {
@@ -1230,6 +1235,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
                     AdapterName = adapterName,
                     IsEnabled = true,
                     Configuration = configuration ?? "{}",
+                    SourceAdapterGuid = sourceGuid,
                     CreatedAt = DateTime.UtcNow
                 };
                 
@@ -1305,38 +1311,48 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            if (_configurations.TryGetValue(interfaceName, out var config))
-            {
-                if (config.Sources == null)
-                {
-                    config.Sources = new Dictionary<string, SourceAdapterInstance>();
-                }
-                
-                // Find source adapter instance by GUID
-                var instance = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
-                if (instance != null)
-                {
-                    if (instanceName != null) instance.InstanceName = instanceName.Trim();
-                    if (isEnabled.HasValue) instance.IsEnabled = isEnabled.Value;
-                    if (configuration != null) instance.Configuration = configuration;
-                    instance.UpdatedAt = DateTime.UtcNow;
-                    config.UpdatedAt = DateTime.UtcNow;
-                    
-                    _logger?.LogInformation("Updated source adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'", 
-                        instance.InstanceName, adapterInstanceGuid, interfaceName);
-                }
-                else
-                {
-                    _logger?.LogWarning("Source adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", 
-                        adapterInstanceGuid, interfaceName);
-                    throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
-                }
-            }
-            else
+            if (!_configurations.TryGetValue(interfaceName, out var config))
             {
                 _logger?.LogWarning("Interface configuration '{InterfaceName}' not found for updating source adapter instance", interfaceName);
                 throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
             }
+
+            if (config.Sources == null)
+            {
+                config.Sources = new Dictionary<string, SourceAdapterInstance>();
+            }
+            
+            // Find source adapter instance by GUID
+            var source = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
+            if (source == null)
+            {
+                _logger?.LogWarning("Source adapter instance '{AdapterInstanceGuid}' not found in interface '{InterfaceName}'", 
+                    adapterInstanceGuid, interfaceName);
+                throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
+            }
+
+            if (instanceName != null) source.InstanceName = instanceName.Trim();
+            if (isEnabled.HasValue) source.IsEnabled = isEnabled.Value;
+            if (configuration != null) source.Configuration = configuration;
+            source.UpdatedAt = DateTime.UtcNow;
+            config.UpdatedAt = DateTime.UtcNow;
+
+            // If we now have an enabled source, backfill any destination instances on this interface
+            // that are missing SourceAdapterGuid.
+            if (source.IsEnabled && config.DestinationAdapterInstances != null && config.DestinationAdapterInstances.Count > 0)
+            {
+                foreach (var dest in config.DestinationAdapterInstances)
+                {
+                    if (!dest.SourceAdapterGuid.HasValue)
+                    {
+                        dest.SourceAdapterGuid = source.AdapterInstanceGuid;
+                        dest.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+            }
+            
+            _logger?.LogInformation("Updated source adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}'", 
+                source.InstanceName, adapterInstanceGuid, interfaceName);
         }
         finally
         {
@@ -1484,7 +1500,7 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
     public async Task UpdateDestinationSourceAdapterSubscriptionAsync(
         string interfaceName,
         Guid adapterInstanceGuid,
-        Guid? sourceAdapterSubscription,
+        Guid? sourceAdapterGuid,
         CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
@@ -1508,11 +1524,11 @@ public class InterfaceConfigurationService : IInterfaceConfigurationService
 
                 if (instance != null)
                 {
-                    instance.SourceAdapterSubscription = sourceAdapterSubscription;
+                    instance.SourceAdapterGuid = sourceAdapterGuid;
                     instance.UpdatedAt = DateTime.UtcNow;
                     config.UpdatedAt = DateTime.UtcNow;
-                    _logger?.LogInformation("Source Adapter Subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{SourceAdapterSubscription}'",
-                        instance.InstanceName, adapterInstanceGuid, interfaceName, sourceAdapterSubscription?.ToString() ?? "null");
+                    _logger?.LogInformation("Source Adapter Guid for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{SourceAdapterGuid}'",
+                        instance.InstanceName, adapterInstanceGuid, interfaceName, sourceAdapterGuid?.ToString() ?? "null");
                 }
                 else
                 {

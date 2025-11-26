@@ -37,7 +37,7 @@ var host = new HostBuilder()
                 var connectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog={sqlDatabase};Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
                 
                 // InterfaceConfigDb database connection (formerly MessageBox)
-                // This database contains InterfaceConfigurations, AdapterInstances, and ProcessLogs tables
+                // This database contains Interfaces, AdapterInstances, and ProcessLogs tables
                 // TransportData table is NOT created here - it belongs to the main application database
                 // Note: Messaging is now handled via Azure Service Bus, not this database
                 var interfaceConfigConnectionString = $"Server=tcp:{sqlServer},1433;Initial Catalog=InterfaceConfigDb;Persist Security Info=False;User ID={sqlUser};Password={sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Pooling=true;Min Pool Size=5;Max Pool Size=100;Connection Lifetime=0;";
@@ -57,7 +57,7 @@ var host = new HostBuilder()
                     }));
                 
                 // Register InterfaceConfigDbContext for InterfaceConfigDb database (formerly MessageBox)
-                // Contains InterfaceConfigurations, AdapterInstances, ProcessLogs - NOT TransportData
+                // Contains Interfaces, AdapterInstances, ProcessLogs - NOT TransportData
                 // Enhanced with retry-on-failure for transient errors
                 services.AddDbContext<InterfaceConfigDbContext>(options =>
                     options.UseSqlServer(interfaceConfigConnectionString, sqlOptions =>

@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
-using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Core.Services;
 
 namespace InterfaceConfigurator.Adapters;
 
@@ -29,8 +29,9 @@ public abstract class HttpClientAdapterBase : AdapterBase
         ILogger? logger = null,
         HttpClient? httpClient = null,
         JQTransformationService? jqService = null,
-        string? jqScriptFile = null)
-        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile)
+        string? jqScriptFile = null,
+        ProcessingStatisticsService? statisticsService = null)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, jqService, jqScriptFile, statisticsService)
     {
         if (httpClient != null)
         {

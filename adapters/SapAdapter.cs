@@ -78,8 +78,9 @@ public class SapAdapter : HttpClientAdapterBase
         string? sapRestApiEndpoint = null,
         bool sapUseOData = false,
         bool sapUseRestApi = false,
-        HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, null, null, httpClient)
+        HttpClient? httpClient = null, // Optional HttpClient for testing
+        ProcessingStatisticsService? statisticsService = null)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, batchSize, adapterRole, logger, httpClient, null, null, statisticsService)
     {
         _sapApplicationServer = sapApplicationServer;
         _sapSystemNumber = sapSystemNumber;
@@ -532,24 +533,70 @@ public class SapAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("SAP Adapter (Destination): Sending {Count} records to SAP", records.Count);
 
-            if (_sapUseOData && !string.IsNullOrEmpty(_sapODataServiceUrl))
-            {
-                await WriteToODataAsync(records, cancellationToken);
-            }
-            else if (_sapUseRestApi && !string.IsNullOrEmpty(_sapRestApiEndpoint))
-            {
-                await WriteToRestApiAsync(records, cancellationToken);
-            }
-            else if (_sapUseRfc && !string.IsNullOrEmpty(_sapRfcFunctionModule))
-            {
-                await WriteToRfcAsync(records, cancellationToken);
-            }
-            else
-            {
-                await WriteToIdocAsync(records, cancellationToken);
-            }
+            // Variables for statistics
+            var startTime = DateTime.UtcNow;
+            var rowsProcessed = records?.Count ?? 0;
+            var rowsSucceeded = 0;
+            var rowsFailed = 0;
 
-            _logger?.LogInformation("SAP Adapter (Destination): Successfully sent {Count} records to SAP", records.Count);
+            try
+            {
+                if (_sapUseOData && !string.IsNullOrEmpty(_sapODataServiceUrl))
+                {
+                    await WriteToODataAsync(records, cancellationToken);
+                }
+                else if (_sapUseRestApi && !string.IsNullOrEmpty(_sapRestApiEndpoint))
+                {
+                    await WriteToRestApiAsync(records, cancellationToken);
+                }
+                else if (_sapUseRfc && !string.IsNullOrEmpty(_sapRfcFunctionModule))
+                {
+                    await WriteToRfcAsync(records, cancellationToken);
+                }
+                else
+                {
+                    await WriteToIdocAsync(records, cancellationToken);
+                }
+
+                rowsSucceeded = rowsProcessed;
+                _logger?.LogInformation("SAP Adapter (Destination): Successfully sent {Count} records to SAP", records.Count);
+            }
+            catch
+            {
+                rowsFailed = rowsProcessed;
+                rowsSucceeded = 0;
+                throw;
+            }
+            finally
+            {
+                // Record processing statistics
+                try
+                {
+                    var duration = DateTime.UtcNow - startTime;
+                    if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                    {
+                        await _statisticsService.RecordProcessingStatsAsync(
+                            _interfaceName,
+                            rowsProcessed,
+                            rowsSucceeded,
+                            rowsFailed,
+                            duration,
+                            sourceFile: null,
+                            adapterType: AdapterRole,
+                            adapterName: AdapterName,
+                            adapterInstanceGuid: _adapterInstanceGuid,
+                            sourceName: null,
+                            destinationName: destination,
+                            batchSize: _batchSize,
+                            useTransaction: null,
+                            cancellationToken);
+                    }
+                }
+                catch (Exception statsEx)
+                {
+                    _logger?.LogWarning(statsEx, "Failed to record processing statistics");
+                }
+            }
 
             // Mark messages as processed if they came from Service Bus
             if (processedMessages != null && processedMessages.Count > 0)

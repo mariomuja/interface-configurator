@@ -74,7 +74,7 @@ public class ValidateCsvFileFunction
             var quoteCharacter = queryParams.ContainsKey("quoteCharacter") ? queryParams["quoteCharacter"] : "\"";
 
             // Validate CSV
-            var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+            var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
             var validationResult = validationService.ValidateCsv(csvContent, expectedDelimiter, quoteCharacter);
 
             var response = req.CreateResponse(HttpStatusCode.OK);

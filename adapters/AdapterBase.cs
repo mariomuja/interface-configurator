@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Core.Models;
-using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Core.Services;
 using System.Text.Json;
 using Azure.Storage.Blobs;
 using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
@@ -32,6 +32,9 @@ public abstract class AdapterBase : IAdapter
     // JQ Transformation support
     protected readonly JQTransformationService? _jqService;
     protected readonly string? _jqScriptFile;
+    
+    // Processing Statistics support
+    protected readonly ProcessingStatisticsService? _statisticsService;
 
     protected AdapterBase(
         IServiceBusService? serviceBusService = null,
@@ -41,7 +44,8 @@ public abstract class AdapterBase : IAdapter
         string adapterRole = "Source",
         ILogger? logger = null,
         JQTransformationService? jqService = null,
-        string? jqScriptFile = null)
+        string? jqScriptFile = null,
+        ProcessingStatisticsService? statisticsService = null)
     {
         _serviceBusService = serviceBusService;
         _interfaceName = interfaceName;
@@ -51,6 +55,7 @@ public abstract class AdapterBase : IAdapter
         _logger = logger;
         _jqService = jqService;
         _jqScriptFile = jqScriptFile;
+        _statisticsService = statisticsService;
     }
 
     // IAdapter interface methods - must be implemented by derived classes

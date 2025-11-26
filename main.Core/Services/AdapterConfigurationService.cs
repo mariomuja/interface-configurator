@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 
-namespace InterfaceConfigurator.Main.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Adapter Configuration Service using JSON file storage in Blob Storage

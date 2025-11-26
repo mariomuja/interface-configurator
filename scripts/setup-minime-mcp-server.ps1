@@ -247,83 +247,82 @@ function Install-StartupTask {
     
     # Create startup script
     $startupScript = "$installDir\start-minime-on-boot.ps1"
-    $startupScriptContent = @"
+    $startupScriptContent = @'
 # Auto-generated startup script for minime MCP Server
-# Ensures Docker Desktop, the minime container, and the MCP Proxy are ready after logon
+# Starts Docker backend, minime container, and MCP proxy headlessly.
 
-`$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
-`$installDir = "$installDir"
-`$proxyScript = "$installDir\start-mcp-proxy.ps1"
-`$logDir = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "minime-mcp"
-`$logFile = Join-Path `$logDir "startup.log"
+$installDir = "__INSTALL_DIR__"
+$proxyScript = "__PROXY_SCRIPT__"
+$logDir = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "minime-mcp"
+$logFile = Join-Path $logDir "startup.log"
 
-if (-not (Test-Path `$logDir)) {
-    New-Item -ItemType Directory -Path `$logDir -Force | Out-Null
+if (-not (Test-Path $logDir)) {
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
 
 function Write-Log {
-    param(
-        [string]`$Message
-    )
-    `$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    `$entry = "[`$timestamp] `$Message"
-    `$entry | Out-File -FilePath `$logFile -Encoding UTF8 -Append
+    param([string]$Message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp $Message" | Out-File -FilePath $logFile -Encoding UTF8 -Append
 }
 
-function Ensure-DockerDesktop {
-    `$service = Get-Service -Name "com.docker.service" -ErrorAction SilentlyContinue
-    if (`$service) {
-        if (`$service.Status -ne "Running") {
+function Start-DockerBackend {
+    $service = Get-Service -Name "com.docker.service" -ErrorAction SilentlyContinue
+    if ($service) {
+        if ($service.Status -ne "Running") {
             Write-Log "Starting Docker Windows service..."
             try {
-                Start-Service -Name `$service.Name -ErrorAction Stop
-                `$service.WaitForStatus("Running","00:02:00")
-                Write-Log "Docker service is running."
+                Start-Service -Name $service.Name -ErrorAction Stop
+                $service.WaitForStatus("Running","00:02:00")
+                Write-Log "Docker Windows service is running."
             } catch {
-                Write-Log "Failed to start Docker service: $($_.Exception.Message)"
+                Write-Log ("Failed to start Docker service: {0}" -f $_.Exception.Message)
+                return $false
             }
         } else {
-            Write-Log "Docker service already running."
+            Write-Log "Docker Windows service already running."
         }
-    } else {
-        `$dockerDesktop = Join-Path `$env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
-        if (Test-Path `$dockerDesktop) {
-            Write-Log "Launching Docker Desktop..."
-            Start-Process -FilePath `$dockerDesktop | Out-Null
-        } else {
-            Write-Log "Docker Desktop executable not found."
-        }
+        return $true
     }
+
+    $desktopExe = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
+    if (Test-Path $desktopExe) {
+        Write-Log "Docker service unavailable. Launching Docker Desktop minimized..."
+        Start-Process -FilePath $desktopExe -WindowStyle Minimized | Out-Null
+        return $true
+    }
+
+    Write-Log "Docker Desktop executable not found."
+    return $false
 }
 
 function Wait-ForDocker {
-    param([int]`$TimeoutSeconds = 120)
-    `$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-
-    while (`$stopwatch.Elapsed.TotalSeconds -lt `$TimeoutSeconds) {
+    param([int]$TimeoutSeconds = 120)
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
         try {
-            docker version --format '{{.Server.Version}}' 2>$null | Out-Null
+            docker version --format "{{.Server.Version}}" 2>$null | Out-Null
             Write-Log "Docker engine is available."
             return $true
         } catch {
             Start-Sleep -Seconds 3
         }
     }
-
-    Write-Log "Docker engine did not become ready within `$TimeoutSeconds seconds."
+    Write-Log "Docker engine did not become ready within $TimeoutSeconds seconds."
     return $false
 }
 
 function Ensure-MinimeContainer {
     Write-Log "Ensuring minimemcp container is running..."
     try {
-        `$status = docker inspect -f '{{.State.Status}}' minimemcp 2>$null
+        $status = docker inspect -f "{{.State.Status}}" minimemcp 2>$null
     } catch {
-        `$status = $null
+        $status = $null
     }
 
-    if (`$status -eq "running") {
+    if ($status -eq "running") {
         Write-Log "minimemcp container already running."
         return $true
     }
@@ -332,24 +331,23 @@ function Ensure-MinimeContainer {
     try {
         docker start minimemcp 2>&1 | Out-Null
     } catch {
-        Write-Log "Failed to start minimemcp container: $($_.Exception.Message)"
+        Write-Log ("Failed to start minimemcp container: {0}" -f $_.Exception.Message)
         return $false
     }
 
     Start-Sleep -Seconds 3
-
     try {
-        `$status = docker inspect -f '{{.State.Status}}' minimemcp 2>$null
+        $status = docker inspect -f "{{.State.Status}}" minimemcp 2>$null
     } catch {
-        `$status = $null
+        $status = $null
     }
 
-    if (`$status -eq "running") {
+    if ($status -eq "running") {
         Write-Log "minimemcp container is now running."
         return $true
     }
 
-    Write-Log "Container status after start attempt: `$status"
+    Write-Log ("Container status after start attempt: {0}" -f $status)
     return $false
 }
 
@@ -364,56 +362,60 @@ function Test-ProxyHealth {
 
 function Ensure-McpProxy {
     if (Test-ProxyHealth) {
-        Write-Log "MCP Proxy already healthy."
+        Write-Log "MCP proxy already healthy."
         return $true
     }
 
-    if (-not (Test-Path `$proxyScript)) {
-        Write-Log "Proxy script not found at `$proxyScript"
+    if (-not (Test-Path $proxyScript)) {
+        Write-Log "Proxy script not found."
         return $false
     }
 
-    Write-Log "Starting MCP Proxy..."
+    Write-Log "Starting MCP proxy..."
     try {
-        & `$proxyScript 2>&1 | Out-Null
+        & $proxyScript 2>&1 | Out-Null
     } catch {
-        Write-Log "Failed to start MCP Proxy: $($_.Exception.Message)"
+        Write-Log ("Failed to start MCP proxy: {0}" -f $_.Exception.Message)
         return $false
     }
 
     Start-Sleep -Seconds 3
-
     if (Test-ProxyHealth) {
-        Write-Log "MCP Proxy is healthy."
+        Write-Log "MCP proxy is healthy."
         return $true
     }
 
-    Write-Log "MCP Proxy failed health check after start."
+    Write-Log "MCP proxy failed health check after start."
     return $false
 }
 
-Write-Log "=== Starting minime MCP bootstrap ==="
+Write-Log "=== minime MCP startup sequence ==="
+$dockerBackend = Start-DockerBackend
+$dockerReady = $false
+if ($dockerBackend) {
+    $dockerReady = Wait-ForDocker
+} else {
+    Write-Log "Docker backend could not be started."
+}
 
-Ensure-DockerDesktop
-`$dockerReady = Wait-ForDocker
-`$containerReady = $false
-
-if (`$dockerReady) {
-    `$containerReady = Ensure-MinimeContainer
+$containerReady = $false
+if ($dockerReady) {
+    $containerReady = Ensure-MinimeContainer
 } else {
     Write-Log "Skipping container start because Docker is unavailable."
 }
 
-`$proxyReady = Ensure-McpProxy
+$proxyReady = Ensure-McpProxy
+Write-Log ("Summary -> DockerBackend={0} DockerReady={1} ContainerReady={2} ProxyReady={3}" -f $dockerBackend, $dockerReady, $containerReady, $proxyReady)
 
-Write-Log ("Bootstrap summary -> DockerReady=`$dockerReady ContainerReady=`$containerReady ProxyReady=`$proxyReady")
-
-if (-not (`$dockerReady -and `$containerReady -and `$proxyReady)) {
+if (-not ($dockerBackend -and $dockerReady -and $containerReady -and $proxyReady)) {
     Write-Log "minime MCP startup completed with warnings."
 } else {
     Write-Log "minime MCP startup completed successfully."
 }
-"@
+'@
+    $startupScriptContent = $startupScriptContent.Replace("__INSTALL_DIR__", $installDir)
+    $startupScriptContent = $startupScriptContent.Replace("__PROXY_SCRIPT__", (Join-Path $installDir "start-mcp-proxy.ps1"))
     
     try {
         $startupScriptContent | Set-Content $startupScript -Encoding UTF8

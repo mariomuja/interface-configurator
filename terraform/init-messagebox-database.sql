@@ -38,6 +38,8 @@ END
 GO
 
 -- Create AdapterInstances table (tracks adapter instance metadata)
+-- Source adapters: SourceAdapterGuid is NULL or empty
+-- Destination adapters: SourceAdapterGuid is set (not NULL/empty)
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[AdapterInstances]') AND type in (N'U'))
 BEGIN
     CREATE TABLE [dbo].[AdapterInstances] (
@@ -45,7 +47,8 @@ BEGIN
         [InterfaceName] NVARCHAR(200) NOT NULL,
         [InstanceName] NVARCHAR(200) NOT NULL,
         [AdapterName] NVARCHAR(100) NOT NULL,
-        [AdapterType] NVARCHAR(50) NOT NULL,
+        [Configuration] NVARCHAR(MAX) NOT NULL DEFAULT '{}',
+        [SourceAdapterGuid] UNIQUEIDENTIFIER NULL,
         [IsEnabled] BIT NOT NULL DEFAULT 1,
         [datetime_created] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
         [datetime_updated] DATETIME2 NULL
@@ -53,7 +56,8 @@ BEGIN
     
     CREATE INDEX [IX_AdapterInstances_InterfaceName] ON [dbo].[AdapterInstances]([InterfaceName]);
     CREATE INDEX [IX_AdapterInstances_AdapterName] ON [dbo].[AdapterInstances]([AdapterName]);
-    CREATE INDEX [IX_AdapterInstances_AdapterType] ON [dbo].[AdapterInstances]([AdapterType]);
+    CREATE INDEX [IX_AdapterInstances_SourceAdapterGuid] ON [dbo].[AdapterInstances]([SourceAdapterGuid]);
+    CREATE INDEX [IX_AdapterInstances_InterfaceName_SourceAdapterGuid] ON [dbo].[AdapterInstances]([InterfaceName], [SourceAdapterGuid]);
     
     PRINT 'AdapterInstances table created successfully';
 END

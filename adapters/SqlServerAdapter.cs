@@ -5,7 +5,7 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Core.Services;
 using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Adapters;
@@ -388,7 +388,14 @@ public class SqlServerAdapter : AdapterBase
                                     rowsSucceeded,
                                     rowsFailed,
                                     duration,
-                                    sourceFile,
+                                    sourceFile: sourceFile,
+                                    adapterType: _adapterRole,
+                                    adapterName: "SqlServer",
+                                    adapterInstanceGuid: _adapterInstanceGuid,
+                                    sourceName: null, // Not applicable for destination adapters
+                                    destinationName: destination,
+                                    batchSize: _batchSize,
+                                    useTransaction: _useTransaction,
                                     cancellationToken);
                             }
                         }

@@ -50,8 +50,9 @@ public class CrmAdapter : HttpClientAdapterBase
         int pollingInterval = 60,
         int adapterBatchSize = 100,
         bool useBatch = true,
-        HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, null, null, httpClient)
+        HttpClient? httpClient = null, // Optional HttpClient for testing
+        ProcessingStatisticsService? statisticsService = null)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient, null, null, statisticsService)
     {
         _organizationUrl = organizationUrl;
         _username = username;
@@ -375,26 +376,72 @@ public class CrmAdapter : HttpClientAdapterBase
 
             _logger?.LogInformation("CRM Adapter (Destination): Writing {Count} records to entity '{EntityName}'", records.Count, _entityName);
 
-            var accessToken = await GetAccessTokenAsync(cancellationToken);
+            // Variables for statistics
+            var startTime = DateTime.UtcNow;
+            var rowsProcessed = records?.Count ?? 0;
+            var rowsSucceeded = 0;
+            var rowsFailed = 0;
 
-            var baseUrl = _organizationUrl.TrimEnd('/');
-            var entityUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
+            try
+            {
+                var accessToken = await GetAccessTokenAsync(cancellationToken);
 
-            if (_useBatch && records.Count > 1)
-            {
-                // Use ExecuteMultiple for batch operations (recommended by Microsoft)
-                await WriteExecuteMultipleAsync(baseUrl, accessToken, entityUrl, records, cancellationToken);
-            }
-            else
-            {
-                // Write records individually
-                foreach (var record in records)
+                var baseUrl = _organizationUrl.TrimEnd('/');
+                var entityUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
+
+                if (_useBatch && records.Count > 1)
                 {
-                    await WriteSingleRecordAsync(entityUrl, accessToken, record, cancellationToken);
+                    // Use ExecuteMultiple for batch operations (recommended by Microsoft)
+                    await WriteExecuteMultipleAsync(baseUrl, accessToken, entityUrl, records, cancellationToken);
+                }
+                else
+                {
+                    // Write records individually
+                    foreach (var record in records)
+                    {
+                        await WriteSingleRecordAsync(entityUrl, accessToken, record, cancellationToken);
+                    }
+                }
+
+                rowsSucceeded = rowsProcessed;
+                _logger?.LogInformation("CRM Adapter (Destination): Successfully wrote {Count} records", records.Count);
+            }
+            catch
+            {
+                rowsFailed = rowsProcessed;
+                rowsSucceeded = 0;
+                throw;
+            }
+            finally
+            {
+                // Record processing statistics
+                try
+                {
+                    var duration = DateTime.UtcNow - startTime;
+                    if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                    {
+                        await _statisticsService.RecordProcessingStatsAsync(
+                            _interfaceName,
+                            rowsProcessed,
+                            rowsSucceeded,
+                            rowsFailed,
+                            duration,
+                            sourceFile: null,
+                            adapterType: AdapterRole,
+                            adapterName: AdapterName,
+                            adapterInstanceGuid: _adapterInstanceGuid,
+                            sourceName: null,
+                            destinationName: destination,
+                            batchSize: _batchSize,
+                            useTransaction: null,
+                            cancellationToken);
+                    }
+                }
+                catch (Exception statsEx)
+                {
+                    _logger?.LogWarning(statsEx, "Failed to record processing statistics");
                 }
             }
-
-            _logger?.LogInformation("CRM Adapter (Destination): Successfully wrote {Count} records", records.Count);
 
             // Mark messages as processed if they came from Service Bus
             if (processedMessages != null && processedMessages.Count > 0)

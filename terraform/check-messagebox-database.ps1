@@ -170,7 +170,7 @@ ORDER BY datetime_created DESC;
     Write-Host "Total Adapter Instances: $totalInstances" -ForegroundColor $(if ($totalInstances -gt 0) { "Green" } else { "Yellow" })
     
     if ($totalInstances -gt 0) {
-        $instancesQuery = "SELECT AdapterInstanceGuid, InterfaceName, InstanceName, AdapterName, AdapterType, IsEnabled FROM [dbo].[AdapterInstances] ORDER BY InterfaceName, AdapterType"
+        $instancesQuery = "SELECT AdapterInstanceGuid, InterfaceName, InstanceName, AdapterName, SourceAdapterGuid, IsEnabled FROM [dbo].[AdapterInstances] ORDER BY InterfaceName, CASE WHEN SourceAdapterGuid IS NULL THEN 0 ELSE 1 END"
         $command.CommandText = $instancesQuery
         $reader = $command.ExecuteReader()
         Write-Host "Adapter Instances:" -ForegroundColor Yellow
@@ -179,8 +179,10 @@ ORDER BY datetime_created DESC;
             $interfaceName = $reader["InterfaceName"]
             $instanceName = $reader["InstanceName"]
             $adapterName = $reader["AdapterName"]
-            $adapterType = $reader["AdapterType"]
+            $sourceAdapterGuid = $reader["SourceAdapterGuid"]
             $isEnabled = $reader["IsEnabled"]
+            # Determine adapter type from SourceAdapterGuid: null/empty = Source, set = Destination
+            $adapterType = if ([DBNull]::Value.Equals($sourceAdapterGuid) -or [string]::IsNullOrEmpty($sourceAdapterGuid)) { "Source" } else { "Destination" }
             Write-Host "  - $guid : $interfaceName / $instanceName / $adapterName ($adapterType) - Enabled: $isEnabled" -ForegroundColor White
         }
         $reader.Close()

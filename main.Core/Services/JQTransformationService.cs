@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace InterfaceConfigurator.Main.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Service for transforming JSON using jq scripts

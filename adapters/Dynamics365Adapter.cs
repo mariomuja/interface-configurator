@@ -53,8 +53,9 @@ public class Dynamics365Adapter : HttpClientAdapterBase
         int adapterBatchSize = 100,
         int pageSize = 50,
         bool useBatch = true,
-        HttpClient? httpClient = null) // Optional HttpClient for testing
-        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, null, null, httpClient)
+        HttpClient? httpClient = null, // Optional HttpClient for testing
+        ProcessingStatisticsService? statisticsService = null)
+        : base(serviceBusService, interfaceName, adapterInstanceGuid, adapterBatchSize, adapterRole, logger, httpClient, null, null, statisticsService)
     {
         _tenantId = tenantId;
         _clientId = clientId;
@@ -358,27 +359,73 @@ public class Dynamics365Adapter : HttpClientAdapterBase
 
             _logger?.LogInformation("Dynamics 365 Adapter (Destination): Writing {Count} records to entity '{EntityName}'", records.Count, _entityName);
 
-            // Get OAuth token (uses caching from base class)
-            var accessToken = await GetAccessTokenAsync(cancellationToken);
+            // Variables for statistics
+            var startTime = DateTime.UtcNow;
+            var rowsProcessed = records?.Count ?? 0;
+            var rowsSucceeded = 0;
+            var rowsFailed = 0;
 
-            var baseUrl = _instanceUrl.TrimEnd('/');
-            var entityUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
+            try
+            {
+                // Get OAuth token (uses caching from base class)
+                var accessToken = await GetAccessTokenAsync(cancellationToken);
 
-            if (_useBatch && records.Count > 1)
-            {
-                // Use OData batch request for multiple records
-                await WriteBatchAsync(entityUrl, accessToken, records, cancellationToken);
-            }
-            else
-            {
-                // Write records individually
-                foreach (var record in records)
+                var baseUrl = _instanceUrl.TrimEnd('/');
+                var entityUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
+
+                if (_useBatch && records.Count > 1)
                 {
-                    await WriteSingleRecordAsync(entityUrl, accessToken, record, cancellationToken);
+                    // Use OData batch request for multiple records
+                    await WriteBatchAsync(entityUrl, accessToken, records, cancellationToken);
+                }
+                else
+                {
+                    // Write records individually
+                    foreach (var record in records)
+                    {
+                        await WriteSingleRecordAsync(entityUrl, accessToken, record, cancellationToken);
+                    }
+                }
+
+                rowsSucceeded = rowsProcessed;
+                _logger?.LogInformation("Dynamics 365 Adapter (Destination): Successfully wrote {Count} records", records.Count);
+            }
+            catch
+            {
+                rowsFailed = rowsProcessed;
+                rowsSucceeded = 0;
+                throw;
+            }
+            finally
+            {
+                // Record processing statistics
+                try
+                {
+                    var duration = DateTime.UtcNow - startTime;
+                    if (_statisticsService != null && !string.IsNullOrWhiteSpace(_interfaceName))
+                    {
+                        await _statisticsService.RecordProcessingStatsAsync(
+                            _interfaceName,
+                            rowsProcessed,
+                            rowsSucceeded,
+                            rowsFailed,
+                            duration,
+                            sourceFile: null,
+                            adapterType: AdapterRole,
+                            adapterName: AdapterName,
+                            adapterInstanceGuid: _adapterInstanceGuid,
+                            sourceName: null,
+                            destinationName: destination,
+                            batchSize: _batchSize,
+                            useTransaction: null,
+                            cancellationToken);
+                    }
+                }
+                catch (Exception statsEx)
+                {
+                    _logger?.LogWarning(statsEx, "Failed to record processing statistics");
                 }
             }
-
-            _logger?.LogInformation("Dynamics 365 Adapter (Destination): Successfully wrote {Count} records", records.Count);
 
             // Mark messages as processed if they came from Service Bus
             if (processedMessages != null && processedMessages.Count > 0)

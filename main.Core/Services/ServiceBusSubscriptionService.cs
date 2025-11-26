@@ -2,7 +2,7 @@ using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 
-namespace InterfaceConfigurator.Main.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Service for managing Azure Service Bus subscriptions for destination adapter instances

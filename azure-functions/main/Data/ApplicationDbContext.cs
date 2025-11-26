@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Core.Models;
 
 namespace InterfaceConfigurator.Main.Data;
 
@@ -18,15 +18,14 @@ public class ApplicationDbContext : DbContext
     /// <summary>
     /// TransportData table - stores CSV data in the main application database
     /// This table is created in app-database (not MessageBox database)
-    /// Note: Features, Users, and InterfaceConfigurations are now in MessageBox database
     /// </summary>
-    public DbSet<InterfaceConfigurator.Main.Models.TransportData> TransportData { get; set; }
+    public DbSet<InterfaceConfigurator.Main.Core.Models.TransportData> TransportData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<InterfaceConfigurator.Main.Models.TransportData>(entity =>
+        modelBuilder.Entity<InterfaceConfigurator.Main.Core.Models.TransportData>(entity =>
         {
             entity.HasKey(e => e.PrimaryKey);
             // GUID primary key with DEFAULT NEWID() - NEVER use IDENTITY for primary keys
@@ -36,14 +35,12 @@ public class ApplicationDbContext : DbContext
                 .HasDefaultValueSql("NEWID()")
                 .ValueGeneratedNever(); // GUID is generated in code, not by database
             // Every SQL table MUST have a datetime_created column with DEFAULT GETUTCDATE()
-            entity.Property(e => e.datetime_created)
+            entity.Property(e => e.DateTimeCreated)
                 .HasDefaultValueSql("GETUTCDATE()")
                 .IsRequired();
-            entity.HasIndex(e => e.datetime_created).HasDatabaseName("IX_TransportData_datetime_created");
+            entity.HasIndex(e => e.DateTimeCreated).HasDatabaseName("IX_TransportData_datetime_created");
             // CSV columns are stored as individual columns, not as JSON
         });
-        
-        // Note: Features, Users, and InterfaceConfigurations are now in MessageBoxDbContext
 
     }
 }

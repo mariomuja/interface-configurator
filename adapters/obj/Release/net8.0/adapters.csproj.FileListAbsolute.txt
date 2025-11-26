@@ -1,0 +1,6 @@
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.csproj.AssemblyReference.cache
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.AssemblyInfoInputs.cache
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.AssemblyInfo.cs
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.csproj.CoreCompileInputs.cache
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.sourcelink.json

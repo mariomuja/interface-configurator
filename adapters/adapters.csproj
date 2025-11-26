@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\main.Core\main.Core.csproj" />
-    <ProjectReference Include="..\azure-functions\main\main.csproj" />
   </ItemGroup>
 
 </Project>

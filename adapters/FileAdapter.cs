@@ -386,7 +386,7 @@ public class FileAdapter : AdapterBase
                     var detectedSeparator = fieldSeparator;
                     if (string.IsNullOrWhiteSpace(fieldSeparator) || fieldSeparator == "‖")
                     {
-                        var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                        var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
                         detectedSeparator = validationService.DetectDelimiter(content, fieldSeparator);
                         _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath}", detectedSeparator, filePath);
                     }
@@ -424,7 +424,7 @@ public class FileAdapter : AdapterBase
             var detectedSeparator = fieldSeparator;
             if (string.IsNullOrWhiteSpace(fieldSeparator) || fieldSeparator == "‖")
             {
-                var validationService = new InterfaceConfigurator.Main.Services.CsvValidationService(_logger);
+                var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
                 detectedSeparator = validationService.DetectDelimiter(content, fieldSeparator);
                 _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source}", detectedSeparator, source);
             }

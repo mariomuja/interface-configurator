@@ -19,6 +19,7 @@ export interface DestinationAdapterInstance {
 export interface DestinationInstancesDialogData {
   instances: DestinationAdapterInstance[];
   availableAdapters: { name: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'; displayName: string; icon: string }[];
+  hasSourceAdapter?: boolean; // Flag to indicate if source adapter exists
 }
 
 @Component({
@@ -55,6 +56,13 @@ export class DestinationInstancesDialogComponent implements OnInit {
   }
 
   onAddAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
+    // Validate that source adapter exists before allowing destination adapter addition
+    if (this.data.hasSourceAdapter === false) {
+      // This should not happen if parent component validates correctly, but add safety check
+      alert('A source adapter must be defined first before adding destination adapters. Please configure a source adapter first.');
+      return;
+    }
+    
     // Set default configuration based on adapter type
     let defaultConfiguration: any = {};
     if (adapterName === 'SqlServer') {

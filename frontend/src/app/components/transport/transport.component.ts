@@ -164,6 +164,49 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.interfaceConfigurations.find(c => c.interfaceName === name);
   }
   
+  /**
+   * Checks if a source adapter exists for the current interface.
+   * Source adapters are identified by having an empty SourceAdapterGuid (null/undefined/empty).
+   */
+  private hasSourceAdapter(): boolean {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return false;
+    }
+
+    const config = this.getInterfaceConfig(interfaceName);
+    if (!config) {
+      return false;
+    }
+
+    // Check if sourceAdapterInstanceGuid exists (indicates source adapter is configured)
+    if (config.sourceAdapterInstanceGuid && config.sourceAdapterInstanceGuid.trim().length > 0) {
+      return true;
+    }
+
+    // Check if source instance exists in sources dictionary
+    const sourceInstance = this.findSourceInstance(config);
+    if (sourceInstance && sourceInstance.adapterInstanceGuid) {
+      return true;
+    }
+
+    // Check if sourceAdapterName is set (indicates source adapter type is configured)
+    if (config.sourceAdapterName && config.sourceAdapterName.trim().length > 0) {
+      return true;
+    }
+
+    // Check local state as fallback
+    if (this.sourceAdapterInstanceGuid && this.sourceAdapterInstanceGuid.trim().length > 0) {
+      return true;
+    }
+
+    if (this.sourceAdapterName && this.sourceAdapterName.trim().length > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   private findSourceInstance(
     config: any,
     options?: { adapterInstanceGuid?: string; instanceName?: string }
@@ -1633,9 +1676,43 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     };
   }
 
+  /**
+   * Validates that the interface configuration is valid:
+   * - If destination adapters exist, a source adapter must also exist
+   */
+  private validateInterfaceConfiguration(): boolean {
+    const interfaceName = this.getActiveInterfaceName();
+    if (!interfaceName) {
+      return true; // No interface selected, validation not applicable
+    }
+
+    const hasDestinations = this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0;
+    if (hasDestinations) {
+      const hasSource = this.hasSourceAdapter();
+      if (!hasSource) {
+        this.snackBar.open(
+          'Interface configuration is invalid: Destination adapters exist but no source adapter is defined. Please define a source adapter first or remove all destination adapters.',
+          'OK',
+          { duration: 7000, panelClass: ['error-snackbar'] }
+        );
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   updateInterfaceName(): void {
     if (!this.currentInterfaceName || this.currentInterfaceName.trim() === '') {
       this.snackBar.open('Interface-Name darf nicht leer sein', 'OK', { duration: 3000 });
+      // Restore previous name
+      const activeConfig = this.getInterfaceConfig();
+      this.currentInterfaceName = activeConfig?.interfaceName || this.DEFAULT_INTERFACE_NAME;
+      return;
+    }
+
+    // Validate interface configuration before saving
+    if (!this.validateInterfaceConfiguration()) {
       // Restore previous name
       const activeConfig = this.getInterfaceConfig();
       this.currentInterfaceName = activeConfig?.interfaceName || this.DEFAULT_INTERFACE_NAME;
@@ -2312,37 +2389,56 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       instanceName: sourceInstance?.instanceName
     });
     
+    // Parse configuration JSON from the active source adapter instance if available
+    let parsedConfig: any = {};
+    const rawConfig = sourceInstance
+      ? (sourceInstance.configuration ?? (sourceInstance as any).Configuration)
+      : undefined;
+    if (rawConfig) {
+      try {
+        parsedConfig = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+      } catch {
+        parsedConfig = {};
+      }
+    }
+
     const dialogData: AdapterPropertiesData = {
       adapterType: 'Source',
       adapterName: this.sourceAdapterName,
       instanceName: resolvedInstanceName,
       isEnabled: resolvedIsEnabled !== undefined ? resolvedIsEnabled : this.sourceIsEnabled,
       // Use explicit undefined checks - empty string is a valid value!
-      receiveFolder: activeConfig?.sourceReceiveFolder !== undefined ? activeConfig.sourceReceiveFolder : this.sourceReceiveFolder,
-      fileMask: activeConfig?.sourceFileMask !== undefined ? activeConfig.sourceFileMask : this.sourceFileMask,
-      batchSize: activeConfig?.sourceBatchSize !== undefined ? activeConfig.sourceBatchSize : this.sourceBatchSize,
-      fieldSeparator: activeConfig?.sourceFieldSeparator !== undefined ? activeConfig.sourceFieldSeparator : this.sourceFieldSeparator,
-      csvAdapterType: activeConfig?.csvAdapterType || (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0 
-        ? (Object.values(activeConfig.sources)[0] as any)?.csvAdapterType || (Object.values(activeConfig.sources)[0] as any)?.CsvAdapterType
-        : undefined),
-      csvData: this.csvDataText || activeConfig?.csvData || activeConfig?.CsvData || 
-        (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0 
+      receiveFolder: parsedConfig.receiveFolder ?? activeConfig?.sourceReceiveFolder ?? this.sourceReceiveFolder,
+      fileMask: parsedConfig.fileMask ?? activeConfig?.sourceFileMask ?? this.sourceFileMask,
+      batchSize: parsedConfig.batchSize ?? activeConfig?.sourceBatchSize ?? this.sourceBatchSize,
+      fieldSeparator: parsedConfig.fieldSeparator ?? activeConfig?.sourceFieldSeparator ?? this.sourceFieldSeparator,
+      csvAdapterType: parsedConfig.csvAdapterType
+        ?? activeConfig?.csvAdapterType
+        ?? (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0
+          ? (Object.values(activeConfig.sources)[0] as any)?.csvAdapterType || (Object.values(activeConfig.sources)[0] as any)?.CsvAdapterType
+          : undefined),
+      csvData: this.csvDataText
+        || parsedConfig.csvData
+        || activeConfig?.csvData
+        || activeConfig?.CsvData
+        || (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0
           ? ((Object.values(activeConfig.sources)[0] as any)?.csvData || (Object.values(activeConfig.sources)[0] as any)?.CsvData || '')
           : ''),
-      csvPollingInterval: activeConfig?.csvPollingInterval !== undefined ? activeConfig.csvPollingInterval : 
-        (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0
+      csvPollingInterval: parsedConfig.csvPollingInterval
+        ?? activeConfig?.csvPollingInterval
+        ?? (activeConfig?.sources && Object.keys(activeConfig.sources).length > 0
           ? ((Object.values(activeConfig.sources)[0] as any)?.csvPollingInterval || (Object.values(activeConfig.sources)[0] as any)?.CsvPollingInterval)
           : this.csvPollingInterval),
-      // SFTP properties - use explicit undefined checks
-      sftpHost: activeConfig?.sftpHost !== undefined ? activeConfig.sftpHost : '',
-      sftpPort: activeConfig?.sftpPort !== undefined ? activeConfig.sftpPort : 22,
-      sftpUsername: activeConfig?.sftpUsername !== undefined ? activeConfig.sftpUsername : '',
-      sftpPassword: activeConfig?.sftpPassword !== undefined ? activeConfig.sftpPassword : '',
-      sftpSshKey: activeConfig?.sftpSshKey !== undefined ? activeConfig.sftpSshKey : '',
-      sftpFolder: activeConfig?.sftpFolder !== undefined ? activeConfig.sftpFolder : '',
-      sftpFileMask: activeConfig?.sftpFileMask !== undefined ? activeConfig.sftpFileMask : '*.txt',
-      sftpMaxConnectionPoolSize: activeConfig?.sftpMaxConnectionPoolSize !== undefined ? activeConfig.sftpMaxConnectionPoolSize : 5,
-      sftpFileBufferSize: activeConfig?.sftpFileBufferSize !== undefined ? activeConfig.sftpFileBufferSize : 8192,
+      // SFTP properties - prefer configuration JSON, then fall back to interface config
+      sftpHost: parsedConfig.sftpHost ?? activeConfig?.sftpHost ?? '',
+      sftpPort: parsedConfig.sftpPort ?? activeConfig?.sftpPort ?? 22,
+      sftpUsername: parsedConfig.sftpUsername ?? activeConfig?.sftpUsername ?? '',
+      sftpPassword: parsedConfig.sftpPassword ?? activeConfig?.sftpPassword ?? '',
+      sftpSshKey: parsedConfig.sftpSshKey ?? activeConfig?.sftpSshKey ?? '',
+      sftpFolder: parsedConfig.sftpFolder ?? activeConfig?.sftpFolder ?? '',
+      sftpFileMask: parsedConfig.sftpFileMask ?? activeConfig?.sftpFileMask ?? '*.txt',
+      sftpMaxConnectionPoolSize: parsedConfig.sftpMaxConnectionPoolSize ?? activeConfig?.sftpMaxConnectionPoolSize ?? 5,
+      sftpFileBufferSize: parsedConfig.sftpFileBufferSize ?? activeConfig?.sftpFileBufferSize ?? 8192,
       // SQL Server properties
       sqlServerName: this.sqlServerName,
       sqlDatabaseName: this.sqlDatabaseName,
@@ -2370,21 +2466,86 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // Update instance name if changed
-        if (result.instanceName !== this.sourceInstanceName) {
-          this.sourceInstanceName = result.instanceName;
-          this.updateSourceInstanceName();
+        // Validate: If there are destination adapters, ensure source adapter is not being removed
+        const hasDestinations = this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0;
+        if (hasDestinations) {
+          // Check if source adapter is being disabled or removed
+          // If isEnabled is explicitly set to false, warn the user
+          if (result.isEnabled === false) {
+            this.snackBar.open(
+              'Cannot disable source adapter while destination adapters exist. Please remove all destination adapters first, or replace the source adapter with another one.',
+              'OK',
+              { duration: 6000, panelClass: ['error-snackbar'] }
+            );
+            return; // Prevent saving
+          }
+          
+          // Check if source adapter instance is being removed (instanceName empty or adapterInstanceGuid missing)
+          // This is a safety check - the actual removal would happen elsewhere
+          if (!result.instanceName || result.instanceName.trim().length === 0) {
+            this.snackBar.open(
+              'Cannot remove source adapter while destination adapters exist. Please remove all destination adapters first, or replace the source adapter with another one.',
+              'OK',
+              { duration: 6000, panelClass: ['error-snackbar'] }
+            );
+            return; // Prevent saving
+          }
         }
 
-        // Update enabled status if provided (always save to ensure backend is updated)
-        let enabledWasChanged = false;
-        if (result.isEnabled !== undefined) {
-          const previousValue = this.sourceIsEnabled;
-          this.sourceIsEnabled = result.isEnabled;
-          enabledWasChanged = true;
-          // Always call onSourceEnabledChange to save, even if value appears unchanged
-          // This ensures the backend is updated with the exact value from the dialog
-          this.onSourceEnabledChange();
+        // Persist all source adapter settings into Configuration JSON
+        const interfaceName = this.getActiveInterfaceName();
+        const sourceGuid = this.sourceAdapterInstanceGuid || activeConfig?.sourceAdapterInstanceGuid;
+        if (interfaceName && sourceGuid) {
+          // Build configuration object from dialog result
+          const config: any = {
+            receiveFolder: result.receiveFolder,
+            fileMask: result.fileMask,
+            batchSize: result.batchSize,
+            fieldSeparator: result.fieldSeparator,
+            csvAdapterType: result.csvAdapterType,
+            csvPollingInterval: result.csvPollingInterval,
+            csvSkipHeaderLines: result.csvSkipHeaderLines,
+            csvSkipFooterLines: result.csvSkipFooterLines,
+            csvQuoteCharacter: result.csvQuoteCharacter,
+            sftpHost: result.sftpHost,
+            sftpPort: result.sftpPort,
+            sftpUsername: result.sftpUsername,
+            sftpPassword: result.sftpPassword,
+            sftpSshKey: result.sftpSshKey,
+            sftpFolder: result.sftpFolder,
+            sftpFileMask: result.sftpFileMask,
+            sftpMaxConnectionPoolSize: result.sftpMaxConnectionPoolSize,
+            sftpFileBufferSize: result.sftpFileBufferSize,
+            // SQL properties relevant for source SqlServer adapters
+            sqlServerName: result.sqlServerName,
+            sqlDatabaseName: result.sqlDatabaseName,
+            sqlUserName: result.sqlUserName,
+            sqlPassword: result.sqlPassword,
+            sqlIntegratedSecurity: result.sqlIntegratedSecurity,
+            sqlResourceGroup: result.sqlResourceGroup,
+            sqlPollingStatement: result.sqlPollingStatement,
+            sqlPollingInterval: result.sqlPollingInterval,
+            sqlUseTransaction: result.sqlUseTransaction,
+            sqlBatchSize: result.sqlBatchSize,
+            tableName: result.tableName
+          };
+
+          this.transportService.updateSourceAdapterInstance(
+            interfaceName,
+            sourceGuid,
+            result.instanceName,
+            result.isEnabled,
+            JSON.stringify(config)
+          ).subscribe({
+            next: () => {
+              // Update local state after successful save
+              this.sourceInstanceName = result.instanceName;
+              this.sourceIsEnabled = result.isEnabled;
+            },
+            error: (error) => {
+              console.error('Error updating source adapter instance configuration:', error);
+            }
+          });
         }
 
         // Update receive folder if changed (only for CSV adapters)
@@ -2658,6 +2819,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     let updateStatement = '';
     let deleteStatement = '';
     
+    let destInstanceConfig: any = {};
     if (interfaceName && activeConfig?.destinations) {
       const destInstance = Object.values(activeConfig.destinations).find((d: any) => 
         d && d.adapterInstanceGuid === this.destinationAdapterInstanceGuid
@@ -2669,6 +2831,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
         insertStatement = destInstance.insertStatement || '';
         updateStatement = destInstance.updateStatement || '';
         deleteStatement = destInstance.deleteStatement || '';
+
+        // Parse configuration JSON from destination adapter if available
+        const rawConfig = (destInstance as any).configuration ?? (destInstance as any).Configuration;
+        if (rawConfig) {
+          try {
+            destInstanceConfig = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+          } catch {
+            destInstanceConfig = {};
+          }
+        }
       }
     }
     
@@ -2678,25 +2850,25 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       instanceName: this.destinationInstanceName,
       // Read isEnabled from config (backend) instead of local state
       isEnabled: activeConfig?.destinationIsEnabled ?? this.destinationIsEnabled,
-      receiveFolder: this.destinationReceiveFolder,
-      fileMask: this.destinationFileMask,
-      fieldSeparator: this.sourceFieldSeparator,
-      destinationReceiveFolder: this.destinationReceiveFolder,
-      destinationFileMask: this.destinationFileMask,
-      sqlServerName: this.sqlServerName,
-      sqlDatabaseName: this.sqlDatabaseName,
-      sqlUserName: this.sqlUserName,
-      sqlPassword: this.sqlPassword,
-      sqlIntegratedSecurity: this.sqlIntegratedSecurity,
-      sqlResourceGroup: this.sqlResourceGroup,
+      receiveFolder: destInstanceConfig.receiveFolder ?? this.destinationReceiveFolder,
+      fileMask: destInstanceConfig.fileMask ?? this.destinationFileMask,
+      fieldSeparator: destInstanceConfig.fieldSeparator ?? this.sourceFieldSeparator,
+      destinationReceiveFolder: destInstanceConfig.destinationReceiveFolder ?? this.destinationReceiveFolder,
+      destinationFileMask: destInstanceConfig.destinationFileMask ?? this.destinationFileMask,
+      sqlServerName: destInstanceConfig.sqlServerName ?? this.sqlServerName,
+      sqlDatabaseName: destInstanceConfig.sqlDatabaseName ?? this.sqlDatabaseName,
+      sqlUserName: destInstanceConfig.sqlUserName ?? this.sqlUserName,
+      sqlPassword: destInstanceConfig.sqlPassword ?? this.sqlPassword,
+      sqlIntegratedSecurity: destInstanceConfig.sqlIntegratedSecurity ?? this.sqlIntegratedSecurity,
+      sqlResourceGroup: destInstanceConfig.sqlResourceGroup ?? this.sqlResourceGroup,
       adapterInstanceGuid: this.destinationAdapterInstanceGuid,
       // JQ Transformation properties
-      jqScriptFile: jqScriptFile,
+      jqScriptFile: destInstanceConfig.jqScriptFile ?? jqScriptFile,
       sourceAdapterSubscription: sourceAdapterSubscription,
       // SQL Server custom statements
-      insertStatement: insertStatement,
-      updateStatement: updateStatement,
-      deleteStatement: deleteStatement,
+      insertStatement: destInstanceConfig.insertStatement ?? insertStatement,
+      updateStatement: destInstanceConfig.updateStatement ?? updateStatement,
+      deleteStatement: destInstanceConfig.deleteStatement ?? deleteStatement,
       // Available source adapters
       availableSourceAdapters: availableSourceAdapters
     };
@@ -2708,94 +2880,43 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // IMPORTANT: This Save handler ONLY updates adapter instance properties persistently.
-        // It does NOT start transport or trigger any processing.
-        // Processing happens automatically when adapters run on their timer schedules.
-        
-        // Update instance name if changed
-        if (result.instanceName !== this.destinationInstanceName) {
-          this.destinationInstanceName = result.instanceName;
-          this.updateDestinationInstanceName(result.instanceName);
-        }
-
-        // Update enabled status if changed
-        if (result.isEnabled !== this.destinationIsEnabled) {
-          this.destinationIsEnabled = result.isEnabled;
-          this.onDestinationEnabledChange();
-        }
-
-        // Update SQL Server connection properties if changed
-        if (result.sqlServerName !== undefined || result.sqlDatabaseName !== undefined || 
-            result.sqlUserName !== undefined || result.sqlPassword !== undefined ||
-            result.sqlIntegratedSecurity !== undefined || result.sqlResourceGroup !== undefined) {
-          this.updateSqlConnectionProperties(
-            result.sqlServerName,
-            result.sqlDatabaseName,
-            result.sqlUserName,
-            result.sqlPassword,
-            result.sqlIntegratedSecurity,
-            result.sqlResourceGroup
-          );
-        }
-
-        // Update field separator if changed (only for CSV adapters)
-        if (result.fieldSeparator !== undefined && result.fieldSeparator !== this.sourceFieldSeparator) {
-          this.sourceFieldSeparator = result.fieldSeparator;
-          this.updateFieldSeparator(result.fieldSeparator);
-        }
-
-        // Update destination receive folder if changed (only for CSV destination adapters)
-        if (result.destinationReceiveFolder !== undefined && result.destinationReceiveFolder !== this.destinationReceiveFolder) {
-          this.destinationReceiveFolder = result.destinationReceiveFolder;
-          this.updateDestinationReceiveFolder(result.destinationReceiveFolder);
-        }
-
-        // Update destination file mask if changed (only for CSV destination adapters)
-        if (result.destinationFileMask !== undefined && result.destinationFileMask !== this.destinationFileMask) {
-          this.destinationFileMask = result.destinationFileMask;
-          this.updateDestinationFileMask(result.destinationFileMask);
-        }
-
-        // Update JQ Script File if changed (only for Destination adapters)
-        if (result.jqScriptFile !== undefined) {
-          this.updateDestinationJQScriptFile(result.jqScriptFile);
-        }
-
-        // Update Source Adapter Subscription if changed (only for Destination adapters)
-        if (result.sourceAdapterSubscription !== undefined) {
-          this.updateDestinationSourceAdapterSubscription(result.sourceAdapterSubscription);
-        }
-
-        // Update SQL Server custom statements if changed (only for Destination SqlServer adapters)
-        if (result.insertStatement !== undefined || result.updateStatement !== undefined || result.deleteStatement !== undefined) {
-          this.updateDestinationSqlStatements(
-            result.insertStatement,
-            result.updateStatement,
-            result.deleteStatement
-          );
-        }
-
-        // Reload configuration after all saves to ensure local state is synced with backend
+        // Persist all destination adapter settings into Configuration JSON
         const interfaceName = this.getActiveInterfaceName();
-        if (interfaceName) {
-          this.transportService.getInterfaceConfiguration(interfaceName).subscribe({
-            next: (freshConfig) => {
-              if (freshConfig) {
-                // Update local cache
-                const index = this.interfaceConfigurations.findIndex(c => c.interfaceName === interfaceName);
-                if (index >= 0) {
-                  this.interfaceConfigurations[index] = freshConfig;
-                }
-                // Sync local state from fresh config
-                this.destinationIsEnabled = freshConfig.destinationIsEnabled ?? this.destinationIsEnabled;
-                this.destinationInstanceName = freshConfig.destinationInstanceName || this.destinationInstanceName;
-                this.destinationReceiveFolder = freshConfig.destinationReceiveFolder || this.destinationReceiveFolder;
-                this.destinationFileMask = freshConfig.destinationFileMask || this.destinationFileMask;
-                this.destinationAdapterInstanceGuid = freshConfig.destinationAdapterInstanceGuid || this.destinationAdapterInstanceGuid;
-              }
+        const destGuid = this.destinationAdapterInstanceGuid;
+        if (interfaceName && destGuid) {
+          const config: any = {
+            receiveFolder: result.receiveFolder,
+            fileMask: result.fileMask,
+            fieldSeparator: result.fieldSeparator,
+            destinationReceiveFolder: result.destinationReceiveFolder,
+            destinationFileMask: result.destinationFileMask,
+            sqlServerName: result.sqlServerName,
+            sqlDatabaseName: result.sqlDatabaseName,
+            sqlUserName: result.sqlUserName,
+            sqlPassword: result.sqlPassword,
+            sqlIntegratedSecurity: result.sqlIntegratedSecurity,
+            sqlResourceGroup: result.sqlResourceGroup,
+            jqScriptFile: result.jqScriptFile,
+            sourceAdapterSubscription: result.sourceAdapterSubscription,
+            insertStatement: result.insertStatement,
+            updateStatement: result.updateStatement,
+            deleteStatement: result.deleteStatement
+          };
+
+          this.transportService.updateDestinationAdapterInstance(
+            interfaceName,
+            destGuid,
+            result.instanceName,
+            result.isEnabled,
+            JSON.stringify(config)
+          ).subscribe({
+            next: () => {
+              // Update local state after successful save
+              this.destinationInstanceName = result.instanceName;
+              this.destinationIsEnabled = result.isEnabled;
             },
             error: (error) => {
-              console.error('Error reloading configuration after save:', error);
+              console.error('Error updating destination adapter instance configuration:', error);
             }
           });
         }
@@ -3962,7 +4083,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
           }
         });
         // If no instances exist, create a default SqlServerAdapter instance pointing to TransportData table
-        if (this.destinationAdapterInstances.length === 0) {
+        // BUT only if a source adapter exists (enforced by business rule)
+        if (this.destinationAdapterInstances.length === 0 && this.hasSourceAdapter()) {
           const configForDefaults = activeConfig;
           
           // Create default SqlServerAdapter destination instance pointing to TransportData table in app database
@@ -4071,6 +4193,15 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // Check if there are destination adapters - if so, warn that source cannot be changed
+    // unless this is a replacement (changing adapter type, not removing)
+    const hasDestinations = this.destinationAdapterInstances && this.destinationAdapterInstances.length > 0;
+    if (hasDestinations) {
+      // This is allowed - we're replacing the source adapter, not removing it
+      // The new source adapter will be created and destinations will be updated to reference it
+      // Just proceed with the change
+    }
+
     // TODO: Implement backend API call to change source adapter type
     // For now, update local state
     const oldAdapterName = this.sourceAdapterName;
@@ -4093,6 +4224,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    // Check if source adapter exists before allowing destination adapter selection
+    if (!this.hasSourceAdapter()) {
+      this.snackBar.open(
+        'A source adapter must be defined first before adding destination adapters. Please configure a source adapter first.',
+        'OK',
+        { duration: 5000, panelClass: ['error-snackbar'] }
+      );
+      return;
+    }
+
     const dialogRef = this.dialog.open(AdapterSelectDialogComponent, {
       width: '800px',
       maxWidth: '90vw',
@@ -4111,6 +4252,16 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   addDestinationAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
     // Check if feature is enabled
     if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
+      return;
+    }
+
+    // Validate that source adapter exists
+    if (!this.hasSourceAdapter()) {
+      this.snackBar.open(
+        'A source adapter must be defined first before adding destination adapters. Please configure a source adapter first.',
+        'OK',
+        { duration: 5000, panelClass: ['error-snackbar'] }
+      );
       return;
     }
     

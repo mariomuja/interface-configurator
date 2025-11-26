@@ -9,7 +9,7 @@ using InterfaceConfigurator.Main.Core.Helpers;
 using CustomServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 using System.Collections.Concurrent;
 
-namespace InterfaceConfigurator.Main.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Service for reading and writing messages to Azure Service Bus
@@ -151,65 +151,34 @@ public class ServiceBusService : IServiceBusService
         var topicName = $"{TopicNamePrefix}{interfaceName.ToLowerInvariant()}";
         await using var sender = _serviceBusClient.CreateSender(topicName);
 
-        // Use batch processing service for efficient batch handling
-        // Note: Batch processing is integrated directly in SendBatchAsync method
-        // BatchProcessingService can be used for other batch operations if needed
-        if (batchProcessingService != null)
-        {
-            // Process records in batches
-            var batches = records
-                .Select((record, index) => new { record, index })
-                .GroupBy(x => x.index / 100) // 100 records per batch
-                .Select(g => g.Select(x => x.record).ToList())
-                .ToList();
+        // Default batch logic: reuse a ServiceBusMessageBatch and flush when needed
+        var batch = await sender.CreateMessageBatchAsync(cancellationToken);
+        var successCount = 0;
+        var errorCount = 0;
 
-            foreach (var batch in batches)
+        foreach (var record in records)
+        {
+            try
             {
-                try
-                {
-                    var batchMessageIds = await SendBatchAsync(sender, batch, headers, interfaceName, adapterName, adapterType, adapterInstanceGuid, correlationId, cancellationToken);
-                    messageIds.AddRange(batchMessageIds);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex,
-                        "[CorrelationId: {CorrelationId}] Failed to send batch: Interface={InterfaceName}, Adapter={AdapterName}",
-                        correlationId, interfaceName, adapterName);
-                    throw;
-                }
+                var messageId = await CreateAndAddMessageToBatchAsync(batch, sender, record, headers, interfaceName, adapterName, adapterType, adapterInstanceGuid, cancellationToken);
+                messageIds.Add(messageId);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                errorCount++;
+                _logger?.LogError(ex,
+                    "[CorrelationId: {CorrelationId}] Failed to add message to batch: Interface={InterfaceName}, Adapter={AdapterName}, RecordIndex={RecordIndex}",
+                    correlationId, interfaceName, adapterName, successCount + errorCount);
             }
         }
-        else
+
+        // Send remaining messages in batch
+        if (batch.Count > 0)
         {
-            // Fallback to original batch logic
-            var batch = await sender.CreateMessageBatchAsync(cancellationToken);
-            var successCount = 0;
-            var errorCount = 0;
-
-            foreach (var record in records)
-            {
-                try
-                {
-                    var messageId = await CreateAndAddMessageToBatchAsync(batch, sender, record, headers, interfaceName, adapterName, adapterType, adapterInstanceGuid, cancellationToken);
-                    messageIds.Add(messageId);
-                    successCount++;
-                }
-                catch (Exception ex)
-                {
-                    errorCount++;
-                    _logger?.LogError(ex,
-                        "[CorrelationId: {CorrelationId}] Failed to add message to batch: Interface={InterfaceName}, Adapter={AdapterName}, RecordIndex={RecordIndex}",
-                        correlationId, interfaceName, adapterName, successCount + errorCount);
-                }
-            }
-
-            // Send remaining messages in batch
-            if (batch.Count > 0)
-            {
-                await sender.SendMessagesAsync(batch, cancellationToken);
-            }
-            batch.Dispose();
+            await sender.SendMessagesAsync(batch, cancellationToken);
         }
+        batch.Dispose();
 
         _logger?.LogInformation(
             "[CorrelationId: {CorrelationId}] Completed debatching: {TotalRecords} records, {SuccessCount} succeeded",
@@ -480,7 +449,7 @@ public class ServiceBusService : IServiceBusService
         {
             if (_activeMessages.TryRemove(messageId, out var messageInfo))
             {
-                var (sbMessage, receiver) = messageInfo;
+                var (sbMessage, receiver, _, _) = messageInfo;
                 
                 // Verify lock token matches
                 if (sbMessage.LockToken != lockToken)
@@ -535,7 +504,7 @@ public class ServiceBusService : IServiceBusService
         {
             if (_activeMessages.TryGetValue(messageId, out var messageInfo))
             {
-                var (sbMessage, receiver) = messageInfo;
+                var (sbMessage, receiver, _, _) = messageInfo;
                 
                 // Verify lock token matches
                 if (sbMessage.LockToken != lockToken)
@@ -595,7 +564,7 @@ public class ServiceBusService : IServiceBusService
         {
             if (_activeMessages.TryRemove(messageId, out var messageInfo))
             {
-                var (sbMessage, receiver) = messageInfo;
+                var (sbMessage, receiver, _, _) = messageInfo;
                 
                 // Verify lock token matches
                 if (sbMessage.LockToken != lockToken)
@@ -604,7 +573,7 @@ public class ServiceBusService : IServiceBusService
                         messageId, sbMessage.LockToken, lockToken);
                 }
 
-                await receiver.DeadLetterMessageAsync(sbMessage, reason: reason, cancellationToken: cancellationToken);
+                await receiver.DeadLetterMessageAsync(sbMessage, deadLetterReason: reason, cancellationToken: cancellationToken);
                 
                 // Update lock status in database
                 try

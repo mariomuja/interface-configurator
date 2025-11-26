@@ -51,6 +51,13 @@ public class InterfaceConfigService : IInterfaceConfigService
                 "Ensuring adapter instance exists: AdapterInstanceGuid={AdapterInstanceGuid}, Interface={InterfaceName}, InstanceName={InstanceName}",
                 adapterInstanceGuid, interfaceName, instanceName);
 
+            // Convert adapterType ("Source" or "Destination") to SourceAdapterGuid
+            // Source: SourceAdapterGuid = null
+            // Destination: SourceAdapterGuid = needs to be determined from interface (will be set later if needed)
+            Guid? sourceAdapterGuid = adapterType.Equals("Source", StringComparison.OrdinalIgnoreCase) 
+                ? null 
+                : Guid.Empty; // Temporary - will be set properly when destination is linked to source
+
             var existingInstance = await _context.AdapterInstances
                 .FirstOrDefaultAsync(a => a.AdapterInstanceGuid == adapterInstanceGuid, cancellationToken);
 
@@ -60,7 +67,11 @@ public class InterfaceConfigService : IInterfaceConfigService
                 existingInstance.InterfaceName = interfaceName;
                 existingInstance.InstanceName = instanceName;
                 existingInstance.AdapterName = adapterName;
-                existingInstance.AdapterType = adapterType;
+                // Only update SourceAdapterGuid if it's a source adapter (null) or if current value is empty/null
+                if (sourceAdapterGuid == null || existingInstance.SourceAdapterGuid == null || existingInstance.SourceAdapterGuid == Guid.Empty)
+                {
+                    existingInstance.SourceAdapterGuid = sourceAdapterGuid;
+                }
                 existingInstance.IsEnabled = isEnabled;
                 existingInstance.datetime_updated = DateTime.UtcNow;
                 _logger?.LogInformation("Updated existing adapter instance: AdapterInstanceGuid={AdapterInstanceGuid}", adapterInstanceGuid);
@@ -74,7 +85,7 @@ public class InterfaceConfigService : IInterfaceConfigService
                     InterfaceName = interfaceName,
                     InstanceName = instanceName,
                     AdapterName = adapterName,
-                    AdapterType = adapterType,
+                    SourceAdapterGuid = sourceAdapterGuid, // null = source, not null = destination
                     IsEnabled = isEnabled,
                     datetime_created = DateTime.UtcNow
                 };

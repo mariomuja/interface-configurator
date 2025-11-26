@@ -30,9 +30,23 @@ public class AdapterInstance
     public string AdapterName { get; set; } = string.Empty; // e.g., "CSV", "SqlServer"
 
     [Required]
-    [MaxLength(50)]
-    [Column("AdapterType")]
-    public string AdapterType { get; set; } = string.Empty; // "Source" or "Destination"
+    [Column("Configuration")]
+    public string Configuration { get; set; } = string.Empty;
+
+    [Column("SourceAdapterGuid")]
+    public Guid? SourceAdapterGuid { get; set; }
+    
+    /// <summary>
+    /// Determines if this adapter instance is a source adapter.
+    /// Source adapters have SourceAdapterGuid = null/empty.
+    /// </summary>
+    public bool IsSourceAdapter => !SourceAdapterGuid.HasValue || SourceAdapterGuid.Value == Guid.Empty;
+    
+    /// <summary>
+    /// Determines if this adapter instance is a destination adapter.
+    /// Destination adapters have SourceAdapterGuid set (not null/empty).
+    /// </summary>
+    public bool IsDestinationAdapter => SourceAdapterGuid.HasValue && SourceAdapterGuid.Value != Guid.Empty;
 
     [Required]
     [Column("datetime_created", TypeName = "datetime2")]

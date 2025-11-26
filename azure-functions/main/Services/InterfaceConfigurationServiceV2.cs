@@ -320,44 +320,83 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                 _context.InterfaceConfigurations.Update(existing);
             }
 
-            // Save SourceAdapterInstances
-            // Note: In a full implementation, we would store InterfaceName as a foreign key
-            // For now, we save them and they will be linked via LoadFullConfigurationAsync
+            // Persist adapter instances into unified AdapterInstances table
+            // Sources: SourceAdapterGuid = NULL (null/empty indicates source adapter)
             foreach (var source in configuration.Sources.Values)
             {
-                var existingSource = await _context.SourceAdapterInstances
-                    .FirstOrDefaultAsync(s => s.AdapterInstanceGuid == source.AdapterInstanceGuid, cancellationToken);
+                var existingAdapter = await _context.AdapterInstances
+                    .FirstOrDefaultAsync(a => a.AdapterInstanceGuid == source.AdapterInstanceGuid, cancellationToken);
 
-                if (existingSource == null)
+                if (existingAdapter == null)
                 {
-                    source.CreatedAt = DateTime.UtcNow;
-                    _context.SourceAdapterInstances.Add(source);
+                    var adapter = new AdapterInstance
+                    {
+                        AdapterInstanceGuid = source.AdapterInstanceGuid,
+                        InterfaceName = configuration.InterfaceName ?? string.Empty,
+                        InstanceName = source.InstanceName ?? string.Empty,
+                        AdapterName = source.AdapterName ?? string.Empty,
+                        IsEnabled = source.IsEnabled,
+                        datetime_created = DateTime.UtcNow,
+                        datetime_updated = DateTime.UtcNow,
+                        Configuration = source.Configuration ?? string.Empty,
+                        SourceAdapterGuid = null // null = source adapter
+                    };
+                    _context.AdapterInstances.Add(adapter);
                 }
                 else
                 {
-                    UpdateSourceAdapterInstance(existingSource, source);
-                    existingSource.UpdatedAt = DateTime.UtcNow;
-                    _context.SourceAdapterInstances.Update(existingSource);
+                    existingAdapter.InterfaceName = configuration.InterfaceName ?? string.Empty;
+                    existingAdapter.InstanceName = source.InstanceName ?? string.Empty;
+                    existingAdapter.AdapterName = source.AdapterName ?? string.Empty;
+                    existingAdapter.IsEnabled = source.IsEnabled;
+                    existingAdapter.Configuration = source.Configuration ?? string.Empty;
+                    existingAdapter.SourceAdapterGuid = null; // null = source adapter
+                    existingAdapter.datetime_updated = DateTime.UtcNow;
+                    _context.AdapterInstances.Update(existingAdapter);
                 }
             }
 
-            // Save DestinationAdapterInstances
-            // Note: In a full implementation, we would store InterfaceName as a foreign key
+            // Destinations: SourceAdapterGuid set (not null/empty indicates destination adapter)
             foreach (var destination in configuration.Destinations.Values)
             {
-                var existingDest = await _context.DestinationAdapterInstances
-                    .FirstOrDefaultAsync(d => d.AdapterInstanceGuid == destination.AdapterInstanceGuid, cancellationToken);
+                var existingAdapter = await _context.AdapterInstances
+                    .FirstOrDefaultAsync(a => a.AdapterInstanceGuid == destination.AdapterInstanceGuid, cancellationToken);
 
-                if (existingDest == null)
+                // Determine effective SourceAdapterGuid: prefer already set, else infer from first source
+                Guid? effectiveSourceGuid = destination.SourceAdapterGuid;
+                if (!effectiveSourceGuid.HasValue && configuration.Sources.Count > 0)
                 {
-                    destination.CreatedAt = DateTime.UtcNow;
-                    _context.DestinationAdapterInstances.Add(destination);
+                    effectiveSourceGuid = configuration.Sources.Values
+                        .Select(s => (Guid?)s.AdapterInstanceGuid)
+                        .FirstOrDefault();
+                }
+
+                if (existingAdapter == null)
+                {
+                    var adapter = new AdapterInstance
+                    {
+                        AdapterInstanceGuid = destination.AdapterInstanceGuid,
+                        InterfaceName = configuration.InterfaceName ?? string.Empty,
+                        InstanceName = destination.InstanceName ?? string.Empty,
+                        AdapterName = destination.AdapterName ?? string.Empty,
+                        IsEnabled = destination.IsEnabled,
+                        datetime_created = DateTime.UtcNow,
+                        datetime_updated = DateTime.UtcNow,
+                        Configuration = destination.Configuration ?? string.Empty,
+                        SourceAdapterGuid = effectiveSourceGuid // not null = destination adapter
+                    };
+                    _context.AdapterInstances.Add(adapter);
                 }
                 else
                 {
-                    UpdateDestinationAdapterInstance(existingDest, destination);
-                    existingDest.UpdatedAt = DateTime.UtcNow;
-                    _context.DestinationAdapterInstances.Update(existingDest);
+                    existingAdapter.InterfaceName = configuration.InterfaceName ?? string.Empty;
+                    existingAdapter.InstanceName = destination.InstanceName ?? string.Empty;
+                    existingAdapter.AdapterName = destination.AdapterName ?? string.Empty;
+                    existingAdapter.IsEnabled = destination.IsEnabled;
+                    existingAdapter.Configuration = destination.Configuration ?? string.Empty;
+                    existingAdapter.SourceAdapterGuid = effectiveSourceGuid; // not null = destination adapter
+                    existingAdapter.datetime_updated = DateTime.UtcNow;
+                    _context.AdapterInstances.Update(existingAdapter);
                 }
             }
 
@@ -382,16 +421,11 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
 
             if (config != null)
             {
-                // Delete related adapter instances
-                var sources = await _context.SourceAdapterInstances
-                    .Where(s => s.AdapterInstanceGuid == config.Sources.Values.Select(s => s.AdapterInstanceGuid).FirstOrDefault())
+                // Delete related adapter instances from unified AdapterInstances table
+                var adapters = await _context.AdapterInstances
+                    .Where(a => a.InterfaceName == interfaceName)
                     .ToListAsync(cancellationToken);
-                _context.SourceAdapterInstances.RemoveRange(sources);
-
-                var destinations = await _context.DestinationAdapterInstances
-                    .Where(d => config.Destinations.Values.Select(d => d.AdapterInstanceGuid).Contains(d.AdapterInstanceGuid))
-                    .ToListAsync(cancellationToken);
-                _context.DestinationAdapterInstances.RemoveRange(destinations);
+                _context.AdapterInstances.RemoveRange(adapters);
 
                 _context.InterfaceConfigurations.Remove(config);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -443,8 +477,8 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                     destination.IsEnabled = enabled;
                     
                     // Automatically create subscription when destination adapter is enabled
-                    // and has a SourceAdapterSubscription configured
-                    if (enabled && !wasEnabled && destination.SourceAdapterSubscription.HasValue)
+                    // and has a SourceAdapterGuid configured
+                    if (enabled && !wasEnabled && destination.SourceAdapterGuid.HasValue)
                     {
                         // Create subscription asynchronously (fire and forget)
                         _ = Task.Run(async () =>
@@ -498,68 +532,46 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         config.Sources = new Dictionary<string, SourceAdapterInstance>();
         config.Destinations = new Dictionary<string, DestinationAdapterInstance>();
 
-        // Load all SourceAdapterInstances and DestinationAdapterInstances
-        // In a real implementation, these would be filtered by InterfaceName via foreign key
-        // For now, we'll try to find adapter instances that belong to this interface
-        // Since we don't have a foreign key, we'll load all and try to match by InterfaceName stored in a property
-        // For the default interface, we'll create default instances if none exist
-        
-        var allSources = await _context.SourceAdapterInstances.ToListAsync(cancellationToken);
-        var allDestinations = await _context.DestinationAdapterInstances.ToListAsync(cancellationToken);
+        // Load unified adapter instances for this interface
+        var adapters = await _context.AdapterInstances
+            .Where(a => a.InterfaceName == interfaceName)
+            .ToListAsync(cancellationToken);
 
-        // For now, we'll use a simple approach: if this is the default interface and no sources/destinations exist,
-        // create them. Otherwise, try to match existing ones.
-        // In production, add InterfaceName property to SourceAdapterInstance and DestinationAdapterInstance models
-        
-        if (interfaceName == DefaultInterfaceName)
+        // Source adapters: SourceAdapterGuid is null or empty
+        var sourceAdapters = adapters.Where(a => !a.SourceAdapterGuid.HasValue || a.SourceAdapterGuid.Value == Guid.Empty).ToList();
+        // Destination adapters: SourceAdapterGuid is set (not null/empty)
+        var destinationAdapters = adapters.Where(a => a.SourceAdapterGuid.HasValue && a.SourceAdapterGuid.Value != Guid.Empty).ToList();
+
+        // Map AdapterInstances to SourceAdapterInstance and DestinationAdapterInstance models
+        foreach (var a in sourceAdapters)
         {
-            // For default interface, ensure we have at least one source and destination
-            if (allSources.Count == 0)
+            var source = new SourceAdapterInstance
             {
-                var defaultSource = CreateDefaultSourceInstance(config);
-                config.Sources[defaultSource.InstanceName] = defaultSource;
-            }
-            else
-            {
-                // Use the first source found (in production, filter by InterfaceName)
-                var source = allSources.FirstOrDefault();
-                if (source != null)
-                {
-                    config.Sources[source.InstanceName] = source;
-                }
-            }
-
-            if (allDestinations.Count == 0)
-            {
-                var defaultDest = CreateDefaultDestinationInstance(config);
-                config.Destinations[defaultDest.InstanceName] = defaultDest;
-            }
-            else
-            {
-                // Use the first destination found (in production, filter by InterfaceName)
-                var dest = allDestinations.FirstOrDefault();
-                if (dest != null)
-                {
-                    config.Destinations[dest.InstanceName] = dest;
-                }
-            }
+                AdapterInstanceGuid = a.AdapterInstanceGuid,
+                InstanceName = a.InstanceName,
+                AdapterName = a.AdapterName,
+                IsEnabled = a.IsEnabled,
+                Configuration = a.Configuration,
+                CreatedAt = a.datetime_created,
+                UpdatedAt = a.datetime_updated
+            };
+            config.Sources[source.InstanceName] = source;
         }
-        else
+
+        foreach (var a in destinationAdapters)
         {
-            // For non-default interfaces, try to find matching adapter instances
-            // In production, this would use a foreign key relationship
-            var matchingSources = allSources.Take(1).ToList();
-            var matchingDestinations = allDestinations.Take(1).ToList();
-
-            foreach (var source in matchingSources)
+            var dest = new DestinationAdapterInstance
             {
-                config.Sources[source.InstanceName] = source;
-            }
-
-            foreach (var dest in matchingDestinations)
-            {
-                config.Destinations[dest.InstanceName] = dest;
-            }
+                AdapterInstanceGuid = a.AdapterInstanceGuid,
+                InstanceName = a.InstanceName,
+                AdapterName = a.AdapterName,
+                IsEnabled = a.IsEnabled,
+                Configuration = a.Configuration,
+                SourceAdapterGuid = a.SourceAdapterGuid,
+                CreatedAt = a.datetime_created,
+                UpdatedAt = a.datetime_updated
+            };
+            config.Destinations[dest.InstanceName] = dest;
         }
 
         return config;
@@ -1041,6 +1053,11 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
             if (config != null)
             {
+                // If the interface already has a source adapter instance, link this destination to it
+                Guid? sourceGuid = config.Sources != null
+                    ? config.Sources.Values.FirstOrDefault()?.AdapterInstanceGuid
+                    : null;
+
                 var newInstance = new DestinationAdapterInstance
                 {
                     AdapterInstanceGuid = Guid.NewGuid(),
@@ -1048,6 +1065,7 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
                     AdapterName = adapterName,
                     IsEnabled = true,
                     Configuration = configuration,
+                    SourceAdapterGuid = sourceGuid,
                     CreatedAt = DateTime.UtcNow
                 };
                 config.Destinations[newInstance.InstanceName] = newInstance;
@@ -1173,26 +1191,34 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
         try
         {
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
-            if (config != null)
-            {
-                var instance = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
-                if (instance != null)
-                {
-                    if (instanceName != null) instance.InstanceName = instanceName;
-                    if (isEnabled.HasValue) instance.IsEnabled = isEnabled.Value;
-                    if (configuration != null) instance.Configuration = configuration;
-                    instance.UpdatedAt = DateTime.UtcNow;
-                    await SaveConfigurationAsync(config, cancellationToken);
-                }
-                else
-                {
-                    throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
-                }
-            }
-            else
-            {
+            if (config == null)
                 throw new KeyNotFoundException($"Interface configuration '{interfaceName}' not found.");
+
+            var source = config.Sources.Values.FirstOrDefault(s => s.AdapterInstanceGuid == adapterInstanceGuid);
+            if (source == null)
+                throw new KeyNotFoundException($"Source adapter instance '{adapterInstanceGuid}' not found.");
+
+            // Update source properties
+            if (instanceName != null) source.InstanceName = instanceName;
+            if (isEnabled.HasValue) source.IsEnabled = isEnabled.Value;
+            if (configuration != null) source.Configuration = configuration;
+            source.UpdatedAt = DateTime.UtcNow;
+
+            // If the source is enabled, backfill any destination adapter instances
+            // for this interface that are missing SourceAdapterGuid.
+            if (source.IsEnabled && config.Destinations != null && config.Destinations.Count > 0)
+            {
+                foreach (var dest in config.Destinations.Values)
+                {
+                    if (!dest.SourceAdapterGuid.HasValue)
+                    {
+                        dest.SourceAdapterGuid = source.AdapterInstanceGuid;
+                        dest.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
             }
+
+            await SaveConfigurationAsync(config, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -1275,7 +1301,7 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
     public async Task UpdateDestinationSourceAdapterSubscriptionAsync(
         string interfaceName,
         Guid adapterInstanceGuid,
-        Guid? sourceAdapterSubscription,
+        Guid? sourceAdapterGuid,
         CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
@@ -1285,14 +1311,14 @@ public class InterfaceConfigurationServiceV2 : IInterfaceConfigurationService
             var config = await LoadFullConfigurationAsync(interfaceName, cancellationToken);
             if (config != null)
             {
-                var instance = config.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == adapterInstanceGuid);
-                if (instance != null)
+                    var instance = config.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == adapterInstanceGuid);
+                    if (instance != null)
                 {
-                    instance.SourceAdapterSubscription = sourceAdapterSubscription;
+                        instance.SourceAdapterGuid = sourceAdapterGuid;
                     instance.UpdatedAt = DateTime.UtcNow;
                     await SaveConfigurationAsync(config, cancellationToken);
-                    _logger?.LogInformation("Source Adapter Subscription for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{SourceAdapterSubscription}'",
-                        instance.InstanceName, adapterInstanceGuid, interfaceName, sourceAdapterSubscription?.ToString() ?? "null");
+                        _logger?.LogInformation("Source Adapter Guid for destination adapter instance '{InstanceName}' ({AdapterInstanceGuid}) in interface '{InterfaceName}' updated to '{SourceAdapterGuid}'",
+                            instance.InstanceName, adapterInstanceGuid, interfaceName, sourceAdapterGuid?.ToString() ?? "null");
                 }
                 else
                 {

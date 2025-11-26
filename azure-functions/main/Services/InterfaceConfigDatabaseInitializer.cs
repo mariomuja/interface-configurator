@@ -50,23 +50,25 @@ public class InterfaceConfigDatabaseInitializer : IHostedService
 
             if (created)
             {
-                _logger.LogInformation("InterfaceConfigDb database and tables created successfully. Tables: AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, InterfaceConfigurations, SourceAdapterInstances, DestinationAdapterInstances");
+                _logger.LogInformation("InterfaceConfigDb database and tables created successfully. Tables: AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, Interfaces");
             }
             else
             {
-                _logger.LogInformation("InterfaceConfigDb database and tables already exist. Tables: AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, InterfaceConfigurations, SourceAdapterInstances, DestinationAdapterInstances");
+                _logger.LogInformation("InterfaceConfigDb database and tables already exist. Tables: AdapterInstances, ProcessLogs, ProcessingStatistics, Features, Users, Interfaces");
                 
                 // Ensure ProcessingStatistics table exists (in case it was added after initial creation)
+                // Note: Use the create-processing-statistics-table.sql script for full schema including new columns
+                // This is a minimal check - the SQL script handles column additions for existing tables
                 try
                 {
                     var tableExists = await interfaceConfigContext.Database.ExecuteSqlRawAsync(
                         "IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProcessingStatistics') CREATE TABLE ProcessingStatistics (Id INT IDENTITY(1,1) PRIMARY KEY, InterfaceName NVARCHAR(200) NOT NULL, RowsProcessed INT NOT NULL, RowsSucceeded INT NOT NULL, RowsFailed INT NOT NULL, ProcessingDurationMs BIGINT NOT NULL, ProcessingStartTime DATETIME2 NOT NULL, ProcessingEndTime DATETIME2 NOT NULL, SourceFile NVARCHAR(500) NULL);",
                         cancellationToken);
-                    _logger.LogInformation("Verified ProcessingStatistics table exists");
+                    _logger.LogInformation("Verified ProcessingStatistics table exists. Run create-processing-statistics-table.sql to add new statistics columns.");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Could not verify/create ProcessingStatistics table. It may need to be created manually.");
+                    _logger.LogWarning(ex, "Could not verify/create ProcessingStatistics table. It may need to be created manually using create-processing-statistics-table.sql.");
                 }
             }
 

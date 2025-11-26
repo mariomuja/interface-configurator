@@ -1,7 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace InterfaceConfigurator.Main.Services;
+namespace InterfaceConfigurator.Main.Core.Services;
 
 /// <summary>
 /// Service for validating CSV files before processing (encoding, delimiters, structure)

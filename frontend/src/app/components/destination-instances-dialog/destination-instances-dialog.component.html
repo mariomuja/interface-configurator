@@ -13,11 +13,16 @@
     <!-- Add Adapter Buttons -->
     <div class="add-adapter-section">
       <h3>Add Destination Adapter</h3>
+      <div *ngIf="data.hasSourceAdapter === false" class="source-adapter-warning">
+        <mat-icon color="warn">warning</mat-icon>
+        <p>A source adapter must be defined first before adding destination adapters. Please configure a source adapter first.</p>
+      </div>
       <div class="adapter-buttons">
         <button mat-raised-button 
                 *ngFor="let adapter of availableAdapters"
                 (click)="onAddAdapter(adapter.name)"
                 [color]="'primary'"
+                [disabled]="data.hasSourceAdapter === false"
                 class="adapter-button">
           <mat-icon>{{ adapter.icon }}</mat-icon>
           <span>Add {{ adapter.displayName }}</span>

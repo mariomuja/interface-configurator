@@ -4,7 +4,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Helpers;
 
 namespace InterfaceConfigurator.Main;
@@ -59,7 +59,7 @@ public class GetProcessingStatisticsFunction
                 endDate = ed;
             }
 
-            var statisticsService = new InterfaceConfigurator.Main.Services.ProcessingStatisticsService(_context, _logger);
+            var statisticsService = new ProcessingStatisticsService(_context, _logger);
 
             if (string.IsNullOrWhiteSpace(interfaceName))
             {

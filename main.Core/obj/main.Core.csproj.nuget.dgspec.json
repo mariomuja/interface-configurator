@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\mario\\interface-configurator\\azure-functions\\main.Core\\main.Core.csproj": {}
+    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {}
   },
   "projects": {
-    "C:\\Users\\mario\\interface-configurator\\azure-functions\\main.Core\\main.Core.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main.Core\\main.Core.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "projectName": "main.Core",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main.Core\\main.Core.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main.Core\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -51,6 +51,14 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Azure.Messaging.ServiceBus": {
+              "target": "Package",
+              "version": "[7.18.1, )"
+            },
+            "Azure.Storage.Blobs": {
+              "target": "Package",
+              "version": "[12.22.0, )"
+            },
             "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
               "version": "[8.0.11, )"
@@ -58,6 +66,10 @@
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
               "version": "[8.0.2, )"
+            },
+            "System.Text.Json": {
+              "target": "Package",
+              "version": "[8.0.5, )"
             }
           },
           "imports": [

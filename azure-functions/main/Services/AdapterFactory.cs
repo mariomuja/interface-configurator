@@ -6,6 +6,7 @@ using InterfaceConfigurator.Main.Core.Helpers;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Core.Services;
 
 #pragma warning disable CS0618 // Type or member is obsolete - Deprecated properties are used for backward compatibility
 
@@ -291,6 +292,7 @@ public class AdapterFactory : IAdapterFactory
         }
 
         var adapterRole = isSource ? "Source" : "Destination";
+        var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
         return new CsvAdapter(
             csvProcessingService,
             adapterConfig,
@@ -311,7 +313,8 @@ public class AdapterFactory : IAdapterFactory
             skipFooterLines,
             quoteCharacter,
             adapterRole,
-            logger);
+            logger,
+            statisticsService);
     }
 
     private SqlServerAdapter CreateSqlServerAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
@@ -508,6 +511,7 @@ public class AdapterFactory : IAdapterFactory
         string? sapReceiverPartner = isSource ? null : destInstance?.SapReceiverPartner; // Only for destination
 
         var adapterRole = isSource ? "Source" : "Destination";
+        var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
 
         return new SapAdapter(
             serviceBusService,
@@ -537,7 +541,9 @@ public class AdapterFactory : IAdapterFactory
             sapODataServiceUrl,
             sapRestApiEndpoint,
             sapUseOData,
-            sapUseRestApi);
+            sapUseRestApi,
+            httpClient: null,
+            statisticsService);
     }
 
     private Dynamics365Adapter CreateDynamics365Adapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
@@ -573,6 +579,7 @@ public class AdapterFactory : IAdapterFactory
         }
 
         var adapterRole = isSource ? "Source" : "Destination";
+        var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
 
         return new Dynamics365Adapter(
             serviceBusService,
@@ -590,7 +597,9 @@ public class AdapterFactory : IAdapterFactory
             pollingInterval,
             batchSize,
             pageSize,
-            useBatch);
+            useBatch,
+            httpClient: null,
+            statisticsService);
     }
 
     private CrmAdapter CreateCrmAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)
@@ -624,6 +633,7 @@ public class AdapterFactory : IAdapterFactory
         }
 
         var adapterRole = isSource ? "Source" : "Destination";
+        var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();
 
         return new CrmAdapter(
             serviceBusService,
@@ -639,7 +649,9 @@ public class AdapterFactory : IAdapterFactory
             fetchXml,
             pollingInterval,
             batchSize,
-            useBatch);
+            useBatch,
+            httpClient: null,
+            statisticsService);
     }
 }
 
