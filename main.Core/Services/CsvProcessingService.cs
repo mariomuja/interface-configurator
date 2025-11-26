@@ -246,10 +246,12 @@ public class CsvProcessingService : ICsvProcessingService
 
     async Task<(List<string> headers, List<Dictionary<string, string>> records)> ICsvProcessingService.ParseCsvWithHeadersAsync(
         string csvContent,
-        string? fieldSeparator,
+        int skipHeaderLines,
+        int skipFooterLines,
+        char quoteCharacter,
         CancellationToken cancellationToken)
     {
-        return await ParseCsvWithHeadersAsync(csvContent, fieldSeparator, 0, 0, '"', cancellationToken);
+        return await ParseCsvWithHeadersAsync(csvContent, null, skipHeaderLines, skipFooterLines, quoteCharacter, cancellationToken);
     }
 
     /// <summary>

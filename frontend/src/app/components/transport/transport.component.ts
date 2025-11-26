@@ -24,7 +24,6 @@ import { DestinationInstancesDialogComponent, DestinationAdapterInstance } from 
 import { InterfaceJsonViewDialogComponent } from '../interface-json-view-dialog/interface-json-view-dialog.component';
 import { BlobContainerExplorerDialogComponent, BlobContainerExplorerDialogData } from '../blob-container-explorer-dialog/blob-container-explorer-dialog.component';
 import { WelcomeDialogComponent } from '../welcome-dialog/welcome-dialog.component';
-import { DiagnoseDialogComponent, DiagnoseDialogData } from '../diagnose-dialog/diagnose-dialog.component';
 import { AddInterfaceDialogComponent, AddInterfaceDialogData } from '../add-interface-dialog/add-interface-dialog.component';
 import { ServiceBusMessageDialogComponent } from '../service-bus-message-dialog/service-bus-message-dialog.component';
 import { ContainerAppProgressDialogComponent, ContainerAppProgressData } from '../container-app-progress-dialog/container-app-progress-dialog.component';
@@ -64,7 +63,6 @@ import { switchMap } from 'rxjs/operators';
     AdapterCardComponent,
     DestinationInstancesDialogComponent,
     BlobContainerExplorerDialogComponent,
-    DiagnoseDialogComponent,
     AddInterfaceDialogComponent,
     ContainerAppProgressDialogComponent
   ],
@@ -1574,43 +1572,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   runDiagnostics(): void {
-    // Open diagnose dialog
-    const dialogData: DiagnoseDialogData = { result: null };
-    const dialogRef = this.dialog.open<DiagnoseDialogComponent, DiagnoseDialogData>(DiagnoseDialogComponent, {
-      width: '90%',
-      maxWidth: '800px',
-      maxHeight: '90vh',
-      data: dialogData
-    });
-    
-    this.isDiagnosing = true;
-    
-    // Start diagnose immediately
-    this.transportService.diagnose().subscribe({
-      next: (result) => {
-        this.isDiagnosing = false;
-        
-        // Update dialog with result
-        dialogData.result = result;
-        const instance = dialogRef.componentInstance;
-        if (instance) {
-          instance.data = dialogData;
-          instance.isLoading = false;
-        }
-        
-        // Log details to console
-        console.log('Diagnostics Result:', result);
-      },
-      error: (error) => {
-        console.error('Error running diagnostics:', error);
-        this.isDiagnosing = false;
-        dialogRef.close();
-        
-        // Extract detailed error message
-        const detailedMessage = this.extractDetailedErrorMessage(error, 'Fehler bei der Diagnose');
-        this.showErrorMessageWithCopy(detailedMessage, { duration: 15000 });
-      }
-    });
+    // Diagnose dialog has been removed - functionality moved elsewhere
+    this.snackBar.open('Diagnostics feature is currently unavailable', 'OK', { duration: 3000 });
   }
 
   private startAutoRefresh(): void {
@@ -2667,7 +2630,7 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
 
         // Reload configuration after all saves to ensure local state is synced with backend
         // But skip if we just saved enabled status (onSourceEnabledChange already reloads)
-        const interfaceName = this.getActiveInterfaceName();
+        const enabledWasChanged = result.isEnabled !== undefined && result.isEnabled !== this.sourceIsEnabled;
         if (interfaceName && !enabledWasChanged) {
           // Save the current enabled state before reload to preserve it
           const savedEnabledState = this.sourceIsEnabled;
