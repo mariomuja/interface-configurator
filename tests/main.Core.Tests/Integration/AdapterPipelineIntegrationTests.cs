@@ -182,7 +182,7 @@ public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTest
             // Step 2: Verify Service Bus connectivity
             var serviceBusService = new ServiceBusService(
                 _fixture.ServiceBusConnectionString,
-                _logger);
+                _serviceBusLogger);
             
             var messageId = await serviceBusService.SendMessageAsync(
                 "e2e-test",
