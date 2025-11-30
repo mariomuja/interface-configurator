@@ -66,7 +66,7 @@ public class AddDestinationAdapterInstance
                 instance.InstanceName, instance.AdapterName, request.InterfaceName);
 
             // Create Service Bus subscription for this destination adapter instance
-            if (instance.AdapterInstanceGuid.HasValue)
+            if (instance.AdapterInstanceGuid != Guid.Empty)
             {
                 _ = Task.Run(async () =>
                 {
@@ -75,7 +75,7 @@ public class AddDestinationAdapterInstance
                         _logger.LogInformation("Creating Service Bus subscription for destination adapter instance {Guid}", instance.AdapterInstanceGuid);
                         await _subscriptionService.CreateSubscriptionAsync(
                             request.InterfaceName,
-                            instance.AdapterInstanceGuid.Value,
+                            instance.AdapterInstanceGuid,
                             executionContext.CancellationToken);
                         _logger.LogInformation("Service Bus subscription created successfully for adapter instance {Guid}", instance.AdapterInstanceGuid);
                     }
@@ -94,27 +94,27 @@ public class AddDestinationAdapterInstance
             string? containerAppError = null;
             string? containerAppName = null;
             
-            if (instance.AdapterInstanceGuid.HasValue)
+            if (instance.AdapterInstanceGuid != Guid.Empty)
             {
                 try
                 {
                     // Check if container app already exists (should not happen for new instances)
                     var exists = await _containerAppService.ContainerAppExistsAsync(
-                        instance.AdapterInstanceGuid.Value,
+                        instance.AdapterInstanceGuid,
                         executionContext.CancellationToken);
                     
                     if (!exists)
                     {
                         // Get full configuration to pass to container app
                         var config = await _configService.GetConfigurationAsync(request.InterfaceName, executionContext.CancellationToken);
-                        var fullInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == instance.AdapterInstanceGuid.Value);
+                        var fullInstance = config?.Destinations.Values.FirstOrDefault(d => d.AdapterInstanceGuid == instance.AdapterInstanceGuid);
                         
                         _logger.LogInformation(
                             "Creating isolated container app for destination adapter instance {Guid} (InstanceName={InstanceName}, AdapterName={AdapterName})",
                             instance.AdapterInstanceGuid, instance.InstanceName, instance.AdapterName);
                         
                         var containerAppInfo = await _containerAppService.CreateContainerAppAsync(
-                            instance.AdapterInstanceGuid.Value,
+                            instance.AdapterInstanceGuid,
                             instance.AdapterName,
                             "Destination",
                             request.InterfaceName,
@@ -131,7 +131,7 @@ public class AddDestinationAdapterInstance
                     else
                     {
                         containerAppStatus = "AlreadyExists";
-                        containerAppName = _containerAppService.GetContainerAppName(instance.AdapterInstanceGuid.Value);
+                        containerAppName = _containerAppService.GetContainerAppName(instance.AdapterInstanceGuid);
                         _logger.LogWarning(
                             "Container app already exists for destination adapter instance {Guid}: ContainerApp={ContainerAppName}",
                             instance.AdapterInstanceGuid, containerAppName);

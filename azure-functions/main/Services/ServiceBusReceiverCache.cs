@@ -112,8 +112,14 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
             // Get or create receiver
             var receiver = await GetOrCreateReceiverAsync(topicName, subscriptionName, cancellationToken);
 
-            // Renew the lock
-            var newExpiration = await receiver.RenewMessageLockAsync(lockToken, cancellationToken);
+            // NOTE: Azure Service Bus SDK's RenewMessageLockAsync requires a ServiceBusReceivedMessage object,
+            // not a lockToken string. This is a design issue that needs to be addressed.
+            // For now, we cannot renew locks with just a lockToken string.
+            // TODO: Redesign to store messages and look them up by lockToken, or change interface to accept ServiceBusReceivedMessage
+            _logger?.LogWarning(
+                "[CorrelationId: {CorrelationId}] Lock renewal with lockToken string is not supported by Azure Service Bus SDK. LockToken={LockToken}",
+                correlationId, lockToken);
+            return null;
 
             _logger?.LogDebug(
                 "[CorrelationId: {CorrelationId}] Successfully renewed lock: Topic={Topic}, Subscription={Subscription}, LockToken={LockToken}, NewExpiration={NewExpiration}",

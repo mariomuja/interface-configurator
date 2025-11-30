@@ -65,7 +65,7 @@ public class GetProcessLogsFunction
                     details = l.Details,
                     component = l.Component,
                     interfaceName = l.InterfaceName,
-                    messageId = l.MessageId
+                    messageId = (string?)null // MessageId property was removed from ProcessLog
                 })
                 .ToListAsync();
 

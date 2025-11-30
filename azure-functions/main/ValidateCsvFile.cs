@@ -71,7 +71,7 @@ public class ValidateCsvFileFunction
             var csvContent = downloadResult.Value.Content.ToString();
 
             // Get quote character from query parameters or use default
-            var quoteCharacter = queryParams.ContainsKey("quoteCharacter") ? queryParams["quoteCharacter"] : "\"";
+            var quoteCharacter = queryParams.AllKeys.Contains("quoteCharacter") ? queryParams["quoteCharacter"] : "\"";
 
             // Validate CSV
             var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
