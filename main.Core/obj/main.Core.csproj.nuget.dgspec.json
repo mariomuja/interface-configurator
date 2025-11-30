@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {}
+    "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {}
   },
   "projects": {
-    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "projectName": "main.Core",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",

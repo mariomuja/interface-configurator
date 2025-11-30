@@ -175,7 +175,7 @@ public class BatchProcessingServiceTests
         cts.CancelAfter(50);
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
             await _service.ProcessBatchAsync(
                 items,

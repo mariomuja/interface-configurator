@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -105,7 +106,7 @@ public class InterfaceConfigurationServiceTests
         // Assert
         mockBlobClient.Verify(x => x.UploadAsync(
             It.IsAny<BinaryData>(),
-            It.IsAny<BlobUploadOptions>(),
+            It.IsAny<bool>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -144,10 +145,8 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResultType = typeof(BlobDownloadResult);
-        var blobDownloadResult = Activator.CreateInstance(blobDownloadResultType, binaryData) 
-            ?? throw new InvalidOperationException("Failed to create BlobDownloadResult");
-        mockDownloadResponse.Setup(r => r.Value).Returns((BlobDownloadResult)blobDownloadResult);
+        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockDownloadResponse.Object);
@@ -197,10 +196,8 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResultType = typeof(BlobDownloadResult);
-        var blobDownloadResult = Activator.CreateInstance(blobDownloadResultType, binaryData) 
-            ?? throw new InvalidOperationException("Failed to create BlobDownloadResult");
-        mockDownloadResponse.Setup(r => r.Value).Returns((BlobDownloadResult)blobDownloadResult);
+        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockDownloadResponse.Object);
@@ -252,10 +249,8 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResultType = typeof(BlobDownloadResult);
-        var blobDownloadResult = Activator.CreateInstance(blobDownloadResultType, binaryData) 
-            ?? throw new InvalidOperationException("Failed to create BlobDownloadResult");
-        mockDownloadResponse.Setup(r => r.Value).Returns((BlobDownloadResult)blobDownloadResult);
+        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockDownloadResponse.Object);
@@ -311,10 +306,8 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResultType = typeof(BlobDownloadResult);
-        var blobDownloadResult = Activator.CreateInstance(blobDownloadResultType, binaryData) 
-            ?? throw new InvalidOperationException("Failed to create BlobDownloadResult");
-        mockDownloadResponse.Setup(r => r.Value).Returns((BlobDownloadResult)blobDownloadResult);
+        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockDownloadResponse.Object);

@@ -9,6 +9,7 @@ using Moq;
 using InterfaceConfigurator.Main;
 using InterfaceConfigurator.Main.Services;
 using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Data;
 using Xunit;
 
 namespace InterfaceConfigurator.Main.Core.Tests.Functions;
@@ -26,7 +27,9 @@ public class LoginTests
     public LoginTests()
     {
         _mockLogger = new Mock<ILogger<LoginFunction>>();
-        _mockAuthService = new Mock<AuthService>(Mock.Of<ILogger<AuthService>>());
+        _mockAuthService = new Mock<AuthService>(
+            Mock.Of<InterfaceConfigurator.Main.Data.InterfaceConfigDbContext>(),
+            Mock.Of<ILogger<AuthService>>());
         _mockContext = new Mock<FunctionContext>();
         _mockRequest = new Mock<HttpRequestData>(_mockContext.Object);
     }

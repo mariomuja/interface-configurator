@@ -133,7 +133,7 @@ public class TokenBucketRateLimiterTests
         cts.CancelAfter(50); // Cancel after 50ms
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
             await rateLimiter.WaitAsync(cts.Token);
         });

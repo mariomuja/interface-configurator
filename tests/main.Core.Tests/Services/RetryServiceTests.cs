@@ -45,13 +45,19 @@ public class RetryServiceTests
             attemptCount++;
             if (attemptCount < 3)
             {
-                throw new Exception($"Attempt {attemptCount} failed");
+                throw new TimeoutException($"Attempt {attemptCount} failed");
             }
             return await Task.FromResult(true);
         };
 
+        var retryPolicy = new RetryPolicy
+        {
+            MaxRetries = 3,
+            InitialDelay = TimeSpan.FromMilliseconds(10)
+        };
+
         // Act
-        var result = await _retryService.ExecuteWithRetryAsync(operation, "test-operation");
+        var result = await _retryService.ExecuteWithRetryAsync(operation, "test-operation", retryPolicy);
 
         // Assert
         Assert.True(result);
@@ -99,14 +105,20 @@ public class RetryServiceTests
             if (attemptCount < 3)
             {
                 await Task.Delay(10); // Small delay to ensure timestamps differ
-                throw new Exception($"Attempt {attemptCount} failed");
+                throw new TimeoutException($"Attempt {attemptCount} failed");
             }
             return await Task.FromResult(true);
         };
 
+        var retryPolicy = new RetryPolicy
+        {
+            MaxRetries = 3,
+            InitialDelay = TimeSpan.FromMilliseconds(50)
+        };
+
         // Act
         var startTime = DateTime.UtcNow;
-        await _retryService.ExecuteWithRetryAsync(operation, "test-operation");
+        await _retryService.ExecuteWithRetryAsync(operation, "test-operation", retryPolicy);
         var endTime = DateTime.UtcNow;
 
         // Assert
@@ -127,8 +139,8 @@ public class RetryServiceTests
             return await Task.FromResult(true);
         };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        // Act & Assert - TaskCanceledException is a subclass of OperationCanceledException
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
             await _retryService.ExecuteWithRetryAsync(operation, "test-operation", cancellationToken: cts.Token);
         });

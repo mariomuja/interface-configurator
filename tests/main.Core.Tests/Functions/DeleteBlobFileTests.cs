@@ -30,8 +30,9 @@ public class DeleteBlobFileTests
     public void DeleteBlobFile_WithMissingBlobPath_ShouldReturnBadRequest()
     {
         // Arrange
+        // Use a valid connection string format for testing
         Environment.SetEnvironmentVariable("MainStorageConnection", 
-            "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test==;EndpointSuffix=core.windows.net");
+            "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=dGVzdGtleQ==;EndpointSuffix=core.windows.net");
 
         var function = new DeleteBlobFile(_mockLogger.Object);
         
@@ -43,8 +44,9 @@ public class DeleteBlobFileTests
     public void DeleteBlobFile_WithNonExistentContainer_ShouldReturnNotFound()
     {
         // Arrange
+        // Use a valid connection string format for testing
         Environment.SetEnvironmentVariable("MainStorageConnection", 
-            "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test==;EndpointSuffix=core.windows.net");
+            "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=dGVzdGtleQ==;EndpointSuffix=core.windows.net");
 
         var function = new DeleteBlobFile(_mockLogger.Object);
         
@@ -55,8 +57,9 @@ public class DeleteBlobFileTests
     public void DeleteBlobFile_WithNonExistentBlob_ShouldReturnNotFound()
     {
         // Arrange
+        // Use a valid connection string format for testing
         Environment.SetEnvironmentVariable("MainStorageConnection", 
-            "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test==;EndpointSuffix=core.windows.net");
+            "DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=dGVzdGtleQ==;EndpointSuffix=core.windows.net");
 
         var function = new DeleteBlobFile(_mockLogger.Object);
         

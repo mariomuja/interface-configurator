@@ -39,12 +39,8 @@ public class GetBlobContainerFoldersTests
         Environment.SetEnvironmentVariable("MainStorageConnection", 
             "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test==;EndpointSuffix=core.windows.net");
 
-        var mockResponse = new Mock<HttpResponseData>(Mock.Of<FunctionContext>());
-        mockResponse.SetupProperty(x => x.StatusCode);
-        mockResponse.SetupProperty(x => x.Headers);
-        
-        _mockRequest.Setup(x => x.CreateResponse(It.IsAny<HttpStatusCode>()))
-            .Returns(mockResponse.Object);
+        // Note: Cannot mock extension methods like CreateResponse
+        // This test is a placeholder and needs proper integration test setup
 
         // Note: This test would need more complex mocking setup for the actual function
         // The function uses reflection and async enumerable which is difficult to mock

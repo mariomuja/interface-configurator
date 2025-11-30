@@ -62,6 +62,12 @@ public class MessageDeduplicationService
         TimeSpan? deduplicationWindow = null,
         CancellationToken cancellationToken = default)
     {
+        // Handle null or empty keys
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return false;
+        }
+
         deduplicationWindow ??= TimeSpan.FromHours(24); // Default 24 hours
 
         // Cleanup old cache entries periodically
@@ -129,6 +135,12 @@ public class MessageDeduplicationService
         string adapterName,
         CancellationToken cancellationToken = default)
     {
+        // Handle null or empty keys
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return;
+        }
+
         // Add to cache
         _hashCache.TryAdd(idempotencyKey, DateTime.UtcNow);
 
