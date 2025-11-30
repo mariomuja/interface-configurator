@@ -89,27 +89,39 @@ jobs:
           PROJECT_PATH=$(echo "$GITLAB_PROJECT_ID" | sed 's/\//%2F/g')
           
           # Clean the file: remove BOM, ensure Unix line endings, remove control characters
-          cat .gitlab-ci.yml | sed 's/\r$//' | sed 's/\x00//g' | sed 's/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]//g' > .gitlab-ci.yml.clean
+          # Remove carriage returns, null bytes, and other control characters
+          sed 's/\r$//' .gitlab-ci.yml | sed 's/\x00//g' | sed 's/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]//g' | sed '1s/^\xEF\xBB\xBF//' > .gitlab-ci.yml.clean
+          
+          # Verify the cleaned file starts correctly (should start with # for YAML comment)
+          FIRST_CHAR=$(head -c 1 .gitlab-ci.yml.clean | od -An -tx1 | tr -d ' \n')
+          if [ "$FIRST_CHAR" != "23" ]; then
+            echo "⚠️  Warning: File may have encoding issues (first byte: $FIRST_CHAR)"
+          fi
           
           # Get the cleaned content and encode it properly
-          CI_CONTENT=$(cat .gitlab-ci.yml.clean | base64 -w 0)
+          CI_CONTENT=$(base64 -w 0 < .gitlab-ci.yml.clean)
           
           echo "Creating commit with .gitlab-ci.yml file..."
           
-          # Create JSON payload - escape the base64 string properly for JSON
-          # Use jq if available, otherwise use printf with proper escaping
+          # First, try to delete existing file if it exists (to avoid control character issues)
+          echo "Checking if file exists and deleting if present..."
+          DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/files/.gitlab-ci.yml?ref=$BRANCH_NAME" 2>/dev/null || echo -e "\n404")
+          
+          # Now create the file fresh
+          # Use jq for proper JSON construction if available
           if command -v jq &> /dev/null; then
             JSON_PAYLOAD=$(jq -n \
               --arg branch "$BRANCH_NAME" \
               --arg content "$CI_CONTENT" \
-              '{branch: $branch, commit_message: "Add .gitlab-ci.yml from ready branch", actions: [{action: "create", file_path: ".gitlab-ci.yml", content: $content, encoding: "base64"}]}')
+              '{branch: $branch, commit_message: "Add/Update .gitlab-ci.yml from ready branch", actions: [{action: "create", file_path: ".gitlab-ci.yml", content: $content, encoding: "base64"}]}')
           else
-            # Escape the base64 content for JSON (escape backslashes and quotes)
-            ESCAPED_CONTENT=$(echo "$CI_CONTENT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
-            JSON_PAYLOAD=$(printf '{"branch":"%s","commit_message":"Add .gitlab-ci.yml from ready branch","actions":[{"action":"create","file_path":".gitlab-ci.yml","content":"%s","encoding":"base64"}]}' "$BRANCH_NAME" "$ESCAPED_CONTENT")
+            # For printf, we need to be careful with escaping - base64 shouldn't need escaping but be safe
+            JSON_PAYLOAD=$(printf '{"branch":"%s","commit_message":"Add/Update .gitlab-ci.yml from ready branch","actions":[{"action":"create","file_path":".gitlab-ci.yml","content":"%s","encoding":"base64"}]}' "$BRANCH_NAME" "$CI_CONTENT")
           fi
           
-          # Create a commit that adds/updates .gitlab-ci.yml
+          # Create a commit that adds .gitlab-ci.yml
           COMMIT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --header "Content-Type: application/json" \
@@ -121,38 +133,9 @@ jobs:
           
           if [ "$COMMIT_HTTP_CODE" = "201" ]; then
             echo "✅ .gitlab-ci.yml file pushed to GitLab branch"
-          elif [ "$COMMIT_HTTP_CODE" = "400" ]; then
-            if echo "$COMMIT_BODY" | grep -q "already exists"; then
-              echo "File exists, updating..."
-              # Update existing file - use same cleaned content
-              if command -v jq &> /dev/null; then
-                UPDATE_JSON=$(jq -n \
-                  --arg branch "$BRANCH_NAME" \
-                  --arg content "$CI_CONTENT" \
-                  '{branch: $branch, commit_message: "Update .gitlab-ci.yml from ready branch", actions: [{action: "update", file_path: ".gitlab-ci.yml", content: $content, encoding: "base64"}]}')
-              else
-                ESCAPED_CONTENT=$(echo "$CI_CONTENT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
-                UPDATE_JSON=$(printf '{"branch":"%s","commit_message":"Update .gitlab-ci.yml from ready branch","actions":[{"action":"update","file_path":".gitlab-ci.yml","content":"%s","encoding":"base64"}]}' "$BRANCH_NAME" "$ESCAPED_CONTENT")
-              fi
-              
-              UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-                --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-                --header "Content-Type: application/json" \
-                --data "$UPDATE_JSON" \
-                "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/commits")
-              
-              UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
-              UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
-              if [ "$UPDATE_HTTP_CODE" = "201" ]; then
-                echo "✅ .gitlab-ci.yml file updated in GitLab branch"
-              else
-                echo "⚠️  Could not update file (HTTP $UPDATE_HTTP_CODE): $UPDATE_BODY"
-              fi
-            else
-              echo "⚠️  Error pushing .gitlab-ci.yml (HTTP $COMMIT_HTTP_CODE): $COMMIT_BODY"
-            fi
           else
             echo "⚠️  Could not push .gitlab-ci.yml (HTTP $COMMIT_HTTP_CODE): $COMMIT_BODY"
+            # Don't fail - the branch exists and push mirror may sync it
           fi
 
       - name: Wait for branch to be ready
