@@ -66,7 +66,7 @@ public class LoginTests
         var headers = new HttpHeadersCollection();
         mockResponse.SetupProperty(x => x.StatusCode);
         mockResponse.SetupProperty(x => x.Headers, headers);
-        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>()))
+        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
             .Returns(Task.CompletedTask);
         
         _mockRequest.Setup(x => x.CreateResponse(It.IsAny<HttpStatusCode>()))
@@ -99,7 +99,7 @@ public class LoginTests
         var headers = new HttpHeadersCollection();
         mockResponse.SetupProperty(x => x.StatusCode);
         mockResponse.SetupProperty(x => x.Headers, headers);
-        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>()))
+        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
             .Returns(Task.CompletedTask);
         
         _mockRequest.Setup(x => x.CreateResponse(It.IsAny<HttpStatusCode>()))

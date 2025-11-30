@@ -43,8 +43,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -56,6 +55,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 
@@ -72,8 +72,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -85,6 +84,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 
@@ -108,8 +108,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -121,6 +120,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 
@@ -143,8 +143,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -156,6 +155,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 
@@ -280,8 +280,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -293,6 +292,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             60, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 
@@ -308,8 +308,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _applicationContext,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
             null, // connectionString
@@ -321,6 +320,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             true, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null); // statisticsService
 

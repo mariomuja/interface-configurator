@@ -33,7 +33,7 @@ public class MessageDeduplicationServiceTests : IDisposable
         var idempotencyKey = Guid.NewGuid().ToString();
 
         // Act
-        var isDuplicate = await _service.CheckForDuplicateAsync(idempotencyKey);
+        var isDuplicate = await _service.IsDuplicateAsync(idempotencyKey);
 
         // Assert
         Assert.False(isDuplicate);
@@ -47,7 +47,7 @@ public class MessageDeduplicationServiceTests : IDisposable
         await _service.MarkAsProcessedAsync(idempotencyKey, "test-interface", "test-adapter");
 
         // Act
-        var isDuplicate = await _service.CheckForDuplicateAsync(idempotencyKey);
+        var isDuplicate = await _service.IsDuplicateAsync(idempotencyKey);
 
         // Assert
         Assert.True(isDuplicate);
@@ -65,7 +65,7 @@ public class MessageDeduplicationServiceTests : IDisposable
         await _service.MarkAsProcessedAsync(idempotencyKey, interfaceName, adapterName);
 
         // Assert
-        var isDuplicate = await _service.CheckForDuplicateAsync(idempotencyKey);
+        var isDuplicate = await _service.IsDuplicateAsync(idempotencyKey);
         Assert.True(isDuplicate);
     }
 
@@ -73,7 +73,7 @@ public class MessageDeduplicationServiceTests : IDisposable
     public async Task CheckForDuplicateAsync_ShouldHandleNullKey()
     {
         // Act
-        var isDuplicate = await _service.CheckForDuplicateAsync(null!);
+        var isDuplicate = await _service.IsDuplicateAsync(null!);
 
         // Assert
         Assert.False(isDuplicate);

@@ -86,12 +86,12 @@ public class BatchProcessingServiceTests
     public async Task ProcessBatchAsync_ShouldPropagateExceptions()
     {
         // Arrange
-        var items = new List<int> { 1, 2, 3 };
+        var items = new List<string> { "1", "2", "3" };
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await _service.ProcessBatchAsync(
+            await _service.ProcessBatchAsync<string, string>(
                 items,
                 async (batch, ct) =>
                 {

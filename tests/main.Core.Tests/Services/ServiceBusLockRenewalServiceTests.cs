@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
+using InterfaceConfigurator.Main.Interfaces;
 using InterfaceConfigurator.Main.Services;
 
 namespace InterfaceConfigurator.Main.Core.Tests.Services;
@@ -10,13 +11,13 @@ namespace InterfaceConfigurator.Main.Core.Tests.Services;
 public class ServiceBusLockRenewalServiceTests
 {
     private readonly Mock<IServiceBusLockTrackingService> _lockTrackingMock;
-    private readonly Mock<IServiceBusService> _serviceBusMock;
+    private readonly Mock<IServiceBusReceiverCache> _receiverCacheMock;
     private readonly Mock<ILogger<ServiceBusLockRenewalService>> _loggerMock;
 
     public ServiceBusLockRenewalServiceTests()
     {
         _lockTrackingMock = new Mock<IServiceBusLockTrackingService>();
-        _serviceBusMock = new Mock<IServiceBusService>();
+        _receiverCacheMock = new Mock<IServiceBusReceiverCache>();
         _loggerMock = new Mock<ILogger<ServiceBusLockRenewalService>>();
     }
 
@@ -26,7 +27,7 @@ public class ServiceBusLockRenewalServiceTests
         // Act
         var service = new ServiceBusLockRenewalService(
             _lockTrackingMock.Object,
-            _serviceBusMock.Object,
+            _receiverCacheMock.Object,
             _loggerMock.Object
         );
 
@@ -40,7 +41,7 @@ public class ServiceBusLockRenewalServiceTests
         // Arrange
         var service = new ServiceBusLockRenewalService(
             _lockTrackingMock.Object,
-            _serviceBusMock.Object,
+            _receiverCacheMock.Object,
             _loggerMock.Object
         );
 
@@ -69,7 +70,7 @@ public class ServiceBusLockRenewalServiceTests
         // Arrange
         var service = new ServiceBusLockRenewalService(
             _lockTrackingMock.Object,
-            _serviceBusMock.Object,
+            _receiverCacheMock.Object,
             _loggerMock.Object
         );
 
@@ -113,7 +114,7 @@ public class ServiceBusLockRenewalServiceTests
         // Arrange
         var service = new ServiceBusLockRenewalService(
             _lockTrackingMock.Object,
-            _serviceBusMock.Object,
+            _receiverCacheMock.Object,
             _loggerMock.Object
         );
 

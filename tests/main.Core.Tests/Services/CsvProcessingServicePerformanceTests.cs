@@ -35,7 +35,7 @@ public class CsvProcessingServicePerformanceTests
 
         // Act
         var stopwatch = Stopwatch.StartNew();
-        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", CancellationToken.None);
+        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
         stopwatch.Stop();
 
         // Assert
@@ -53,7 +53,7 @@ public class CsvProcessingServicePerformanceTests
 
         // Act
         var stopwatch = Stopwatch.StartNew();
-        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", CancellationToken.None);
+        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
         stopwatch.Stop();
 
         // Assert
@@ -70,7 +70,7 @@ public class CsvProcessingServicePerformanceTests
 
         // Act
         var stopwatch = Stopwatch.StartNew();
-        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", CancellationToken.None);
+        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
         stopwatch.Stop();
 
         // Assert
@@ -90,7 +90,7 @@ public class CsvProcessingServicePerformanceTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidDataException>(async () =>
         {
-            await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", CancellationToken.None);
+            await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
         });
     }
 
