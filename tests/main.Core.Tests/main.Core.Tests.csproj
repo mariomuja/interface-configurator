@@ -26,6 +26,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Additional packages for integration tests -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Azure.ResourceManager.AppContainers" Version="1.2.0" />
+    <PackageReference Include="Azure.Containers.ContainerRegistry" Version="1.2.0" />
+    <!-- Azure.Storage.Blobs and Azure.Messaging.ServiceBus are available via project references -->
   </ItemGroup>
 
   <ItemGroup>

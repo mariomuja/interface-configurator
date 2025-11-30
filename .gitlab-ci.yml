@@ -620,6 +620,214 @@ test:service-bus:
     - job: deploy:production
       optional: true
 
+test:blob-storage:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up Blob Storage integration tests..."
+    - |
+      if [ -z "$AZURE_STORAGE_CONNECTION_STRING" ] && [ -z "$MainStorageConnection" ] && [ -z "$AzureWebJobsStorage" ]; then
+        echo "⚠️  Blob Storage connection string not set. Tests will be skipped."
+        echo "Required CI/CD variable:"
+        echo "   - AZURE_STORAGE_CONNECTION_STRING (or MainStorageConnection or AzureWebJobsStorage)"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running Blob Storage integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~BlobStorageIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-blob-storage.xml"
+    - echo "Blob Storage tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-blob-storage.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:production
+      optional: true
+
+test:container-apps:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up Container Apps integration tests..."
+    - |
+      if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_SUBSCRIPTION_ID" ]; then
+        echo "⚠️  Azure resource information not set. Tests will be skipped."
+        echo "Required CI/CD variables:"
+        echo "   - AZURE_RESOURCE_GROUP"
+        echo "   - AZURE_SUBSCRIPTION_ID"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running Container Apps integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~ContainerAppIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-apps.xml"
+    - echo "Container Apps tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-container-apps.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:production
+      optional: true
+
+test:container-registry:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up Container Registry integration tests..."
+    - |
+      if [ -z "$AZURE_CONTAINER_REGISTRY" ]; then
+        echo "⚠️  Container Registry name not set. Tests will be skipped."
+        echo "Required CI/CD variable:"
+        echo "   - AZURE_CONTAINER_REGISTRY"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running Container Registry integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~ContainerRegistryIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-registry.xml"
+    - echo "Container Registry tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-container-registry.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: package:adapter-containers
+      optional: true
+
+test:static-web-app:
+  stage: test:post-deploy
+  image: node:${NODE_VERSION}
+  dependencies: []
+  <<: *node_cache
+  variables:
+    CI: "true"
+    STATIC_WEB_APP_URL: "${STATIC_WEB_APP_URL:-https://interface-configurator.vercel.app}"
+  before_script:
+    - echo "Installing Node.js dependencies..."
+    - npm ci
+    - echo "Installing Playwright browsers and system dependencies..."
+    - npx playwright install --with-deps chromium
+    - echo "Playwright setup completed"
+    - mkdir -p test-results
+    - |
+      if [ -z "$STATIC_WEB_APP_URL" ]; then
+        echo "⚠️  STATIC_WEB_APP_URL not set. Using default."
+        export STATIC_WEB_APP_URL="https://interface-configurator.vercel.app"
+      fi
+      echo "Testing Static Web App at: $STATIC_WEB_APP_URL"
+  script:
+    - echo "Running Static Web App E2E tests with Playwright..."
+    - npx playwright test tests/end-to-end/static-web-app.spec.ts
+    - echo "Static Web App tests completed"
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+      - test-results/
+    reports:
+      junit: test-results/junit.xml
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:vercel
+      optional: true
+    - job: deploy:azure-static-web-app
+      optional: true
+
+test:adapter-pipeline:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up Adapter Pipeline integration tests..."
+    - |
+      if [ -z "$AZURE_SERVICE_BUS_CONNECTION_STRING" ] || [ -z "$AZURE_STORAGE_CONNECTION_STRING" ] || \
+         [ -z "$AZURE_SQL_SERVER" ] || [ -z "$AZURE_SQL_DATABASE" ] || [ -z "$AZURE_SQL_USER" ] || [ -z "$AZURE_SQL_PASSWORD" ]; then
+        echo "⚠️  Required connection strings not set. Tests will be skipped."
+        echo "Required CI/CD variables:"
+        echo "   - AZURE_SERVICE_BUS_CONNECTION_STRING"
+        echo "   - AZURE_STORAGE_CONNECTION_STRING"
+        echo "   - AZURE_SQL_SERVER, AZURE_SQL_DATABASE, AZURE_SQL_USER, AZURE_SQL_PASSWORD"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running Adapter Pipeline end-to-end tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~AdapterPipelineIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-adapter-pipeline.xml"
+    - echo "Adapter Pipeline tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-adapter-pipeline.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:production
+      optional: true
+    - job: package:adapter-containers
+      optional: true
+
 deploy:vercel:
   stage: deploy
   image: node:22
