@@ -1,0 +1,694 @@
+# GitLab CI/CD Pipeline for Interface Configurator
+# This pipeline builds, tests, and optionally deploys the application
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+variables:
+  DOTNET_VERSION: "8.0"
+  DOTNET_SDK_VERSION: "8.0"
+  NODE_VERSION: "22"
+  NPM_VERSION: "10"
+  # Solution and project paths
+  SOLUTION_PATH: "azure-functions/azure-functions.sln"
+  TEST_PROJECT: "tests/main.Core.Tests/main.Core.Tests.csproj"
+  FRONTEND_PATH: "frontend"
+  # Build configuration
+  BUILD_CONFIGURATION: "Release"
+  # Artifact paths
+  ARTIFACTS_PATH: "artifacts"
+  COVERAGE_PATH: "coverage"
+
+# Cache configuration for faster builds
+.dotnet_cache: &dotnet_cache
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-dotnet
+    paths:
+      - .nuget/
+      - azure-functions/**/bin/
+      - azure-functions/**/obj/
+      - main.Core/**/bin/
+      - main.Core/**/obj/
+      - adapters/**/bin/
+      - adapters/**/obj/
+      - services/**/bin/
+      - services/**/obj/
+      - tests/**/bin/
+      - tests/**/obj/
+
+.node_cache: &node_cache
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-node
+    paths:
+      - frontend/node_modules/
+      - node_modules/
+      - api/node_modules/
+
+# Branch filter: Only process branches starting with "ready/" OR main branch
+# Feature branches must use "ready/" prefix (e.g., ready/myfeature)
+# Main branch runs pipelines directly (no prefix needed)
+
+# ============================================
+# BUILD STAGE
+# ============================================
+
+build:dotnet:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  <<: *dotnet_cache
+  script:
+    - echo "Restoring NuGet packages..."
+    - dotnet restore $SOLUTION_PATH
+    - echo "Building solution..."
+    - dotnet build $SOLUTION_PATH --configuration $BUILD_CONFIGURATION --no-restore
+    - echo "Build completed successfully"
+  artifacts:
+    paths:
+      - azure-functions/**/bin/$BUILD_CONFIGURATION/
+      - main.Core/**/bin/$BUILD_CONFIGURATION/
+      - adapters/**/bin/$BUILD_CONFIGURATION/
+      - services/**/bin/$BUILD_CONFIGURATION/
+    expire_in: 1 hour
+    when: on_success
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "azure-functions/**/*"
+        - "main.Core/**/*"
+        - "adapters/**/*"
+        - "services/**/*"
+        - ".gitlab-ci.yml"
+
+build:frontend:
+  stage: build
+  image: node:${NODE_VERSION}
+  <<: *node_cache
+  before_script:
+    - echo "Installing Node.js dependencies..."
+    - cd $FRONTEND_PATH
+    - npm ci
+  script:
+    - echo "Building Angular frontend..."
+    - npm run build:prod
+    - echo "Frontend build completed successfully"
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 hour
+    when: on_success
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "frontend/**/*"
+        - "package.json"
+        - "package-lock.json"
+        - ".gitlab-ci.yml"
+
+# ============================================
+# TEST STAGE
+# ============================================
+
+test:dotnet:unit:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  script:
+    - echo "Running all unit tests (excluding integration tests)..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --no-build 
+        --verbosity normal
+        --filter "FullyQualifiedName!~Integration"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-unit.xml"
+        --collect:"XPlat Code Coverage"
+        --results-directory:"${CI_PROJECT_DIR}/test-results"
+    - echo "Unit tests completed"
+  coverage: '/Total\s*\|\s*(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      junit: test-results/junit-unit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: test-results/**/coverage.cobertura.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "tests/**/*"
+        - "main.Core/**/*"
+        - "azure-functions/**/*"
+        - "adapters/**/*"
+        - ".gitlab-ci.yml"
+
+test:dotnet:integration:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  script:
+    - echo "Running all integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --no-build 
+        --verbosity normal
+        --filter "FullyQualifiedName~Integration"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-integration.xml"
+    - echo "Integration tests completed"
+  artifacts:
+    reports:
+      junit: test-results/junit-integration.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "tests/**/*"
+        - "main.Core/**/*"
+        - "azure-functions/**/*"
+        - "adapters/**/*"
+        - ".gitlab-ci.yml"
+
+test:frontend:
+  stage: test
+  image: node:${NODE_VERSION}
+  dependencies:
+    - build:frontend
+  <<: *node_cache
+  before_script:
+    - cd $FRONTEND_PATH
+    - npm ci
+  script:
+    - echo "Running frontend tests..."
+    - npm test
+    - echo "Frontend tests completed"
+  artifacts:
+    paths:
+      - frontend/coverage/
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "frontend/**/*"
+        - "package.json"
+        - "package-lock.json"
+        - ".gitlab-ci.yml"
+
+test:playwright:
+  stage: test
+  image: node:${NODE_VERSION}
+  dependencies:
+    - build:frontend
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Installing Node.js dependencies..."
+    - npm ci
+    - echo "Installing Playwright browsers and system dependencies..."
+    - npx playwright install --with-deps chromium firefox webkit
+    - echo "Playwright setup completed"
+  script:
+    - echo "Running all Playwright end-to-end tests..."
+    - npx playwright test
+    - echo "Playwright tests completed"
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+      - test-results/
+    reports:
+      junit: test-results/junit.xml
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "tests/end-to-end/**/*"
+        - "playwright.config.ts"
+        - "package.json"
+        - "package-lock.json"
+        - "frontend/**/*"
+        - ".gitlab-ci.yml"
+
+# ============================================
+# PACKAGE STAGE
+# ============================================
+
+package:dotnet:
+  stage: package
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+    - test:dotnet:unit
+  script:
+    - echo "Packaging .NET artifacts..."
+    - mkdir -p $ARTIFACTS_PATH
+    - |
+      cd azure-functions/main
+      dotnet publish --configuration $BUILD_CONFIGURATION --output ../../$ARTIFACTS_PATH/azure-functions
+    - |
+      cd main.Core
+      dotnet publish --configuration $BUILD_CONFIGURATION --output ../$ARTIFACTS_PATH/main.Core
+    - echo "Packaging completed"
+  artifacts:
+    paths:
+      - $ARTIFACTS_PATH/
+    expire_in: 1 week
+    when: on_success
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+
+package:frontend:
+  stage: package
+  image: node:${NODE_VERSION}
+  dependencies:
+    - build:frontend
+    - test:frontend
+  script:
+    - echo "Packaging frontend artifacts..."
+    - mkdir -p $ARTIFACTS_PATH
+    - cp -r frontend/dist $ARTIFACTS_PATH/frontend
+    - echo "Frontend packaging completed"
+  artifacts:
+    paths:
+      - $ARTIFACTS_PATH/frontend/
+    expire_in: 1 week
+    when: on_success
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+
+# ============================================
+# DEPLOY STAGE (Manual - Configure as needed)
+# ============================================
+
+
+deploy:production:
+  stage: deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - package:dotnet
+    - package:frontend
+  before_script:
+    - echo "Setting up deployment environment..."
+    - apt-get update
+    - apt-get install -y curl gnupg lsb-release
+    # Install Azure CLI
+    - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+    # Install Azure Functions Core Tools
+    - curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg
+    - sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main" > /etc/apt/sources.list.d/dotnetdev.list'
+    - apt-get update
+    - apt-get install -y azure-functions-core-tools-4
+    - echo "✅ Azure Functions Core Tools installed"
+    - func --version
+    - echo "Logging in to Azure..."
+    # Login to Azure using service principal
+    - |
+      if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_TENANT_ID" ]; then
+        az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+        if [ -n "$AZURE_SUBSCRIPTION_ID" ]; then
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+        fi
+        echo "✅ Azure login successful"
+        az account show
+      else
+        echo "⚠️  Azure credentials not set. Please configure CI/CD variables:"
+        echo "   - AZURE_CLIENT_ID"
+        echo "   - AZURE_CLIENT_SECRET"
+        echo "   - AZURE_TENANT_ID"
+        exit 1
+      fi
+  script:
+    - echo "Deploying Azure Function App to production..."
+    - |
+      cd azure-functions/main
+      echo "Step 1: Publishing Function App (--self-contained false)..."
+      dotnet publish --self-contained false --configuration $BUILD_CONFIGURATION --output ./publish
+      echo "✅ Publish completed"
+    - |
+      cd azure-functions/main
+      echo "Step 2: Deploying to Azure Function App..."
+      if [ -z "$AZURE_FUNCTION_APP_NAME" ] || [ -z "$AZURE_RESOURCE_GROUP" ]; then
+        echo "⚠️  Required CI/CD variables not set:"
+        echo "   - AZURE_FUNCTION_APP_NAME"
+        echo "   - AZURE_RESOURCE_GROUP"
+        exit 1
+      fi
+      echo "Function App: $AZURE_FUNCTION_APP_NAME"
+      echo "Resource Group: $AZURE_RESOURCE_GROUP"
+      echo "Deploying with: func azure functionapp publish --dotnet-isolated"
+      func azure functionapp publish "$AZURE_FUNCTION_APP_NAME" --dotnet-isolated
+      echo "✅ Deployment completed successfully"
+      echo ""
+      echo "Function App URL: https://${AZURE_FUNCTION_APP_NAME}.azurewebsites.net"
+  environment:
+    name: production
+    url: https://${AZURE_FUNCTION_APP_NAME}.azurewebsites.net
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+
+deploy:vercel:
+  stage: deploy
+  image: node:22
+  dependencies:
+    - package:frontend
+  before_script:
+    - echo "Setting up Vercel deployment..."
+    - npm install -g vercel@latest
+    - vercel --version
+  script:
+    - echo "Deploying static web app to Vercel..."
+    - |
+      if [ -z "$VERCEL_TOKEN" ]; then
+        echo "⚠️  VERCEL_TOKEN not set. Please configure CI/CD variable:"
+        echo "   - VERCEL_TOKEN (get from https://vercel.com/account/tokens)"
+        exit 1
+      fi
+    - |
+      # Set Vercel environment variables
+      export VERCEL_ORG_ID="${VERCEL_ORG_ID:-}"
+      export VERCEL_PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+      
+      # Deploy to Vercel production
+      echo "Deploying to Vercel production..."
+      vercel deploy --prod --token "$VERCEL_TOKEN" --yes
+      
+      if [ $? -eq 0 ]; then
+        echo "✅ Vercel deployment completed successfully"
+      else
+        echo "❌ Vercel deployment failed"
+        exit 1
+      fi
+  environment:
+    name: vercel-production
+    url: https://${VERCEL_PROJECT_NAME:-interface-configurator}.vercel.app
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+
+deploy:azure-static-web-app:
+  stage: deploy
+  image: node:22
+  dependencies:
+    - package:frontend
+  before_script:
+    - echo "Setting up Azure Static Web App deployment..."
+    - echo "Installing Azure CLI..."
+    - apt-get update
+    - apt-get install -y curl gnupg lsb-release ca-certificates
+    - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+    - az --version
+    - echo "Installing Azure Static Web Apps CLI..."
+    - npm install -g @azure/static-web-apps-cli
+    - swa --version
+    - echo "Logging in to Azure..."
+    - |
+      if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_TENANT_ID" ]; then
+        az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+        if [ -n "$AZURE_SUBSCRIPTION_ID" ]; then
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+        fi
+        echo "✅ Azure login successful"
+        az account show
+      else
+        echo "⚠️  Azure credentials not set. Please configure CI/CD variables:"
+        echo "   - AZURE_CLIENT_ID"
+        echo "   - AZURE_CLIENT_SECRET"
+        echo "   - AZURE_TENANT_ID"
+        exit 1
+      fi
+  script:
+    - echo "Deploying static web app to Azure Static Web Apps..."
+    - |
+      if [ -z "$AZURE_STATIC_WEB_APP_NAME" ] || [ -z "$AZURE_RESOURCE_GROUP" ]; then
+        echo "⚠️  Required CI/CD variables not set:"
+        echo "   - AZURE_STATIC_WEB_APP_NAME"
+        echo "   - AZURE_RESOURCE_GROUP"
+        exit 1
+      fi
+    - |
+      # Get deployment token - prefer CI/CD variable, otherwise retrieve from Azure
+      if [ -n "$DEPLOYMENT_TOKEN" ]; then
+        FINAL_DEPLOYMENT_TOKEN="$DEPLOYMENT_TOKEN"
+        echo "✅ Using deployment token from CI/CD variable"
+      else
+        echo "Retrieving deployment token from Azure Static Web App..."
+        RETRIEVED_TOKEN=$(az staticwebapp secrets list \
+          --name "$AZURE_STATIC_WEB_APP_NAME" \
+          --resource-group "$AZURE_RESOURCE_GROUP" \
+          --query "properties.apiKey" -o tsv 2>/dev/null || echo "")
+        
+        if [ -z "$RETRIEVED_TOKEN" ]; then
+          echo "⚠️  Could not retrieve deployment token via secrets. Trying alternative method..."
+          # Alternative: Get from app settings
+          RETRIEVED_TOKEN=$(az staticwebapp appsettings list \
+            --name "$AZURE_STATIC_WEB_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query "[?name=='DEPLOYMENT_TOKEN'].value" -o tsv 2>/dev/null || echo "")
+        fi
+        
+        if [ -z "$RETRIEVED_TOKEN" ]; then
+          echo "❌ Could not retrieve deployment token from Azure"
+          echo "   Please set DEPLOYMENT_TOKEN as a CI/CD variable"
+          echo "   Or ensure the Azure Static Web App has a deployment token configured"
+          exit 1
+        fi
+        
+        FINAL_DEPLOYMENT_TOKEN="$RETRIEVED_TOKEN"
+        echo "✅ Using deployment token retrieved from Azure"
+      fi
+    - |
+      # Deploy using SWA CLI
+      echo "Deploying to Azure Static Web App..."
+      echo "Static Web App: $AZURE_STATIC_WEB_APP_NAME"
+      echo "Resource Group: $AZURE_RESOURCE_GROUP"
+      
+      # Use the packaged frontend artifacts
+      # The artifacts are in $ARTIFACTS_PATH/frontend/dist/ from package:frontend job
+      # package:frontend copies frontend/dist to $ARTIFACTS_PATH/frontend
+      # So the structure is: $ARTIFACTS_PATH/frontend/dist/interface-configuration/browser
+      ARTIFACTS_BASE="${ARTIFACTS_PATH:-artifacts}/frontend/dist"
+      BROWSER_DIR="$ARTIFACTS_BASE/interface-configuration/browser"
+      
+      if [ ! -d "$BROWSER_DIR" ]; then
+        echo "⚠️  Frontend artifacts not found at $BROWSER_DIR"
+        echo "   Building frontend now..."
+        cd frontend
+        npm ci
+        npm run build:prod
+        BROWSER_DIR="frontend/dist/interface-configuration/browser"
+      fi
+      
+      echo "Deploying from: $BROWSER_DIR"
+      
+      # Deploy using SWA CLI
+      swa deploy "$BROWSER_DIR" \
+        --app-name "$AZURE_STATIC_WEB_APP_NAME" \
+        --resource-group "$AZURE_RESOURCE_GROUP" \
+        --deployment-token "$FINAL_DEPLOYMENT_TOKEN" \
+        --env production \
+        --no-use-keychain
+      
+      if [ $? -eq 0 ]; then
+        echo "✅ Azure Static Web App deployment completed successfully"
+        echo ""
+        echo "Static Web App URL: https://${AZURE_STATIC_WEB_APP_NAME}.azurestaticapps.net"
+      else
+        echo "❌ Azure Static Web App deployment failed"
+        exit 1
+      fi
+  environment:
+    name: azure-static-web-app-production
+    url: https://${AZURE_STATIC_WEB_APP_NAME}.azurestaticapps.net
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+
+# ============================================
+# CLEANUP
+# ============================================
+
+cleanup:delete-merged-ready-branch:
+  stage: deploy
+  image: curlimages/curl:latest
+  variables:
+    CI: "true"
+  before_script:
+    - apk add --no-cache git || true
+  script:
+    - |
+      echo "Cleaning up merged ready/* branch..."
+      
+      # Only run if this is a merge to main
+      if [ "$CI_COMMIT_REF_NAME" != "main" ]; then
+        echo "Not on main branch, skipping cleanup"
+        exit 0
+      fi
+      
+      # Try multiple methods to detect merged branch
+      SOURCE_BRANCH=""
+      
+      # Method 1: Check merge commit message (GitLab format)
+      if git log -1 --pretty=%B | grep -q "Merge branch"; then
+        SOURCE_BRANCH=$(git log -1 --pretty=%B | grep -oP "Merge branch ['\"]\Kready/[^'\"]+" | head -1 || echo "")
+      fi
+      
+      # Method 2: Check if merge commit has two parents (indicates merge)
+      PARENT_COUNT=$(git log -1 --pretty=%P | wc -w)
+      if [ "$PARENT_COUNT" -eq 2 ]; then
+        # Get the second parent (the merged branch)
+        MERGED_BRANCH=$(git log -1 --pretty=%P | awk '{print $2}')
+        if [ -n "$MERGED_BRANCH" ]; then
+          # Try to find branch name from commit
+          SOURCE_BRANCH=$(git branch -r --contains $MERGED_BRANCH | grep "ready/" | head -1 | sed 's|origin/||' | xargs || echo "")
+        fi
+      fi
+      
+      # Method 3: Check recent merge requests via API (if token available)
+      if [ -z "$SOURCE_BRANCH" ] && [ -n "$GITLAB_TOKEN" ] && [ -n "$CI_PROJECT_ID" ]; then
+        echo "Checking recent merge requests via API..."
+        RECENT_MR=$(curl -s --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests?state=merged&target_branch=main&per_page=1" | \
+          grep -oP '"source_branch":"\Kready/[^"]+' | head -1 || echo "")
+        if [ -n "$RECENT_MR" ]; then
+          SOURCE_BRANCH="$RECENT_MR"
+        fi
+      fi
+      
+      # If we found a ready/* branch, delete it
+      if [[ "$SOURCE_BRANCH" =~ ^ready/ ]]; then
+        echo "Found ready/* branch to delete: $SOURCE_BRANCH"
+        
+        # Delete branch using GitLab API
+        if [ -n "$GITLAB_TOKEN" ] && [ -n "$CI_PROJECT_ID" ]; then
+          echo "Deleting branch $SOURCE_BRANCH from origin..."
+          DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/branches/$(echo $SOURCE_BRANCH | sed 's|/|%2F|g')")
+          
+          HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -1)
+          if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Branch $SOURCE_BRANCH deleted successfully"
+          elif [ "$HTTP_CODE" = "404" ]; then
+            echo "ℹ️  Branch $SOURCE_BRANCH already deleted or doesn't exist"
+          else
+            echo "⚠️  Failed to delete branch (HTTP $HTTP_CODE)"
+            echo "   Response: $(echo "$DELETE_RESPONSE" | head -n -1)"
+          fi
+        else
+          echo "⚠️  GITLAB_TOKEN not set. Cannot delete branch automatically."
+          echo "   Branch $SOURCE_BRANCH should be deleted via merge request settings"
+          echo "   Or set GITLAB_TOKEN in CI/CD Variables"
+        fi
+      else
+        echo "ℹ️  No ready/* branch detected to delete"
+        echo "   (This is normal if branch was already deleted or merge used different method)"
+      fi
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main"
+      when: on_success
+  allow_failure: true
+  needs:
+    - job: package:dotnet
+      optional: true
+    - job: package:frontend
+      optional: true
+
+# ============================================
+# NOTIFICATIONS
+# ============================================
+
+notify:sms:
+  stage: test
+  image: curlimages/curl:latest
+  variables:
+    CI: "true"
+  script:
+    - |
+      echo "Sending SMS notification for test failures..."
+      # Extract branch name
+      BRANCH_NAME="${CI_COMMIT_REF_NAME}"
+      PIPELINE_URL="${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
+      
+      # SMS message
+      MESSAGE="🚨 Test failures in ready branch: ${BRANCH_NAME}. Pipeline: ${PIPELINE_URL}"
+      
+      # Send SMS via API (configure your SMS service)
+      # Example using generic HTTP API
+      if [ -n "$SMS_API_URL" ] && [ -n "$SMS_API_KEY" ] && [ -n "$SMS_PHONE_NUMBER" ]; then
+        curl -X POST "$SMS_API_URL" \
+          -H "Authorization: Bearer $SMS_API_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"to\": \"$SMS_PHONE_NUMBER\",
+            \"message\": \"$MESSAGE\"
+          }" || echo "SMS sending failed, but continuing..."
+      else
+        echo "SMS variables not configured. Skipping SMS notification."
+        echo "To enable SMS, set: SMS_API_URL, SMS_API_KEY, SMS_PHONE_NUMBER"
+      fi
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\//
+      when: on_failure  # Only run when previous jobs fail
+  allow_failure: true  # Don't block pipeline if SMS fails
+  needs:
+    - job: test:dotnet:unit
+      optional: true
+    - job: test:dotnet:integration
+      optional: true
+    - job: test:frontend
+      optional: true
+    - job: test:playwright
+      optional: true
+
+# ============================================
+# CODE QUALITY (Optional)
+# ============================================
+
+lint:dotnet:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  <<: *dotnet_cache
+  script:
+    - echo "Running .NET code analysis..."
+    - dotnet format $SOLUTION_PATH --verify-no-changes --verbosity diagnostic || true
+    - echo "Code analysis completed"
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "azure-functions/**/*.cs"
+        - "main.Core/**/*.cs"
+        - "adapters/**/*.cs"
+        - ".gitlab-ci.yml"
+
+lint:frontend:
+  stage: test
+  image: node:${NODE_VERSION}
+  <<: *node_cache
+  before_script:
+    - cd $FRONTEND_PATH
+    - npm ci
+  script:
+    - echo "Running frontend linting..."
+    - npm run lint || true
+    - echo "Linting completed"
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "frontend/**/*.ts"
+        - "frontend/**/*.html"
+        - ".gitlab-ci.yml"
+
