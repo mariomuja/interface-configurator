@@ -705,3 +705,5 @@ lint:frontend:
         - "frontend/**/*.html"
         - ".gitlab-ci.yml"
 
+#   T r i g g e r   G i t L a b   m i r r o r   s y n c  
+ 
