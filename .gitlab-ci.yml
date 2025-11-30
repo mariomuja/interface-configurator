@@ -740,11 +740,11 @@ cleanup:delete-merged-ready-branch:
 
 notify:email:on-failure:
   stage: test
-  image: curlimages/curl:latest
+  image: alpine:latest
   variables:
     CI: "true"
   before_script:
-    - apk add --no-cache jq bash
+    - apk add --no-cache curl jq bash
   script:
     - |
       echo "Sending failure notification email to commit author..."
@@ -844,7 +844,7 @@ notify:email:on-failure:
   rules:
     - if: $CI_COMMIT_REF_NAME =~ /^ready\//
       when: on_failure  # Only run when previous jobs fail
-  allow_failure: true  # Don't block pipeline if email fails
+  allow_failure: false  # Don't allow failures - email notification is critical
   needs:
     - job: build:dotnet
       optional: true
