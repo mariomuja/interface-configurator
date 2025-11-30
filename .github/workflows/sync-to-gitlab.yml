@@ -80,23 +80,38 @@ jobs:
           echo "✅ Branch exists in GitLab"
           echo "Pushing all files to GitLab branch using git..."
           
-          # Get GitLab repository URL
+          # Get GitLab repository URL - use project ID format
+          # GitLab API uses project ID or path, for git we need the full path
           GITLAB_REPO_URL="https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_PROJECT_ID}.git"
+          
+          echo "GitLab repo URL: https://oauth2:***@gitlab.com/${GITLAB_PROJECT_ID}.git"
           
           # Configure git
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           
-          # Add GitLab remote temporarily
-          git remote add gitlab "$GITLAB_REPO_URL" || git remote set-url gitlab "$GITLAB_REPO_URL"
+          # Show current branch and commits
+          echo "Current branch: $(git branch --show-current)"
+          echo "Latest commit: $(git rev-parse HEAD)"
+          echo "Files in current commit:"
+          git ls-tree -r HEAD --name-only | head -20
           
-          # Push the branch to GitLab (force push to overwrite if needed)
-          echo "Pushing branch to GitLab..."
-          if git push gitlab "$BRANCH_NAME" --force; then
+          # Add GitLab remote temporarily
+          git remote add gitlab "$GITLAB_REPO_URL" 2>/dev/null || git remote set-url gitlab "$GITLAB_REPO_URL"
+          
+          # Fetch from GitLab to see what's there
+          echo "Fetching from GitLab..."
+          git fetch gitlab "$BRANCH_NAME" 2>&1 || echo "Branch doesn't exist in GitLab yet (expected)"
+          
+          # Push the branch to GitLab (force push to overwrite)
+          echo "Pushing branch '$BRANCH_NAME' to GitLab..."
+          if git push gitlab "HEAD:$BRANCH_NAME" --force 2>&1; then
             echo "✅ Entire branch pushed to GitLab successfully"
             echo "SKIP_FILE_PUSH=true" >> $GITHUB_ENV
           else
-            echo "⚠️  Git push failed, will try API method for .gitlab-ci.yml only"
+            PUSH_ERROR=$?
+            echo "⚠️  Git push failed with exit code $PUSH_ERROR"
+            echo "Will try API method for .gitlab-ci.yml only"
             echo "SKIP_FILE_PUSH=false" >> $GITHUB_ENV
           fi
           
