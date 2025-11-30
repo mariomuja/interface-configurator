@@ -16,6 +16,7 @@ namespace InterfaceConfigurator.Main.Core.Tests.Services;
 /// Unit tests for AdapterFactory
 /// Tests adapter creation for both source and destination adapters
 /// </summary>
+#pragma warning disable CS0618 // Obsolete members - Used for backward compatibility in tests
 public class AdapterFactoryTests
 {
     private readonly IServiceProvider _serviceProvider;
@@ -102,7 +103,6 @@ public class AdapterFactoryTests
             SqlPassword = "test-password",
             SourceIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act
@@ -130,7 +130,6 @@ public class AdapterFactoryTests
             SourceFieldSeparator = "║",
             DestinationIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act
@@ -159,7 +158,6 @@ public class AdapterFactoryTests
             SqlPassword = "test-password",
             DestinationIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act
@@ -183,7 +181,6 @@ public class AdapterFactoryTests
             SourceConfiguration = "{}",
             SourceIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act & Assert
@@ -201,7 +198,6 @@ public class AdapterFactoryTests
             DestinationConfiguration = "{}",
             DestinationIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act & Assert
@@ -229,7 +225,7 @@ public class AdapterFactoryTests
     }
 
     [Fact]
-    public async Task CreateSourceAdapterAsync_WithCsvAdapterAndSftpProperties_ShouldIncludeSftpProperties()
+    public async Task CreateSourceAdapterAsync_WithSftpCsvAdapter_ShouldReturnCsvAdapter()
     {
         // Arrange
         var config = new InterfaceConfiguration
@@ -249,7 +245,6 @@ public class AdapterFactoryTests
             SftpFileBufferSize = 8192,
             SourceIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act
@@ -282,7 +277,6 @@ public class AdapterFactoryTests
             SqlFailOnBadStatement = false,
             SourceIsEnabled = true
         };
-
         var factory = new AdapterFactory(_serviceProvider, _mockLogger.Object);
 
         // Act
@@ -291,8 +285,7 @@ public class AdapterFactoryTests
         // Assert
         Assert.NotNull(adapter);
         Assert.IsType<SqlServerAdapter>(adapter);
+        Assert.Equal("SqlServer", adapter.AdapterName);
     }
 }
-
-
-
+#pragma warning restore CS0618

@@ -12,6 +12,7 @@ namespace InterfaceConfigurator.Main.Core.Tests.Functions;
 /// Unit tests for SourceAdapterFunction
 /// Tests timer-triggered source adapter processing
 /// </summary>
+#pragma warning disable CS0618 // Obsolete members - Used for backward compatibility in tests
 public class SourceAdapterFunctionTests
 {
     private readonly Mock<IInterfaceConfigurationService> _mockConfigService;

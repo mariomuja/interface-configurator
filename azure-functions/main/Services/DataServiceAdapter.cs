@@ -10,6 +10,7 @@ using System.Data;
 
 namespace InterfaceConfigurator.Main.Services;
 
+#pragma warning disable CS0436 // Type conflicts with imported type - This is intentional, azure-functions/main has its own implementation
 public class DataServiceAdapter : IDataService
 {
     private readonly ApplicationDbContext? _context;

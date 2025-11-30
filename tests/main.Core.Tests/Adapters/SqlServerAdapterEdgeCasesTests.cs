@@ -14,6 +14,8 @@ namespace InterfaceConfigurator.Main.Core.Tests.Adapters;
 /// <summary>
 /// Unit tests for SqlServerAdapter edge cases and error scenarios
 /// </summary>
+#pragma warning disable CS8625 // Null literals - Used in tests to verify null handling
+/// </summary>
 public class SqlServerAdapterEdgeCasesTests : IDisposable
 {
     private readonly ApplicationDbContext _applicationContext;
@@ -187,7 +189,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // failOnBadStatement
             null, // configService
             _mockLogger.Object,
-            null)); // statisticsService
+            null!)); // statisticsService
     }
 
     [Fact]
@@ -212,7 +214,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // failOnBadStatement
             null, // configService
             _mockLogger.Object,
-            null)); // statisticsService
+            null!)); // statisticsService
     }
 
     [Fact]
@@ -237,7 +239,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // failOnBadStatement
             null, // configService
             _mockLogger.Object,
-            null)); // statisticsService
+            null!)); // statisticsService
     }
 
     [Fact]

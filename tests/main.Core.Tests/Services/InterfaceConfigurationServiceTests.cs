@@ -13,6 +13,7 @@ namespace InterfaceConfigurator.Main.Core.Tests.Services;
 /// <summary>
 /// Unit tests for InterfaceConfigurationService
 /// </summary>
+#pragma warning disable CS0618 // Obsolete members - Used for backward compatibility in tests
 public class InterfaceConfigurationServiceTests
 {
     private readonly Mock<BlobServiceClient> _mockBlobServiceClient;

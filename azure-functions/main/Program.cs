@@ -342,7 +342,9 @@ var host = new HostBuilder()
             
             // Register Feature Factories for Services
             // Feature #5: Enhanced DataService (example - adjust feature number as needed)
+#pragma warning disable CS0436 // Type conflicts with imported type - This is intentional, azure-functions/main has its own implementation
             services.AddFeatureFactory<IDataService, DataServiceAdapter, DataServiceAdapterV2>(featureNumber: 5);
+#pragma warning restore CS0436
             
             // Feature #6: Enhanced LoggingService (example - adjust feature number as needed)
             services.AddScoped<ILoggingService>(sp =>

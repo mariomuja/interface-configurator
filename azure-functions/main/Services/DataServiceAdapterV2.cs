@@ -10,6 +10,7 @@ using System.Data;
 
 namespace InterfaceConfigurator.Main.Services;
 
+#pragma warning disable CS0436 // Type conflicts with imported type - This is intentional, azure-functions/main has its own implementation
 /// <summary>
 /// Enhanced version of DataServiceAdapter with improved error handling and performance
 /// This is the NEW implementation that will be used when the feature is enabled

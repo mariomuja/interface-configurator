@@ -38,6 +38,9 @@ public class AdapterFactory : IAdapterFactory
 
         try
         {
+            if (string.IsNullOrWhiteSpace(adapterName))
+                throw new ArgumentException("SourceAdapterName cannot be null or empty", nameof(config));
+
             var configDict = !string.IsNullOrWhiteSpace(configJson) 
                 ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson) 
                 ?? new Dictionary<string, JsonElement>()
@@ -72,6 +75,9 @@ public class AdapterFactory : IAdapterFactory
 
         try
         {
+            if (string.IsNullOrWhiteSpace(adapterName))
+                throw new ArgumentException("DestinationAdapterName cannot be null or empty", nameof(config));
+
             var configDict = !string.IsNullOrWhiteSpace(configJson) 
                 ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson) 
                 ?? new Dictionary<string, JsonElement>()
