@@ -1074,3 +1074,5 @@ For issues or questions:
 Made with ❤️ using Azure, Terraform, Angular, and Vercel
 
 </div>
+ 
+ 
