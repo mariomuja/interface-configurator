@@ -330,9 +330,11 @@ public class BlobStorageIntegrationTests : IClassFixture<BlobStorageTestFixture>
                 { "Source", "Test" },
                 { "InterfaceName", "test-interface" }
             };
+            // Delete if exists to allow overwrite
+            await blobClient.DeleteIfExistsAsync();
             await blobClient.UploadAsync(
                 BinaryData.FromString(testContent),
-                new BlobUploadOptions { Metadata = metadata, Overwrite = true });
+                new BlobUploadOptions { Metadata = metadata });
 
             // Act
             var properties = await blobClient.GetPropertiesAsync();
