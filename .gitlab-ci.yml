@@ -537,6 +537,89 @@ test:azure-functions:
     - job: deploy:production
       optional: true
 
+test:sql-server:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up SQL Server integration tests..."
+    - |
+      if [ -z "$AZURE_SQL_SERVER" ] || [ -z "$AZURE_SQL_DATABASE" ] || [ -z "$AZURE_SQL_USER" ] || [ -z "$AZURE_SQL_PASSWORD" ]; then
+        echo "⚠️  SQL Server connection details not set. Tests will be skipped."
+        echo "Required CI/CD variables:"
+        echo "   - AZURE_SQL_SERVER"
+        echo "   - AZURE_SQL_DATABASE"
+        echo "   - AZURE_SQL_USER"
+        echo "   - AZURE_SQL_PASSWORD"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running SQL Server integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~SqlServerIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-sql-server.xml"
+    - echo "SQL Server tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-sql-server.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:production
+      optional: true
+
+test:service-bus:
+  stage: test:post-deploy
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+  <<: *dotnet_cache
+  variables:
+    CI: "true"
+  before_script:
+    - echo "Setting up Service Bus integration tests..."
+    - |
+      if [ -z "$AZURE_SERVICE_BUS_CONNECTION_STRING" ]; then
+        echo "⚠️  Service Bus connection string not set. Tests will be skipped."
+        echo "Required CI/CD variable:"
+        echo "   - AZURE_SERVICE_BUS_CONNECTION_STRING"
+        exit 0
+      fi
+    - mkdir -p test-results
+  script:
+    - echo "Running Service Bus integration tests..."
+    - dotnet test $TEST_PROJECT 
+        --configuration $BUILD_CONFIGURATION 
+        --verbosity normal
+        --filter "FullyQualifiedName~ServiceBusIntegrationTests"
+        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-service-bus.xml"
+    - echo "Service Bus tests completed"
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/junit-service-bus.xml
+    paths:
+      - test-results/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+      when: on_success
+  needs:
+    - job: deploy:production
+      optional: true
+
 deploy:vercel:
   stage: deploy
   image: node:22
