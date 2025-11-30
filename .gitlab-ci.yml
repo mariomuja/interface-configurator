@@ -1,6 +1,19 @@
 # GitLab CI/CD Pipeline for Interface Configurator
 # This pipeline builds, tests, and optionally deploys the application
 
+# Workflow rules: Always run pipelines on push events (including from mirroring)
+# This ensures pipelines run for all push events, including mirrored branches
+# Note: GitLab mirroring may not trigger pipelines automatically - you may need to
+# manually trigger or enable "Trigger pipelines for mirror updates" in mirror settings
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "external"'
+
 stages:
   - build
   - test
@@ -692,3 +705,5 @@ lint:frontend:
         - "frontend/**/*.html"
         - ".gitlab-ci.yml"
 
+#   T r i g g e r   G i t L a b   m i r r o r   s y n c  
+ 
