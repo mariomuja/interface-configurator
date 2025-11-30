@@ -78,15 +78,39 @@ jobs:
           fi
           
           echo "✅ Branch exists in GitLab"
-          echo "Pushing .gitlab-ci.yml file to branch..."
+          echo "Pushing all files to GitLab branch using git..."
+          
+          # Get GitLab repository URL
+          GITLAB_REPO_URL="https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_PROJECT_ID}.git"
+          
+          # Configure git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Add GitLab remote temporarily
+          git remote add gitlab "$GITLAB_REPO_URL" || git remote set-url gitlab "$GITLAB_REPO_URL"
+          
+          # Push the branch to GitLab (force push to overwrite if needed)
+          echo "Pushing branch to GitLab..."
+          git push gitlab "$BRANCH_NAME" --force || {
+            echo "⚠️  Git push failed, will try API method for .gitlab-ci.yml only"
+            echo "Pushing .gitlab-ci.yml file to branch..."
+          }
+          
+          # Remove the temporary remote
+          git remote remove gitlab
 
-      - name: Push .gitlab-ci.yml to GitLab branch
+      - name: Push .gitlab-ci.yml to GitLab branch (fallback)
+        if: env.SKIP_FILE_PUSH != 'true'
         env:
           GITLAB_TOKEN: ${{ secrets.gitlab_token }}
           GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID || 'mariomuja/interface-configurator' }}
+          SKIP_FILE_PUSH: ${{ env.SKIP_FILE_PUSH }}
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           PROJECT_PATH=$(echo "$GITLAB_PROJECT_ID" | sed 's/\//%2F/g')
+          
+          echo "Using API fallback method to push .gitlab-ci.yml..."
           
           # Clean the file: remove BOM, ensure Unix line endings, remove control characters
           # Remove carriage returns, null bytes, and other control characters
