@@ -7,7 +7,12 @@
 # manually trigger or enable "Trigger pipelines for mirror updates" in mirror settings
 workflow:
   rules:
-    - when: always  # Always run pipelines regardless of source
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "external"'
 
 stages:
   - build
