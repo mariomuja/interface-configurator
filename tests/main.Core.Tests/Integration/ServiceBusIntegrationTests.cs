@@ -50,7 +50,6 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     {
         // Arrange
         var service = new ServiceBusService(_connectionString, _logger);
-        var topicName = "interface-test-interface";
         var testInterfaceName = "test-interface";
         var testAdapterName = "test-adapter";
         var testAdapterType = "CSV";
@@ -152,12 +151,12 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     {
         // Arrange
         var service = new ServiceBusService(_connectionString, _logger);
-        var topicName = "interface-test-interface";
-        var subscriptionName = "destination-test-subscription";
+        var interfaceName = "test-interface";
+        var destinationAdapterInstanceGuid = Guid.NewGuid();
 
         // First, send a test message
         await service.SendMessageAsync(
-            "test-interface",
+            interfaceName,
             "test-adapter",
             "CSV",
             Guid.NewGuid(),
@@ -170,8 +169,8 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
 
         // Act
         var messages = await service.ReceiveMessagesAsync(
-            topicName,
-            subscriptionName,
+            interfaceName,
+            destinationAdapterInstanceGuid,
             maxMessages: 10,
             cancellationToken: CancellationToken.None);
 
@@ -186,13 +185,13 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     public async Task PeekLock_Receive_Mode_Should_Work()
     {
         // Arrange
-        var topicName = "interface-test-interface";
-        var subscriptionName = "destination-test-subscription";
+        var interfaceName = "test-interface";
+        var destinationAdapterInstanceGuid = Guid.NewGuid();
 
         // Send a test message
         var service = new ServiceBusService(_connectionString, _logger);
         await service.SendMessageAsync(
-            "test-interface",
+            interfaceName,
             "test-adapter",
             "CSV",
             Guid.NewGuid(),
@@ -204,8 +203,8 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
 
         // Act - Receive with PeekLock (default)
         var messages = await service.ReceiveMessagesAsync(
-            topicName,
-            subscriptionName,
+            interfaceName,
+            destinationAdapterInstanceGuid,
             maxMessages: 1,
             cancellationToken: CancellationToken.None);
 
@@ -280,11 +279,10 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     {
         // Arrange
         var service = new ServiceBusService(_connectionString, _logger);
-        var topicName = "interface-test-interface";
-        var subscriptionName = "destination-test-subscription";
+        var interfaceName = "test-interface";
 
         // Act
-        var count = await service.GetMessageCountAsync(topicName, subscriptionName, CancellationToken.None);
+        var count = await service.GetMessageCountAsync(interfaceName, CancellationToken.None);
 
         // Assert
         Assert.True(count >= 0, "Message count should be non-negative");
@@ -297,11 +295,11 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     {
         // Arrange
         var service = new ServiceBusService(_connectionString, _logger);
-        var topicName = "interface-test-interface";
+        var interfaceName = "test-interface";
 
         // Act
         var messages = await service.GetRecentMessagesAsync(
-            topicName,
+            interfaceName,
             maxMessages: 10,
             cancellationToken: CancellationToken.None);
 
@@ -356,14 +354,15 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     {
         // Arrange
         var service = new ServiceBusService(_connectionString, _logger);
-        var invalidTopicName = "nonexistent-topic";
 
         // Act & Assert - Should handle exception gracefully
         try
         {
+            var invalidInterfaceName = "nonexistent-interface";
+            var destinationAdapterInstanceGuid = Guid.NewGuid();
             var messages = await service.ReceiveMessagesAsync(
-                invalidTopicName,
-                "test-subscription",
+                invalidInterfaceName,
+                destinationAdapterInstanceGuid,
                 maxMessages: 1,
                 cancellationToken: CancellationToken.None);
             
@@ -410,7 +409,8 @@ public class ServiceBusIntegrationTests : IClassFixture<ServiceBusTestFixture>, 
     public void Dispose()
     {
         _serviceBusClient?.DisposeAsync().AsTask().Wait();
-        _adminClient?.DisposeAsync().AsTask().Wait();
+        // ServiceBusAdministrationClient doesn't implement IDisposable or IAsyncDisposable
+        // It's safe to leave it - resources will be cleaned up by GC
     }
 }
 

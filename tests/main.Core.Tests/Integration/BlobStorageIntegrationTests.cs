@@ -332,8 +332,7 @@ public class BlobStorageIntegrationTests : IClassFixture<BlobStorageTestFixture>
             };
             await blobClient.UploadAsync(
                 BinaryData.FromString(testContent),
-                new BlobUploadOptions { Metadata = metadata },
-                overwrite: true);
+                new BlobUploadOptions { Metadata = metadata, Overwrite = true });
 
             // Act
             var properties = await blobClient.GetPropertiesAsync();

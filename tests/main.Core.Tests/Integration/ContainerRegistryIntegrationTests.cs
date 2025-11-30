@@ -31,12 +31,13 @@ public class ContainerRegistryIntegrationTests : IClassFixture<ContainerRegistry
         var credential = new Azure.Identity.DefaultAzureCredential();
         var client = new ContainerRegistryClient(registryUri, credential);
 
-        // Act
-        var properties = await client.GetPropertiesAsync();
+        // Act - Get repository properties instead
+        var repository = client.GetRepository("interface-configurator-adapters");
+        var properties = await repository.GetPropertiesAsync();
 
         // Assert
         Assert.NotNull(properties.Value);
-        Assert.NotNull(properties.Value.LoginServer);
+        Assert.NotNull(properties.Value.Name);
     }
 
     [Fact]
@@ -95,10 +96,10 @@ public class ContainerRegistryIntegrationTests : IClassFixture<ContainerRegistry
         // Act
         var repository = client.GetRepository(repositoryName);
         var tag = repository.GetArtifact(tagName);
-        var manifest = await tag.GetManifestAsync();
+        var manifestProperties = await tag.GetManifestPropertiesAsync();
 
         // Assert
-        Assert.NotNull(manifest.Value);
+        Assert.NotNull(manifestProperties.Value);
     }
 
     public void Dispose()

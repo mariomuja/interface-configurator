@@ -17,12 +17,12 @@ namespace InterfaceConfigurator.Main.Core.Tests.Integration;
 public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTestFixture>, IDisposable
 {
     private readonly AdapterPipelineTestFixture _fixture;
-    private readonly ILogger<AdapterPipelineIntegrationTests> _logger;
+    private readonly ILogger<ServiceBusService> _serviceBusLogger;
 
     public AdapterPipelineIntegrationTests(AdapterPipelineTestFixture fixture)
     {
         _fixture = fixture;
-        _logger = new Mock<ILogger<AdapterPipelineIntegrationTests>>().Object;
+        _serviceBusLogger = new Mock<ILogger<ServiceBusService>>().Object;
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTest
         // Arrange
         var serviceBusService = new ServiceBusService(
             _fixture.ServiceBusConnectionString,
-            _logger);
+            _serviceBusLogger);
 
         var testInterfaceName = $"test-interface-{Guid.NewGuid()}";
         var testAdapterName = "CsvAdapter";
@@ -70,14 +70,14 @@ public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTest
         // Arrange
         var serviceBusService = new ServiceBusService(
             _fixture.ServiceBusConnectionString,
-            _logger);
+            _serviceBusLogger);
 
-        var topicName = $"interface-test-{Guid.NewGuid()}";
-        var subscriptionName = $"destination-test-{Guid.NewGuid()}";
+        var interfaceName = "test-interface";
+        var destinationAdapterInstanceGuid = Guid.NewGuid();
 
         // First, send a test message
         await serviceBusService.SendMessageAsync(
-            "test-interface",
+            interfaceName,
             "CsvAdapter",
             "CSV",
             Guid.NewGuid(),
@@ -89,8 +89,8 @@ public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTest
 
         // Act - Receive message from Service Bus (simulating SQL adapter)
         var messages = await serviceBusService.ReceiveMessagesAsync(
-            topicName,
-            subscriptionName,
+            interfaceName,
+            destinationAdapterInstanceGuid,
             maxMessages: 1,
             cancellationToken: CancellationToken.None);
 
@@ -193,7 +193,8 @@ public class AdapterPipelineIntegrationTests : IClassFixture<AdapterPipelineTest
                 new Dictionary<string, string> { { "Id", "1" }, { "Name", "Test1" }, { "Value", "100" } },
                 CancellationToken.None);
             
-            Assert.NotNull(messageId, "Message should be sent to Service Bus");
+            Assert.NotNull(messageId);
+            Assert.NotEmpty(messageId);
 
             // Step 3: Verify SQL connectivity
             using var sqlConnection = new SqlConnection(_fixture.SqlConnectionString);
