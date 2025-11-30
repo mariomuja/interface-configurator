@@ -165,6 +165,72 @@ test:dotnet:unit:
         - "adapters/**/*"
         - ".gitlab-ci.yml"
 
+test:mutation:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  dependencies:
+    - build:dotnet
+    - test:dotnet:unit
+  <<: *dotnet_cache
+  variables:
+    STRYKER_PROJECT: "main.Core/main.Core.csproj"
+    STRYKER_TEST_PROJECT: "tests/main.Core.Tests/main.Core.Tests.csproj"
+  before_script:
+    - echo "Installing Stryker.NET mutation testing tool..."
+    - dotnet tool install -g dotnet-stryker
+    - export PATH="$PATH:/root/.dotnet/tools"
+    - dotnet-stryker --version
+    - echo "Setting up mutation testing environment..."
+    - mkdir -p mutation-reports
+  script:
+    - echo "Running mutation tests with Stryker.NET..."
+    - echo "Testing project: $STRYKER_PROJECT"
+    - echo "Test project: $STRYKER_TEST_PROJECT"
+    - |
+      cd main.Core
+      dotnet-stryker \
+        --test-project "../$STRYKER_TEST_PROJECT" \
+        --reporters "html" "json" "progress" \
+        --output "../mutation-reports" \
+        --log-level "info" \
+        --threshold-break 60 \
+        --threshold-high 70 \
+        --threshold-low 60 \
+        --mutation-level "Standard" || true
+    - echo "Mutation testing completed"
+    - cd ..
+    - |
+      # Check if mutation report was generated
+      if [ -f "mutation-reports/mutation-report.json" ]; then
+        echo "✅ Mutation report generated successfully"
+        # Extract mutation score from JSON report
+        MUTATION_SCORE=$(cat mutation-reports/mutation-report.json | grep -o '"mutationScore":[0-9.]*' | cut -d':' -f2 || echo "0")
+        echo "Mutation Score: $MUTATION_SCORE%"
+      else
+        echo "⚠️  Mutation report not found"
+      fi
+  artifacts:
+    when: always
+    paths:
+      - mutation-reports/
+    reports:
+      junit: mutation-reports/mutation-report.xml
+    expire_in: 30 days
+  coverage: '/Mutation score: (\d+\.\d+)%/'
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "main.Core/**/*"
+        - "tests/main.Core.Tests/**/*"
+        - ".gitlab-ci.yml"
+      when: on_success
+  allow_failure: true
+  needs:
+    - job: build:dotnet
+      artifacts: true
+    - job: test:dotnet:unit
+      artifacts: false
+
 test:frontend:
   stage: test
   image: node:${NODE_VERSION}
