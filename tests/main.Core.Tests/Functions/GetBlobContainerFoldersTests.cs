@@ -30,7 +30,7 @@ public class GetBlobContainerFoldersTests
     }
 
     [Fact]
-    public async Task GetBlobContainerFolders_WithValidContainer_ShouldReturnFolderStructure()
+    public Task GetBlobContainerFolders_WithValidContainer_ShouldReturnFolderStructure()
     {
         // Arrange
         var function = new GetBlobContainerFolders(_mockLogger.Object);
@@ -50,6 +50,8 @@ public class GetBlobContainerFoldersTests
         // The function uses reflection and async enumerable which is difficult to mock
         // This is a placeholder test structure
         // TODO: Complete this test with proper mocking of BlobContainerClient.GetBlobsAsync()
+        
+        return Task.CompletedTask;
     }
 }
 

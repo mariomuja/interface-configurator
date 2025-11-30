@@ -63,10 +63,10 @@ public class RetryServiceTests
     {
         // Arrange
         int attemptCount = 0;
-        Func<Task<bool>> operation = async () =>
+        Func<Task<bool>> operation = () =>
         {
             attemptCount++;
-            throw new Exception($"Attempt {attemptCount} failed");
+            return Task.FromException<bool>(new Exception($"Attempt {attemptCount} failed"));
         };
 
         var retryPolicy = new RetryPolicy

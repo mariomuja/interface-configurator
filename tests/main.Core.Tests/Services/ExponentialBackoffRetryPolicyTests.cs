@@ -82,10 +82,10 @@ public class ExponentialBackoffRetryPolicyTests
         // Act & Assert
         await Assert.ThrowsAsync<HttpRequestException>(async () =>
         {
-            await retryPolicy.ExecuteAsync(async () =>
+            await retryPolicy.ExecuteAsync(() =>
             {
                 attemptCount++;
-                throw new HttpRequestException("Always fails");
+                return Task.FromException<string>(new HttpRequestException("Always fails"));
             }, CancellationToken.None);
         });
 
@@ -107,10 +107,10 @@ public class ExponentialBackoffRetryPolicyTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await retryPolicy.ExecuteAsync(async () =>
+            await retryPolicy.ExecuteAsync(() =>
             {
                 attemptCount++;
-                throw new InvalidOperationException("Non-retryable");
+                return Task.FromException<string>(new InvalidOperationException("Non-retryable"));
             }, CancellationToken.None);
         });
 

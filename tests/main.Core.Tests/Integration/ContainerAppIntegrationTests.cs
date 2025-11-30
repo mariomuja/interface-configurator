@@ -50,7 +50,7 @@ public class ContainerAppIntegrationTests : IClassFixture<AzureTestFixture>, IDi
     [Fact]
     [Trait("Category", "Integration")]
     [Trait("Requires", "Azure Container Apps")]
-    public async Task Container_App_Should_Have_Correct_Configuration()
+    public Task Container_App_Should_Have_Correct_Configuration()
     {
         // This test verifies that container apps can be queried
         // Actual container app names would need to be provided via environment variables
@@ -59,17 +59,18 @@ public class ContainerAppIntegrationTests : IClassFixture<AzureTestFixture>, IDi
         if (string.IsNullOrWhiteSpace(containerAppName))
         {
             Assert.True(true, "CONTAINER_APP_NAME not set - skipping test");
-            return;
+            return Task.CompletedTask;
         }
 
         // Test would verify container app configuration
         Assert.NotNull(containerAppName);
+        return Task.CompletedTask;
     }
 
     [Fact]
     [Trait("Category", "Integration")]
     [Trait("Requires", "Azure Container Apps")]
-    public async Task Container_App_Image_Should_Be_From_ACR()
+    public Task Container_App_Image_Should_Be_From_ACR()
     {
         // This test verifies that container apps use images from ACR
         var acrName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_REGISTRY");
@@ -77,11 +78,12 @@ public class ContainerAppIntegrationTests : IClassFixture<AzureTestFixture>, IDi
         if (string.IsNullOrWhiteSpace(acrName))
         {
             Assert.True(true, "AZURE_CONTAINER_REGISTRY not set - skipping test");
-            return;
+            return Task.CompletedTask;
         }
 
         // Test would verify image source
         Assert.NotNull(acrName);
+        return Task.CompletedTask;
     }
 
     public void Dispose()

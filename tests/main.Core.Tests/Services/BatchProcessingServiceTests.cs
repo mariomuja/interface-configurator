@@ -30,10 +30,10 @@ public class BatchProcessingServiceTests
         // Act
         var results = await _service.ProcessBatchAsync(
             items,
-            async (batch, ct) =>
+            (batch, ct) =>
             {
                 processedItems.AddRange(batch);
-                return batch.Select(i => i * 2).ToList();
+                return Task.FromResult(batch.Select(i => i * 2).ToList());
             }
         );
 
@@ -53,10 +53,10 @@ public class BatchProcessingServiceTests
         // Act
         await _service.ProcessBatchAsync(
             items,
-            async (batch, ct) =>
+            (batch, ct) =>
             {
                 batchSizes.Add(batch.Count);
-                return batch.Select(i => i).ToList();
+                return Task.FromResult(batch.Select(i => i).ToList());
             }
         );
 
@@ -75,7 +75,7 @@ public class BatchProcessingServiceTests
         // Act
         var results = await _service.ProcessBatchAsync(
             items,
-            async (batch, ct) => batch.Select(i => i * 2).ToList()
+            (batch, ct) => Task.FromResult(batch.Select(i => i * 2).ToList())
         );
 
         // Assert
@@ -93,9 +93,9 @@ public class BatchProcessingServiceTests
         {
             await _service.ProcessBatchAsync<string, string>(
                 items,
-                async (batch, ct) =>
+                (batch, ct) =>
                 {
-                    throw new InvalidOperationException("Test error");
+                    return Task.FromException<string>(new InvalidOperationException("Test error"));
                 }
             );
         });
