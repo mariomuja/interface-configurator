@@ -931,8 +931,7 @@ lint:frontend:
         - "frontend/**/*.html"
         - ".gitlab-ci.yml"
 
-#   T r i g g e r   G i t L a b   m i r r o r   s y n c 
- 
- #   T r i g g e r   s y n c   a f t e r   t o k e n   u p d a t e 
- 
- 
+# Trigger GitLab mirror sync
+
+# Trigger sync after token update
+
