@@ -28,7 +28,7 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
 
     public int Count => _receivers.Count;
 
-    public async Task<ServiceBusReceiver> GetOrCreateReceiverAsync(
+    public Task<ServiceBusReceiver> GetOrCreateReceiverAsync(
         string topicName,
         string subscriptionName,
         CancellationToken cancellationToken = default)
@@ -52,7 +52,7 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
                 _logger?.LogDebug(
                     "[CorrelationId: {CorrelationId}] Using cached receiver for Topic={Topic}, Subscription={Subscription}",
                     correlationId, topicName, subscriptionName);
-                return existingReceiver;
+                return Task.FromResult(existingReceiver);
             }
             catch (ObjectDisposedException)
             {
@@ -89,7 +89,7 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
         // Add to cache
         _receivers.TryAdd(key, receiver);
 
-        return receiver;
+        return Task.FromResult(receiver);
     }
 
     public async Task<DateTimeOffset?> RenewMessageLockAsync(

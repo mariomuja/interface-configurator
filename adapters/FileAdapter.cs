@@ -338,14 +338,15 @@ public class FileAdapter : AdapterBase
     /// Note: This method requires ICsvProcessingService which is not available in IAdapter
     /// Use ReadFileAsync, ReadAllFilesAsync, or ReadCsvFilesAsync methods instead
     /// </summary>
-    public override async Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
+    public override Task<(List<string> headers, List<Dictionary<string, string>> records)> ReadAsync(
         string source,
         CancellationToken cancellationToken = default)
     {
         // This method requires ICsvProcessingService which is not available in IAdapter interface
         // FileAdapter is primarily designed to be used by other adapters (like CsvAdapter)
         // For standalone use, use ReadFileAsync, ReadAllFilesAsync, or ReadCsvFilesAsync methods
-        throw new NotSupportedException("FileAdapter.ReadAsync requires ICsvProcessingService. Use ReadFileAsync(ICsvProcessingService, fieldSeparator, source, cancellationToken) instead, or use FileAdapter through CsvAdapter.");
+        return Task.FromException<(List<string> headers, List<Dictionary<string, string>> records)>(
+            new NotSupportedException("FileAdapter.ReadAsync requires ICsvProcessingService. Use ReadFileAsync(ICsvProcessingService, fieldSeparator, source, cancellationToken) instead, or use FileAdapter through CsvAdapter."));
     }
 
     /// <summary>

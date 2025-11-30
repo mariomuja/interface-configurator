@@ -357,7 +357,7 @@ public class Bootstrap
         }
     }
 
-    private async Task<BootstrapCheck> CheckContainerAppsEnvironmentAsync()
+    private Task<BootstrapCheck> CheckContainerAppsEnvironmentAsync()
     {
         try
         {
@@ -372,34 +372,34 @@ public class Bootstrap
             
             if (hasCredentials)
             {
-                return new BootstrapCheck
+                return Task.FromResult(new BootstrapCheck
                 {
                     Name = "ContainerApps",
                     Status = "Healthy",
                     Message = "Container App Service is available",
                     Details = $"Container App Environment: {containerAppEnvironmentName}, Resource Group: {resourceGroupName}"
-                };
+                });
             }
             else
             {
-                return new BootstrapCheck
+                return Task.FromResult(new BootstrapCheck
                 {
                     Name = "ContainerApps",
                     Status = "Degraded",
                     Message = "Azure credentials not available for Container App management",
                     Details = "DefaultAzureCredential could not find credentials"
-                };
+                });
             }
         }
         catch (Exception ex)
         {
-            return new BootstrapCheck
+            return Task.FromResult(new BootstrapCheck
             {
                 Name = "ContainerApps",
                 Status = "Degraded",
                 Message = $"Container Apps check failed: {ex.Message}",
                 Details = ex.ToString()
-            };
+            });
         }
     }
 

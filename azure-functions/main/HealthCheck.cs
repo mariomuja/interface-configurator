@@ -271,7 +271,7 @@ public class HealthCheck
         }
     }
 
-    private async Task<HealthCheckItem> CheckContainerAppsAsync()
+    private Task<HealthCheckItem> CheckContainerAppsAsync()
     {
         try
         {
@@ -295,31 +295,31 @@ public class HealthCheck
             
             if (hasCredentials)
             {
-                return new HealthCheckItem
+                return Task.FromResult(new HealthCheckItem
                 {
                     Name = "ContainerApps",
                     Status = "Healthy",
                     Message = $"Container App Service is available. Environment: {containerAppEnvironmentName}"
-                };
+                });
             }
             else
             {
-                return new HealthCheckItem
+                return Task.FromResult(new HealthCheckItem
                 {
                     Name = "ContainerApps",
                     Status = "Degraded",
                     Message = "Azure credentials not available for Container App management"
-                };
+                });
             }
         }
         catch (Exception ex)
         {
-            return new HealthCheckItem
+            return Task.FromResult(new HealthCheckItem
             {
                 Name = "ContainerApps",
                 Status = "Degraded",
                 Message = $"Container Apps check failed: {ex.Message}"
-            };
+            });
         }
     }
 
