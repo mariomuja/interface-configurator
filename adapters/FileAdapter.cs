@@ -518,7 +518,7 @@ public class FileAdapter : AdapterBase
         }
 
         // Write records
-        if (records != null)
+        if (records != null && headers != null)
         {
             foreach (var record in records)
             {
@@ -539,6 +539,7 @@ public class FileAdapter : AdapterBase
     /// </summary>
     public override async Task<Dictionary<string, CsvColumnAnalyzer.ColumnTypeInfo>> GetSchemaAsync(string source, CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask;
         throw new NotSupportedException("FileAdapter does not support schema detection. Use ICsvProcessingService to analyze CSV content.");
     }
 

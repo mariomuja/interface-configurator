@@ -539,6 +539,12 @@ public class SapAdapter : HttpClientAdapterBase
             var rowsSucceeded = 0;
             var rowsFailed = 0;
 
+            if (records == null)
+            {
+                _logger?.LogWarning("No records to write");
+                return;
+            }
+
             try
             {
                 if (_sapUseOData && !string.IsNullOrEmpty(_sapODataServiceUrl))

@@ -71,6 +71,7 @@ public class CrmAdapter : HttpClientAdapterBase
     /// </summary>
     protected override async Task<string> GetAccessTokenInternalAsync(CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask;
         if (string.IsNullOrEmpty(_organizationUrl))
         {
             throw new InvalidOperationException("CRM OrganizationUrl is required");
@@ -388,6 +389,12 @@ public class CrmAdapter : HttpClientAdapterBase
 
                 var baseUrl = _organizationUrl.TrimEnd('/');
                 var entityUrl = $"{baseUrl}/api/data/v9.2/{_entityName}";
+
+                if (records == null || records.Count == 0)
+                {
+                    _logger?.LogWarning("No records to write");
+                    return;
+                }
 
                 if (_useBatch && records.Count > 1)
                 {

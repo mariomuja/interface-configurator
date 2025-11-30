@@ -57,7 +57,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => adapter.ReadAsync("", CancellationToken.None));
@@ -86,7 +86,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         var headers = new List<string> { "Name", "Age" };
         var records = new List<Dictionary<string, string>>();
@@ -122,7 +122,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         var headers = new List<string>();
         var records = new List<Dictionary<string, string>>();
@@ -157,7 +157,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         var records = new List<Dictionary<string, string>>();
 
@@ -170,7 +170,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
     {
         // Act & Assert
         Assert.Throws<ArgumentException>(() => new SqlServerAdapter(
-            null,
+            null!,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
             null, // messageBoxService
@@ -248,7 +248,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
 
         // Act
         var adapter = new SqlServerAdapter(
-            null,
+            null!,
             _mockDynamicTableService.Object,
             _mockDataService.Object,
             null, // messageBoxService
@@ -265,7 +265,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // failOnBadStatement
             null, // configService
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);
@@ -294,7 +294,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);
@@ -322,7 +322,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // configService
             "Source", // adapterRole
             _mockLogger.Object,
-            null); // statisticsService
+            null!); // statisticsService
 
         // Assert
         Assert.NotNull(adapter);

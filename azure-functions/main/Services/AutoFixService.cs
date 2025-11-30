@@ -196,6 +196,7 @@ public class AutoFixService
     /// </summary>
     public async Task<bool> CommitFixesAsync(FixApplicationResult fixResult, string errorId)
     {
+        await Task.CompletedTask;
         try
         {
             _logger.LogInformation("Committing fixes for error: {ErrorId}", errorId);

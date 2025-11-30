@@ -185,6 +185,7 @@ public class DataServiceAdapter : IDataService
     // This method is kept for backward compatibility but should not be called
     private async Task InsertChunkAsync(List<Core.Models.TransportData> chunk, int chunkNumber, int totalChunks, CancellationToken cancellationToken)
     {
+        await Task.CompletedTask;
         throw new NotSupportedException("InsertChunkAsync is deprecated. The new implementation uses InsertRowsAsync with dynamic columns.");
     }
 

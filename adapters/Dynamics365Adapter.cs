@@ -365,6 +365,12 @@ public class Dynamics365Adapter : HttpClientAdapterBase
             var rowsSucceeded = 0;
             var rowsFailed = 0;
 
+            if (records == null || records.Count == 0)
+            {
+                _logger?.LogWarning("No records to write");
+                return;
+            }
+
             try
             {
                 // Get OAuth token (uses caching from base class)

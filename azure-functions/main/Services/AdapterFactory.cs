@@ -28,6 +28,7 @@ public class AdapterFactory : IAdapterFactory
 
     public async Task<IAdapter> CreateSourceAdapterAsync(InterfaceConfiguration config, CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask;
         if (config == null)
             throw new ArgumentNullException(nameof(config));
 
@@ -62,6 +63,7 @@ public class AdapterFactory : IAdapterFactory
 
     public async Task<IAdapter> CreateDestinationAdapterAsync(InterfaceConfiguration config, CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask;
         if (config == null)
             throw new ArgumentNullException(nameof(config));
 

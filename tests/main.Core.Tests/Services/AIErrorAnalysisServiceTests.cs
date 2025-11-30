@@ -85,7 +85,7 @@ public class AIErrorAnalysisServiceTests
 
         // Assert
         Assert.Equal("NullReference", result.RootCause.Category);
-        Assert.True(result.SuggestedFixes.Any(f => f.Description.Contains("null check")));
+        Assert.Contains(result.SuggestedFixes, f => f.Description.Contains("null check"));
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class AIErrorAnalysisServiceTests
 
         // Assert
         Assert.Equal("Network", result.RootCause.Category);
-        Assert.True(result.SuggestedFixes.Any(f => f.Description.Contains("timeout") || f.Description.Contains("retry")));
+        Assert.Contains(result.SuggestedFixes, f => f.Description.Contains("timeout") || f.Description.Contains("retry"));
     }
 
     [Fact]

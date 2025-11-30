@@ -310,7 +310,7 @@ public class DeadLetterRecoveryService : IDeadLetterRecoveryService
         return statistics;
     }
 
-    private async Task<DeadLetterMessage> ConvertToDeadLetterMessageAsync(
+    private Task<DeadLetterMessage> ConvertToDeadLetterMessageAsync(
         ServiceBusReceivedMessage message,
         string interfaceName)
     {
@@ -318,7 +318,7 @@ public class DeadLetterRecoveryService : IDeadLetterRecoveryService
         var messageBody = message.Body.ToString();
         var messageData = System.Text.Json.JsonSerializer.Deserialize<MessageData>(messageBody);
 
-        return new DeadLetterMessage
+        return Task.FromResult(new DeadLetterMessage
         {
             MessageId = message.MessageId,
             InterfaceName = message.ApplicationProperties.TryGetValue("InterfaceName", out var ifName)
@@ -335,7 +335,7 @@ public class DeadLetterRecoveryService : IDeadLetterRecoveryService
             Record = messageData?.record ?? new Dictionary<string, string>(),
             Headers = messageData?.headers ?? new List<string>(),
             Properties = message.ApplicationProperties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-        };
+        });
     }
 
     private class MessageData

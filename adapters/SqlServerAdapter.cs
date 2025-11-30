@@ -5,7 +5,6 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Core.Services;
 using ServiceBusMessage = InterfaceConfigurator.Main.Core.Interfaces.ServiceBusMessage;
 
 namespace InterfaceConfigurator.Adapters;
@@ -26,11 +25,11 @@ public class SqlServerAdapter : AdapterBase
     /// ApplicationDbContext connects to the configured SQL Server database
     /// Can use either the default context (from DI) or a custom connection string
     /// </summary>
-    private readonly ApplicationDbContext _defaultContext;
+    private readonly ApplicationDbContext? _defaultContext;
     private readonly string? _connectionString;
     private readonly IDynamicTableService _dynamicTableService;
     private readonly IDataService _dataService;
-    private readonly ILogger<SqlServerAdapter>? _logger;
+    private new readonly ILogger<SqlServerAdapter>? _logger;
     private readonly CsvColumnAnalyzer _columnAnalyzer;
     private readonly TypeValidator _typeValidator;
     
@@ -44,14 +43,14 @@ public class SqlServerAdapter : AdapterBase
     private readonly int _commandTimeout;
     private readonly bool _failOnBadStatement;
     private readonly IInterfaceConfigurationService? _configService;
-    private readonly ProcessingStatisticsService? _statisticsService;
+    private new readonly ProcessingStatisticsService? _statisticsService;
     
     // Custom SQL statements for OPENJSON operations
     private readonly string? _insertStatement;
     private readonly string? _updateStatement;
     private readonly string? _deleteStatement;
-    private readonly JQTransformationService? _jqService;
-    private readonly string? _jqScriptFile;
+    private new readonly JQTransformationService? _jqService;
+    private new readonly string? _jqScriptFile;
 
     public SqlServerAdapter(
         ApplicationDbContext context,

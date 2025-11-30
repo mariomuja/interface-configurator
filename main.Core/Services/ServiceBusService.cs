@@ -603,7 +603,7 @@ public class ServiceBusService : IServiceBusService
         }
     }
 
-    public async Task<int> GetMessageCountAsync(
+    public Task<int> GetMessageCountAsync(
         string interfaceName,
         CancellationToken cancellationToken = default)
     {
@@ -615,7 +615,7 @@ public class ServiceBusService : IServiceBusService
             // Note: Getting message count requires Service Bus Management client
             // For now, return 0 as placeholder - this would need ServiceBusAdministrationClient
             _logger?.LogInformation("GetMessageCountAsync called: Interface={InterfaceName}", interfaceName);
-            return 0;
+            return Task.FromResult(0);
         }
         catch (Exception ex)
         {

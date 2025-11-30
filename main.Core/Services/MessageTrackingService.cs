@@ -21,7 +21,7 @@ public class MessageTrackingService
     /// <summary>
     /// Track message flow through the system
     /// </summary>
-    public async Task TrackMessageFlowAsync(
+    public Task TrackMessageFlowAsync(
         string messageId,
         string stage,
         string adapterName,
@@ -50,6 +50,7 @@ public class MessageTrackingService
         _logger?.LogInformation(
             "[MessageTracking] MessageId={MessageId}, Stage={Stage}, Adapter={Adapter}, ProcessingTime={ProcessingTime}ms, Success={Success}",
             messageId, stage, adapterName, processingTime.TotalMilliseconds, success);
+        return Task.CompletedTask;
     }
 
     /// <summary>

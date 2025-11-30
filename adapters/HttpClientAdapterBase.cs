@@ -4,7 +4,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Services;
-using InterfaceConfigurator.Main.Core.Services;
 
 namespace InterfaceConfigurator.Adapters;
 

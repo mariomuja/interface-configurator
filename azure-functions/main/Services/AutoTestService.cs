@@ -171,6 +171,7 @@ public class AutoTestService
 
     private async Task<TestRunResult> RunIntegrationTestsAsync()
     {
+        await Task.CompletedTask;
         _logger.LogInformation("Running integration tests");
 
         // Integration tests would be run here

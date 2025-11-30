@@ -306,6 +306,7 @@ public class SftpAdapter : AdapterBase
     {
         // This method requires ICsvProcessingService which is not available in IAdapter
         // For now, throw an exception indicating that ReadCsvFilesAsync should be used instead
+        await Task.CompletedTask;
         throw new NotSupportedException("Use ReadFileAsync, ReadAllFilesAsync, or ReadCsvFilesAsync methods instead. ReadAsync requires ICsvProcessingService.");
     }
 
@@ -585,6 +586,7 @@ public class SftpAdapter : AdapterBase
 
     private async Task ReturnSftpClientAsync(SftpClient client)
     {
+        await Task.CompletedTask;
         lock (_connectionPool)
         {
             if (client.IsConnected && _connectionPool.Count < _maxConnectionPoolSize)

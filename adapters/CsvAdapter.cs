@@ -27,14 +27,14 @@ public class CsvAdapter : AdapterBase
     private readonly BlobServiceClient _blobServiceClient;
     private readonly string? _receiveFolder;
     private readonly string _fileMask;
-    private readonly int _batchSize;
+    // Note: _batchSize is inherited from AdapterBase
     private readonly string _fieldSeparator;
     private readonly string? _destinationReceiveFolder;
     private readonly string _destinationFileMask;
     private readonly int _skipHeaderLines;
     private readonly int _skipFooterLines;
     private readonly char _quoteCharacter;
-    private readonly ILogger<CsvAdapter>? _logger;
+    private new readonly ILogger<CsvAdapter>? _logger;
     
     // CSV Data property - can be set directly to trigger debatching
     private string? _csvData;
@@ -223,6 +223,8 @@ public class CsvAdapter : AdapterBase
 
             // Step 1: Read file content
             LogProcessingState("ProcessSingleFile", "ReadingFile", $"Reading content from {filePath}");
+            if (_fileAdapter == null)
+                throw new InvalidOperationException("FileAdapter is not initialized");
             var fileContent = await _fileAdapter.ReadFileAsync(filePath, cancellationToken);
             LogProcessingState("ProcessSingleFile", "FileRead", $"Read {fileContent.Length} characters from {fileName}");
 
@@ -595,6 +597,9 @@ public class CsvAdapter : AdapterBase
                 ? source
                 : _fileAdapter.BuildDefaultBlobSourcePath(_receiveFolder);
             
+            if (string.IsNullOrWhiteSpace(effectiveSource))
+                throw new InvalidOperationException("Source path cannot be null or empty");
+            
             // Auto-detect delimiter from file content for FILE adapter type
             var detectedSeparatorForFile = _fieldSeparator;
             if ((_adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase) || _adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase)) 
@@ -637,6 +642,8 @@ public class CsvAdapter : AdapterBase
                 }
             }
             
+            if (_fileAdapter == null || _csvProcessingService == null)
+                throw new InvalidOperationException("FileAdapter or CsvProcessingService is not initialized");
             var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, detectedSeparatorForFile, effectiveSource, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
             
             // For FILE adapter type: Copy files to csv-incoming folder if reading from a different folder
@@ -809,7 +816,7 @@ public class CsvAdapter : AdapterBase
                             adapterInstanceGuid: _adapterInstanceGuid,
                             sourceName: null,
                             destinationName: destination,
-                            batchSize: _batchSize,
+                            batchSize: base._batchSize,
                             useTransaction: null,
                             cancellationToken);
                     }

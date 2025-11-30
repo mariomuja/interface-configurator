@@ -23,7 +23,7 @@ public class AdaptiveBatchingService
     /// <summary>
     /// Calculate optimal batch size for an interface
     /// </summary>
-    public async Task<int> GetOptimalBatchSizeAsync(
+    public Task<int> GetOptimalBatchSizeAsync(
         string interfaceName,
         int defaultBatchSize = 100,
         int? averageRecordSize = null,
@@ -76,7 +76,7 @@ public class AdaptiveBatchingService
             }
         }
 
-        return metrics.OptimalBatchSize;
+        return Task.FromResult(metrics.OptimalBatchSize);
     }
 
     /// <summary>
