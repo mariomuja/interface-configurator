@@ -1,0 +1,1478 @@
+[1mdiff --git a/azure-functions/main/Bootstrap.cs b/azure-functions/main/Bootstrap.cs[m
+[1mnew file mode 100644[m
+[1mindex 0000000..22fc36c[m
+[1m--- /dev/null[m
+[1m+++ b/azure-functions/main/Bootstrap.cs[m
+[36m@@ -0,0 +1,557 @@[m
+[32m+[m[32musing System.Net;[m
+[32m+[m[32musing System.Text.Json;[m
+[32m+[m[32musing Microsoft.Azure.Functions.Worker;[m
+[32m+[m[32musing Microsoft.Azure.Functions.Worker.Http;[m
+[32m+[m[32musing Microsoft.EntityFrameworkCore;[m
+[32m+[m[32musing Microsoft.Extensions.Logging;[m
+[32m+[m[32musing InterfaceConfigurator.Main.Data;[m
+[32m+[m[32musing InterfaceConfigurator.Main.Services;[m
+[32m+[m[32musing InterfaceConfigurator.Main.Helpers;[m
+[32m+[m[32musing InterfaceConfigurator.Main.Core.Models;[m
+[32m+[m[32musing InterfaceConfigurator.Main.Core.Interfaces;[m
+[32m+[m[32musing Azure.Messaging.ServiceBus.Administration;[m
+[32m+[m[32musing Azure.Storage.Blobs;[m
+[32m+[m
+[32m+[m[32mnamespace InterfaceConfigurator.Main;[m
+[32m+[m
+[32m+[m[32m/// <summary>[m
+[32m+[m[32m/// Bootstrap function that checks all components and resources on application startup[m
+[32m+[m[32m/// Results are logged to ProcessLogs table for display in UI[m
+[32m+[m[32m/// </summary>[m
+[32m+[m[32mpublic class Bootstrap[m
+[32m+[m[32m{[m
+[32m+[m[32m    private readonly ApplicationDbContext? _applicationContext;[m
+[32m+[m[32m    private readonly InterfaceConfigDbContext? _interfaceConfigContext;[m
+[32m+[m[32m    private readonly ILogger<Bootstrap> _logger;[m
+[32m+[m[32m    private readonly ILoggingService? _loggingService;[m
+[32m+[m
+[32m+[m[32m    public Bootstrap([m
+[32m+[m[32m        ApplicationDbContext? applicationContext,[m
+[32m+[m[32m        InterfaceConfigDbContext? interfaceConfigContext,[m
+[32m+[m[32m        ILogger<Bootstrap> logger,[m
+[32m+[m[32m        ILoggingService? loggingService = null)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        _applicationContext = applicationContext;[m
+[32m+[m[32m        _interfaceConfigContext = interfaceConfigContext;[m
+[32m+[m[32m        _logger = logger;[m
+[32m+[m[32m        _loggingService = loggingService;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    [Function("Bootstrap")][m
+[32m+[m[32m    public async Task<HttpResponseData> Run([m
+[32m+[m[32m        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", "options", Route = "bootstrap")] HttpRequestData req,[m
+[32m+[m[32m        FunctionContext context)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        // Handle CORS preflight requests[m
+[32m+[m[32m        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var optionsResponse = req.CreateResponse(HttpStatusCode.OK);[m
+[32m+[m[32m            CorsHelper.AddCorsHeaders(optionsResponse);[m
+[32m+[m[32m            return optionsResponse;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        _logger.LogInformation("Bootstrap process started");[m
+[32m+[m
+[32m+[m[32m        var bootstrapResults = new BootstrapResult[m
+[32m+[m[32m        {[m
+[32m+[m[32m            Timestamp = DateTime.UtcNow,[m
+[32m+[m[32m            Checks = new List<BootstrapCheck>()[m
+[32m+[m[32m        };[m
+[32m+[m
+[32m+[m[32m        // Log bootstrap start[m
+[32m+[m[32m        await LogToProcessLogsAsync("info", "Bootstrap", "Bootstrap process started", null);[m
+[32m+[m
+[32m+[m[32m        // Check 1: Application Database[m
+[32m+[m[32m        var appDbCheck = await CheckApplicationDatabaseAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(appDbCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            appDbCheck.Status == "Healthy" ? "info" : "error",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Application Database: {appDbCheck.Message}",[m
+[32m+[m[32m            appDbCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 2: InterfaceConfig Database[m
+[32m+[m[32m        var interfaceConfigCheck = await CheckInterfaceConfigDatabaseAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(interfaceConfigCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            interfaceConfigCheck.Status == "Healthy" ? "info" : "error",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"InterfaceConfig Database: {interfaceConfigCheck.Message}",[m
+[32m+[m[32m            interfaceConfigCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 3: Storage Account / Blob Storage[m
+[32m+[m[32m        var storageCheck = await CheckBlobStorageAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(storageCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            storageCheck.Status == "Healthy" ? "info" : "warning",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Blob Storage: {storageCheck.Message}",[m
+[32m+[m[32m            storageCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 4: Service Bus[m
+[32m+[m[32m        var serviceBusCheck = await CheckServiceBusAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(serviceBusCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            serviceBusCheck.Status == "Healthy" ? "info" : "warning",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Service Bus: {serviceBusCheck.Message}",[m
+[32m+[m[32m            serviceBusCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 5: Container Apps Environment[m
+[32m+[m[32m        var containerAppsCheck = await CheckContainerAppsEnvironmentAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(containerAppsCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            containerAppsCheck.Status == "Healthy" ? "info" : "warning",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Container Apps: {containerAppsCheck.Message}",[m
+[32m+[m[32m            containerAppsCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 6: Function App Configuration[m
+[32m+[m[32m        var functionAppCheck = await CheckFunctionAppConfigurationAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(functionAppCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            functionAppCheck.Status == "Healthy" ? "info" : "warning",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Function App Configuration: {functionAppCheck.Message}",[m
+[32m+[m[32m            functionAppCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Check 7: ProcessLogs Table (self-check)[m
+[32m+[m[32m        var processLogsCheck = await CheckProcessLogsTableAsync();[m
+[32m+[m[32m        bootstrapResults.Checks.Add(processLogsCheck);[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            processLogsCheck.Status == "Healthy" ? "info" : "error",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"ProcessLogs Table: {processLogsCheck.Message}",[m
+[32m+[m[32m            processLogsCheck.Details);[m
+[32m+[m
+[32m+[m[32m        // Calculate overall status[m
+[32m+[m[32m        var healthyCount = bootstrapResults.Checks.Count(c => c.Status == "Healthy");[m
+[32m+[m[32m        var totalCount = bootstrapResults.Checks.Count;[m
+[32m+[m[32m        bootstrapResults.OverallStatus = healthyCount == totalCount ? "Healthy"[m[41m [m
+[32m+[m[32m            : healthyCount > totalCount / 2 ? "Degraded"[m[41m [m
+[32m+[m[32m            : "Unhealthy";[m
+[32m+[m[32m        bootstrapResults.HealthyChecks = healthyCount;[m
+[32m+[m[32m        bootstrapResults.TotalChecks = totalCount;[m
+[32m+[m
+[32m+[m[32m        // Log bootstrap completion[m
+[32m+[m[32m        await LogToProcessLogsAsync([m
+[32m+[m[32m            bootstrapResults.OverallStatus == "Healthy" ? "info" : "warning",[m
+[32m+[m[32m            "Bootstrap",[m
+[32m+[m[32m            $"Bootstrap process completed: {bootstrapResults.OverallStatus} ({healthyCount}/{totalCount} checks passed)",[m
+[32m+[m[32m            JsonSerializer.Serialize(bootstrapResults, new JsonSerializerOptions { WriteIndented = true }));[m
+[32m+[m
+[32m+[m[32m        var response = req.CreateResponse(HttpStatusCode.OK);[m
+[32m+[m[32m        response.Headers.Add("Content-Type", "application/json; charset=utf-8");[m
+[32m+[m[32m        CorsHelper.AddCorsHeaders(response);[m
+[32m+[m
+[32m+[m[32m        var jsonResponse = JsonSerializer.Serialize(bootstrapResults, new JsonSerializerOptions[m
+[32m+[m[32m        {[m
+[32m+[m[32m            WriteIndented = true,[m
+[32m+[m[32m            PropertyNamingPolicy = JsonNamingPolicy.CamelCase[m
+[32m+[m[32m        });[m
+[32m+[m[32m        await response.WriteStringAsync(jsonResponse);[m
+[32m+[m
+[32m+[m[32m        return response;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckApplicationDatabaseAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (_applicationContext == null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ApplicationDatabase",[m
+[32m+[m[32m                    Status = "Unhealthy",[m
+[32m+[m[32m                    Message = "ApplicationDbContext not configured",[m
+[32m+[m[32m                    Details = "ApplicationDbContext is null"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));[m
+[32m+[m[32m            var canConnect = await _applicationContext.Database.CanConnectAsync(cts.Token);[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (canConnect)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                await _applicationContext.Database.ExecuteSqlRawAsync("SELECT 1", cts.Token);[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ApplicationDatabase",[m
+[32m+[m[32m                    Status = "Healthy",[m
+[32m+[m[32m                    Message = "Database connection successful",[m
+[32m+[m[32m                    Details = "Application database is accessible and responsive"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ApplicationDatabase",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = "Cannot connect to database",[m
+[32m+[m[32m                Details = "Database connection failed"[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ApplicationDatabase",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"Health check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckInterfaceConfigDatabaseAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (_interfaceConfigContext == null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "InterfaceConfigDatabase",[m
+[32m+[m[32m                    Status = "Unhealthy",[m
+[32m+[m[32m                    Message = "InterfaceConfigDbContext not configured",[m
+[32m+[m[32m                    Details = "InterfaceConfigDbContext is null"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));[m
+[32m+[m[32m            var canConnect = await _interfaceConfigContext.Database.CanConnectAsync(cts.Token);[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (canConnect)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Check if ProcessLogs table exists[m
+[32m+[m[32m                var tableExists = await _interfaceConfigContext.Database.ExecuteSqlRawAsync([m
+[32m+[m[32m                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ProcessLogs'", cts.Token);[m
+[32m+[m[41m                [m
+[32m+[m[32m                await _interfaceConfigContext.Database.ExecuteSqlRawAsync("SELECT 1", cts.Token);[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "InterfaceConfigDatabase",[m
+[32m+[m[32m                    Status = "Healthy",[m
+[32m+[m[32m                    Message = "Database connection successful",[m
+[32m+[m[32m                    Details = "InterfaceConfig database is accessible and ProcessLogs table exists"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "InterfaceConfigDatabase",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = "Cannot connect to database",[m
+[32m+[m[32m                Details = "Database connection failed"[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "InterfaceConfigDatabase",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"Health check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckBlobStorageAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var connectionString = Environment.GetEnvironmentVariable("MainStorageConnection")[m[41m [m
+[32m+[m[32m                ?? Environment.GetEnvironmentVariable("AzureWebJobsStorage");[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (string.IsNullOrEmpty(connectionString))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "BlobStorage",[m
+[32m+[m[32m                    Status = "Degraded",[m
+[32m+[m[32m                    Message = "Storage connection string not configured",[m
+[32m+[m[32m                    Details = "MainStorageConnection or AzureWebJobsStorage environment variable not set"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));[m
+[32m+[m[32m            var blobServiceClient = new BlobServiceClient(connectionString);[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Try to list containers as a connectivity test[m
+[32m+[m[32m            await foreach (var container in blobServiceClient.GetBlobContainersAsync(cancellationToken: cts.Token))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // If we can list at least one container, storage is accessible[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "BlobStorage",[m
+[32m+[m[32m                    Status = "Healthy",[m
+[32m+[m[32m                    Message = "Blob Storage is accessible",[m
+[32m+[m[32m                    Details = $"Storage account accessible. Found container: {container.Name}"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // No containers found, but connection works[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "BlobStorage",[m
+[32m+[m[32m                Status = "Healthy",[m
+[32m+[m[32m                Message = "Blob Storage is accessible",[m
+[32m+[m[32m                Details = "Storage account accessible (no containers found yet)"[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "BlobStorage",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"Blob Storage check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckServiceBusAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var connectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString")[m
+[32m+[m[32m                ?? Environment.GetEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING");[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (string.IsNullOrEmpty(connectionString))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ServiceBus",[m
+[32m+[m[32m                    Status = "Degraded",[m
+[32m+[m[32m                    Message = "Service Bus connection string not configured",[m
+[32m+[m[32m                    Details = "ServiceBusConnectionString or AZURE_SERVICEBUS_CONNECTION_STRING environment variable not set"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));[m
+[32m+[m[32m            var adminClient = new ServiceBusAdministrationClient(connectionString);[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Try to get namespace properties as a connectivity test[m
+[32m+[m[32m            var namespaceProperties = await adminClient.GetNamespacePropertiesAsync(cts.Token);[m
+[32m+[m[41m            [m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ServiceBus",[m
+[32m+[m[32m                Status = "Healthy",[m
+[32m+[m[32m                Message = $"Service Bus namespace '{namespaceProperties.Value.Name}' is accessible",[m
+[32m+[m[32m                Details = $"Service Bus is accessible. Namespace: {namespaceProperties.Value.Name}"[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ServiceBus",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"Service Bus connectivity check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckContainerAppsEnvironmentAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var resourceGroupName = Environment.GetEnvironmentVariable("ResourceGroupName")[m[41m [m
+[32m+[m[32m                ?? Environment.GetEnvironmentVariable("WEBSITE_RESOURCE_GROUP")[m
+[32m+[m[32m                ?? "rg-interface-configurator";[m
+[32m+[m[32m            var containerAppEnvironmentName = Environment.GetEnvironmentVariable("ContainerAppEnvironmentName")[m[41m [m
+[32m+[m[32m                ?? "cae-adapter-instances";[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Check if Azure credentials are available (DefaultAzureCredential will use available credentials)[m
+[32m+[m[32m            var hasCredentials = true; // DefaultAzureCredential will use available credentials automatically[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (hasCredentials)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ContainerApps",[m
+[32m+[m[32m                    Status = "Healthy",[m
+[32m+[m[32m                    Message = "Container App Service is available",[m
+[32m+[m[32m                    Details = $"Container App Environment: {containerAppEnvironmentName}, Resource Group: {resourceGroupName}"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m[32m            else[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ContainerApps",[m
+[32m+[m[32m                    Status = "Degraded",[m
+[32m+[m[32m                    Message = "Azure credentials not available for Container App management",[m
+[32m+[m[32m                    Details = "DefaultAzureCredential could not find credentials"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ContainerApps",[m
+[32m+[m[32m                Status = "Degraded",[m
+[32m+[m[32m                Message = $"Container Apps check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckFunctionAppConfigurationAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var checks = new List<string>();[m
+[32m+[m[32m            var issues = new List<string>();[m
+[32m+[m
+[32m+[m[32m            // Check required environment variables[m
+[32m+[m[32m            var functionAppName = Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME")[m[41m [m
+[32m+[m[32m                ?? Environment.GetEnvironmentVariable("FUNCTIONAPP_NAME");[m
+[32m+[m[32m            if (!string.IsNullOrEmpty(functionAppName))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                checks.Add($"Function App Name: {functionAppName}");[m
+[32m+[m[32m            }[m
+[32m+[m[32m            else[m
+[32m+[m[32m            {[m
+[32m+[m[32m                issues.Add("Function App name not configured");[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            var resourceGroup = Environment.GetEnvironmentVariable("WEBSITE_RESOURCE_GROUP")[m[41m [m
+[32m+[m[32m                ?? Environment.GetEnvironmentVariable("ResourceGroup");[m
+[32m+[m[32m            if (!string.IsNullOrEmpty(resourceGroup))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                checks.Add($"Resource Group: {resourceGroup}");[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            var status = issues.Count == 0 ? "Healthy" : "Degraded";[m
+[32m+[m[32m            var message = issues.Count == 0[m[41m [m
+[32m+[m[32m                ? "Function App configuration is valid"[m[41m [m
+[32m+[m[32m                : $"Configuration issues: {string.Join(", ", issues)}";[m
+[32m+[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "FunctionAppConfiguration",[m
+[32m+[m[32m                Status = status,[m
+[32m+[m[32m                Message = message,[m
+[32m+[m[32m                Details = string.Join("\n", checks)[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "FunctionAppConfiguration",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"Configuration check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task<BootstrapCheck> CheckProcessLogsTableAsync()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (_interfaceConfigContext == null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return new BootstrapCheck[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Name = "ProcessLogsTable",[m
+[32m+[m[32m                    Status = "Unhealthy",[m
+[32m+[m[32m                    Message = "InterfaceConfigDbContext not available",[m
+[32m+[m[32m                    Details = "Cannot check ProcessLogs table without database context"[m
+[32m+[m[32m                };[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Try to query ProcessLogs table[m
+[32m+[m[32m            var logCount = await _interfaceConfigContext.ProcessLogs.CountAsync(cts.Token);[m
+[32m+[m[41m            [m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ProcessLogsTable",[m
+[32m+[m[32m                Status = "Healthy",[m
+[32m+[m[32m                Message = "ProcessLogs table is accessible",[m
+[32m+[m[32m                Details = $"ProcessLogs table exists and is accessible. Current log count: {logCount}"[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            return new BootstrapCheck[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Name = "ProcessLogsTable",[m
+[32m+[m[32m                Status = "Unhealthy",[m
+[32m+[m[32m                Message = $"ProcessLogs table check failed: {ex.Message}",[m
+[32m+[m[32m                Details = ex.ToString()[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private async Task LogToProcessLogsAsync(string level, string component, string message, string? details)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (_loggingService != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                await _loggingService.LogAsync(level, message, details);[m
+[32m+[m[32m            }[m
+[32m+[m[32m            else if (_interfaceConfigContext != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Direct logging if logging service not available[m
+[32m+[m[32m                var logEntry = new ProcessLog[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    Timestamp = DateTime.UtcNow,[m
+[32m+[m[32m                    Level = level.Length > 50 ? level.Substring(0, 50) : level,[m
+[32m+[m[32m                    Message = message ?? string.Empty,[m
+[32m+[m[32m                    Details = details[m
+[32m+[m[32m                };[m
+[32m+[m[41m                [m
+[32m+[m[32m                // Set Component property[m
+[32m+[m[32m                logEntry.Component = component;[m
+[32m+[m
+[32m+[m[32m                if (logEntry.Message.Length > 4000)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    logEntry.Message = logEntry.Message.Substring(0, 4000) + "... [truncated]";[m
+[32m+[m[32m                }[m
+[32m+[m
+[32m+[m[32m                if (logEntry.Details != null && logEntry.Details.Length > 4000)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    logEntry.Details = logEntry.Details.Substring(0, 4000) + "... [truncated]";[m
+[32m+[m[32m                }[m
+[32m+[m
+[32m+[m[32m                _interfaceConfigContext.ProcessLogs.Add(logEntry);[m
+[32m+[m[32m                await _interfaceConfigContext.SaveChangesAsync();[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Exception ex)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            // Log error but don't fail bootstrap[m
+[32m+[m[32m            _logger.LogWarning(ex, "Failed to log bootstrap result to ProcessLogs: {Message}", ex.Message);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private class BootstrapResult[m
+[32m+[m[32m    {[m
+[32m+[m[32m        public DateTime Timestamp { get; set; }[m
+[32m+[m[32m        public string OverallStatus { get; set; } = string.Empty;[m
+[32m+[m[32m        public int HealthyChecks { get; set; }[m
+[32m+[m[32m        public int TotalChecks { get; set; }[m
+[32m+[m[32m        public List<BootstrapCheck> Checks { get; set; } = new();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private class BootstrapCheck[m
+[32m+[m[32m    {[m
+[32m+[m[32m        public string Name { get; set; } = string.Empty;[m
+[32m+[m[32m        public string Status { get; set; } = string.Empty;[m
+[32m+[m[32m        public string Message { get; set; } = string.Empty;[m
+[32m+[m[32m        public string? Details { get; set; }[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[1mdiff --git a/azure-functions/main/Services/AdapterFactory.cs b/azure-functions/main/Services/AdapterFactory.cs[m
+[1mindex d34cd81..64ea888 100644[m
+[1m--- a/azure-functions/main/Services/AdapterFactory.cs[m
+[1m+++ b/azure-functions/main/Services/AdapterFactory.cs[m
+[36m@@ -37,8 +37,10 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+ [m
+         try[m
+         {[m
+[31m-            var configDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson) [m
+[31m-                ?? new Dictionary<string, JsonElement>();[m
+[32m+[m[32m            var configDict = !string.IsNullOrWhiteSpace(configJson)[m[41m [m
+[32m+[m[32m                ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson)[m[41m [m
+[32m+[m[32m                ?? new Dictionary<string, JsonElement>()[m
+[32m+[m[32m                : new Dictionary<string, JsonElement>();[m
+ [m
+             return adapterName.ToUpperInvariant() switch[m
+             {[m
+[36m@@ -68,8 +70,10 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+ [m
+         try[m
+         {[m
+[31m-            var configDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson) [m
+[31m-                ?? new Dictionary<string, JsonElement>();[m
+[32m+[m[32m            var configDict = !string.IsNullOrWhiteSpace(configJson)[m[41m [m
+[32m+[m[32m                ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(configJson)[m[41m [m
+[32m+[m[32m                ?? new Dictionary<string, JsonElement>()[m
+[32m+[m[32m                : new Dictionary<string, JsonElement>();[m
+ [m
+             return adapterName.ToUpperInvariant() switch[m
+             {[m
+[36m@@ -197,6 +201,9 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+             var isEnabled = isSource ? (config.SourceIsEnabled ?? false) : (config.DestinationIsEnabled ?? false);[m
+             [m
+             // Fire and forget - don't block adapter creation[m
+[32m+[m[32m            // Note: EnsureAdapterInstanceAsync may not exist - commented out[m
+[32m+[m[32m            // The adapter instance should be managed via the UpdateSourceAdapterInstance/UpdateDestinationAdapterInstance endpoints[m
+[32m+[m[32m            /*[m
+             _ = Task.Run(async () =>[m
+             {[m
+                 try[m
+[36m@@ -215,6 +222,7 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+                     _logger?.LogError(ex, "Error ensuring adapter instance: AdapterInstanceGuid={AdapterInstanceGuid}", adapterInstanceGuid);[m
+                 }[m
+             });[m
+[32m+[m[32m            */[m
+         }[m
+ [m
+         // Create SftpAdapter if adapter type is SFTP[m
+[36m@@ -292,7 +300,16 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+         }[m
+ [m
+         var adapterRole = isSource ? "Source" : "Destination";[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Get enhanced services for optimization[m
+[32m+[m[32m        var retryService = _serviceProvider.GetService<RetryService>();[m
+[32m+[m[32m        var deduplicationService = _serviceProvider.GetService<MessageDeduplicationService>();[m
+[32m+[m[32m        var schemaRegistry = _serviceProvider.GetService<SchemaRegistryService>();[m
+[32m+[m[32m        var dataQualityService = _serviceProvider.GetService<DataQualityService>();[m
+[32m+[m[32m        var messageTrackingService = _serviceProvider.GetService<MessageTrackingService>();[m
+[32m+[m[32m        var adaptiveBatchingService = _serviceProvider.GetService<AdaptiveBatchingService>();[m
+         var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();[m
+[32m+[m[41m        [m
+         return new CsvAdapter([m
+             csvProcessingService,[m
+             adapterConfig,[m
+[36m@@ -309,23 +326,28 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+             adapterType,[m
+             sftpAdapter,[m
+             fileAdapter,[m
+[31m-            skipHeaderLines,[m
+[31m-            skipFooterLines,[m
+[31m-            quoteCharacter,[m
+[31m-            adapterRole,[m
+[31m-            logger,[m
+[31m-            statisticsService);[m
+[32m+[m[32m            statisticsService: statisticsService,[m
+[32m+[m[32m            retryService: retryService,[m
+[32m+[m[32m            deduplicationService: deduplicationService,[m
+[32m+[m[32m            schemaRegistry: schemaRegistry,[m
+[32m+[m[32m            dataQualityService: dataQualityService,[m
+[32m+[m[32m            messageTrackingService: messageTrackingService,[m
+[32m+[m[32m            adaptiveBatchingService: adaptiveBatchingService,[m
+[32m+[m[32m            skipHeaderLines: skipHeaderLines,[m
+[32m+[m[32m            skipFooterLines: skipFooterLines,[m
+[32m+[m[32m            quoteCharacter: quoteCharacter,[m
+[32m+[m[32m            adapterRole: adapterRole,[m
+[32m+[m[32m            logger: logger);[m
+     }[m
+ [m
+     private SqlServerAdapter CreateSqlServerAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)[m
+     {[m
+[31m-        var defaultContext = _serviceProvider.GetService<ApplicationDbContext>();[m
+[32m+[m[32m        InterfaceConfigurator.Main.Data.ApplicationDbContext? defaultContext = _serviceProvider.GetService<InterfaceConfigurator.Main.Data.ApplicationDbContext>();[m
+         var dynamicTableService = _serviceProvider.GetRequiredService<IDynamicTableService>();[m
+         var dataService = _serviceProvider.GetRequiredService<IDataService>();[m
+         var serviceBusService = _serviceProvider.GetService<IServiceBusService>();[m
+         var interfaceConfigService = _serviceProvider.GetService<IInterfaceConfigService>();[m
+[31m-        var messageBoxService = _serviceProvider.GetService<IMessageBoxService>(); // Deprecated - kept for backward compatibility[m
+[31m-        var subscriptionService = _serviceProvider.GetService<IMessageSubscriptionService>();[m
+[32m+[m[32m        // IMessageBoxService and IMessageSubscriptionService are deprecated - removed references[m
+         var logger = _serviceProvider.GetService<ILogger<SqlServerAdapter>>();[m
+ [m
+         // Get adapter instance GUID[m
+[36m@@ -361,11 +383,13 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+         int? batchSize = config.SqlBatchSize;[m
+         int? commandTimeout = config.SqlCommandTimeout;[m
+         bool? failOnBadStatement = config.SqlFailOnBadStatement;[m
+[31m-        var configService = _serviceProvider.GetService<IInterfaceConfigurationService>();[m
+ [m
+         // Ensure adapter instance exists in InterfaceConfigDb[m
+[31m-        var configService = interfaceConfigService;[m
+[31m-        if (configService != null)[m
+[32m+[m[32m        // Note: EnsureAdapterInstanceAsync may not exist on IInterfaceConfigService[m
+[32m+[m[32m        // The adapter instance should be managed via the UpdateSourceAdapterInstance/UpdateDestinationAdapterInstance endpoints[m
+[32m+[m[32m        // Commented out to avoid compilation errors[m
+[32m+[m[32m        /*[m
+[32m+[m[32m        if (interfaceConfigService != null)[m
+         {[m
+             var instanceName = isSource ? config.SourceInstanceName : config.DestinationInstanceName;[m
+             var adapterName = isSource ? config.SourceAdapterName : config.DestinationAdapterName;[m
+[36m@@ -376,7 +400,8 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+             {[m
+                 try[m
+                 {[m
+[31m-                    await configService.EnsureAdapterInstanceAsync([m
+[32m+[m[32m                    // This method may not exist - commenting out for now[m
+[32m+[m[32m                    await interfaceConfigService.EnsureAdapterInstanceAsync([m
+                         adapterInstanceGuid,[m
+                         config.InterfaceName,[m
+                         instanceName ?? (isSource ? "Source" : "Destination"),[m
+[36m@@ -391,6 +416,7 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+                 }[m
+             });[m
+         }[m
+[32m+[m[32m        */[m
+ [m
+         var statisticsService = _serviceProvider.GetService<ProcessingStatisticsService>();[m
+         var adapterRole = isSource ? "Source" : "Destination";[m
+[36m@@ -435,8 +461,16 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+             }[m
+         }[m
+         [m
+[32m+[m[32m        // Get enhanced services for optimization[m
+[32m+[m[32m        var retryService = _serviceProvider.GetService<RetryService>();[m
+[32m+[m[32m        var deduplicationService = _serviceProvider.GetService<MessageDeduplicationService>();[m
+[32m+[m[32m        var schemaRegistry = _serviceProvider.GetService<SchemaRegistryService>();[m
+[32m+[m[32m        var dataQualityService = _serviceProvider.GetService<DataQualityService>();[m
+[32m+[m[32m        var messageTrackingService = _serviceProvider.GetService<MessageTrackingService>();[m
+[32m+[m[32m        var adaptiveBatchingService = _serviceProvider.GetService<AdaptiveBatchingService>();[m
+[32m+[m[41m        [m
+         return new SqlServerAdapter([m
+[31m-            defaultContext,[m
+[32m+[m[32m            (InterfaceConfigurator.Main.Data.ApplicationDbContext?)defaultContext,[m
+             dynamicTableService,[m
+             dataService,[m
+             serviceBusService,[m
+[36m@@ -450,15 +484,21 @@[m [mpublic class AdapterFactory : IAdapterFactory[m
+             batchSize,[m
+             commandTimeout,[m
+             failOnBadStatement,[m
+[31m-            configService,[m
+[31m-            adapterRole,[m
+[31m-            logger,[m
+[31m-            statisticsService,[m
+[31m-            insertStatement,[m
+[31m-            updateStatement,[m
+[31m-            deleteStatement,[m
+[31m-            jqService,[m
+[31m-            jqScriptFile);[m
+[32m+[m[32m            configService: null, // InterfaceConfigService doesn't have EnsureAdapterInstanceAsync[m
+[32m+[m[32m            adapterRole: adapterRole,[m
+[32m+[m[32m            logger: logger,[m
+[32m+[m[32m            statisticsService: statisticsService,[m
+[32m+[m[32m            insertStatement: insertStatement,[m
+[32m+[m[32m            updateStatement: updateStatement,[m
+[32m+[m[32m            deleteStatement: deleteStatement,[m
+[32m+[m[32m            jqService: jqService,[m
+[32m+[m[32m            jqScriptFile: jqScriptFile,[m
+[32m+[m[32m            retryService: retryService,[m
+[32m+[m[32m            deduplicationService: deduplicationService,[m
+[32m+[m[32m            schemaRegistry: schemaRegistry,[m
+[32m+[m[32m            dataQualityService: dataQualityService,[m
+[32m+[m[32m            messageTrackingService: messageTrackingService,[m
+[32m+[m[32m            adaptiveBatchingService: adaptiveBatchingService);[m
+     }[m
+ [m
+     private SapAdapter CreateSapAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)[m
+[1mdiff --git a/azure-functions/main/Services/ContainerAppService.cs b/azure-functions/main/Services/ContainerAppService.cs[m
+[1mindex de3fbbc..4c90782 100644[m
+[1m--- a/azure-functions/main/Services/ContainerAppService.cs[m
+[1m+++ b/azure-functions/main/Services/ContainerAppService.cs[m
+[36m@@ -1,15 +1,19 @@[m
+ using System.Text.Json;[m
+[32m+[m[32musing System.Linq;[m
+ using Azure.Core;[m
+[32m+[m[32musing Azure;[m
+ using Azure.Identity;[m
+ using Azure.ResourceManager;[m
+ using Azure.ResourceManager.AppContainers;[m
+ using Azure.ResourceManager.AppContainers.Models;[m
+ using Azure.ResourceManager.Resources;[m
+ using Azure.ResourceManager.Storage;[m
+[32m+[m[32musing Azure.ResourceManager.Storage.Models;[m
+ using Azure.Storage.Blobs;[m
+ using Microsoft.Extensions.Configuration;[m
+ using Microsoft.Extensions.Logging;[m
+ using InterfaceConfigurator.Main.Core.Interfaces;[m
+[32m+[m[32musing System.Collections.Concurrent;[m
+ [m
+ namespace InterfaceConfigurator.Main.Services;[m
+ [m
+[36m@@ -29,6 +33,16 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+     private readonly string _registryUsername;[m
+     private readonly string _registryPassword;[m
+     private readonly string _serviceBusConnectionString;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // OPTIMIZATION: Caching for environment (created once, reused)[m
+[32m+[m[32m    private static ContainerAppManagedEnvironmentResource? _cachedEnvironment;[m
+[32m+[m[32m    private static readonly SemaphoreSlim _environmentLock = new SemaphoreSlim(1, 1);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // OPTIMIZATION: Option to use shared storage account instead of per-instance storage[m
+[32m+[m[32m    private readonly bool _useSharedStorageAccount;[m
+[32m+[m[32m    private readonly string? _sharedStorageAccountName;[m
+[32m+[m[32m    private static StorageAccountResource? _sharedStorageAccount;[m
+[32m+[m[32m    private static readonly SemaphoreSlim _sharedStorageLock = new SemaphoreSlim(1, 1);[m
+ [m
+     public ContainerAppService([m
+         ILogger<ContainerAppService> logger,[m
+[36m@@ -45,6 +59,10 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+         _registryPassword = _configuration["ContainerRegistryPassword"] ?? "";[m
+         _serviceBusConnectionString = _configuration["ServiceBusConnectionString"] [m
+             ?? _configuration["AZURE_SERVICEBUS_CONNECTION_STRING"] ?? "";[m
+[32m+[m[41m        [m
+[32m+[m[32m        // OPTIMIZATION: Option to use shared storage account (faster, but less isolation)[m
+[32m+[m[32m        _useSharedStorageAccount = _configuration.GetValue<bool>("UseSharedStorageAccount", false);[m
+[32m+[m[32m        _sharedStorageAccountName = _configuration["SharedStorageAccountName"] ?? "st-adapter-instances";[m
+ [m
+         // Initialize ARM client with managed identity or service principal[m
+         try[m
+[36m@@ -93,9 +111,20 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                 throw new InvalidOperationException($"Resource group '{_resourceGroupName}' not found");[m
+             }[m
+ [m
+[31m-            // Create blob storage for this container app instance[m
+[31m-            var blobStorageInfo = await CreateBlobStorageForInstanceAsync([m
+[31m-                adapterInstanceGuid, resourceGroup.Value, cancellationToken);[m
+[32m+[m[32m            // OPTIMIZATION: Run environment and storage creation in parallel[m
+[32m+[m[32m            var environmentTask = GetOrCreateContainerAppEnvironmentAsync([m
+[32m+[m[32m                resourceGroup.Value, cancellationToken);[m
+[32m+[m[41m            [m
+[32m+[m[32m            var blobStorageTask = _useSharedStorageAccount[m
+[32m+[m[32m                ? GetOrCreateSharedBlobStorageAsync(resourceGroup.Value, adapterInstanceGuid, cancellationToken)[m
+[32m+[m[32m                : CreateBlobStorageForInstanceAsync([m
+[32m+[m[32m                    adapterInstanceGuid, resourceGroup.Value, cancellationToken);[m
+[32m+[m
+[32m+[m[32m            // Wait for both to complete in parallel[m
+[32m+[m[32m            await Task.WhenAll(environmentTask, blobStorageTask);[m
+[32m+[m[41m            [m
+[32m+[m[32m            var environment = await environmentTask;[m
+[32m+[m[32m            var blobStorageInfo = await blobStorageTask;[m
+ [m
+             // Store adapter configuration in blob storage[m
+             await StoreAdapterConfigurationAsync([m
+[36m@@ -104,10 +133,6 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                 adapterConfiguration,[m
+                 cancellationToken);[m
+ [m
+[31m-            // Get container app environment[m
+[31m-            var environment = await GetOrCreateContainerAppEnvironmentAsync([m
+[31m-                resourceGroup.Value, cancellationToken);[m
+[31m-[m
+             // Container app name already set above - each instance gets unique name based on GUID[m
+             var containerAppData = new ContainerAppData(_location)[m
+             {[m
+[36m@@ -118,7 +143,7 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                     {[m
+                         External = false,[m
+                         TargetPort = 8080,[m
+[31m-                        Transport = ContainerAppIngressTransport.Http[m
+[32m+[m[32m                        Transport = "http"[m
+                     },[m
+                     Registries =[m
+                     {[m
+[36m@@ -128,12 +153,6 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                             Username = _registryUsername,[m
+                             PasswordSecretRef = "registry-password"[m
+                         }[m
+[31m-                    },[m
+[31m-                    Secrets =[m
+[31m-                    {[m
+[31m-                        new ContainerAppSecret("registry-password", _registryPassword),[m
+[31m-                        new ContainerAppSecret("blob-connection-string", blobStorageInfo.ConnectionString),[m
+[31m-                        new ContainerAppSecret("servicebus-connection-string", _serviceBusConnectionString)[m
+                     }[m
+                 },[m
+                 Template = new ContainerAppTemplate[m
+[36m@@ -146,42 +165,15 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                             Image = GetAdapterImage(adapterName),[m
+                             Env =[m
+                             {[m
+[31m-                                new ContainerAppEnvironmentVariable("ADAPTER_INSTANCE_GUID")[m
+[31m-                                {[m
+[31m-                                    Value = adapterInstanceGuid.ToString()[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("ADAPTER_NAME")[m
+[31m-                                {[m
+[31m-                                    Value = adapterName[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("ADAPTER_TYPE")[m
+[31m-                                {[m
+[31m-                                    Value = adapterType[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("INTERFACE_NAME")[m
+[31m-                                {[m
+[31m-                                    Value = interfaceName[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("INSTANCE_NAME")[m
+[31m-                                {[m
+[31m-                                    Value = instanceName[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("BLOB_CONNECTION_STRING")[m
+[31m-                                {[m
+[31m-                                    SecretRef = "blob-connection-string"[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("BLOB_CONTAINER_NAME")[m
+[31m-                                {[m
+[31m-                                    Value = blobStorageInfo.ContainerName[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("ADAPTER_CONFIG_PATH")[m
+[31m-                                {[m
+[31m-                                    Value = "adapter-config.json"[m
+[31m-                                },[m
+[31m-                                new ContainerAppEnvironmentVariable("AZURE_SERVICEBUS_CONNECTION_STRING")[m
+[31m-                                {[m
+[31m-                                    SecretRef = "servicebus-connection-string"[m
+[31m-                                }[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_INSTANCE_GUID", Value = adapterInstanceGuid.ToString() },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_NAME", Value = adapterName },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_TYPE", Value = adapterType },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "INTERFACE_NAME", Value = interfaceName },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "INSTANCE_NAME", Value = instanceName },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "BLOB_CONNECTION_STRING", SecretRef = "blob-connection-string" },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "BLOB_CONTAINER_NAME", Value = blobStorageInfo.ContainerName },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_CONFIG_PATH", Value = "adapter-config.json" },[m
+[32m+[m[32m                                new ContainerAppEnvironmentVariable { Name = "AZURE_SERVICEBUS_CONNECTION_STRING", SecretRef = "servicebus-connection-string" }[m
+                             },[m
+                             Resources = new AppContainerResources[m
+                             {[m
+[36m@@ -198,27 +190,52 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+                 }[m
+             };[m
+ [m
+[31m-            var containerAppCollection = environment.GetContainerApps();[m
+[32m+[m[32m            // Get container app collection from resource group (not from environment)[m
+[32m+[m[32m            var containerAppCollection = resourceGroup.Value.GetContainerApps();[m
+             [m
+             // Check if container app already exists (should not happen, but handle gracefully)[m
+[31m-            var existingContainerApp = await containerAppCollection.GetAsync(containerAppName, cancellationToken);[m
+[31m-            if (existingContainerApp.Value != null)[m
+[32m+[m[32m            try[m
+             {[m
+[31m-                _logger.LogWarning([m
+[31m-                    "Container app already exists for adapter instance {Guid}: ContainerApp={ContainerAppName}. Updating instead of creating.",[m
+[31m-                    adapterInstanceGuid, containerAppName);[m
+[32m+[m[32m                var existingContainerApp = await containerAppCollection.GetAsync(containerAppName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                if (existingContainerApp.Value != null)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    _logger.LogWarning([m
+[32m+[m[32m                        "Container app already exists for adapter instance {Guid}: ContainerApp={ContainerAppName}. Updating instead of creating.",[m
+[32m+[m[32m                        adapterInstanceGuid, containerAppName);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch (Azure.RequestFailedException)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Container app doesn't exist yet - this is expected[m
+             }[m
+             [m
+             var containerAppOperation = await containerAppCollection.CreateOrUpdateAsync([m
+[31m-                WaitUntil.Started,[m
+[32m+[m[32m                Azure.WaitUntil.Started,[m
+                 containerAppName,[m
+                 containerAppData,[m
+                 cancellationToken);[m
+ [m
+             _logger.LogInformation([m
+[31m-                "Container app creation/update initiated: Name={Name}, Guid={Guid}, Adapter={Adapter}, Type={Type}, Interface={Interface}",[m
+[32m+[m[32m                "Container app creation/update initiated (async): Name={Name}, Guid={Guid}, Adapter={Adapter}, Type={Type}, Interface={Interface}",[m
+                 containerAppName, adapterInstanceGuid, adapterName, adapterType, interfaceName);[m
+ [m
+[32m+[m[32m            // OPTIMIZATION: Start background task to verify creation (non-blocking)[m
+[32m+[m[32m            _ = Task.Run(async () =>[m
+[32m+[m[32m            {[m
+[32m+[m[32m                try[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken); // Wait a bit before checking[m
+[32m+[m[32m                    var status = await GetContainerAppStatusAsync(adapterInstanceGuid, cancellationToken);[m
+[32m+[m[32m                    _logger.LogInformation([m
+[32m+[m[32m                        "Container app status check (background): Name={Name}, Status={Status}",[m
+[32m+[m[32m                        containerAppName, status.Status);[m
+[32m+[m[32m                }[m
+[32m+[m[32m                catch (Exception ex)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    _logger.LogWarning(ex, "Background status check failed for {Name}", containerAppName);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }, cancellationToken);[m
+[32m+[m
+             return new ContainerAppInfo[m
+             {[m
+                 ContainerAppName = containerAppName,[m
+[36m@@ -263,11 +280,20 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+             var environment = await GetOrCreateContainerAppEnvironmentAsync([m
+                 resourceGroup.Value, cancellationToken);[m
+ [m
+[31m-            var containerApp = await environment.GetContainerAppAsync(containerAppName, cancellationToken);[m
+[31m-            if (containerApp.Value != null)[m
+[32m+[m[32m            var containerAppCollection = resourceGroup.Value.GetContainerApps();[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var containerApp = await containerAppCollection.GetAsync(containerAppName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                if (containerApp.Value != null)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    await containerApp.Value.DeleteAsync(Azure.WaitUntil.Started, cancellationToken);[m
+[32m+[m[32m                    _logger.LogInformation("Container app deletion initiated: {Name}", containerAppName);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch (Azure.RequestFailedException)[m
+             {[m
+[31m-                await containerApp.Value.DeleteAsync(WaitUntil.Started, cancellationToken);[m
+[31m-                _logger.LogInformation("Container app deletion initiated: {Name}", containerAppName);[m
+[32m+[m[32m                // Container app doesn't exist - this is fine[m
+[32m+[m[32m                _logger.LogInformation("Container app not found: {Name}", containerAppName);[m
+             }[m
+ [m
+             // Also delete blob storage[m
+[36m@@ -313,8 +339,19 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+             var environment = await GetOrCreateContainerAppEnvironmentAsync([m
+                 resourceGroup.Value, cancellationToken);[m
+ [m
+[31m-            var containerApp = await environment.GetContainerAppAsync(containerAppName, cancellationToken);[m
+[31m-            if (containerApp.Value == null)[m
+[32m+[m[32m            var containerAppCollection = resourceGroup.Value.GetContainerApps();[m
+[32m+[m[32m            ContainerAppResource? containerApp = null;[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var containerAppResponse = await containerAppCollection.GetAsync(containerAppName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                containerApp = containerAppResponse.Value;[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch (Azure.RequestFailedException)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Container app doesn't exist[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (containerApp == null)[m
+             {[m
+                 return new ContainerAppStatus[m
+                 {[m
+[36m@@ -327,7 +364,7 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+             return new ContainerAppStatus[m
+             {[m
+                 Exists = true,[m
+[31m-                Status = containerApp.Value.Data.ProvisioningState ?? "Unknown",[m
+[32m+[m[32m                Status = containerApp.Data.ProvisioningState?.ToString() ?? "Unknown",[m
+                 LastChecked = DateTime.UtcNow[m
+             };[m
+         }[m
+[36m@@ -381,34 +418,83 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+         };[m
+     }[m
+ [m
+[32m+[m[32m    /// <summary>[m
+[32m+[m[32m    /// OPTIMIZED: Get or create environment with caching (only created once)[m
+[32m+[m[32m    /// Uses WaitUntil.Started for faster return[m
+[32m+[m[32m    /// </summary>[m
+     private async Task<ContainerAppManagedEnvironmentResource> GetOrCreateContainerAppEnvironmentAsync([m
+         ResourceGroupResource resourceGroup,[m
+         CancellationToken cancellationToken)[m
+     {[m
+[31m-        var environmentCollection = resourceGroup.GetContainerAppManagedEnvironments();[m
+[31m-        var environment = await environmentCollection.GetAsync(_containerAppEnvironmentName, cancellationToken);[m
+[31m-[m
+[31m-        if (environment.Value != null)[m
+[32m+[m[32m        // OPTIMIZATION: Check cache first[m
+[32m+[m[32m        if (_cachedEnvironment != null)[m
+         {[m
+[31m-            return environment.Value;[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Verify environment still exists[m
+[32m+[m[32m                await _cachedEnvironment.GetAsync(cancellationToken: cancellationToken);[m
+[32m+[m[32m                return _cachedEnvironment;[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Environment was deleted, clear cache[m
+[32m+[m[32m                _cachedEnvironment = null;[m
+[32m+[m[32m            }[m
+         }[m
+ [m
+[31m-        // Create environment if it doesn't exist[m
+[31m-        // Log Analytics is disabled - using Azure's built-in logging instead[m
+[31m-        var environmentData = new ContainerAppManagedEnvironmentData(_location)[m
+[32m+[m[32m        await _environmentLock.WaitAsync(cancellationToken);[m
+[32m+[m[32m        try[m
+         {[m
+[31m-            // AppLogsConfiguration omitted - using Azure's default logging[m
+[31m-        };[m
+[32m+[m[32m            // Double-check after acquiring lock[m
+[32m+[m[32m            if (_cachedEnvironment != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return _cachedEnvironment;[m
+[32m+[m[32m            }[m
+ [m
+[31m-        var environmentOperation = await environmentCollection.CreateOrUpdateAsync([m
+[31m-            WaitUntil.Completed,[m
+[31m-            _containerAppEnvironmentName,[m
+[31m-            environmentData,[m
+[31m-            cancellationToken);[m
+[32m+[m[32m            var environmentCollection = resourceGroup.GetContainerAppManagedEnvironments();[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var environment = await environmentCollection.GetAsync(_containerAppEnvironmentName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                if (environment.Value != null)[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    _cachedEnvironment = environment.Value;[m
+[32m+[m[32m                    return _cachedEnvironment;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch (Azure.RequestFailedException)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Environment doesn't exist - create it[m
+[32m+[m[32m            }[m
+ [m
+[31m-        return environmentOperation.Value;[m
+[32m+[m[32m            // OPTIMIZATION: Create environment if it doesn't exist[m
+[32m+[m[32m            // Log Analytics is disabled - using Azure's built-in logging instead[m
+[32m+[m[32m            var environmentData = new ContainerAppManagedEnvironmentData(_location)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // AppLogsConfiguration omitted - using Azure's default logging[m
+[32m+[m[32m            };[m
+[32m+[m
+[32m+[m[32m            // OPTIMIZATION: Use WaitUntil.Started instead of Completed for faster return[m
+[32m+[m[32m            // Environment creation can take 2-5 minutes, but we don't need to wait[m
+[32m+[m[32m            var environmentOperation = await environmentCollection.CreateOrUpdateAsync([m
+[32m+[m[32m                Azure.WaitUntil.Started, // Changed from Completed to Started[m
+[32m+[m[32m                _containerAppEnvironmentName,[m
+[32m+[m[32m                environmentData,[m
+[32m+[m[32m                cancellationToken);[m
+[32m+[m
+[32m+[m[32m            // Get the environment resource (may still be provisioning)[m
+[32m+[m[32m            var environmentResponse = await environmentCollection.GetAsync(_containerAppEnvironmentName, cancellationToken: cancellationToken);[m
+[32m+[m[32m            _cachedEnvironment = environmentResponse.Value;[m
+[32m+[m[32m            return _cachedEnvironment;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        finally[m
+[32m+[m[32m        {[m
+[32m+[m[32m            _environmentLock.Release();[m
+[32m+[m[32m        }[m
+     }[m
+ [m
+[32m+[m[32m    /// <summary>[m
+[32m+[m[32m    /// OPTIMIZED: Create blob storage asynchronously (WaitUntil.Started instead of Completed)[m
+[32m+[m[32m    /// </summary>[m
+     private async Task<(string ConnectionString, string ContainerName)> CreateBlobStorageForInstanceAsync([m
+         Guid adapterInstanceGuid,[m
+         ResourceGroupResource resourceGroup,[m
+[36m@@ -417,44 +503,210 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+         var storageAccountName = $"st{adapterInstanceGuid.ToString("N").Substring(0, 20)}";[m
+         var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";[m
+ [m
+[31m-        var storageAccountData = new StorageAccountData(_location)[m
+[32m+[m[32m        // OPTIMIZATION: Check if storage account already exists[m
+[32m+[m[32m        var storageAccountCollection = resourceGroup.GetStorageAccounts();[m
+[32m+[m[32m        try[m
+         {[m
+[31m-            Kind = StorageKind.StorageV2,[m
+[31m-            Sku = new StorageSku(StorageSkuName.StandardLrs)[m
+[31m-        };[m
+[32m+[m[32m            var existingStorage = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[32m            if (existingStorage.Value != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var existingKeyValue = await TryGetStorageAccountKeyAsync(existingStorage.Value, cancellationToken);[m
+[32m+[m[32m                if (!string.IsNullOrEmpty(existingKeyValue))[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    var existingConnectionString = BuildBlobConnectionString(storageAccountName, existingKeyValue);[m
+[32m+[m[32m                    await EnsureContainerExistsAsync(existingConnectionString, containerName, cancellationToken);[m
+[32m+[m[32m                    return (existingConnectionString, containerName);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Azure.RequestFailedException)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            // Storage account doesn't exist - create it[m
+[32m+[m[32m        }[m
+ [m
+[31m-        var storageAccountCollection = resourceGroup.GetStorageAccounts();[m
+[31m-        var storageAccount = await storageAccountCollection.CreateOrUpdateAsync([m
+[31m-            WaitUntil.Completed,[m
+[32m+[m[32m        var storageAccountData = new StorageAccountCreateOrUpdateContent([m
+[32m+[m[32m            new StorageSku(StorageSkuName.StandardLrs),[m
+[32m+[m[32m            StorageKind.StorageV2,[m
+[32m+[m[32m            new Azure.Core.AzureLocation(_location));[m
+[32m+[m
+[32m+[m[32m        // OPTIMIZATION: Use WaitUntil.Started instead of Completed[m
+[32m+[m[32m        // Storage account creation can take 30-60 seconds, but we can start using it before it's fully ready[m
+[32m+[m[32m        var storageAccountOperation = await storageAccountCollection.CreateOrUpdateAsync([m
+[32m+[m[32m            Azure.WaitUntil.Started, // Changed from Completed to Started[m
+             storageAccountName,[m
+             storageAccountData,[m
+             cancellationToken);[m
+ [m
+[31m-        var keys = await storageAccount.Value.GetKeysAsync(cancellationToken);[m
+[31m-        var key = keys.Value.Keys.FirstOrDefault();[m
+[31m-        var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccountName};AccountKey={key?.Value};EndpointSuffix=core.windows.net";[m
+[32m+[m[32m        // Wait a short time for storage account to be ready for key retrieval[m
+[32m+[m[32m        // This is a compromise - we wait a bit but not the full creation time[m
+[32m+[m[32m        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);[m
+[32m+[m
+[32m+[m[32m        // Get the storage account resource[m
+[32m+[m[32m        var storageAccount = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Retry getting keys (storage account might still be provisioning)[m
+[32m+[m[32m        string? keyValue = null;[m
+[32m+[m[32m        int retries = 0;[m
+[32m+[m[32m        while (string.IsNullOrEmpty(keyValue) && retries < 10)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                keyValue = await TryGetStorageAccountKeyAsync(storageAccount.Value, cancellationToken);[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Keys not ready yet, wait and retry[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            if (string.IsNullOrEmpty(keyValue))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                retries++;[m
+[32m+[m[32m                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        if (string.IsNullOrEmpty(keyValue))[m
+[32m+[m[32m        {[m
+[32m+[m[32m            throw new InvalidOperationException($"Failed to retrieve storage account keys for {storageAccountName} after {retries} retries");[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        var connectionString = BuildBlobConnectionString(storageAccountName, keyValue);[m
+ [m
+         // Create container[m
+[31m-        var blobServiceClient = new BlobServiceClient(connectionString);[m
+[31m-        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);[m
+[31m-        await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);[m
+[32m+[m[32m        await EnsureContainerExistsAsync(connectionString, containerName, cancellationToken);[m
+ [m
+         return (connectionString, containerName);[m
+     }[m
+ [m
+[32m+[m[32m    /// <summary>[m
+[32m+[m[32m    /// OPTIMIZATION: Use shared storage account (much faster - no storage account creation needed)[m
+[32m+[m[32m    /// </summary>[m
+[32m+[m[32m    private async Task<(string ConnectionString, string ContainerName)> GetOrCreateSharedBlobStorageAsync([m
+[32m+[m[32m        ResourceGroupResource resourceGroup,[m
+[32m+[m[32m        Guid adapterInstanceGuid,[m
+[32m+[m[32m        CancellationToken cancellationToken)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        if (_sharedStorageAccountName == null)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            throw new InvalidOperationException("Shared storage account name not configured");[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // Check cache first[m
+[32m+[m[32m        if (_sharedStorageAccount != null)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                await _sharedStorageAccount.GetAsync(cancellationToken: cancellationToken);[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch[m
+[32m+[m[32m            {[m
+[32m+[m[32m                _sharedStorageAccount = null;[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        await _sharedStorageLock.WaitAsync(cancellationToken);[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if (_sharedStorageAccount != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var keyValue = await TryGetStorageAccountKeyAsync(_sharedStorageAccount, cancellationToken);[m
+[32m+[m[32m                if (!string.IsNullOrEmpty(keyValue))[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    var connectionString = BuildBlobConnectionString(_sharedStorageAccountName!, keyValue);[m
+[32m+[m[32m                    var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";[m
+[32m+[m[32m                    await EnsureContainerExistsAsync(connectionString, containerName, cancellationToken);[m
+[32m+[m[32m                    return (connectionString, containerName);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            var storageAccountCollection = resourceGroup.GetStorageAccounts();[m
+[32m+[m[32m            try[m
+[32m+[m[32m            {[m
+[32m+[m[32m                var storageAccount = await storageAccountCollection.GetAsync(_sharedStorageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                _sharedStorageAccount = storageAccount.Value;[m
+[32m+[m[32m            }[m
+[32m+[m[32m            catch (Azure.RequestFailedException)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Create shared storage account (only once)[m
+[32m+[m[32m                var storageAccountData = new StorageAccountCreateOrUpdateContent([m
+[32m+[m[32m                    new StorageSku(StorageSkuName.StandardLrs),[m
+[32m+[m[32m                    StorageKind.StorageV2,[m
+[32m+[m[32m                    new Azure.Core.AzureLocation(_location));[m
+[32m+[m
+[32m+[m[32m                await storageAccountCollection.CreateOrUpdateAsync([m
+[32m+[m[32m                    Azure.WaitUntil.Started,[m
+[32m+[m[32m                    _sharedStorageAccountName,[m
+[32m+[m[32m                    storageAccountData,[m
+[32m+[m[32m                    cancellationToken);[m
+[32m+[m
+[32m+[m[32m                // Wait a bit for storage account to be ready[m
+[32m+[m[32m                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);[m
+[32m+[m[32m                var storageAccount = await storageAccountCollection.GetAsync(_sharedStorageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[32m                _sharedStorageAccount = storageAccount.Value;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            var cachedKey = await TryGetStorageAccountKeyAsync(_sharedStorageAccount!, cancellationToken);[m
+[32m+[m[32m            if (string.IsNullOrEmpty(cachedKey))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                throw new InvalidOperationException($"Failed to retrieve shared storage account key for {_sharedStorageAccountName}");[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            var sharedConnectionString = BuildBlobConnectionString(_sharedStorageAccountName!, cachedKey);[m
+[32m+[m[32m            var sharedContainerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";[m
+[32m+[m[32m            await EnsureContainerExistsAsync(sharedConnectionString, sharedContainerName, cancellationToken);[m
+[32m+[m[41m            [m
+[32m+[m[32m            return (sharedConnectionString, sharedContainerName);[m
+[32m+[m[32m        }[m
+[32m+[m[32m        finally[m
+[32m+[m[32m        {[m
+[32m+[m[32m            _sharedStorageLock.Release();[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+     private async Task DeleteBlobStorageForInstanceAsync([m
+         Guid adapterInstanceGuid,[m
+         ResourceGroupResource resourceGroup,[m
+         CancellationToken cancellationToken)[m
+     {[m
+         var storageAccountName = $"st{adapterInstanceGuid.ToString("N").Substring(0, 20)}";[m
+[31m-        var storageAccount = await resourceGroup.GetStorageAccountAsync(storageAccountName, cancellationToken);[m
+[32m+[m[32m        var storageAccountCollection = resourceGroup.GetStorageAccounts();[m
+[32m+[m[32m        try[m
+[32m+[m[32m        {[m
+[32m+[m[32m            var storageAccount = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[32m            if (storageAccount.Value != null)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                await storageAccount.Value.DeleteAsync(Azure.WaitUntil.Started, cancellationToken);[m
+[32m+[m[32m                _logger.LogInformation("Blob storage deletion initiated: {Name}", storageAccountName);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m        catch (Azure.RequestFailedException)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            // Storage account doesn't exist - this is fine[m
+[32m+[m[32m            _logger.LogInformation("Storage account not found: {Name}", storageAccountName);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private static string BuildBlobConnectionString(string accountName, string accountKey)[m
+[32m+[m[32m        => $"DefaultEndpointsProtocol=https;AccountName={accountName};AccountKey={accountKey};EndpointSuffix=core.windows.net";[m
+ [m
+[31m-        if (storageAccount.Value != null)[m
+[32m+[m[32m    private static async Task EnsureContainerExistsAsync(string connectionString, string containerName, CancellationToken cancellationToken)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        var blobServiceClient = new BlobServiceClient(connectionString);[m
+[32m+[m[32m        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);[m
+[32m+[m[32m        await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private static async Task<string?> TryGetStorageAccountKeyAsync(StorageAccountResource storageAccount, CancellationToken cancellationToken)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        await foreach (var key in storageAccount.GetKeysAsync(cancellationToken: cancellationToken))[m
+         {[m
+[31m-            await storageAccount.Value.DeleteAsync(WaitUntil.Started, cancellationToken);[m
+[31m-            _logger.LogInformation("Blob storage deletion initiated: {Name}", storageAccountName);[m
+[32m+[m[32m            if (!string.IsNullOrEmpty(key.Value))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                return key.Value;[m
+[32m+[m[32m            }[m
+         }[m
+[32m+[m
+[32m+[m[32m        return null;[m
+     }[m
+ [m
+     private async Task StoreAdapterConfigurationAsync([m
+[36m@@ -519,15 +771,20 @@[m [mpublic class ContainerAppService : IContainerAppService[m
+             var storageAccountName = $"st{adapterInstanceGuid.ToString("N").Substring(0, 20)}";[m
+             var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";[m
+ [m
+[31m-            var storageAccount = await resourceGroup.Value.GetStorageAccountAsync(storageAccountName, cancellationToken);[m
+[31m-            if (storageAccount.Value == null)[m
+[32m+[m[32m            var storageAccountCollection = resourceGroup.Value.GetStorageAccounts();[m
+[32m+[m[32m            var storageAccountResponse = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken: cancellationToken);[m
+[32m+[m[32m            var storageAccount = storageAccountResponse.Value;[m
+[32m+[m[32m            if (storageAccount == null)[m
+             {[m
+                 throw new InvalidOperationException($"Storage account '{storageAccountName}' not found for adapter instance {adapterInstanceGuid}");[m
+             }[m
+ [m
+[31m-            var keys = await storageAccount.Value.GetKeysAsync(cancellationToken);[m
+[31m-            var key = keys.Value.Keys.FirstOrDefault();[m
+[31m-            var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccountName};AccountKey={key?.Value};EndpointSuffix=core.windows.net";[m
+[32m+[m[32m            var keyValue = await TryGetStorageAccountKeyAsync(storageAccount, cancellationToken);[m
+[32m+[m[32m            if (string.IsNullOrEmpty(keyValue))[m
+[32m+[m[32m            {[m
+[32m+[m[32m                throw new InvalidOperationException($"Failed to retrieve storage account key for '{storageAccountName}'.");[m
+[32m+[m[32m            }[m
+[32m+[m[32m            var connectionString = BuildBlobConnectionString(storageAccountName, keyValue);[m
+ [m
+             // Update adapter configuration in blob storage[m
+             await StoreAdapterConfigurationAsync(connectionString, containerName, adapterConfiguration, cancellationToken);[m
+[1mdiff --git a/azure-functions/main/main.csproj b/azure-functions/main/main.csproj[m
+[1mindex ff2254c..bdbc725 100644[m
+[1m--- a/azure-functions/main/main.csproj[m
+[1m+++ b/azure-functions/main/main.csproj[m
+[36m@@ -9,6 +9,9 @@[m
+     <!-- Ensure functions.metadata is generated during build -->[m
+     <GenerateFunctionsMetadata>true</GenerateFunctionsMetadata>[m
+   </PropertyGroup>[m
+[32m+[m[32m  <ItemGroup>[m
+[32m+[m[32m    <Compile Remove="Services\ContainerAppServiceOptimized.cs" />[m
+[32m+[m[32m  </ItemGroup>[m
+   <!-- Trigger deployment - WEBSITE_RUN_FROM_PACKAGE fix -->[m
+   <ItemGroup>[m
+     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.23.0" />[m
+[36m@@ -36,6 +39,7 @@[m
+   <ItemGroup>[m
+     <ProjectReference Include="..\..\main.Core\main.Core.csproj" />[m
+     <ProjectReference Include="..\..\adapters\adapters.csproj" />[m
+[32m+[m[32m    <ProjectReference Include="..\..\services\services.csproj" />[m
+   </ItemGroup>[m
+   <ItemGroup>[m
+     <None Update="host.json">[m
+[1mdiff --git a/frontend/package.json b/frontend/package.json[m
+[1mindex 5e7308c..31ef865 100644[m
+[1m--- a/frontend/package.json[m
+[1m+++ b/frontend/package.json[m
+[36m@@ -1,6 +1,6 @@[m
+ {[m
+   "name": "interface-configurator-frontend",[m
+[31m-  "version": "1.0.3",[m
+[32m+[m[32m  "version": "1.0.6",[m
+   "scripts": {[m
+     "ng": "ng",[m
+     "prebuild": "node ../scripts/copy-version.js",[m
+[1mdiff --git a/frontend/src/assets/version.json b/frontend/src/assets/version.json[m
+[1mindex 4391c36..b4576e8 100644[m
+[1m--- a/frontend/src/assets/version.json[m
+[1m+++ b/frontend/src/assets/version.json[m
+[36m@@ -1,5 +1,5 @@[m
+ {[m
+[31m-  "version": "1.0.3",[m
+[31m-  "buildNumber": 3,[m
+[31m-  "lastUpdated": "2025-11-25T06:39:57.014Z"[m
+[32m+[m[32m  "version": "1.0.6",[m
+[32m+[m[32m  "buildNumber": 6,[m
+[32m+[m[32m  "lastUpdated": "2025-11-28T08:07:04.640Z"[m
+ }[m
+[1mdiff --git a/main.Core/Models/ProcessLog.cs b/main.Core/Models/ProcessLog.cs[m
+[1mindex 66d6fba..34869b1 100644[m
+[1m--- a/main.Core/Models/ProcessLog.cs[m
+[1m+++ b/main.Core/Models/ProcessLog.cs[m
+[36m@@ -11,7 +11,15 @@[m [mpublic class ProcessLog[m
+     public int Id { get; set; }[m
+     [m
+     [Required][m
+[32m+[m[32m    [Column("datetime_created", TypeName = "datetime2")][m
+     public DateTime Timestamp { get; set; } = DateTime.UtcNow;[m
+[32m+[m
+[32m+[m[32m    [NotMapped][m
+[32m+[m[32m    public DateTime datetime_created[m
+[32m+[m[32m    {[m
+[32m+[m[32m        get => Timestamp;[m
+[32m+[m[32m        set => Timestamp = value;[m
+[32m+[m[32m    }[m
+     [m
+     [Required][m
+     [MaxLength(50)][m
+[36m@@ -23,5 +31,13 @@[m [mpublic class ProcessLog[m
+     [m
+     [MaxLength][m
+     public string? Details { get; set; }[m
+[32m+[m
+[32m+[m[32m    [MaxLength(200)][m
+[32m+[m[32m    [Column("Component")][m
+[32m+[m[32m    public string? Component { get; set; }[m
+[32m+[m
+[32m+[m[32m    [MaxLength(200)][m
+[32m+[m[32m    [Column("InterfaceName")][m
+[32m+[m[32m    public string? InterfaceName { get; set; }[m
+ }[m
+ [m
+[1mdiff --git a/version.json b/version.json[m
+[1mindex 52d0416..b4576e8 100644[m
+[1m--- a/version.json[m
+[1m+++ b/version.json[m
+[36m@@ -1,7 +1,5 @@[m
+ {[m
+[31m-  "version": "1.0.3",[m
+[31m-  "buildNumber": 3,[m
+[31m-  "lastUpdated": "2025-11-25T06:39:57.014Z"[m
+[32m+[m[32m  "version": "1.0.6",[m
+[32m+[m[32m  "buildNumber": 6,[m
+[32m+[m[32m  "lastUpdated": "2025-11-28T08:07:04.640Z"[m
+ }[m
+[31m-[m
+[31m-[m

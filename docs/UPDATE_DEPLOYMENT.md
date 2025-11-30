@@ -53,8 +53,8 @@ git push origin main
 Azure Functions will be automatically deployed via GitHub Actions when you push changes to the `main` branch that affect files in `azure-functions/**`.
 
 ### Automatic Deployment (Recommended):
-1. Push changes to GitHub (Step 1)
-2. GitHub Actions workflow will automatically:
+1. Push changes to GitLab (Step 1)
+2. GitLab CI/CD pipeline will automatically:
    - Build the .NET Functions
    - Create deployment package
    - Deploy to Azure Function App
@@ -135,13 +135,13 @@ az functionapp function list `
 
 ## Troubleshooting
 
-### GitHub Actions Not Triggering:
-- Ensure workflow file exists: `.github/workflows/deploy-functions.yml`
+### GitLab CI/CD Pipeline Not Triggering:
+- Ensure `.gitlab-ci.yml` file exists in the root
 - Check that changes are in `azure-functions/**` path
-- Verify GitHub secrets are set: `AZURE_CREDENTIALS`, `AZURE_RESOURCE_GROUP`, `AZURE_FUNCTIONAPP_NAME`
+- Verify GitLab CI/CD variables are set: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_FUNCTION_APP_NAME`
 
 ### Azure Functions Not Deploying:
-- Check GitHub Actions logs
+- Check GitLab CI/CD pipeline logs
 - Verify Function App exists and is running
 - Check `WEBSITE_RUN_FROM_PACKAGE` setting
 
@@ -165,7 +165,7 @@ git add README.md
 git commit -m "Add Interface Configurator"
 git push origin main
 
-# 3. Azure Functions (auto-deploys via GitHub Actions)
+# 3. Azure Functions (auto-deploys via GitLab CI/CD)
 # No action needed - will deploy automatically after Step 1
 
 # 4. Vercel (auto-deploys if connected)

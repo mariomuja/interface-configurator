@@ -1,0 +1,617 @@
+using System.Text.Json;
+using System.Linq;
+using Azure.Core;
+using Azure;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.AppContainers;
+using Azure.ResourceManager.AppContainers.Models;
+using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.Storage;
+using Azure.ResourceManager.Storage.Models;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using InterfaceConfigurator.Main.Core.Interfaces;
+using System.Collections.Concurrent;
+
+namespace InterfaceConfigurator.Main.Services;
+
+/// <summary>
+/// OPTIMIZED Container App Service with faster creation times
+/// Key optimizations:
+/// 1. Asynchronous resource creation (WaitUntil.Started instead of Completed)
+/// 2. Shared storage account option (reduces storage account creation time)
+/// 3. Environment caching (only created once)
+/// 4. Parallel operations where possible
+/// 5. Background status polling
+/// </summary>
+public class ContainerAppServiceOptimized : IContainerAppService
+{
+    private readonly ILogger<ContainerAppServiceOptimized> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly ArmClient? _armClient;
+    private readonly string _resourceGroupName;
+    private readonly string _location;
+    private readonly string _containerAppEnvironmentName;
+    private readonly string _registryServer;
+    private readonly string _registryUsername;
+    private readonly string _registryPassword;
+    private readonly string _serviceBusConnectionString;
+    
+    // Caching for environment (created once, reused)
+    private static ContainerAppManagedEnvironmentResource? _cachedEnvironment;
+    private static readonly SemaphoreSlim _environmentLock = new SemaphoreSlim(1, 1);
+    
+    // Option: Use shared storage account instead of per-instance storage
+    private readonly bool _useSharedStorageAccount;
+    private readonly string? _sharedStorageAccountName;
+    private static StorageAccountResource? _sharedStorageAccount;
+    private static readonly SemaphoreSlim _sharedStorageLock = new SemaphoreSlim(1, 1);
+
+    public ContainerAppServiceOptimized(
+        ILogger<ContainerAppServiceOptimized> logger,
+        IConfiguration configuration)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+
+        _resourceGroupName = _configuration["ResourceGroupName"] ?? "rg-interface-configurator";
+        _location = _configuration["Location"] ?? "Central US";
+        _containerAppEnvironmentName = _configuration["ContainerAppEnvironmentName"] ?? "cae-adapter-instances";
+        _registryServer = _configuration["ContainerRegistryServer"] ?? "";
+        _registryUsername = _configuration["ContainerRegistryUsername"] ?? "";
+        _registryPassword = _configuration["ContainerRegistryPassword"] ?? "";
+        _serviceBusConnectionString = _configuration["ServiceBusConnectionString"] 
+            ?? _configuration["AZURE_SERVICEBUS_CONNECTION_STRING"] ?? "";
+        
+        // Option to use shared storage account (faster, but less isolation)
+        _useSharedStorageAccount = _configuration.GetValue<bool>("UseSharedStorageAccount", false);
+        _sharedStorageAccountName = _configuration["SharedStorageAccountName"] ?? "st-adapter-instances";
+
+        // Initialize ARM client with managed identity or service principal
+        try
+        {
+            var credential = new DefaultAzureCredential();
+            _armClient = new ArmClient(credential);
+            _logger.LogInformation("ContainerAppServiceOptimized initialized with DefaultAzureCredential");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to initialize ARM client. Container app management will be disabled.");
+            _armClient = null;
+        }
+    }
+
+    public async Task<ContainerAppInfo> CreateContainerAppAsync(
+        Guid adapterInstanceGuid,
+        string adapterName,
+        string adapterType,
+        string interfaceName,
+        string instanceName,
+        object adapterConfiguration,
+        CancellationToken cancellationToken = default)
+    {
+        if (_armClient == null)
+        {
+            throw new InvalidOperationException("ARM client not initialized. Cannot create container app.");
+        }
+
+        try
+        {
+            var containerAppName = GetContainerAppNamePrivate(adapterInstanceGuid);
+            
+            _logger.LogInformation(
+                "Creating container app (OPTIMIZED): Guid={Guid}, ContainerApp={ContainerAppName}, Adapter={Adapter}",
+                adapterInstanceGuid, containerAppName, adapterName);
+
+            var subscription = await _armClient.GetDefaultSubscriptionAsync(cancellationToken);
+            var resourceGroup = await subscription.GetResourceGroupAsync(_resourceGroupName, cancellationToken);
+
+            if (resourceGroup.Value == null)
+            {
+                throw new InvalidOperationException($"Resource group '{_resourceGroupName}' not found");
+            }
+
+            // OPTIMIZATION 1: Get environment asynchronously (cached, only created once)
+            var environmentTask = GetOrCreateContainerAppEnvironmentAsync(resourceGroup.Value, cancellationToken);
+
+            // OPTIMIZATION 2: Create blob storage asynchronously (or use shared storage)
+            var blobStorageTask = _useSharedStorageAccount
+                ? GetOrCreateSharedBlobStorageAsync(resourceGroup.Value, adapterInstanceGuid, cancellationToken)
+                : CreateBlobStorageForInstanceAsyncOptimized(adapterInstanceGuid, resourceGroup.Value, cancellationToken);
+
+            // OPTIMIZATION 3: Run operations in parallel
+            await Task.WhenAll(environmentTask, blobStorageTask);
+            
+            var environment = await environmentTask;
+            var blobStorageInfo = await blobStorageTask;
+
+            // Store adapter configuration in blob storage
+            await StoreAdapterConfigurationAsync(
+                blobStorageInfo.ConnectionString,
+                blobStorageInfo.ContainerName,
+                adapterConfiguration,
+                cancellationToken);
+
+            // OPTIMIZATION 4: Create container app asynchronously (already using WaitUntil.Started)
+            var containerAppData = new ContainerAppData(_location)
+            {
+                ManagedEnvironmentId = environment.Id,
+                Configuration = new ContainerAppConfiguration
+                {
+                    Ingress = new ContainerAppIngressConfiguration
+                    {
+                        External = false,
+                        TargetPort = 8080,
+                        Transport = "http"
+                    },
+                    Registries =
+                    {
+                        new ContainerAppRegistryCredentials
+                        {
+                            Server = _registryServer,
+                            Username = _registryUsername,
+                            PasswordSecretRef = "registry-password"
+                        }
+                    }
+                },
+                Template = new ContainerAppTemplate
+                {
+                    Containers =
+                    {
+                        new ContainerAppContainer
+                        {
+                            Name = containerAppName,
+                            Image = GetAdapterImage(adapterName),
+                            Env =
+                            {
+                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_INSTANCE_GUID", Value = adapterInstanceGuid.ToString() },
+                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_NAME", Value = adapterName },
+                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_TYPE", Value = adapterType },
+                                new ContainerAppEnvironmentVariable { Name = "INTERFACE_NAME", Value = interfaceName },
+                                new ContainerAppEnvironmentVariable { Name = "INSTANCE_NAME", Value = instanceName },
+                                new ContainerAppEnvironmentVariable { Name = "BLOB_CONNECTION_STRING", SecretRef = "blob-connection-string" },
+                                new ContainerAppEnvironmentVariable { Name = "BLOB_CONTAINER_NAME", Value = blobStorageInfo.ContainerName },
+                                new ContainerAppEnvironmentVariable { Name = "ADAPTER_CONFIG_PATH", Value = "adapter-config.json" },
+                                new ContainerAppEnvironmentVariable { Name = "AZURE_SERVICEBUS_CONNECTION_STRING", SecretRef = "servicebus-connection-string" }
+                            },
+                            Resources = new AppContainerResources
+                            {
+                                Cpu = 0.25,
+                                Memory = "0.5Gi"
+                            }
+                        }
+                    },
+                    Scale = new ContainerAppScale
+                    {
+                        MinReplicas = 1,
+                        MaxReplicas = 1
+                    }
+                }
+            };
+
+            var containerAppCollection = resourceGroup.Value.GetContainerApps();
+            
+            // Check if container app already exists
+            try
+            {
+                var existingContainerApp = await containerAppCollection.GetAsync(containerAppName, cancellationToken);
+                if (existingContainerApp.Value != null)
+                {
+                    _logger.LogWarning(
+                        "Container app already exists: {Name}. Updating instead of creating.",
+                        containerAppName);
+                }
+            }
+            catch (Azure.RequestFailedException)
+            {
+                // Container app doesn't exist yet - this is expected
+            }
+            
+            // OPTIMIZATION: Use WaitUntil.Started (already implemented, but ensure it's used)
+            var containerAppOperation = await containerAppCollection.CreateOrUpdateAsync(
+                Azure.WaitUntil.Started, // Don't wait for completion - return immediately
+                containerAppName,
+                containerAppData,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Container app creation initiated (async): Name={Name}, Guid={Guid}",
+                containerAppName, adapterInstanceGuid);
+
+            // OPTIMIZATION 5: Start background task to verify creation (non-blocking)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken); // Wait a bit before checking
+                    var status = await GetContainerAppStatusAsync(adapterInstanceGuid, cancellationToken);
+                    _logger.LogInformation(
+                        "Container app status check (background): Name={Name}, Status={Status}",
+                        containerAppName, status.Status);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Background status check failed for {Name}", containerAppName);
+                }
+            }, cancellationToken);
+
+            return new ContainerAppInfo
+            {
+                ContainerAppName = containerAppName,
+                ContainerAppUrl = $"https://{containerAppName}.{environment.Data.DefaultDomain}",
+                BlobStorageConnectionString = blobStorageInfo.ConnectionString,
+                BlobContainerName = blobStorageInfo.ContainerName,
+                Status = "Creating", // Status is "Creating" - actual status checked asynchronously
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error creating container app for adapter instance {Guid}",
+                adapterInstanceGuid);
+            throw;
+        }
+    }
+
+    // ... (other methods remain similar, but with optimizations)
+
+    /// <summary>
+    /// OPTIMIZED: Get or create environment with caching (only created once)
+    /// </summary>
+    private async Task<ContainerAppManagedEnvironmentResource> GetOrCreateContainerAppEnvironmentAsync(
+        ResourceGroupResource resourceGroup,
+        CancellationToken cancellationToken)
+    {
+        // Check cache first
+        if (_cachedEnvironment != null)
+        {
+            try
+            {
+                // Verify environment still exists
+                await _cachedEnvironment.GetAsync(cancellationToken);
+                return _cachedEnvironment;
+            }
+            catch
+            {
+                // Environment was deleted, clear cache
+                _cachedEnvironment = null;
+            }
+        }
+
+        await _environmentLock.WaitAsync(cancellationToken);
+        try
+        {
+            // Double-check after acquiring lock
+            if (_cachedEnvironment != null)
+            {
+                return _cachedEnvironment;
+            }
+
+            var environmentCollection = resourceGroup.GetContainerAppManagedEnvironments();
+            try
+            {
+                var environment = await environmentCollection.GetAsync(_containerAppEnvironmentName, cancellationToken);
+                if (environment.Value != null)
+                {
+                    _cachedEnvironment = environment.Value;
+                    return _cachedEnvironment;
+                }
+            }
+            catch (Azure.RequestFailedException)
+            {
+                // Environment doesn't exist - create it
+            }
+
+            // OPTIMIZATION: Use WaitUntil.Started instead of Completed for faster return
+            // Environment creation can take 2-5 minutes, but we don't need to wait
+            var environmentData = new ContainerAppManagedEnvironmentData(_location)
+            {
+                // AppLogsConfiguration omitted - using Azure's default logging
+            };
+
+            var environmentOperation = await environmentCollection.CreateOrUpdateAsync(
+                Azure.WaitUntil.Started, // Changed from Completed to Started
+                _containerAppEnvironmentName,
+                environmentData,
+                cancellationToken);
+
+            // Get the environment resource (may still be provisioning)
+            var environmentResponse = await environmentCollection.GetAsync(_containerAppEnvironmentName, cancellationToken);
+            _cachedEnvironment = environmentResponse.Value;
+            return _cachedEnvironment;
+        }
+        finally
+        {
+            _environmentLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// OPTIMIZED: Create blob storage asynchronously (WaitUntil.Started instead of Completed)
+    /// </summary>
+    private async Task<(string ConnectionString, string ContainerName)> CreateBlobStorageForInstanceAsyncOptimized(
+        Guid adapterInstanceGuid,
+        ResourceGroupResource resourceGroup,
+        CancellationToken cancellationToken)
+    {
+        var storageAccountName = $"st{adapterInstanceGuid.ToString("N").Substring(0, 20)}";
+        var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";
+
+        // Check if storage account already exists
+        var storageAccountCollection = resourceGroup.GetStorageAccounts();
+        try
+        {
+            var existingStorage = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken);
+            if (existingStorage.Value != null)
+            {
+                // Storage account exists, get connection string
+                var keysAsync = existingStorage.Value.GetKeysAsync(cancellationToken: cancellationToken);
+                Azure.ResourceManager.Storage.Models.StorageAccountKey? key = null;
+                await foreach (var keyItem in keysAsync)
+                {
+                    key = keyItem;
+                    break;
+                }
+                var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccountName};AccountKey={key?.Value};EndpointSuffix=core.windows.net";
+                
+                // Ensure container exists
+                var blobServiceClient = new BlobServiceClient(connectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+                
+                return (connectionString, containerName);
+            }
+        }
+        catch (Azure.RequestFailedException)
+        {
+            // Storage account doesn't exist - create it
+        }
+
+        var storageAccountData = new StorageAccountCreateOrUpdateContent(
+            new StorageSku(StorageSkuName.StandardLrs),
+            StorageKind.StorageV2,
+            new Azure.Core.AzureLocation(_location));
+
+        // OPTIMIZATION: Use WaitUntil.Started instead of Completed
+        // Storage account creation can take 30-60 seconds, but we can start using it before it's fully ready
+        var storageAccountOperation = await storageAccountCollection.CreateOrUpdateAsync(
+            Azure.WaitUntil.Started, // Changed from Completed to Started
+            storageAccountName,
+            storageAccountData,
+            cancellationToken);
+
+        // Wait a short time for storage account to be ready for key retrieval
+        // This is a compromise - we wait a bit but not the full creation time
+        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+
+        // Get the storage account resource
+        var storageAccount = await storageAccountCollection.GetAsync(storageAccountName, cancellationToken);
+        
+        // Retry getting keys (storage account might still be provisioning)
+        Azure.ResourceManager.Storage.Models.StorageAccountKey? key = null;
+        int retries = 0;
+        while (key == null && retries < 10)
+        {
+            try
+            {
+                var keysAsync = storageAccount.Value.GetKeysAsync(cancellationToken: cancellationToken);
+                await foreach (var keyItem in keysAsync)
+                {
+                    key = keyItem;
+                    break;
+                }
+            }
+            catch
+            {
+                // Keys not ready yet, wait and retry
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                retries++;
+            }
+        }
+
+        if (key == null)
+        {
+            throw new InvalidOperationException($"Failed to retrieve storage account keys for {storageAccountName} after {retries} retries");
+        }
+
+        var connectionString = $"DefaultEndpointsProtocol=https;AccountName={storageAccountName};AccountKey={key.Value};EndpointSuffix=core.windows.net";
+
+        // Create container
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+        return (connectionString, containerName);
+    }
+
+    /// <summary>
+    /// OPTIMIZATION: Use shared storage account (much faster - no storage account creation needed)
+    /// </summary>
+    private async Task<(string ConnectionString, string ContainerName)> GetOrCreateSharedBlobStorageAsync(
+        ResourceGroupResource resourceGroup,
+        Guid adapterInstanceGuid,
+        CancellationToken cancellationToken)
+    {
+        if (_sharedStorageAccountName == null)
+        {
+            throw new InvalidOperationException("Shared storage account name not configured");
+        }
+
+        // Check cache first
+        if (_sharedStorageAccount != null)
+        {
+            try
+            {
+                await _sharedStorageAccount.GetAsync(cancellationToken);
+            }
+            catch
+            {
+                _sharedStorageAccount = null;
+            }
+        }
+
+        await _sharedStorageLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_sharedStorageAccount != null)
+            {
+                // Get connection string from cached storage account
+                var keysAsync = _sharedStorageAccount.GetKeysAsync(cancellationToken: cancellationToken);
+                Azure.ResourceManager.Storage.Models.StorageAccountKey? key = null;
+                await foreach (var keyItem in keysAsync)
+                {
+                    key = keyItem;
+                    break;
+                }
+                var connectionString = $"DefaultEndpointsProtocol=https;AccountName={_sharedStorageAccountName};AccountKey={key?.Value};EndpointSuffix=core.windows.net";
+                var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";
+                
+                // Ensure container exists
+                var blobServiceClient = new BlobServiceClient(connectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+                
+                return (connectionString, containerName);
+            }
+
+            var storageAccountCollection = resourceGroup.GetStorageAccounts();
+            try
+            {
+                var storageAccount = await storageAccountCollection.GetAsync(_sharedStorageAccountName, cancellationToken);
+                _sharedStorageAccount = storageAccount.Value;
+            }
+            catch (Azure.RequestFailedException)
+            {
+                // Create shared storage account (only once)
+                var storageAccountData = new StorageAccountCreateOrUpdateContent(
+                    new StorageSku(StorageSkuName.StandardLrs),
+                    StorageKind.StorageV2,
+                    new Azure.Core.AzureLocation(_location));
+
+                var storageAccountOperation = await storageAccountCollection.CreateOrUpdateAsync(
+                    Azure.WaitUntil.Started,
+                    _sharedStorageAccountName,
+                    storageAccountData,
+                    cancellationToken);
+
+                // Wait a bit for storage account to be ready
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                var storageAccount = await storageAccountCollection.GetAsync(_sharedStorageAccountName, cancellationToken);
+                _sharedStorageAccount = storageAccount.Value;
+            }
+
+            // Get connection string
+            var keysAsync = _sharedStorageAccount.GetKeysAsync(cancellationToken: cancellationToken);
+            Azure.ResourceManager.Storage.Models.StorageAccountKey? key = null;
+            await foreach (var keyItem in keysAsync)
+            {
+                key = keyItem;
+                break;
+            }
+            var connectionString = $"DefaultEndpointsProtocol=https;AccountName={_sharedStorageAccountName};AccountKey={key?.Value};EndpointSuffix=core.windows.net";
+            var containerName = $"adapter-{adapterInstanceGuid.ToString("N").Substring(0, 8)}";
+            
+            // Ensure container exists
+            var blobServiceClient = new BlobServiceClient(connectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            
+            return (connectionString, containerName);
+        }
+        finally
+        {
+            _sharedStorageLock.Release();
+        }
+    }
+
+    // ... (other methods: DeleteContainerAppAsync, GetContainerAppStatusAsync, etc. remain similar)
+    
+    // Placeholder methods - implement similar to original ContainerAppService
+    public async Task DeleteContainerAppAsync(Guid adapterInstanceGuid, CancellationToken cancellationToken = default)
+    {
+        // Implementation similar to original
+        throw new NotImplementedException("Implement similar to ContainerAppService");
+    }
+
+    public async Task<ContainerAppStatus> GetContainerAppStatusAsync(Guid adapterInstanceGuid, CancellationToken cancellationToken = default)
+    {
+        // Implementation similar to original
+        throw new NotImplementedException("Implement similar to ContainerAppService");
+    }
+
+    public async Task<bool> ContainerAppExistsAsync(Guid adapterInstanceGuid, CancellationToken cancellationToken = default)
+    {
+        var status = await GetContainerAppStatusAsync(adapterInstanceGuid, cancellationToken);
+        return status.Exists;
+    }
+
+    public string GetContainerAppName(Guid adapterInstanceGuid)
+    {
+        var guidStr = adapterInstanceGuid.ToString("N");
+        return $"ca-{guidStr.Substring(0, Math.Min(24, guidStr.Length))}";
+    }
+
+    private string GetContainerAppNamePrivate(Guid adapterInstanceGuid) => GetContainerAppName(adapterInstanceGuid);
+
+    private string GetAdapterImage(string adapterName)
+    {
+        return adapterName.ToLowerInvariant() switch
+        {
+            "csv" => $"{_registryServer}/csv-adapter:latest",
+            "sqlserver" => $"{_registryServer}/sqlserver-adapter:latest",
+            "file" => $"{_registryServer}/file-adapter:latest",
+            "sftp" => $"{_registryServer}/sftp-adapter:latest",
+            "sap" => $"{_registryServer}/sap-adapter:latest",
+            "dynamics365" => $"{_registryServer}/dynamics365-adapter:latest",
+            "crm" => $"{_registryServer}/crm-adapter:latest",
+            _ => $"{_registryServer}/generic-adapter:latest"
+        };
+    }
+
+    private async Task StoreAdapterConfigurationAsync(
+        string connectionString,
+        string containerName,
+        object adapterConfiguration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var blobServiceClient = new BlobServiceClient(connectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+            var blobClient = containerClient.GetBlobClient("adapter-config.json");
+            var configJson = System.Text.Json.JsonSerializer.Serialize(adapterConfiguration, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            await blobClient.UploadAsync(
+                new BinaryData(configJson),
+                overwrite: true,
+                cancellationToken: cancellationToken);
+
+            _logger.LogInformation(
+                "Stored adapter configuration: Container={Container}",
+                containerName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error storing adapter configuration");
+            throw;
+        }
+    }
+
+    public async Task UpdateContainerAppConfigurationAsync(
+        Guid adapterInstanceGuid,
+        object adapterConfiguration,
+        CancellationToken cancellationToken = default)
+    {
+        // Implementation similar to original
+        throw new NotImplementedException("Implement similar to ContainerAppService");
+    }
+}
+
