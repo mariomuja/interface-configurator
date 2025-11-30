@@ -172,6 +172,7 @@ test:mutation:
   variables:
     STRYKER_PROJECT: "main.Core/main.Core.csproj"
     STRYKER_TEST_PROJECT: "tests/main.Core.Tests/main.Core.Tests.csproj"
+    STRYKER_OUTPUT: "../mutation-reports"
   before_script:
     - echo "Installing Stryker.NET mutation testing tool..."
     - dotnet tool install -g dotnet-stryker
@@ -180,16 +181,11 @@ test:mutation:
     - echo "Setting up mutation testing environment..."
     - mkdir -p mutation-reports
   script:
-    - echo "Running mutation tests with Stryker.NET..."
-    - echo "Testing project: $STRYKER_PROJECT"
-    - echo "Test project: $STRYKER_TEST_PROJECT"
-    - set +e
+    - echo "Running mutation tests with Stryker.NET"
     - cd main.Core
-    - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters html json progress --output ../mutation-reports --log-level info --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level Standard
+    - dotnet-stryker --test-project "../tests/main.Core.Tests/main.Core.Tests.csproj" --reporters html json progress --output ../mutation-reports --log-level info --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level Standard
     - cd ..
-    - set -e
     - echo "Mutation testing completed"
-    - ls -la mutation-reports/ || echo "Mutation report directory not found"
   artifacts:
     when: always
     paths:
