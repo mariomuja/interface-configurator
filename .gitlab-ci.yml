@@ -91,20 +91,10 @@ build:dotnet:
     - echo "Build configuration: $BUILD_CONFIGURATION"
     - pwd
     - echo "=== Checking for solution file ==="
-    - |
-      if [ -f "$SOLUTION_PATH" ]; then
-        ls -la "$SOLUTION_PATH"
-      else
-        echo "Solution file not found at $SOLUTION_PATH"
-        find . -name "*.sln" -type f
-      fi
+    - test -f "$SOLUTION_PATH" && ls -la "$SOLUTION_PATH" || echo "Solution file not found at $SOLUTION_PATH"
+    - find . -name "*.sln" -type f 2>/dev/null | head -10 || echo "No .sln files found"
     - echo "=== Directory structure ==="
-    - |
-      if [ -d "azure-functions" ]; then
-        ls -la azure-functions/ | head -20
-      else
-        echo "azure-functions directory not found"
-      fi
+    - test -d "azure-functions" && ls -la azure-functions/ | head -20 || echo "azure-functions directory not found"
     - echo "=== Restoring NuGet packages ==="
     - dotnet restore $SOLUTION_PATH
     - echo "=== Building solution ==="
