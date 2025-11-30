@@ -17,6 +17,7 @@ workflow:
 stages:
   - build
   - test
+  - version
   - package
   - deploy
 
@@ -931,7 +932,144 @@ lint:frontend:
         - "frontend/**/*.html"
         - ".gitlab-ci.yml"
 
-# Trigger GitLab mirror sync
+# ============================================
+# VERSION BUMP STAGE - Auto version bumping
+# ============================================
 
-# Trigger sync after token update
+version:bump:
+  stage: version
+  image: node:${NODE_VERSION}
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    - apk add --no-cache git sed || true
+    - git config --global user.email "gitlab-ci@noreply.gitlab.com"
+    - git config --global user.name "GitLab CI"
+  script:
+    - |
+      echo "Checking if commit is from version bump..."
+      COMMIT_MSG=$(git log -1 --pretty=%B)
+      if [[ "$COMMIT_MSG" == "chore: bump version"* ]]; then
+        echo "⚠️  Commit is from version bump, skipping to avoid infinite loop"
+        exit 0
+      fi
+      
+      echo "Reading current version..."
+      if [ -f version.json ]; then
+        CURRENT_VERSION=$(node -p "require('./version.json').version")
+        CURRENT_BUILD=$(node -p "require('./version.json').buildNumber")
+        echo "Current version: $CURRENT_VERSION"
+        echo "Current build: $CURRENT_BUILD"
+      else
+        CURRENT_VERSION="1.0.0"
+        CURRENT_BUILD=0
+        echo "No version.json found, starting with version: $CURRENT_VERSION"
+      fi
+      
+      # Increment build number
+      NEW_BUILD=$((CURRENT_BUILD + 1))
+      
+      # Parse version (e.g., "1.2.3")
+      IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+      MAJOR=${VERSION_PARTS[0]}
+      MINOR=${VERSION_PARTS[1]}
+      PATCH=${VERSION_PARTS[2]}
+      
+      # Increment patch version
+      NEW_PATCH=$((PATCH + 1))
+      NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+      
+      echo "New version: $NEW_VERSION"
+      echo "New build: $NEW_BUILD"
+      
+      # Update version.json
+      cat > version.json << EOF
+      {
+        "version": "$NEW_VERSION",
+        "buildNumber": $NEW_BUILD,
+        "lastUpdated": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      }
+      EOF
+      
+      # Update root package.json
+      if [ -f package.json ]; then
+        node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.version = '$NEW_VERSION';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+        "
+      fi
+      
+      # Update frontend package.json
+      if [ -f frontend/package.json ]; then
+        node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+          pkg.version = '$NEW_VERSION';
+          fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2) + '\n');
+        "
+      fi
+      
+      # Update Azure Functions .csproj if it has a Version property
+      if [ -f azure-functions/main/main.csproj ]; then
+        sed -i "s/<Version>.*<\/Version>/<Version>$NEW_VERSION<\/Version>/g" azure-functions/main/main.csproj || true
+      fi
+      
+      # Copy version.json to frontend assets
+      mkdir -p frontend/src/assets
+      cp version.json frontend/src/assets/version.json || true
+      
+      echo "Committing version bump..."
+      git add version.json package.json frontend/package.json azure-functions/main/main.csproj frontend/src/assets/version.json 2>/dev/null || true
+      git commit -m "chore: bump version to $NEW_VERSION (build $NEW_BUILD)" || exit 0
+      
+      echo "Pushing version bump to GitLab..."
+      git push origin HEAD:${CI_COMMIT_REF_NAME} || {
+        echo "⚠️  Failed to push to GitLab, but continuing..."
+        exit 0
+      }
+      
+      # Also push to GitHub if configured
+      if [ -n "$GITHUB_REPO_URL" ]; then
+        echo "Pushing version bump to GitHub..."
+        if [[ "$GITHUB_REPO_URL" == *"@"* ]]; then
+          # SSH URL
+          git remote add github "$GITHUB_REPO_URL" 2>/dev/null || git remote set-url github "$GITHUB_REPO_URL"
+        else
+          # HTTPS URL - use token if provided
+          if [ -n "$GITHUB_TOKEN" ]; then
+            GITHUB_URL_WITH_TOKEN=$(echo "$GITHUB_REPO_URL" | sed "s|https://|https://${GITHUB_TOKEN}@|")
+            git remote add github "$GITHUB_URL_WITH_TOKEN" 2>/dev/null || git remote set-url github "$GITHUB_URL_WITH_TOKEN"
+          else
+            git remote add github "$GITHUB_REPO_URL" 2>/dev/null || git remote set-url github "$GITHUB_REPO_URL"
+          fi
+        fi
+        git push github HEAD:${CI_COMMIT_REF_NAME} || {
+          echo "⚠️  Failed to push to GitHub, but continuing..."
+        }
+      fi
+      
+      echo "✅ Version bumped to $NEW_VERSION (build $NEW_BUILD)"
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "azure-functions/**/*"
+        - "main.Core/**/*"
+        - "adapters/**/*"
+        - "services/**/*"
+        - "frontend/**/*"
+        - "package.json"
+        - ".gitlab-ci.yml"
+      exists:
+        - "version.json"
+  needs:
+    - job: test:dotnet:unit
+      optional: true
+    - job: test:dotnet:integration
+      optional: true
+    - job: test:frontend
+      optional: true
+  allow_failure: false
 
