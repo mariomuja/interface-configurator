@@ -1,0 +1,7 @@
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\bin\Release\net8.0\CoverletSourceRootsMapping_main.Core.Tests
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.csproj.AssemblyReference.cache
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.AssemblyInfoInputs.cache
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.AssemblyInfo.cs
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.csproj.CoreCompileInputs.cache
+C:\Users\mario\interface-configurator\tests\main.Core.Tests\obj\Release\net8.0\main.Core.Tests.sourcelink.json

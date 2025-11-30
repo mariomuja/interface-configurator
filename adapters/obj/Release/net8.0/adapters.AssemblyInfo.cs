@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("adapters")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0170900e04d624db60867e05bd1dfd0c7cb7f5f2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d8df956a29ef59a9aa81914b969d6ac787d5d85c")]
 [assembly: System.Reflection.AssemblyProductAttribute("adapters")]
 [assembly: System.Reflection.AssemblyTitleAttribute("adapters")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

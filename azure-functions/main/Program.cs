@@ -451,8 +451,10 @@ var host = new HostBuilder()
                 }
                 // GetService returns ApplicationDbContext?, but after null check compiler treats it as non-nullable
                 // Constructor expects ApplicationDbContext?, so we need to explicitly treat it as nullable
-                // Use null-forgiving operator to tell compiler it's nullable
-                return new SqlServerAdapter(context!, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
+                // context is from azure-functions/main/Data/ApplicationDbContext, adapter expects main.Core version
+                // Both are in same namespace, but different assemblies - need to ensure we're using the right one
+                // The adapter uses InterfaceConfigurator.Main.Data which should resolve to the one in main.Core
+                return new SqlServerAdapter(context, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
             });
             
         }
