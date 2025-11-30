@@ -96,6 +96,23 @@ jobs:
           # Add GitLab remote temporarily
           git remote add gitlab "$GITLAB_REPO_URL" 2>/dev/null || git remote set-url gitlab "$GITLAB_REPO_URL"
           
+          # Clean .gitlab-ci.yml file before pushing to avoid control character issues
+          echo "Cleaning .gitlab-ci.yml file to remove control characters..."
+          if [ -f .gitlab-ci.yml ]; then
+            # Remove BOM, control characters, and ensure Unix line endings
+            sed 's/\r$//' .gitlab-ci.yml | \
+            sed 's/\x00//g' | \
+            sed 's/[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]//g' | \
+            sed '1s/^\xEF\xBB\xBF//' > .gitlab-ci.yml.clean
+            
+            # Replace the file with cleaned version
+            mv .gitlab-ci.yml.clean .gitlab-ci.yml
+            
+            # Commit the cleaned file
+            git add .gitlab-ci.yml
+            git commit -m "ci: clean .gitlab-ci.yml to remove control characters" || echo "No changes to commit (file already clean)"
+          fi
+          
           # Show what we're about to push
           echo "Current branch: $(git branch --show-current)"
           echo "HEAD commit: $(git rev-parse HEAD)"
