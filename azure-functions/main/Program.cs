@@ -444,15 +444,15 @@ var host = new HostBuilder()
                 var dataService = sp.GetRequiredService<IDataService>();
                 var serviceBusService = sp.GetService<IServiceBusService>();
                 var logger = sp.GetService<ILogger<SqlServerAdapter>>();
-                // GetService returns ApplicationDbContext?, constructor expects ApplicationDbContext?
-                // Use 'as' operator to handle nullable conversion
-                var nullableContext = context as InterfaceConfigurator.Main.Data.ApplicationDbContext?;
-                if (nullableContext == null)
+                if (context == null)
                 {
                     logger?.LogWarning("ApplicationDbContext is not available. SqlServerAdapter may not work correctly.");
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(nullableContext, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
+                // GetService returns ApplicationDbContext?, but after null check compiler treats it as non-nullable
+                // Constructor expects ApplicationDbContext?, so we need to explicitly treat it as nullable
+                // Use null-forgiving operator to tell compiler it's nullable
+                return new SqlServerAdapter(context!, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
             });
             
         }

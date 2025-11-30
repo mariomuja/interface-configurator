@@ -26,7 +26,7 @@ public class SqlServerAdapter : AdapterBase
     /// ApplicationDbContext connects to the configured SQL Server database
     /// Can use either the default context (from DI) or a custom connection string
     /// </summary>
-    private readonly ApplicationDbContext? _defaultContext;
+    private readonly ApplicationDbContext _defaultContext;
     private readonly string? _connectionString;
     private readonly IDynamicTableService _dynamicTableService;
     private readonly IDataService _dataService;
@@ -54,7 +54,7 @@ public class SqlServerAdapter : AdapterBase
     private readonly string? _jqScriptFile;
 
     public SqlServerAdapter(
-        ApplicationDbContext? context,
+        ApplicationDbContext context,
         IDynamicTableService dynamicTableService,
         IDataService dataService,
         IServiceBusService? serviceBusService = null,

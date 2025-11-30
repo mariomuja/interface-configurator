@@ -464,10 +464,10 @@ public class AdapterFactory : IAdapterFactory
         var adaptiveBatchingService = _serviceProvider.GetService<AdaptiveBatchingService>();
         
         // defaultContext is ApplicationDbContext?, constructor expects ApplicationDbContext?
-        // Use 'as' operator to handle nullable conversion
-        var nullableContext = defaultContext as InterfaceConfigurator.Main.Data.ApplicationDbContext?;
+        // defaultContext is ApplicationDbContext?, constructor expects ApplicationDbContext?
+        // Use null-forgiving operator since constructor accepts nullable
         return new SqlServerAdapter(
-            nullableContext,
+            defaultContext!,
             dynamicTableService,
             dataService,
             serviceBusService,
