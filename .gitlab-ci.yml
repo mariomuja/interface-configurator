@@ -165,40 +165,6 @@ test:dotnet:unit:
         - "adapters/**/*"
         - ".gitlab-ci.yml"
 
-test:dotnet:integration:
-  stage: test
-  image: mcr.microsoft.com/dotnet/sdk:8.0
-  dependencies:
-    - build:dotnet
-  <<: *dotnet_cache
-  script:
-    - echo "Running all integration tests..."
-    - mkdir -p test-results
-    - dotnet test $TEST_PROJECT 
-        --configuration $BUILD_CONFIGURATION 
-        --verbosity normal
-        --filter "FullyQualifiedName~Integration"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-integration.xml"
-    - echo "Integration tests completed"
-    - |
-      # Ensure test-results directory exists even if tests fail
-      mkdir -p test-results
-  artifacts:
-    reports:
-      junit: test-results/junit-integration.xml
-    paths:
-      - test-results/
-    expire_in: 30 days
-    when: always
-  rules:
-    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
-      changes:
-        - "tests/**/*"
-        - "main.Core/**/*"
-        - "azure-functions/**/*"
-        - "adapters/**/*"
-        - ".gitlab-ci.yml"
-
 test:frontend:
   stage: test
   image: node:${NODE_VERSION}
@@ -696,7 +662,7 @@ test:container-apps:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
