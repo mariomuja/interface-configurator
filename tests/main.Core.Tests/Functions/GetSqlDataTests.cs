@@ -65,8 +65,8 @@ public class GetSqlDataTests
 
         var mockResponse = new Mock<HttpResponseData>(_mockContext.Object);
         var headers = new HttpHeadersCollection();
-        mockResponse.SetupProperty(x => x.StatusCode);
-        mockResponse.SetupProperty(x => x.Headers, headers);
+        mockResponse.Setup(x => x.StatusCode).Returns(HttpStatusCode.OK);
+        mockResponse.Setup(x => x.Headers).Returns(headers);
         mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
             .Returns(Task.CompletedTask);
         
