@@ -764,7 +764,7 @@ test:static-web-app:
     - echo "Installing Node.js dependencies..."
     - npm ci
     - echo "Installing Playwright browsers and system dependencies..."
-    - npx playwright install --with-deps chromium
+    - npx playwright install --with-deps
     - echo "Playwright setup completed"
     - mkdir -p test-results
     - |
