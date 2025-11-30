@@ -5,7 +5,7 @@ using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Core.Services;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Services;
+using DataServiceAdapterMain = InterfaceConfigurator.Main.Services.DataServiceAdapter;
 using Xunit;
 using System.Diagnostics;
 
@@ -20,7 +20,7 @@ public class DataServiceAdapterPerformanceTests : IDisposable
     private readonly ApplicationDbContext _context;
     private readonly IDataService _dataService;
     private readonly Mock<ILoggingService> _mockLoggingService;
-    private readonly Mock<ILogger<DataServiceAdapter>> _mockLogger;
+    private readonly Mock<ILogger<DataServiceAdapterMain>> _mockLogger;
 
     public DataServiceAdapterPerformanceTests()
     {
@@ -30,8 +30,8 @@ public class DataServiceAdapterPerformanceTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         _mockLoggingService = new Mock<ILoggingService>();
-        _mockLogger = new Mock<ILogger<DataServiceAdapter>>();
-        _dataService = new DataServiceAdapter(_context, _mockLoggingService.Object, _mockLogger.Object);
+        _mockLogger = new Mock<ILogger<DataServiceAdapterMain>>();
+        _dataService = new DataServiceAdapterMain(_context, _mockLoggingService.Object, _mockLogger.Object);
 
         _context.Database.EnsureCreated();
     }

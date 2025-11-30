@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
-using InterfaceConfigurator.Main.Services;
+using InterfaceConfigurator.Main.Core.Services;
 using Xunit;
 
 namespace InterfaceConfigurator.Main.Core.Tests.Services;
