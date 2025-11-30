@@ -526,7 +526,7 @@ test:azure-functions:
       junit: test-results/junit.xml
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: deploy:production
@@ -569,7 +569,7 @@ test:sql-server:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
@@ -611,7 +611,7 @@ test:service-bus:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
@@ -653,7 +653,7 @@ test:blob-storage:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
@@ -738,7 +738,7 @@ test:container-registry:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
@@ -780,7 +780,7 @@ test:static-web-app:
       junit: test-results/junit.xml
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: deploy:vercel
@@ -825,7 +825,7 @@ test:adapter-pipeline:
       - test-results/
     expire_in: 30 days
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
     - job: build:dotnet
