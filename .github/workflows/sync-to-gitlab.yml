@@ -60,26 +60,22 @@ jobs:
           
           CHECK_HTTP_CODE=$(echo "$CHECK_RESPONSE" | tail -n1)
           
-          if [ "$CHECK_HTTP_CODE" != "200" ]; then
-            # Create branch using main as base (GitLab API requires ref to be an existing branch)
-            echo "Creating branch based on main..."
-            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          # If branch exists, delete it first to ensure clean push
+          if [ "$CHECK_HTTP_CODE" = "200" ]; then
+            echo "Branch exists in GitLab, deleting it first to ensure clean push..."
+            DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
               --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-              --header "Content-Type: application/json" \
-              --data "{\"branch\":\"$BRANCH_NAME\",\"ref\":\"main\"}" \
-              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/branches")
-            
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            
-            if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "400" ]; then
-              echo "❌ Error creating branch (HTTP $HTTP_CODE): $BODY"
-              exit 1
+              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/branches/$BRANCH_PATH")
+            DELETE_HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
+            if [ "$DELETE_HTTP_CODE" = "204" ] || [ "$DELETE_HTTP_CODE" = "200" ]; then
+              echo "✅ Branch deleted, will create fresh branch with all files"
+              sleep 2  # Wait a moment for deletion to complete
+            else
+              echo "⚠️  Could not delete branch (HTTP $DELETE_HTTP_CODE), will try to push anyway"
             fi
           fi
           
-          echo "✅ Branch exists in GitLab"
-          echo "Pushing all files to GitLab branch using git..."
+          echo "Pushing entire branch to GitLab using git push..."
           
           # Get GitLab repository URL - use project ID format
           # GitLab API uses project ID or path, for git we need the full path
@@ -100,32 +96,20 @@ jobs:
           # Add GitLab remote temporarily
           git remote add gitlab "$GITLAB_REPO_URL" 2>/dev/null || git remote set-url gitlab "$GITLAB_REPO_URL"
           
-          # Fetch from GitLab to see what's there
-          echo "Fetching from GitLab..."
-          git fetch gitlab "$BRANCH_NAME" 2>&1 || echo "Branch doesn't exist in GitLab yet (expected)"
-          
-          # Push the branch to GitLab
-          echo "Pushing branch '$BRANCH_NAME' to GitLab..."
+          # Show what we're about to push
           echo "Current branch: $(git branch --show-current)"
           echo "HEAD commit: $(git rev-parse HEAD)"
-          echo "Using command: git push gitlab HEAD:$BRANCH_NAME --force"
+          echo "Total commits to push: $(git rev-list --count HEAD ^origin/main 2>/dev/null || echo "all")"
+          echo "Sample files in this branch:"
+          git ls-tree -r HEAD --name-only | head -10
           
-          # First, try without force to see if branch exists and can be updated
-          echo "Attempting push (will use force if needed)..."
+          # Push the branch to GitLab (force push since we deleted the old branch)
+          echo "Pushing branch '$BRANCH_NAME' to GitLab (force push)..."
           
           # Capture both stdout and stderr
           set +e  # Don't exit on error
-          # Try regular push first
-          git push gitlab "HEAD:$BRANCH_NAME" 2>&1 | tee /tmp/git_push_output.txt
+          git push gitlab "HEAD:$BRANCH_NAME" --force -v 2>&1 | tee /tmp/git_push_output.txt
           PUSH_EXIT_CODE=${PIPESTATUS[0]}
-          
-          # If that failed, try force push
-          if [ $PUSH_EXIT_CODE -ne 0 ]; then
-            echo "Regular push failed, trying force push..."
-            git push gitlab "HEAD:$BRANCH_NAME" --force -v 2>&1 | tee /tmp/git_push_output.txt
-            PUSH_EXIT_CODE=${PIPESTATUS[0]}
-          fi
-          
           set -e  # Re-enable exit on error
           
           PUSH_OUTPUT=$(cat /tmp/git_push_output.txt)
