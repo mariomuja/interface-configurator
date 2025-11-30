@@ -2,15 +2,12 @@
 # This pipeline builds, tests, and optionally deploys the application
 
 # Workflow rules: Always run pipelines on push events (including from mirroring)
+# This ensures pipelines run for all push events, including mirrored branches
+# Note: GitLab mirroring may not trigger pipelines automatically - you may need to
+# manually trigger or enable "Trigger pipelines for mirror updates" in mirror settings
 workflow:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_PIPELINE_SOURCE == "web"
-    - if: $CI_PIPELINE_SOURCE == "api"
-    - if: $CI_PIPELINE_SOURCE == "external"
-    - if: $CI_PIPELINE_SOURCE == "trigger"
-    - if: $CI_PIPELINE_SOURCE == "pipeline"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - when: always  # Always run pipelines regardless of source
 
 stages:
   - build
