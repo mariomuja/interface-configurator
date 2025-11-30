@@ -776,21 +776,15 @@ notify:email:on-failure:
       
       SUBJECT="🚨 Pipeline Failed: ${BRANCH_NAME} - ${PROJECT_NAME}"
       COMMIT_MSG=$(echo "$COMMIT_INFO" | jq -r '.message // "N/A"' | head -1)
-      MESSAGE=$(cat <<EOF
-Pipeline failed for your ready branch: ${BRANCH_NAME}
-
-Project: ${PROJECT_NAME}
-Branch: ${BRANCH_NAME}
-Pipeline ID: ${CI_PIPELINE_ID}
-Pipeline URL: ${PIPELINE_URL}
-Commit: ${CI_COMMIT_SHORT_SHA}
-Commit Message: ${COMMIT_MSG}
-
-Please check the pipeline logs and fix the issues.
-
-Pipeline URL: ${PIPELINE_URL}
-EOF
-)
+      MESSAGE=$(printf "Pipeline failed for your ready branch: %s\n\nProject: %s\nBranch: %s\nPipeline ID: %s\nPipeline URL: %s\nCommit: %s\nCommit Message: %s\n\nPlease check the pipeline logs and fix the issues.\n\nPipeline URL: %s\n" \
+        "${BRANCH_NAME}" \
+        "${PROJECT_NAME}" \
+        "${BRANCH_NAME}" \
+        "${CI_PIPELINE_ID}" \
+        "${PIPELINE_URL}" \
+        "${CI_COMMIT_SHORT_SHA}" \
+        "${COMMIT_MSG}" \
+        "${PIPELINE_URL}")
       
       # Send email via configured email service
       if [ -n "$EMAIL_API_URL" ] && [ -n "$EMAIL_API_KEY" ]; then
