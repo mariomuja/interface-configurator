@@ -134,7 +134,7 @@ test:dotnet:unit:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName!~Integration"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-unit.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-unit.xml"
         --collect:"XPlat Code Coverage"
         --results-directory:"${CI_PROJECT_DIR}/test-results"
     - echo "Unit tests completed"
@@ -565,7 +565,7 @@ test:sql-server:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~SqlServerIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-sql-server.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-sql-server.xml"
     - echo "SQL Server tests completed"
   artifacts:
     when: always
@@ -607,7 +607,7 @@ test:service-bus:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~ServiceBusIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-service-bus.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-service-bus.xml"
     - echo "Service Bus tests completed"
   artifacts:
     when: always
@@ -649,7 +649,7 @@ test:blob-storage:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~BlobStorageIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-blob-storage.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-blob-storage.xml"
     - echo "Blob Storage tests completed"
   artifacts:
     when: always
@@ -692,7 +692,7 @@ test:container-apps:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~ContainerAppIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-apps.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-apps.xml"
     - echo "Container Apps tests completed"
   artifacts:
     when: always
@@ -734,7 +734,7 @@ test:container-registry:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~ContainerRegistryIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-registry.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-container-registry.xml"
     - echo "Container Registry tests completed"
   artifacts:
     when: always
@@ -821,7 +821,7 @@ test:adapter-pipeline:
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~AdapterPipelineIntegrationTests"
-        --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-adapter-pipeline.xml"
+        --logger "JunitXml;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-adapter-pipeline.xml"
     - echo "Adapter Pipeline tests completed"
   artifacts:
     when: always
