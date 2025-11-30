@@ -240,7 +240,6 @@ package:adapter-containers:
   dependencies:
     - build:dotnet
     - test:dotnet:unit
-    - test:dotnet:integration
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
     DOCKER_DRIVER: overlay2
@@ -333,8 +332,6 @@ package:adapter-containers:
     - job: build:dotnet
       artifacts: true
     - job: test:dotnet:unit
-      artifacts: false
-    - job: test:dotnet:integration
       artifacts: false
 
 package:dotnet:
@@ -1164,8 +1161,6 @@ notify:email:on-failure:
       optional: true
     - job: test:dotnet:unit
       optional: true
-    - job: test:dotnet:integration
-      optional: true
     - job: test:frontend
       optional: true
     - job: test:e2e
@@ -1206,8 +1201,6 @@ notify:sms:
   allow_failure: true  # Don't block pipeline if SMS fails
   needs:
     - job: test:dotnet:unit
-      optional: true
-    - job: test:dotnet:integration
       optional: true
     - job: test:frontend
       optional: true
@@ -1388,8 +1381,6 @@ version:bump:
         - "version.json"
   needs:
     - job: test:dotnet:unit
-      optional: true
-    - job: test:dotnet:integration
       optional: true
     - job: test:frontend
       optional: true
