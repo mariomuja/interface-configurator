@@ -133,6 +133,7 @@ test:dotnet:unit:
   <<: *dotnet_cache
   script:
     - echo "Running all unit tests (excluding integration tests)..."
+    - mkdir -p test-results
     - dotnet test $TEST_PROJECT 
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
@@ -141,13 +142,20 @@ test:dotnet:unit:
         --collect:"XPlat Code Coverage"
         --results-directory:"${CI_PROJECT_DIR}/test-results"
     - echo "Unit tests completed"
+    - |
+      # Ensure test-results directory exists even if tests fail
+      mkdir -p test-results
+      # Find and copy coverage files if they exist
+      if [ -d "test-results" ]; then
+        find test-results -name "coverage.cobertura.xml" -type f | head -1 | xargs -I {} cp {} test-results/coverage.cobertura.xml 2>/dev/null || true
+      fi
   coverage: '/Total\s*\|\s*(\d+\.\d+)%/'
   artifacts:
     reports:
       junit: test-results/junit-unit.xml
       coverage_report:
         coverage_format: cobertura
-        path: test-results/**/coverage.cobertura.xml
+        path: test-results/coverage.cobertura.xml
     paths:
       - test-results/
     expire_in: 30 days
@@ -169,12 +177,16 @@ test:dotnet:integration:
   <<: *dotnet_cache
   script:
     - echo "Running all integration tests..."
+    - mkdir -p test-results
     - dotnet test $TEST_PROJECT 
         --configuration $BUILD_CONFIGURATION 
         --verbosity normal
         --filter "FullyQualifiedName~Integration"
         --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-integration.xml"
     - echo "Integration tests completed"
+    - |
+      # Ensure test-results directory exists even if tests fail
+      mkdir -p test-results
   artifacts:
     reports:
       junit: test-results/junit-integration.xml
