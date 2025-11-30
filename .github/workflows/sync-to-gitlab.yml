@@ -89,25 +89,12 @@ jobs:
           PROJECT_PATH=$(echo "$GITLAB_PROJECT_ID" | sed 's/\//%2F/g')
           
           # Get the .gitlab-ci.yml content and encode it properly
-          # Use base64 without line breaks and escape JSON properly
           CI_CONTENT=$(cat .gitlab-ci.yml | base64 | tr -d '\n')
           
           echo "Creating commit with .gitlab-ci.yml file..."
           
-          # Create JSON payload with proper escaping
-          JSON_PAYLOAD=$(cat <<EOF
-          {
-            "branch": "$BRANCH_NAME",
-            "commit_message": "Add .gitlab-ci.yml from ready branch",
-            "actions": [{
-              "action": "create",
-              "file_path": ".gitlab-ci.yml",
-              "content": "$CI_CONTENT",
-              "encoding": "base64"
-            }]
-          }
-          EOF
-          )
+          # Create JSON payload using jq or printf to avoid heredoc issues
+          JSON_PAYLOAD=$(printf '{"branch":"%s","commit_message":"Add .gitlab-ci.yml from ready branch","actions":[{"action":"create","file_path":".gitlab-ci.yml","content":"%s","encoding":"base64"}]}' "$BRANCH_NAME" "$CI_CONTENT")
           
           # Create a commit that adds/updates .gitlab-ci.yml
           COMMIT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
@@ -125,19 +112,7 @@ jobs:
             if echo "$COMMIT_BODY" | grep -q "already exists"; then
               echo "File exists, updating..."
               # Update existing file
-              UPDATE_JSON=$(cat <<EOF
-              {
-                "branch": "$BRANCH_NAME",
-                "commit_message": "Update .gitlab-ci.yml from ready branch",
-                "actions": [{
-                  "action": "update",
-                  "file_path": ".gitlab-ci.yml",
-                  "content": "$CI_CONTENT",
-                  "encoding": "base64"
-                }]
-              }
-              EOF
-              )
+              UPDATE_JSON=$(printf '{"branch":"%s","commit_message":"Update .gitlab-ci.yml from ready branch","actions":[{"action":"update","file_path":".gitlab-ci.yml","content":"%s","encoding":"base64"}]}' "$BRANCH_NAME" "$CI_CONTENT")
               
               UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
                 --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
