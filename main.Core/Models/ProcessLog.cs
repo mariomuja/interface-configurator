@@ -11,7 +11,15 @@ public class ProcessLog
     public int Id { get; set; }
     
     [Required]
+    [Column("datetime_created", TypeName = "datetime2")]
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    [NotMapped]
+    public DateTime datetime_created
+    {
+        get => Timestamp;
+        set => Timestamp = value;
+    }
     
     [Required]
     [MaxLength(50)]
@@ -23,5 +31,13 @@ public class ProcessLog
     
     [MaxLength]
     public string? Details { get; set; }
+
+    [MaxLength(200)]
+    [Column("Component")]
+    public string? Component { get; set; }
+
+    [MaxLength(200)]
+    [Column("InterfaceName")]
+    public string? InterfaceName { get; set; }
 }
 

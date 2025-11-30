@@ -1,5 +1,7 @@
 # 📊 Interface Configuration Demo
 
+<!-- CI/CD Test: Updated via GitLab pipeline test -->
+
 <div align="center">
 
 [![Live Preview](https://img.shields.io/badge/🌐_Live_Preview-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://interface-configurator.vercel.app)
@@ -952,22 +954,16 @@ The frontend is deployed to Vercel. Configuration is in `vercel/vercel.json`.
 
 #### Azure Functions
 
-Azure Functions are automatically deployed via GitHub Actions using the **"Run from Package"** method (Microsoft's recommended approach).
+Azure Functions are automatically deployed via GitLab CI/CD using the **"Run from Package"** method (Microsoft's recommended approach).
 
 **Quick Setup:**
-```powershell
-# Windows
-.\setup-github-secrets.ps1
-```
-
-```bash
-# Linux/Mac
-./setup-github-secrets.sh
-```
+1. Configure GitLab CI/CD variables (see [GitLab Setup Guide](./GITLAB_SETUP.md))
+2. Push to GitLab to trigger the pipeline
+3. Manually trigger deployment jobs when ready
 
 **Documentation:**
-- [GitHub Actions Deployment](./GITHUB_ACTIONS_DEPLOYMENT.md) - Complete guide
-- [Setup GitHub Secrets](./SETUP_GITHUB_SECRETS.md) - Automated setup
+- [GitLab CI/CD Setup](./GITLAB_SETUP.md) - Complete setup guide
+- [GitLab Pipeline Documentation](.gitlab/README.md) - Detailed pipeline documentation
 - [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) - Step-by-step checklist
 - [Documentation Index](./DOCUMENTATION_INDEX.md) - Complete documentation overview
 
@@ -1027,8 +1023,8 @@ Configured via Terraform in Function App settings:
 - **Build Errors**: Check Node.js version compatibility
 - **Environment Variables**: Verify all required variables are set
 - **CORS**: Check CORS configuration matches frontend URL
-- **Function App Deployment**: See [GITHUB_ACTIONS_DEPLOYMENT.md](./GITHUB_ACTIONS_DEPLOYMENT.md)
-- **GitHub Secrets**: See [SETUP_GITHUB_SECRETS.md](./SETUP_GITHUB_SECRETS.md)
+- **Function App Deployment**: See [GitLab Setup Guide](./GITLAB_SETUP.md) and [GitLab Pipeline Documentation](.gitlab/README.md)
+- **GitLab CI/CD Variables**: Configure in GitLab project settings (see [GITLAB_SETUP.md](./GITLAB_SETUP.md))
 
 ## 🔧 Maintenance
 
@@ -1061,7 +1057,7 @@ For issues or questions:
 
 **Call me:** +49 1520 464 14 73 / +39 345 345 00 98
 
-[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mario.muja@gmail.com)
+[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mariomuja@mariomujagmail508.onmicrosoft.com)
 [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/mariomuja)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mario-muja-016782347)
 
