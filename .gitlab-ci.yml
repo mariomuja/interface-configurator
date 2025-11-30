@@ -183,11 +183,13 @@ test:mutation:
     - echo "Running mutation tests with Stryker.NET..."
     - echo "Testing project: $STRYKER_PROJECT"
     - echo "Test project: $STRYKER_TEST_PROJECT"
+    - set +e
     - cd main.Core
-    - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters html json progress --output ../mutation-reports --log-level info --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level Standard; exit 0
+    - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters html json progress --output ../mutation-reports --log-level info --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level Standard
     - cd ..
+    - set -e
     - echo "Mutation testing completed"
-    - test -f mutation-reports/mutation-report.json && echo "Mutation report generated successfully" || echo "Mutation report not found"
+    - ls -la mutation-reports/ || echo "Mutation report directory not found"
   artifacts:
     when: always
     paths:
