@@ -71,20 +71,7 @@ variables:
 build:dotnet:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:8.0
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-dotnet
-    paths:
-      - .nuget/
-      - azure-functions/**/bin/
-      - azure-functions/**/obj/
-      - main.Core/**/bin/
-      - main.Core/**/obj/
-      - adapters/**/bin/
-      - adapters/**/obj/
-      - services/**/bin/
-      - services/**/obj/
-      - tests/**/bin/
-      - tests/**/obj/
+  <<: *dotnet_cache
   script:
     - echo "Restoring NuGet packages..."
     - dotnet restore $SOLUTION_PATH
