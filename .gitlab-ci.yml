@@ -775,14 +775,15 @@ notify:email:on-failure:
       PROJECT_NAME="${CI_PROJECT_NAME}"
       
       SUBJECT="🚨 Pipeline Failed: ${BRANCH_NAME} - ${PROJECT_NAME}"
+      COMMIT_MSG=$(echo "$COMMIT_INFO" | jq -r '.message // "N/A"' | head -1)
       MESSAGE="Pipeline failed for your ready branch: ${BRANCH_NAME}
-      
+
 Project: ${PROJECT_NAME}
 Branch: ${BRANCH_NAME}
 Pipeline ID: ${CI_PIPELINE_ID}
 Pipeline URL: ${PIPELINE_URL}
 Commit: ${CI_COMMIT_SHORT_SHA}
-Commit Message: $(echo "$COMMIT_INFO" | jq -r '.message // "N/A"' | head -1)
+Commit Message: ${COMMIT_MSG}
 
 Please check the pipeline logs and fix the issues.
 
