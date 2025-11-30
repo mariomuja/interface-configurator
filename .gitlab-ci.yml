@@ -727,6 +727,127 @@ cleanup:delete-merged-ready-branch:
 # NOTIFICATIONS
 # ============================================
 
+notify:email:on-failure:
+  stage: test
+  image: curlimages/curl:latest
+  variables:
+    CI: "true"
+  before_script:
+    - apk add --no-cache jq bash
+  script:
+    - |
+      echo "Sending failure notification email to commit author..."
+      
+      # Only run for ready/* branches
+      if [[ ! "$CI_COMMIT_REF_NAME" =~ ^ready/ ]]; then
+        echo "Not a ready/* branch, skipping email notification"
+        exit 0
+      fi
+      
+      # Get commit author email from GitLab API
+      if [ -z "$GITLAB_TOKEN" ]; then
+        echo "⚠️  GITLAB_TOKEN not set. Cannot retrieve commit author email."
+        echo "   Email notification will be skipped."
+        exit 0
+      fi
+      
+      echo "Fetching commit author information..."
+      COMMIT_INFO=$(curl -s --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$CI_COMMIT_SHA")
+      
+      AUTHOR_EMAIL=$(echo "$COMMIT_INFO" | jq -r '.author_email // empty')
+      AUTHOR_NAME=$(echo "$COMMIT_INFO" | jq -r '.author_name // "Developer"')
+      
+      if [ -z "$AUTHOR_EMAIL" ] || [ "$AUTHOR_EMAIL" == "null" ]; then
+        echo "⚠️  Could not retrieve commit author email from GitLab API"
+        echo "   Commit info: $COMMIT_INFO"
+        exit 0
+      fi
+      
+      echo "Commit author: $AUTHOR_NAME <$AUTHOR_EMAIL>"
+      echo "Branch: $CI_COMMIT_REF_NAME"
+      echo "Pipeline: $CI_PIPELINE_ID"
+      
+      # Build email content
+      PIPELINE_URL="${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
+      BRANCH_NAME="${CI_COMMIT_REF_NAME}"
+      PROJECT_NAME="${CI_PROJECT_NAME}"
+      
+      SUBJECT="🚨 Pipeline Failed: ${BRANCH_NAME} - ${PROJECT_NAME}"
+      MESSAGE="Pipeline failed for your ready branch: ${BRANCH_NAME}
+      
+Project: ${PROJECT_NAME}
+Branch: ${BRANCH_NAME}
+Pipeline ID: ${CI_PIPELINE_ID}
+Pipeline URL: ${PIPELINE_URL}
+Commit: ${CI_COMMIT_SHORT_SHA}
+Commit Message: $(echo "$COMMIT_INFO" | jq -r '.message // "N/A"' | head -1)
+
+Please check the pipeline logs and fix the issues.
+
+Pipeline URL: ${PIPELINE_URL}"
+      
+      # Send email via configured email service
+      if [ -n "$EMAIL_API_URL" ] && [ -n "$EMAIL_API_KEY" ]; then
+        echo "Sending email to $AUTHOR_EMAIL via email service API..."
+        
+        # Construct email payload (adjust based on your email service API)
+        EMAIL_PAYLOAD=$(jq -n \
+          --arg to "$AUTHOR_EMAIL" \
+          --arg subject "$SUBJECT" \
+          --arg body "$MESSAGE" \
+          '{
+            "to": $to,
+            "subject": $subject,
+            "body": $body,
+            "from": "noreply@gitlab-ci"
+          }')
+        
+        HTTP_CODE=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL" \
+          -H "Authorization: Bearer $EMAIL_API_KEY" \
+          -H "Content-Type: application/json" \
+          -d "$EMAIL_PAYLOAD" | tail -1)
+        
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
+          echo "✅ Email sent successfully to $AUTHOR_EMAIL"
+        else
+          echo "⚠️  Email sending failed (HTTP $HTTP_CODE)"
+          echo "   Email would have been sent to: $AUTHOR_EMAIL"
+        fi
+      elif [ -n "$SMTP_HOST" ] && [ -n "$SMTP_USER" ] && [ -n "$SMTP_PASSWORD" ]; then
+        echo "Sending email via SMTP to $AUTHOR_EMAIL..."
+        
+        # Use sendmail or similar (if available) or curl with SMTP
+        # For simplicity, we'll use a basic SMTP approach
+        # Note: This requires additional tools. For production, use a proper email service.
+        echo "⚠️  Direct SMTP sending not implemented. Please use EMAIL_API_URL or configure GitLab project notifications."
+        echo "   Email would have been sent to: $AUTHOR_EMAIL"
+      else
+        echo "⚠️  Email service not configured. Please set one of:"
+        echo "   Option 1: EMAIL_API_URL and EMAIL_API_KEY (for email service API)"
+        echo "   Option 2: SMTP_HOST, SMTP_USER, SMTP_PASSWORD (for SMTP)"
+        echo "   Option 3: Configure GitLab project-level email notifications"
+        echo ""
+        echo "   Email would have been sent to: $AUTHOR_EMAIL"
+        echo "   Subject: $SUBJECT"
+        echo "   Pipeline URL: $PIPELINE_URL"
+      fi
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\//
+      when: on_failure  # Only run when previous jobs fail
+  allow_failure: true  # Don't block pipeline if email fails
+  needs:
+    - job: build:dotnet
+      optional: true
+    - job: test:dotnet:unit
+      optional: true
+    - job: test:dotnet:integration
+      optional: true
+    - job: test:frontend
+      optional: true
+    - job: test:playwright
+      optional: true
+
 notify:sms:
   stage: test
   image: curlimages/curl:latest
