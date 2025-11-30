@@ -257,6 +257,103 @@ test:playwright:
 # PACKAGE STAGE
 # ============================================
 
+package:adapter-containers:
+  stage: package
+  image: docker:24
+  services:
+    - docker:24-dind
+  dependencies:
+    - build:dotnet
+    - test:dotnet:unit
+    - test:dotnet:integration
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - echo "Setting up Docker and Azure Container Registry..."
+    - apk add --no-cache curl bash
+    # Install Azure CLI
+    - apk add --no-cache python3 py3-pip
+    - pip3 install --upgrade pip
+    - pip3 install azure-cli
+    - az --version
+    # Login to Azure
+    - |
+      if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_TENANT_ID" ]; then
+        az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+        if [ -n "$AZURE_SUBSCRIPTION_ID" ]; then
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+        fi
+        echo "✅ Azure login successful"
+        az account show
+      else
+        echo "⚠️  Azure credentials not set. Please configure CI/CD variables:"
+        echo "   - AZURE_CLIENT_ID"
+        echo "   - AZURE_CLIENT_SECRET"
+        echo "   - AZURE_TENANT_ID"
+        exit 1
+      fi
+    # Login to Azure Container Registry
+    - |
+      if [ -z "$AZURE_CONTAINER_REGISTRY" ]; then
+        echo "⚠️  AZURE_CONTAINER_REGISTRY not set. Please configure CI/CD variable:"
+        echo "   - AZURE_CONTAINER_REGISTRY (e.g., myregistry.azurecr.io)"
+        exit 1
+      fi
+      echo "Logging in to Azure Container Registry: $AZURE_CONTAINER_REGISTRY"
+      az acr login --name "$AZURE_CONTAINER_REGISTRY"
+      echo "✅ ACR login successful"
+  script:
+    - echo "Building and pushing adapter container images to Azure Container Registry..."
+    - |
+      # Set image name and tag
+      IMAGE_NAME="interface-configurator-adapters"
+      IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      FULL_IMAGE_NAME="${AZURE_CONTAINER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+      LATEST_TAG="${AZURE_CONTAINER_REGISTRY}/${IMAGE_NAME}:latest"
+      
+      echo "Building Docker image: $FULL_IMAGE_NAME"
+      echo "Dockerfile: docker/Dockerfile.adapter"
+      
+      # Build the Docker image
+      docker build \
+        -f docker/Dockerfile.adapter \
+        -t "$FULL_IMAGE_NAME" \
+        -t "$LATEST_TAG" \
+        --build-arg BUILD_CONFIGURATION="$BUILD_CONFIGURATION" \
+        .
+      
+      echo "✅ Docker image built successfully"
+      
+      # Push both tags
+      echo "Pushing image with tag: $IMAGE_TAG"
+      docker push "$FULL_IMAGE_NAME"
+      
+      echo "Pushing image with tag: latest"
+      docker push "$LATEST_TAG"
+      
+      echo "✅ Adapter container images pushed successfully to ACR"
+      echo ""
+      echo "Image details:"
+      echo "  - Tagged: $FULL_IMAGE_NAME"
+      echo "  - Latest: $LATEST_TAG"
+      echo "  - Registry: $AZURE_CONTAINER_REGISTRY"
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "adapters/**/*"
+        - "main.Core/**/*"
+        - "docker/**/*"
+        - ".gitlab-ci.yml"
+      when: on_success
+  needs:
+    - job: build:dotnet
+      artifacts: true
+    - job: test:dotnet:unit
+      artifacts: false
+    - job: test:dotnet:integration
+      artifacts: false
+
 package:dotnet:
   stage: package
   image: mcr.microsoft.com/dotnet/sdk:8.0
