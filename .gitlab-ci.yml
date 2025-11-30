@@ -297,20 +297,28 @@ package:adapter-containers:
     - |
       if [ -z "$AZURE_CONTAINER_REGISTRY" ]; then
         echo "⚠️  AZURE_CONTAINER_REGISTRY not set. Please configure CI/CD variable:"
-        echo "   - AZURE_CONTAINER_REGISTRY (e.g., myregistry.azurecr.io)"
+        echo "   - AZURE_CONTAINER_REGISTRY (e.g., myregistry.azurecr.io or just myregistry)"
         exit 1
       fi
-      echo "Logging in to Azure Container Registry: $AZURE_CONTAINER_REGISTRY"
-      az acr login --name "$AZURE_CONTAINER_REGISTRY"
+      # Extract registry name (remove .azurecr.io if present)
+      ACR_NAME=$(echo "$AZURE_CONTAINER_REGISTRY" | sed 's/\.azurecr\.io$//')
+      echo "Logging in to Azure Container Registry: $ACR_NAME"
+      az acr login --name "$ACR_NAME"
       echo "✅ ACR login successful"
   script:
     - echo "Building and pushing adapter container images to Azure Container Registry..."
     - |
       # Set image name and tag
+      # Ensure ACR URL format (add .azurecr.io if not present)
+      if [[ "$AZURE_CONTAINER_REGISTRY" == *.azurecr.io ]]; then
+        ACR_URL="$AZURE_CONTAINER_REGISTRY"
+      else
+        ACR_URL="${AZURE_CONTAINER_REGISTRY}.azurecr.io"
+      fi
       IMAGE_NAME="interface-configurator-adapters"
       IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
-      FULL_IMAGE_NAME="${AZURE_CONTAINER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-      LATEST_TAG="${AZURE_CONTAINER_REGISTRY}/${IMAGE_NAME}:latest"
+      FULL_IMAGE_NAME="${ACR_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+      LATEST_TAG="${ACR_URL}/${IMAGE_NAME}:latest"
       
       echo "Building Docker image: $FULL_IMAGE_NAME"
       echo "Dockerfile: docker/Dockerfile.adapter"
