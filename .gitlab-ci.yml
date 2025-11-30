@@ -219,7 +219,7 @@ test:frontend:
         - "package-lock.json"
         - ".gitlab-ci.yml"
 
-test:playwright:
+test:e2e:
   stage: test
   image: node:${NODE_VERSION}
   dependencies:
@@ -233,9 +233,9 @@ test:playwright:
     - npx playwright install --with-deps chromium firefox webkit
     - echo "Playwright setup completed"
   script:
-    - echo "Running all Playwright end-to-end tests..."
+    - echo "Running end-to-end tests with Playwright..."
     - npx playwright test
-    - echo "Playwright tests completed"
+    - echo "End-to-end tests completed"
   artifacts:
     when: always
     paths:
@@ -844,7 +844,7 @@ notify:email:on-failure:
       optional: true
     - job: test:frontend
       optional: true
-    - job: test:playwright
+    - job: test:e2e
       optional: true
 
 notify:sms:
@@ -887,7 +887,7 @@ notify:sms:
       optional: true
     - job: test:frontend
       optional: true
-    - job: test:playwright
+    - job: test:e2e
       optional: true
 
 # ============================================
