@@ -105,11 +105,21 @@ jobs:
           
           # Push the branch to GitLab (force push to overwrite)
           echo "Pushing branch '$BRANCH_NAME' to GitLab..."
-          PUSH_OUTPUT=$(git push gitlab "HEAD:$BRANCH_NAME" --force 2>&1)
-          PUSH_EXIT_CODE=$?
+          echo "Using command: git push gitlab HEAD:$BRANCH_NAME --force"
           
-          echo "Git push output:"
+          # Capture both stdout and stderr
+          set +e  # Don't exit on error
+          git push gitlab "HEAD:$BRANCH_NAME" --force -v 2>&1 | tee /tmp/git_push_output.txt
+          PUSH_EXIT_CODE=${PIPESTATUS[0]}
+          set -e  # Re-enable exit on error
+          
+          PUSH_OUTPUT=$(cat /tmp/git_push_output.txt)
+          echo ""
+          echo "=== Git Push Output ==="
           echo "$PUSH_OUTPUT"
+          echo "=== End Git Push Output ==="
+          echo ""
+          echo "Exit code: $PUSH_EXIT_CODE"
           
           if [ $PUSH_EXIT_CODE -eq 0 ]; then
             echo "✅ Entire branch pushed to GitLab successfully"
@@ -117,15 +127,25 @@ jobs:
             
             # Verify the push worked by checking if files exist
             echo "Verifying push by checking file count..."
-            sleep 2
+            sleep 3
             FILES_RESPONSE=$(curl -s -X GET \
               --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/tree?ref=$BRANCH_NAME&recursive=true")
-            FILE_COUNT=$(echo "$FILES_RESPONSE" | grep -o '"name"' | wc -l)
+              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/tree?ref=$BRANCH_NAME&recursive=true&per_page=100")
+            FILE_COUNT=$(echo "$FILES_RESPONSE" | grep -o '"name"' | wc -l || echo "0")
             echo "Files found in GitLab branch: $FILE_COUNT"
+            
+            if [ "$FILE_COUNT" -lt "10" ]; then
+              echo "⚠️  Warning: Very few files found. Push may not have worked correctly."
+              echo "SKIP_FILE_PUSH=false" >> $GITHUB_ENV
+            fi
           else
-            echo "⚠️  Git push failed with exit code $PUSH_EXIT_CODE"
-            echo "Error details: $PUSH_OUTPUT"
+            echo "❌ Git push failed with exit code $PUSH_EXIT_CODE"
+            echo ""
+            echo "Common causes:"
+            echo "  1. Token doesn't have 'write_repository' scope"
+            echo "  2. Branch is protected in GitLab"
+            echo "  3. Force push is not allowed"
+            echo ""
             echo "Will try API method for .gitlab-ci.yml only"
             echo "SKIP_FILE_PUSH=false" >> $GITHUB_ENV
           fi
