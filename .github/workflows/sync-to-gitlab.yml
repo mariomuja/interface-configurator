@@ -105,12 +105,27 @@ jobs:
           
           # Push the branch to GitLab (force push to overwrite)
           echo "Pushing branch '$BRANCH_NAME' to GitLab..."
-          if git push gitlab "HEAD:$BRANCH_NAME" --force 2>&1; then
+          PUSH_OUTPUT=$(git push gitlab "HEAD:$BRANCH_NAME" --force 2>&1)
+          PUSH_EXIT_CODE=$?
+          
+          echo "Git push output:"
+          echo "$PUSH_OUTPUT"
+          
+          if [ $PUSH_EXIT_CODE -eq 0 ]; then
             echo "✅ Entire branch pushed to GitLab successfully"
             echo "SKIP_FILE_PUSH=true" >> $GITHUB_ENV
+            
+            # Verify the push worked by checking if files exist
+            echo "Verifying push by checking file count..."
+            sleep 2
+            FILES_RESPONSE=$(curl -s -X GET \
+              --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/tree?ref=$BRANCH_NAME&recursive=true")
+            FILE_COUNT=$(echo "$FILES_RESPONSE" | grep -o '"name"' | wc -l)
+            echo "Files found in GitLab branch: $FILE_COUNT"
           else
-            PUSH_ERROR=$?
-            echo "⚠️  Git push failed with exit code $PUSH_ERROR"
+            echo "⚠️  Git push failed with exit code $PUSH_EXIT_CODE"
+            echo "Error details: $PUSH_OUTPUT"
             echo "Will try API method for .gitlab-ci.yml only"
             echo "SKIP_FILE_PUSH=false" >> $GITHUB_ENV
           fi
