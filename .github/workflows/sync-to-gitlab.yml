@@ -85,6 +85,11 @@ jobs:
             fi
           fi
 
+      - name: Wait for branch to be ready
+        run: |
+          echo "Waiting a few seconds for GitLab to process the branch..."
+          sleep 5
+
       - name: Trigger GitLab Pipeline
         env:
           GITLAB_TOKEN: ${{ secrets.gitlab_token }}
@@ -95,6 +100,7 @@ jobs:
           
           echo "Triggering pipeline for branch '$BRANCH_NAME' in GitLab..."
           
+          # Try to trigger pipeline
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --header "Content-Type: application/json" \
@@ -109,10 +115,23 @@ jobs:
             echo "✅ Pipeline triggered successfully!"
             echo "Pipeline ID: $PIPELINE_ID"
             echo "View pipeline: https://gitlab.com/$GITLAB_PROJECT_ID/-/pipelines/$PIPELINE_ID"
+          elif [ "$HTTP_CODE" = "400" ] && echo "$BODY" | grep -q "Missing CI config file"; then
+            echo "⚠️  Pipeline cannot be triggered: Missing CI config file"
+            echo "This usually means:"
+            echo "  1. The branch doesn't have .gitlab-ci.yml yet (will be synced by push mirror)"
+            echo "  2. Or the file path is incorrect"
+            echo ""
+            echo "The branch exists in GitLab. Once the push mirror syncs the commits,"
+            echo "you can manually trigger the pipeline in GitLab UI:"
+            echo "  https://gitlab.com/$GITLAB_PROJECT_ID/-/pipelines/new"
+            echo ""
+            echo "Or wait for the push mirror to sync, then pipelines will appear automatically."
           else
             echo "⚠️  Could not trigger pipeline (HTTP $HTTP_CODE): $BODY"
-            echo "Branch may need to sync first. Check GitLab manually."
-            # Don't fail - branch sync is the important part
+            echo ""
+            echo "The branch exists in GitLab. You can manually trigger the pipeline:"
+            echo "  https://gitlab.com/$GITLAB_PROJECT_ID/-/pipelines/new"
+            echo "  Select branch: $BRANCH_NAME"
           fi
 
       - name: Summary
