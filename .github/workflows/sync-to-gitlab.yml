@@ -42,7 +42,7 @@ jobs:
 
       - name: Sync branch to GitLab
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.gitlab_token }}
           GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID || 'mariomuja/interface-configurator' }}
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
@@ -75,7 +75,7 @@ jobs:
 
       - name: Trigger GitLab Pipeline
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.gitlab_token }}
           GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID || 'mariomuja/interface-configurator' }}
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
