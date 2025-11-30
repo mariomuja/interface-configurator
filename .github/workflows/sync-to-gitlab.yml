@@ -92,10 +92,13 @@ jobs:
           
           # Push the branch to GitLab (force push to overwrite if needed)
           echo "Pushing branch to GitLab..."
-          git push gitlab "$BRANCH_NAME" --force || {
+          if git push gitlab "$BRANCH_NAME" --force; then
+            echo "✅ Entire branch pushed to GitLab successfully"
+            echo "SKIP_FILE_PUSH=true" >> $GITHUB_ENV
+          else
             echo "⚠️  Git push failed, will try API method for .gitlab-ci.yml only"
-            echo "Pushing .gitlab-ci.yml file to branch..."
-          }
+            echo "SKIP_FILE_PUSH=false" >> $GITHUB_ENV
+          fi
           
           # Remove the temporary remote
           git remote remove gitlab
