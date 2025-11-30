@@ -135,7 +135,6 @@ test:dotnet:unit:
     - echo "Running all unit tests (excluding integration tests)..."
     - dotnet test $TEST_PROJECT 
         --configuration $BUILD_CONFIGURATION 
-        --no-build 
         --verbosity normal
         --filter "FullyQualifiedName!~Integration"
         --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-unit.xml"
@@ -172,7 +171,6 @@ test:dotnet:integration:
     - echo "Running all integration tests..."
     - dotnet test $TEST_PROJECT 
         --configuration $BUILD_CONFIGURATION 
-        --no-build 
         --verbosity normal
         --filter "FullyQualifiedName~Integration"
         --logger "junit;LogFilePath=${CI_PROJECT_DIR}/test-results/junit-integration.xml"
