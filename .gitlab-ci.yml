@@ -619,6 +619,8 @@ test:service-bus:
     - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
+    - job: build:dotnet
+      artifacts: true
     - job: deploy:production
       optional: true
 
@@ -659,6 +661,8 @@ test:blob-storage:
     - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
+    - job: build:dotnet
+      artifacts: true
     - job: deploy:production
       optional: true
 
@@ -700,6 +704,8 @@ test:container-apps:
     - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
+    - job: build:dotnet
+      artifacts: true
     - job: deploy:production
       optional: true
 
@@ -740,6 +746,8 @@ test:container-registry:
     - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
+    - job: build:dotnet
+      artifacts: true
     - job: package:adapter-containers
       optional: true
 
@@ -825,6 +833,8 @@ test:adapter-pipeline:
     - if: $CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_TAG
       when: on_success
   needs:
+    - job: build:dotnet
+      artifacts: true
     - job: deploy:production
       optional: true
     - job: package:adapter-containers
