@@ -234,6 +234,7 @@ test:e2e:
   image: node:${NODE_VERSION}
   dependencies:
     - build:frontend
+  <<: *node_cache
   variables:
     CI: "true"
   before_script:
@@ -242,6 +243,7 @@ test:e2e:
     - echo "Installing Playwright browsers and system dependencies..."
     - npx playwright install --with-deps chromium firefox webkit
     - echo "Playwright setup completed"
+    - mkdir -p test-results
   script:
     - echo "Running end-to-end tests with Playwright..."
     - npx playwright test
