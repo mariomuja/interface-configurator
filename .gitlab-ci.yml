@@ -15,6 +15,7 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "external"'
 
 stages:
+  - sync
   - build
   - test
   - package
@@ -63,6 +64,100 @@ variables:
 # Branch filter: Only process branches starting with "ready/" OR main branch
 # Feature branches must use "ready/" prefix (e.g., ready/myfeature)
 # Main branch runs pipelines directly (no prefix needed)
+
+# ============================================
+# SYNC STAGE - Push commits to GitHub
+# ============================================
+
+sync:push-to-github:
+  stage: sync
+  image: alpine/git:latest
+  variables:
+    GIT_STRATEGY: clone
+  before_script:
+    - apk add --no-cache openssh-client || true
+    - git config --global user.name "GitLab CI"
+    - git config --global user.email "gitlab-ci@noreply.gitlab.com"
+  script:
+    - |
+      echo "Syncing commits to GitHub..."
+      
+      # Check if GitHub remote is configured
+      if ! git remote | grep -q "^github$"; then
+        echo "Adding GitHub remote..."
+        if [ -z "$GITHUB_REPO_URL" ]; then
+          echo "⚠️  GITHUB_REPO_URL not set. Please configure CI/CD variable:"
+          echo "   - GITHUB_REPO_URL (e.g., https://github.com/mariomuja/interface-configurator.git)"
+          echo "   Or use SSH: git@github.com:mariomuja/interface-configurator.git"
+          exit 0
+        fi
+        
+        # Add GitHub remote
+        if [[ "$GITHUB_REPO_URL" == *"@"* ]]; then
+          # SSH URL
+          git remote add github "$GITHUB_REPO_URL" || git remote set-url github "$GITHUB_REPO_URL"
+        else
+          # HTTPS URL - use token if provided
+          if [ -n "$GITHUB_TOKEN" ]; then
+            GITHUB_URL_WITH_TOKEN=$(echo "$GITHUB_REPO_URL" | sed "s|https://|https://${GITHUB_TOKEN}@|")
+            git remote add github "$GITHUB_URL_WITH_TOKEN" || git remote set-url github "$GITHUB_URL_WITH_TOKEN"
+          else
+            git remote add github "$GITHUB_REPO_URL" || git remote set-url github "$GITHUB_REPO_URL"
+          fi
+        fi
+      fi
+      
+      # Fetch from GitHub to check what's there
+      echo "Fetching from GitHub..."
+      git fetch github --prune || echo "⚠️  Could not fetch from GitHub (may need authentication)"
+      
+      # Get current branch name
+      CURRENT_BRANCH="${CI_COMMIT_REF_NAME}"
+      echo "Current branch: $CURRENT_BRANCH"
+      
+      # Push current branch to GitHub
+      echo "Pushing branch '$CURRENT_BRANCH' to GitHub..."
+      
+      # Use force push for ready/* branches to ensure sync, regular push for main
+      if [[ "$CURRENT_BRANCH" =~ ^ready/ ]]; then
+        echo "Using force push for ready/* branch..."
+        git push github "HEAD:$CURRENT_BRANCH" --force || {
+          echo "⚠️  Force push failed, trying regular push..."
+          git push github "HEAD:$CURRENT_BRANCH" || {
+            echo "❌ Failed to push to GitHub"
+            echo "   This may be due to:"
+            echo "   1. Authentication issues (check GITHUB_TOKEN or SSH keys)"
+            echo "   2. Branch protection rules in GitHub"
+            echo "   3. Divergent history"
+            exit 0  # Don't fail the pipeline
+          }
+        }
+      else
+        echo "Using regular push for branch: $CURRENT_BRANCH"
+        git push github "HEAD:$CURRENT_BRANCH" || {
+          echo "⚠️  Failed to push to GitHub"
+          echo "   This may be due to:"
+          echo "   1. Authentication issues (check GITHUB_TOKEN or SSH keys)"
+          echo "   2. Branch protection rules in GitHub"
+          echo "   3. Divergent history"
+          exit 0  # Don't fail the pipeline
+        }
+      fi
+      
+      echo "✅ Successfully pushed '$CURRENT_BRANCH' to GitHub"
+      
+      # Also push tags if any
+      if git describe --tags --exact-match HEAD 2>/dev/null; then
+        TAG=$(git describe --tags --exact-match HEAD)
+        echo "Pushing tag '$TAG' to GitHub..."
+        git push github "$TAG" || echo "⚠️  Could not push tag (non-critical)"
+      fi
+  rules:
+    - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
+      changes:
+        - "**/*"
+  allow_failure: true  # Don't block pipeline if GitHub sync fails
+  needs: []  # Run immediately, no dependencies
 
 # ============================================
 # BUILD STAGE
