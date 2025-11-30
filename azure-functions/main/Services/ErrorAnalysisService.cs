@@ -39,7 +39,30 @@ public class ErrorAnalysisService
             var currentError = errorReport.CurrentError;
             if (currentError == null)
             {
+                // If no current error but we have function call history, analyze that
+                if (errorReport.FunctionCallHistory != null && errorReport.FunctionCallHistory.Count > 0)
+                {
+                    var failedCall = errorReport.FunctionCallHistory.FirstOrDefault(f => !f.Success && f.Error != null);
+                    if (failedCall != null && failedCall.Error != null)
+                    {
+                        // Use the failed function call as the error source
+                        var errorMessage = failedCall.Error.Message ?? string.Empty;
+                        var errorName = failedCall.Error.Name;
+                        var functionName = failedCall.FunctionName ?? string.Empty;
+                        var component = failedCall.Component ?? string.Empty;
+                        
+                        result.AffectedFiles = InferFileFromFunction(functionName, component) != null 
+                            ? new List<AffectedFile> { InferFileFromFunction(functionName, component)! }
+                            : new List<AffectedFile>();
+                        result.RootCause = AnalyzeRootCause(errorMessage, string.Empty, functionName, errorName);
+                        result.SuggestedFixes = GenerateSuggestedFixes(errorReport, result.RootCause, result.AffectedFiles);
+                        result.ConfidenceScore = CalculateConfidenceScore(result);
+                        return result;
+                    }
+                }
+                
                 result.RootCause.Summary = "No error information available";
+                result.ConfidenceScore = 0.1; // Low confidence but not zero
                 return result;
             }
 
@@ -52,7 +75,8 @@ public class ErrorAnalysisService
             result.AffectedFiles = AnalyzeStackTrace(stackTrace, functionName, component);
 
             // Analyze error message to determine root cause
-            result.RootCause = AnalyzeRootCause(errorMessage, stackTrace, functionName);
+            var errorName = currentError.Error?.Name;
+            result.RootCause = AnalyzeRootCause(errorMessage, stackTrace, functionName, errorName);
 
             // Generate suggested fixes
             result.SuggestedFixes = GenerateSuggestedFixes(errorReport, result.RootCause, result.AffectedFiles);
@@ -249,7 +273,7 @@ public class ErrorAnalysisService
         return "low";
     }
 
-    private RootCauseAnalysis AnalyzeRootCause(string errorMessage, string stackTrace, string functionName)
+    private RootCauseAnalysis AnalyzeRootCause(string errorMessage, string stackTrace, string functionName, string? errorName = null)
     {
         var analysis = new RootCauseAnalysis
         {
@@ -259,12 +283,16 @@ public class ErrorAnalysisService
             ErrorPattern = string.Empty
         };
 
-        // Analyze error message patterns
+        // Analyze error message and name patterns
         var lowerMessage = errorMessage.ToLowerInvariant();
+        var lowerName = errorName?.ToLowerInvariant() ?? string.Empty;
 
-        // Null reference errors
-        if (lowerMessage.Contains("null") || lowerMessage.Contains("undefined") || 
-            lowerMessage.Contains("cannot read") || lowerMessage.Contains("cannot access"))
+        // Null reference errors (check name first, then message)
+        if (lowerName.Contains("nullreference") || lowerName.Contains("null reference") ||
+            (lowerMessage.Contains("null") && !lowerMessage.Contains("typeerror")) ||
+            (lowerMessage.Contains("undefined") && !lowerMessage.Contains("typeerror")) ||
+            (lowerMessage.Contains("cannot read") && lowerMessage.Contains("undefined")) ||
+            (lowerMessage.Contains("cannot access") && lowerMessage.Contains("null")))
         {
             analysis.Category = "NullReference";
             analysis.Summary = "Null or undefined reference error";
@@ -273,8 +301,9 @@ public class ErrorAnalysisService
             analysis.LikelyCauses.Add("Optional property accessed without checking");
             analysis.ErrorPattern = "NullReference";
         }
-        // Type errors
-        else if (lowerMessage.Contains("type") && (lowerMessage.Contains("error") || lowerMessage.Contains("cannot")))
+        // Type errors (check name first, then message)
+        else if (lowerName.Contains("typeerror") || lowerName.Contains("type error") ||
+                 (lowerMessage.Contains("typeerror") || (lowerMessage.Contains("type") && lowerMessage.Contains("error"))))
         {
             analysis.Category = "TypeError";
             analysis.Summary = "Type mismatch or incorrect type usage";
@@ -283,11 +312,13 @@ public class ErrorAnalysisService
             analysis.LikelyCauses.Add("Function parameter type mismatch");
             analysis.ErrorPattern = "TypeError";
         }
-        // Network/HTTP errors
+        // Network/HTTP errors (including timeout)
         else if (lowerMessage.Contains("network") || lowerMessage.Contains("fetch") || 
-                 lowerMessage.Contains("http") || lowerMessage.Contains("connection"))
+                 lowerMessage.Contains("http") || lowerMessage.Contains("connection") ||
+                 lowerMessage.Contains("timeout") || lowerMessage.Contains("timed out") ||
+                 lowerName.Contains("timeout") || lowerName.Contains("network"))
         {
-            analysis.Category = "NetworkError";
+            analysis.Category = "Network";
             analysis.Summary = "Network or HTTP request error";
             analysis.LikelyCauses.Add("Server unavailable or unreachable");
             analysis.LikelyCauses.Add("Network timeout");
@@ -324,7 +355,8 @@ public class ErrorAnalysisService
     {
         var fixes = new List<SuggestedFix>();
 
-        if (affectedFiles.Count == 0)
+        // Generate fixes even if no affected files (based on root cause)
+        if (affectedFiles.Count == 0 && rootCause.Category == "Unknown")
         {
             return fixes;
         }
@@ -338,6 +370,7 @@ public class ErrorAnalysisService
             case "TypeError":
                 fixes.AddRange(GenerateTypeErrorFixes(affectedFiles, errorReport));
                 break;
+            case "Network":
             case "NetworkError":
                 fixes.AddRange(GenerateNetworkErrorFixes(affectedFiles, errorReport));
                 break;
@@ -352,6 +385,17 @@ public class ErrorAnalysisService
                     Priority = "medium"
                 });
                 break;
+        }
+        
+        // If no fixes generated and we have a root cause, add a generic fix
+        if (fixes.Count == 0 && rootCause.Category != "Unknown")
+        {
+            fixes.Add(new SuggestedFix
+            {
+                Description = $"Address {rootCause.Category} error: {rootCause.Summary}",
+                CodeChanges = new List<CodeChange>(),
+                Priority = "medium"
+            });
         }
 
         return fixes;
@@ -422,13 +466,13 @@ public class ErrorAnalysisService
 
         fixes.Add(new SuggestedFix
         {
-            Description = "Add retry logic and error handling for network requests",
+            Description = "Add retry logic and error handling for network requests. Consider implementing timeout handling and retry with exponential backoff.",
             CodeChanges = new List<CodeChange>
             {
                 new CodeChange
                 {
-                    FilePath = "frontend/src/app/services/transport.service.ts",
-                    LineNumber = 0,
+                    FilePath = files.Count > 0 ? files[0].FilePath : "frontend/src/app/services/transport.service.ts",
+                    LineNumber = files.Count > 0 && files[0].LineNumber.HasValue ? files[0].LineNumber.Value : 0,
                     ChangeType = "AddRetryLogic",
                     OldCode = "// HTTP request",
                     NewCode = "// Add retry with exponential backoff"
