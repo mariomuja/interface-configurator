@@ -190,14 +190,7 @@ test:mutation:
     - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters "html" "json" "progress" --output "../mutation-reports" --log-level "info" --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level "Standard" || true
     - cd ..
     - echo "Mutation testing completed"
-    - |
-      if [ -f "mutation-reports/mutation-report.json" ]; then
-        echo "✅ Mutation report generated successfully"
-        MUTATION_SCORE=$(cat mutation-reports/mutation-report.json | grep -o '"mutationScore":[0-9.]*' | cut -d':' -f2 || echo "0")
-        echo "Mutation Score: $MUTATION_SCORE%"
-      else
-        echo "⚠️  Mutation report not found"
-      fi
+    - if [ -f "mutation-reports/mutation-report.json" ]; then echo "✅ Mutation report generated successfully"; MUTATION_SCORE=$(cat mutation-reports/mutation-report.json | grep -o '"mutationScore":[0-9.]*' | cut -d':' -f2 || echo "0"); echo "Mutation Score: $MUTATION_SCORE%"; else echo "⚠️  Mutation report not found"; fi
   artifacts:
     when: always
     paths:
