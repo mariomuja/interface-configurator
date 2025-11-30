@@ -48,29 +48,41 @@ jobs:
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           COMMIT_SHA="${{ steps.commit.outputs.commit_sha }}"
           PROJECT_PATH=$(echo "$GITLAB_PROJECT_ID" | sed 's/\//%2F/g')
+          BRANCH_PATH=$(echo "$BRANCH_NAME" | sed 's/\//%2F/g')
           
           echo "Syncing branch '$BRANCH_NAME' (commit: $COMMIT_SHA) to GitLab..."
           
-          # Create or update branch in GitLab
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          # Check if branch exists in GitLab
+          CHECK_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
             --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data "{\"branch\":\"$BRANCH_NAME\",\"ref\":\"$COMMIT_SHA\"}" \
-            "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/branches")
+            "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/branches/$BRANCH_PATH")
           
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+          CHECK_HTTP_CODE=$(echo "$CHECK_RESPONSE" | tail -n1)
           
-          if [ "$HTTP_CODE" = "201" ]; then
-            echo "✅ Branch created successfully in GitLab"
-          elif [ "$HTTP_CODE" = "400" ] && echo "$BODY" | grep -q "already exists"; then
-            echo "Branch already exists, updating..."
-            # Update branch by deleting and recreating, or use PUT if available
-            # For now, we'll try to trigger pipeline which will work if branch exists
-            echo "✅ Branch already exists in GitLab"
+          if [ "$CHECK_HTTP_CODE" = "200" ]; then
+            echo "Branch already exists, will be updated by push mirror"
+            echo "✅ Branch exists in GitLab"
           else
-            echo "❌ Error syncing branch (HTTP $HTTP_CODE): $BODY"
-            exit 1
+            # Create branch using main as base (GitLab API requires ref to be an existing branch)
+            echo "Creating branch based on main..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data "{\"branch\":\"$BRANCH_NAME\",\"ref\":\"main\"}" \
+              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/branches")
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            
+            if [ "$HTTP_CODE" = "201" ]; then
+              echo "✅ Branch created in GitLab (based on main)"
+              echo "Note: Branch will be updated to correct commit when push mirror syncs"
+            elif [ "$HTTP_CODE" = "400" ] && echo "$BODY" | grep -q "already exists"; then
+              echo "✅ Branch already exists in GitLab"
+            else
+              echo "❌ Error creating branch (HTTP $HTTP_CODE): $BODY"
+              exit 1
+            fi
           fi
 
       - name: Trigger GitLab Pipeline
