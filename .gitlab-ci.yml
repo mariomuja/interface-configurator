@@ -1,6 +1,17 @@
 # GitLab CI/CD Pipeline for Interface Configurator
 # This pipeline builds, tests, and optionally deploys the application
 
+# Workflow rules: Always run pipelines on push events (including from mirroring)
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "api"
+    - if: $CI_PIPELINE_SOURCE == "external"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
 stages:
   - build
   - test
