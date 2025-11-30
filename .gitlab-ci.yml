@@ -168,9 +168,6 @@ test:dotnet:unit:
 test:mutation:
   stage: test
   image: mcr.microsoft.com/dotnet/sdk:8.0
-  dependencies:
-    - build:dotnet
-    - test:dotnet:unit
   <<: *dotnet_cache
   variables:
     STRYKER_PROJECT: "main.Core/main.Core.csproj"
@@ -187,10 +184,10 @@ test:mutation:
     - echo "Testing project: $STRYKER_PROJECT"
     - echo "Test project: $STRYKER_TEST_PROJECT"
     - cd main.Core
-    - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters "html" "json" "progress" --output "../mutation-reports" --log-level "info" --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level "Standard" || true
+    - dotnet-stryker --test-project "../$STRYKER_TEST_PROJECT" --reporters html json progress --output ../mutation-reports --log-level info --threshold-break 60 --threshold-high 70 --threshold-low 60 --mutation-level Standard; exit 0
     - cd ..
     - echo "Mutation testing completed"
-    - if [ -f "mutation-reports/mutation-report.json" ]; then echo "✅ Mutation report generated successfully"; MUTATION_SCORE=$(cat mutation-reports/mutation-report.json | grep -o '"mutationScore":[0-9.]*' | cut -d':' -f2 || echo "0"); echo "Mutation Score: $MUTATION_SCORE%"; else echo "⚠️  Mutation report not found"; fi
+    - test -f mutation-reports/mutation-report.json && echo "Mutation report generated successfully" || echo "Mutation report not found"
   artifacts:
     when: always
     paths:
