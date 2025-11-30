@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -66,7 +67,7 @@ public class LoginTests
         var headers = new HttpHeadersCollection();
         mockResponse.Setup(x => x.StatusCode).Returns(HttpStatusCode.OK);
         mockResponse.Setup(x => x.Headers).Returns(headers);
-        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         
         _mockRequest.Setup(x => x.CreateResponse(It.IsAny<HttpStatusCode>()))
@@ -99,7 +100,7 @@ public class LoginTests
         var headers = new HttpHeadersCollection();
         mockResponse.Setup(x => x.StatusCode).Returns(HttpStatusCode.OK);
         mockResponse.Setup(x => x.Headers).Returns(headers);
-        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<System.Threading.CancellationToken>()))
+        mockResponse.Setup(x => x.WriteStringAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         
         _mockRequest.Setup(x => x.CreateResponse(It.IsAny<HttpStatusCode>()))
