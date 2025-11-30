@@ -95,7 +95,7 @@ public class BatchProcessingServiceTests
                 items,
                 (batch, ct) =>
                 {
-                    return Task.FromException<List<string>>(new InvalidOperationException("Test error"));
+                    return Task.FromException<string>(new InvalidOperationException("Test error"));
                 }
             );
         });

@@ -403,7 +403,7 @@ public class Bootstrap
         }
     }
 
-    private async Task<BootstrapCheck> CheckFunctionAppConfigurationAsync()
+    private Task<BootstrapCheck> CheckFunctionAppConfigurationAsync()
     {
         try
         {
@@ -434,23 +434,23 @@ public class Bootstrap
                 ? "Function App configuration is valid" 
                 : $"Configuration issues: {string.Join(", ", issues)}";
 
-            return new BootstrapCheck
+            return Task.FromResult(new BootstrapCheck
             {
                 Name = "FunctionAppConfiguration",
                 Status = status,
                 Message = message,
                 Details = string.Join("\n", checks)
-            };
+            });
         }
         catch (Exception ex)
         {
-            return new BootstrapCheck
+            return Task.FromResult(new BootstrapCheck
             {
                 Name = "FunctionAppConfiguration",
                 Status = "Unhealthy",
                 Message = $"Configuration check failed: {ex.Message}",
                 Details = ex.ToString()
-            };
+            });
         }
     }
 
