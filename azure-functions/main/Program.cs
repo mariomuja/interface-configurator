@@ -151,7 +151,7 @@ var host = new HostBuilder()
                 
                 var serviceBusClient = new Azure.Messaging.ServiceBus.ServiceBusClient(serviceBusConnectionString);
                 var logger = sp.GetService<ILogger<ServiceBusReceiverCache>>();
-                return new ServiceBusReceiverCache(serviceBusClient, logger);
+                return new ServiceBusReceiverCache(serviceBusClient, logger ?? sp.GetRequiredService<ILogger<ServiceBusReceiverCache>>());
             });
             
             // Register Service Bus Lock Renewal Background Service
@@ -444,13 +444,15 @@ var host = new HostBuilder()
                 var dataService = sp.GetRequiredService<IDataService>();
                 var serviceBusService = sp.GetService<IServiceBusService>();
                 var logger = sp.GetService<ILogger<SqlServerAdapter>>();
-                if (context == null)
+                // GetService returns ApplicationDbContext?, constructor expects ApplicationDbContext?
+                // Use 'as' operator to handle nullable conversion
+                var nullableContext = context as InterfaceConfigurator.Main.Data.ApplicationDbContext?;
+                if (nullableContext == null)
                 {
                     logger?.LogWarning("ApplicationDbContext is not available. SqlServerAdapter may not work correctly.");
-                    // Still allow registration - will fail when actually used
                     throw new InvalidOperationException("ApplicationDbContext is required for SqlServerAdapter");
                 }
-                return new SqlServerAdapter(context, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
+                return new SqlServerAdapter(nullableContext, dynamicTableService, dataService, serviceBusService, "FromCsvToSqlServerExample", null, null, null, null, null, null, null, null, null, null, adapterRole: "Destination", logger: logger, statisticsService: null);
             });
             
         }

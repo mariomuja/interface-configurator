@@ -281,7 +281,17 @@ public class HealthCheck
             var containerAppEnvironmentName = Environment.GetEnvironmentVariable("ContainerAppEnvironmentName") ?? "cae-adapter-instances";
             
             // Check if Azure credentials are available
-            var hasCredentials = Azure.Identity.DefaultAzureCredential.TryGetDefaultAzureCredential(out _);
+            // TryGetDefaultAzureCredential doesn't exist - try to create DefaultAzureCredential instead
+            bool hasCredentials = false;
+            try
+            {
+                var credential = new Azure.Identity.DefaultAzureCredential();
+                hasCredentials = true;
+            }
+            catch
+            {
+                hasCredentials = false;
+            }
             
             if (hasCredentials)
             {

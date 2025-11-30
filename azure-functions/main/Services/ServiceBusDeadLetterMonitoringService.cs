@@ -67,14 +67,30 @@ public class ServiceBusDeadLetterMonitoringService : BackgroundService
                 try
                 {
                     // Get all subscriptions for this topic
+                    // Note: GetSubscriptionsAsync returns SubscriptionProperties which may not have a direct Name property
+                    // We need to get subscription runtime properties separately to access the subscription name
+                    var subscriptions = new List<string>();
                     await foreach (var subscriptionProperties in adminClient.GetSubscriptionsAsync(topicProperties.Name, cancellationToken))
                     {
+                        // Extract subscription name - in Azure Service Bus SDK, subscription name might be in the path
+                        // or we need to use GetSubscriptionAsync with the subscription name
+                        // For now, we'll get runtime properties which should include the subscription name
+                        var subscriptionName = subscriptionProperties.SubscriptionName ?? "unknown";
                         try
                         {
+                            // Try to get subscription runtime properties to find the subscription name
+                            // The subscription name is typically the identifier in the subscription path
+                            // We'll need to iterate and get runtime properties for each to find dead letters
+                            
+                            var subscriptionRuntimeProps = await adminClient.GetSubscriptionRuntimePropertiesAsync(
+                                topicProperties.Name,
+                                subscriptionName,
+                                cancellationToken);
+                            
                             // Get runtime properties to check dead letter count
                             var runtimeProperties = await adminClient.GetSubscriptionRuntimePropertiesAsync(
                                 topicProperties.Name, 
-                                subscriptionProperties.Name, 
+                                subscriptionName, 
                                 cancellationToken);
 
                             var deadLetterCount = runtimeProperties.Value.DeadLetterMessageCount;
@@ -83,7 +99,7 @@ public class ServiceBusDeadLetterMonitoringService : BackgroundService
                             {
                                 _logger.LogWarning(
                                     "Dead Letter Queue Alert: Topic={Topic}, Subscription={Subscription}, DeadLetterCount={DeadLetterCount}",
-                                    topicProperties.Name, subscriptionProperties.Name, deadLetterCount);
+                                    topicProperties.Name, subscriptionName, deadLetterCount);
 
                                 // Try to peek at dead-lettered messages to get details
                                 try
@@ -91,7 +107,7 @@ public class ServiceBusDeadLetterMonitoringService : BackgroundService
                                     await using var client = new ServiceBusClient(_connectionString);
                                     await using var receiver = client.CreateReceiver(
                                         topicProperties.Name,
-                                        subscriptionProperties.Name,
+                                        subscriptionName,
                                         new ServiceBusReceiverOptions
                                         {
                                             SubQueue = SubQueue.DeadLetter,
@@ -113,14 +129,14 @@ public class ServiceBusDeadLetterMonitoringService : BackgroundService
                                 catch (Exception peekEx)
                                 {
                                     _logger.LogWarning(peekEx, "Failed to peek dead-lettered messages for Topic={Topic}, Subscription={Subscription}",
-                                        topicProperties.Name, subscriptionProperties.Name);
+                                        topicProperties.Name, subscriptionName);
                                 }
                             }
                         }
                         catch (Exception subEx)
                         {
                             _logger.LogWarning(subEx, "Error checking subscription: Topic={Topic}, Subscription={Subscription}",
-                                topicProperties.Name, subscriptionProperties.Name);
+                                topicProperties.Name, subscriptionName);
                         }
                     }
                 }

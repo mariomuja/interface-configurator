@@ -327,10 +327,6 @@ public class AdapterFactory : IAdapterFactory
             sftpAdapter,
             fileAdapter,
             statisticsService: statisticsService,
-            schemaRegistry: schemaRegistry,
-            dataQualityService: dataQualityService,
-            messageTrackingService: messageTrackingService,
-            adaptiveBatchingService: adaptiveBatchingService,
             skipHeaderLines: skipHeaderLines,
             skipFooterLines: skipFooterLines,
             quoteCharacter: quoteCharacter,
@@ -467,8 +463,11 @@ public class AdapterFactory : IAdapterFactory
         var messageTrackingService = _serviceProvider.GetService<MessageTrackingService>();
         var adaptiveBatchingService = _serviceProvider.GetService<AdaptiveBatchingService>();
         
+        // defaultContext is ApplicationDbContext?, constructor expects ApplicationDbContext?
+        // Use 'as' operator to handle nullable conversion
+        var nullableContext = defaultContext as InterfaceConfigurator.Main.Data.ApplicationDbContext?;
         return new SqlServerAdapter(
-            (InterfaceConfigurator.Main.Data.ApplicationDbContext?)defaultContext,
+            nullableContext,
             dynamicTableService,
             dataService,
             serviceBusService,
@@ -490,11 +489,7 @@ public class AdapterFactory : IAdapterFactory
             updateStatement: updateStatement,
             deleteStatement: deleteStatement,
             jqService: jqService,
-            jqScriptFile: jqScriptFile,
-            schemaRegistry: schemaRegistry,
-            dataQualityService: dataQualityService,
-            messageTrackingService: messageTrackingService,
-            adaptiveBatchingService: adaptiveBatchingService);
+            jqScriptFile: jqScriptFile);
     }
 
     private SapAdapter CreateSapAdapter(InterfaceConfiguration config, Dictionary<string, JsonElement> configDict, bool isSource)

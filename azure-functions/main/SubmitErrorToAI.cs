@@ -4,8 +4,9 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Helpers;
-using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Core.Models;
 using InterfaceConfigurator.Main.Data;
+using InterfaceConfigurator.Main.Models;
 
 namespace InterfaceConfigurator.Main;
 
@@ -85,15 +86,14 @@ public class SubmitErrorToAIFunction
             }
 
             // Store error in ProcessLogs table
-            var processLog = new ProcessLog
+            var processLog = new InterfaceConfigurator.Main.Core.Models.ProcessLog
             {
-                datetime_created = DateTime.UtcNow,
+                Timestamp = DateTime.UtcNow,
                 Level = "Error",
                 Message = $"Error Report: {errorMessage}",
                 Details = errorDetails,
                 Component = component.Length > 200 ? component.Substring(0, 200) : component,
-                InterfaceName = null, // Can be extracted from errorReport if available
-                MessageId = null
+                InterfaceName = null // Can be extracted from errorReport if available
             };
 
             // Truncate Message if too long

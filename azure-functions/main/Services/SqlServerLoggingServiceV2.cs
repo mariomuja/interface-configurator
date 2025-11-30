@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Core.Models;
 
 namespace InterfaceConfigurator.Main.Services;
 
@@ -72,7 +72,7 @@ public class SqlServerLoggingServiceV2 : ILoggingService
                 Level = level,
                 Message = message,
                 Details = details ?? string.Empty,
-                datetime_created = DateTime.UtcNow
+                Timestamp = DateTime.UtcNow
             };
 
             _logQueue.Enqueue(logEntry);
@@ -124,7 +124,7 @@ public class SqlServerLoggingServiceV2 : ILoggingService
         try
         {
             // Enhanced: Use bulk insert for better performance
-            await _context.ProcessLogs.AddRangeAsync(logsToSave, cancellationToken);
+            _context.ProcessLogs.AddRange(logsToSave);
             await _context.SaveChangesAsync(cancellationToken);
             
             _logger?.LogDebug("Flushed {Count} log entries to database", logsToSave.Count);

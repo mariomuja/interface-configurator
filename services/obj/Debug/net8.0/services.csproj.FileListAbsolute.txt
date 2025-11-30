@@ -1,0 +1,16 @@
+C:\Users\mario\interface-configurator\services\bin\Debug\net8.0\services.deps.json
+C:\Users\mario\interface-configurator\services\bin\Debug\net8.0\services.dll
+C:\Users\mario\interface-configurator\services\bin\Debug\net8.0\services.pdb
+C:\Users\mario\interface-configurator\services\bin\Debug\net8.0\main.Core.dll
+C:\Users\mario\interface-configurator\services\bin\Debug\net8.0\main.Core.pdb
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.csproj.AssemblyReference.cache
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.AssemblyInfoInputs.cache
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.AssemblyInfo.cs
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.csproj.CoreCompileInputs.cache
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.sourcelink.json
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.csproj.Up2Date
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.dll
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\refint\services.dll
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\services.pdb
+C:\Users\mario\interface-configurator\services\obj\Debug\net8.0\ref\services.dll

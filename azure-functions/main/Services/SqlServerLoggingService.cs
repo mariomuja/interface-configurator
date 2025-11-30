@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using InterfaceConfigurator.Main.Core.Interfaces;
 using InterfaceConfigurator.Main.Data;
-using InterfaceConfigurator.Main.Models;
+using InterfaceConfigurator.Main.Core.Models;
 
 namespace InterfaceConfigurator.Main.Services;
 
@@ -72,7 +72,7 @@ public class SqlServerLoggingService : ILoggingService
             
             var logEntry = new ProcessLog
             {
-                datetime_created = DateTime.UtcNow,
+                Timestamp = DateTime.UtcNow,
                 Level = level.Length > 50 ? level.Substring(0, 50) : level,
                 Message = message ?? string.Empty,
                 Details = details,

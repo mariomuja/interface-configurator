@@ -4,3 +4,13 @@ C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.Assem
 C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.AssemblyInfo.cs
 C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.csproj.CoreCompileInputs.cache
 C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.sourcelink.json
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.dll
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\refint\adapters.dll
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.pdb
+C:\Users\mario\interface-configurator\adapters\bin\Release\net8.0\adapters.deps.json
+C:\Users\mario\interface-configurator\adapters\bin\Release\net8.0\adapters.dll
+C:\Users\mario\interface-configurator\adapters\bin\Release\net8.0\adapters.pdb
+C:\Users\mario\interface-configurator\adapters\bin\Release\net8.0\main.Core.dll
+C:\Users\mario\interface-configurator\adapters\bin\Release\net8.0\main.Core.pdb
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\adapters.csproj.Up2Date
+C:\Users\mario\interface-configurator\adapters\obj\Release\net8.0\ref\adapters.dll

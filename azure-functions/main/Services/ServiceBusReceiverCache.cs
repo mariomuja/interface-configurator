@@ -120,12 +120,6 @@ public class ServiceBusReceiverCache : IServiceBusReceiverCache, IDisposable
                 "[CorrelationId: {CorrelationId}] Lock renewal with lockToken string is not supported by Azure Service Bus SDK. LockToken={LockToken}",
                 correlationId, lockToken);
             return null;
-
-            _logger?.LogDebug(
-                "[CorrelationId: {CorrelationId}] Successfully renewed lock: Topic={Topic}, Subscription={Subscription}, LockToken={LockToken}, NewExpiration={NewExpiration}",
-                correlationId, topicName, subscriptionName, lockToken, newExpiration);
-
-            return newExpiration;
         }
         catch (ServiceBusException ex)
         {
