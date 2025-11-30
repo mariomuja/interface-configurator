@@ -389,7 +389,7 @@ public class SqlServerAdapter : AdapterBase
                                     rowsFailed,
                                     duration,
                                     sourceFile: sourceFile,
-                                    adapterType: _adapterRole,
+                                    adapterType: AdapterRole,
                                     adapterName: "SqlServer",
                                     adapterInstanceGuid: _adapterInstanceGuid,
                                     sourceName: null, // Not applicable for destination adapters

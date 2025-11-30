@@ -596,18 +596,18 @@ public class CsvAdapter : AdapterBase
                 : _fileAdapter.BuildDefaultBlobSourcePath(_receiveFolder);
             
             // Auto-detect delimiter from file content for FILE adapter type
-            var detectedSeparator = _fieldSeparator;
+            var detectedSeparatorForFile = _fieldSeparator;
             if ((_adapterType.Equals("FILE", StringComparison.OrdinalIgnoreCase) || _adapterType.Equals("SFTP", StringComparison.OrdinalIgnoreCase)) 
                 && (string.IsNullOrWhiteSpace(_fieldSeparator) || _fieldSeparator == "‖"))
             {
                 // Read first file to detect delimiter
                 try
                 {
-                    var pathParts = effectiveSource.Split('/', 2);
-                    if (pathParts.Length == 2)
+                    var sourcePathParts = effectiveSource.Split('/', 2);
+                    if (sourcePathParts.Length == 2)
                     {
-                        var containerName = pathParts[0];
-                        var blobPath = pathParts[1];
+                        var containerName = sourcePathParts[0];
+                        var blobPath = sourcePathParts[1];
                         var isFolder = blobPath.EndsWith("/") || (!blobPath.Contains(".") && !string.IsNullOrWhiteSpace(blobPath));
                         
                         if (isFolder || !string.IsNullOrWhiteSpace(_receiveFolder))
@@ -618,16 +618,16 @@ public class CsvAdapter : AdapterBase
                                 var firstFilePath = $"{containerName}/{filePaths.First()}";
                                 var sampleContent = await _fileAdapter.ReadFileAsync(firstFilePath, cancellationToken);
                                 var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
-                                detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
-                                _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath} for FILE adapter", detectedSeparator, filePaths.First());
+                                detectedSeparatorForFile = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
+                                _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {FilePath} for FILE adapter", detectedSeparatorForFile, filePaths.First());
                             }
                         }
                         else
                         {
                             var sampleContent = await _fileAdapter.ReadFileAsync(effectiveSource, cancellationToken);
                             var validationService = new InterfaceConfigurator.Main.Core.Services.CsvValidationService(_logger);
-                            detectedSeparator = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
-                            _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source} for FILE adapter", detectedSeparator, effectiveSource);
+                            detectedSeparatorForFile = validationService.DetectDelimiter(sampleContent, _fieldSeparator);
+                            _logger?.LogInformation("Auto-detected CSV delimiter '{Delimiter}' from file {Source} for FILE adapter", detectedSeparatorForFile, effectiveSource);
                         }
                     }
                 }
@@ -637,7 +637,7 @@ public class CsvAdapter : AdapterBase
                 }
             }
             
-            var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, detectedSeparator, effectiveSource, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
+            var (csvHeaders, csvRecords) = await _fileAdapter.ReadCsvFilesAsync(_csvProcessingService, detectedSeparatorForFile, effectiveSource, _skipHeaderLines, _skipFooterLines, _quoteCharacter, cancellationToken);
             
             // For FILE adapter type: Copy files to csv-incoming folder if reading from a different folder
             // Files in csv-incoming are processed by container apps via ProcessFilesFromIncomingAsync
