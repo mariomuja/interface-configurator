@@ -89,13 +89,8 @@ build:dotnet:
     expire_in: 1 hour
     when: on_success
   rules:
+    # Always run build on ready/* or main branches (ensures tests can always run)
     - if: $CI_COMMIT_REF_NAME =~ /^ready\// || $CI_COMMIT_REF_NAME == "main"
-      changes:
-        - "azure-functions/**/*"
-        - "main.Core/**/*"
-        - "adapters/**/*"
-        - "services/**/*"
-        - ".gitlab-ci.yml"
 
 build:frontend:
   stage: build
