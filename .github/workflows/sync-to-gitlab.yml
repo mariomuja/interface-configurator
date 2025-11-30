@@ -88,25 +88,32 @@ jobs:
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           PROJECT_PATH=$(echo "$GITLAB_PROJECT_ID" | sed 's/\//%2F/g')
           
-          # Get the .gitlab-ci.yml content from the current commit
-          CI_CONTENT=$(cat .gitlab-ci.yml | base64 -w 0)
+          # Get the .gitlab-ci.yml content and encode it properly
+          # Use base64 without line breaks and escape JSON properly
+          CI_CONTENT=$(cat .gitlab-ci.yml | base64 | tr -d '\n')
           
           echo "Creating commit with .gitlab-ci.yml file..."
+          
+          # Create JSON payload with proper escaping
+          JSON_PAYLOAD=$(cat <<EOF
+          {
+            "branch": "$BRANCH_NAME",
+            "commit_message": "Add .gitlab-ci.yml from ready branch",
+            "actions": [{
+              "action": "create",
+              "file_path": ".gitlab-ci.yml",
+              "content": "$CI_CONTENT",
+              "encoding": "base64"
+            }]
+          }
+          EOF
+          )
           
           # Create a commit that adds/updates .gitlab-ci.yml
           COMMIT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{
-              \"branch\": \"$BRANCH_NAME\",
-              \"commit_message\": \"Add .gitlab-ci.yml from ready branch\",
-              \"actions\": [{
-                \"action\": \"create\",
-                \"file_path\": \".gitlab-ci.yml\",
-                \"content\": \"$CI_CONTENT\",
-                \"encoding\": \"base64\"
-              }]
-            }" \
+            --data "$JSON_PAYLOAD" \
             "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/commits")
           
           COMMIT_HTTP_CODE=$(echo "$COMMIT_RESPONSE" | tail -n1)
@@ -114,33 +121,42 @@ jobs:
           
           if [ "$COMMIT_HTTP_CODE" = "201" ]; then
             echo "✅ .gitlab-ci.yml file pushed to GitLab branch"
-          elif [ "$COMMIT_HTTP_CODE" = "400" ] && echo "$COMMIT_BODY" | grep -q "already exists"; then
-            echo "File exists, updating..."
-            # Update existing file
-            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-              --header "Content-Type: application/json" \
-              --data "{
-                \"branch\": \"$BRANCH_NAME\",
-                \"commit_message\": \"Update .gitlab-ci.yml from ready branch\",
-                \"actions\": [{
-                  \"action\": \"update\",
-                  \"file_path\": \".gitlab-ci.yml\",
-                  \"content\": \"$CI_CONTENT\",
-                  \"encoding\": \"base64\"
+          elif [ "$COMMIT_HTTP_CODE" = "400" ]; then
+            if echo "$COMMIT_BODY" | grep -q "already exists"; then
+              echo "File exists, updating..."
+              # Update existing file
+              UPDATE_JSON=$(cat <<EOF
+              {
+                "branch": "$BRANCH_NAME",
+                "commit_message": "Update .gitlab-ci.yml from ready branch",
+                "actions": [{
+                  "action": "update",
+                  "file_path": ".gitlab-ci.yml",
+                  "content": "$CI_CONTENT",
+                  "encoding": "base64"
                 }]
-              }" \
-              "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/commits")
-            
-            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
-            if [ "$UPDATE_HTTP_CODE" = "201" ]; then
-              echo "✅ .gitlab-ci.yml file updated in GitLab branch"
+              }
+              EOF
+              )
+              
+              UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+                --header "Content-Type: application/json" \
+                --data "$UPDATE_JSON" \
+                "https://gitlab.com/api/v4/projects/$PROJECT_PATH/repository/commits")
+              
+              UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+              UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+              if [ "$UPDATE_HTTP_CODE" = "201" ]; then
+                echo "✅ .gitlab-ci.yml file updated in GitLab branch"
+              else
+                echo "⚠️  Could not update file (HTTP $UPDATE_HTTP_CODE): $UPDATE_BODY"
+              fi
             else
-              echo "⚠️  Could not update file (HTTP $UPDATE_HTTP_CODE), but branch exists"
+              echo "⚠️  Error pushing .gitlab-ci.yml (HTTP $COMMIT_HTTP_CODE): $COMMIT_BODY"
             fi
           else
             echo "⚠️  Could not push .gitlab-ci.yml (HTTP $COMMIT_HTTP_CODE): $COMMIT_BODY"
-            echo "Branch exists, but file may need to be synced by push mirror"
           fi
 
       - name: Wait for branch to be ready
