@@ -776,7 +776,8 @@ notify:email:on-failure:
       
       SUBJECT="🚨 Pipeline Failed: ${BRANCH_NAME} - ${PROJECT_NAME}"
       COMMIT_MSG=$(echo "$COMMIT_INFO" | jq -r '.message // "N/A"' | head -1)
-      MESSAGE="Pipeline failed for your ready branch: ${BRANCH_NAME}
+      MESSAGE=$(cat <<EOF
+Pipeline failed for your ready branch: ${BRANCH_NAME}
 
 Project: ${PROJECT_NAME}
 Branch: ${BRANCH_NAME}
@@ -787,7 +788,9 @@ Commit Message: ${COMMIT_MSG}
 
 Please check the pipeline logs and fix the issues.
 
-Pipeline URL: ${PIPELINE_URL}"
+Pipeline URL: ${PIPELINE_URL}
+EOF
+)
       
       # Send email via configured email service
       if [ -n "$EMAIL_API_URL" ] && [ -n "$EMAIL_API_KEY" ]; then
