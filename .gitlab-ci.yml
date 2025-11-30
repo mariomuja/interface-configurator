@@ -73,9 +73,22 @@ build:dotnet:
   image: mcr.microsoft.com/dotnet/sdk:8.0
   <<: *dotnet_cache
   script:
-    - echo "Restoring NuGet packages..."
+    - echo "=== Build Environment ==="
+    - echo "Solution path: $SOLUTION_PATH"
+    - echo "Build configuration: $BUILD_CONFIGURATION"
+    - echo "Current directory: $(pwd)"
+    - echo ""
+    - echo "=== Checking for solution file ==="
+    - ls -la $SOLUTION_PATH || echo "Solution file not found at $SOLUTION_PATH"
+    - find . -name "*.sln" -type f | head -10 || echo "No .sln files found"
+    - echo ""
+    - echo "=== Directory structure ==="
+    - ls -la azure-functions/ | head -20 || echo "azure-functions directory not found"
+    - echo ""
+    - echo "=== Restoring NuGet packages ==="
     - dotnet restore $SOLUTION_PATH
-    - echo "Building solution..."
+    - echo ""
+    - echo "=== Building solution ==="
     - dotnet build $SOLUTION_PATH --configuration $BUILD_CONFIGURATION --no-restore
     - echo "Build completed successfully"
   artifacts:
@@ -705,6 +718,8 @@ lint:frontend:
         - "frontend/**/*.html"
         - ".gitlab-ci.yml"
 
-#   T r i g g e r   G i t L a b   m i r r o r   s y n c  
- #   T r i g g e r   s y n c   a f t e r   t o k e n   u p d a t e  
+#   T r i g g e r   G i t L a b   m i r r o r   s y n c 
+ 
+ #   T r i g g e r   s y n c   a f t e r   t o k e n   u p d a t e 
+ 
  
