@@ -28,10 +28,11 @@ pipeline {
             }
             steps {
                 sh '''
+                  export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Restoring NuGet packages..."
-                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore "$SOLUTION_PATH"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore "$SOLUTION_PATH"
                   echo "Building solution..."
-                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
                   echo "Build completed successfully"
                 '''
             }
@@ -47,10 +48,11 @@ pipeline {
             steps {
                 dir(env.FRONTEND_PATH) {
                     sh '''
+                      export PATH="/usr/bin:/usr/local/bin:$PATH"
                       echo "Installing Node.js dependencies..."
-                      docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm ci
+                      /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm ci
                       echo "Building Angular frontend..."
-                      docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm run build:prod
+                      /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm run build:prod
                       echo "Frontend build completed successfully"
                     '''
                 }
@@ -66,9 +68,10 @@ pipeline {
             }
             steps {
                 sh '''
+                  export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Running all unit tests (excluding integration tests)..."
                   mkdir -p test-results
-                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test "$TEST_PROJECT" \
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test "$TEST_PROJECT" \
                     --configuration "$BUILD_CONFIGURATION" \
                     --verbosity normal \
                     --filter "FullyQualifiedName!~Integration" \
@@ -92,10 +95,11 @@ pipeline {
             }
             steps {
                 sh '''
+                  export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Packaging .NET artifacts..."
                   mkdir -p "$ARTIFACTS_PATH"
-                  docker run --rm -v "$PWD:/workspace" -w /workspace/azure-functions/main mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../../$ARTIFACTS_PATH/azure-functions"
-                  docker run --rm -v "$PWD:/workspace" -w /workspace/main.Core mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../$ARTIFACTS_PATH/main.Core"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace/azure-functions/main mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../../$ARTIFACTS_PATH/azure-functions"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace/main.Core mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../$ARTIFACTS_PATH/main.Core"
                   echo "Packaging completed"
                 '''
             }
@@ -135,8 +139,9 @@ pipeline {
             }
             steps {
                 sh '''
+                  export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Setting up deployment environment..."
-                  docker run --rm -v "$PWD:/workspace" -w /workspace \
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace \
                     -e AZURE_CLIENT_ID="$AZURE_CLIENT_ID" \
                     -e AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
                     -e AZURE_TENANT_ID="$AZURE_TENANT_ID" \
