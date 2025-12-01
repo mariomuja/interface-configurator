@@ -3,7 +3,6 @@ pipeline {
 
     options {
         timestamps()
-        ansiColor('xterm')
     }
 
     environment {
@@ -22,27 +21,17 @@ pipeline {
         GITHUB_REPO          = "interface-configurator"
     }
 
-    triggers {
-        // In Kombination mit Multibranch-Pipeline: Branch-Scans/Webhooks kommen vom Job, nicht von hier
-    }
-
     stages {
         stage('Build .NET') {
             when {
                 expression { isReadyOrMain() }
             }
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_VERSION}"
-                    reuseNode true
-                }
-            }
             steps {
                 sh '''
                   echo "Restoring NuGet packages..."
-                  dotnet restore "$SOLUTION_PATH"
+                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore "$SOLUTION_PATH"
                   echo "Building solution..."
-                  dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
+                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
                   echo "Build completed successfully"
                 '''
             }
@@ -55,19 +44,13 @@ pipeline {
                     changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
                 }
             }
-            agent {
-                docker {
-                    image "node:${env.NODE_VERSION}"
-                    reuseNode true
-                }
-            }
             steps {
                 dir(env.FRONTEND_PATH) {
                     sh '''
                       echo "Installing Node.js dependencies..."
-                      npm ci
+                      docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm ci
                       echo "Building Angular frontend..."
-                      npm run build:prod
+                      docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm run build:prod
                       echo "Frontend build completed successfully"
                     '''
                 }
@@ -81,17 +64,11 @@ pipeline {
                     changeset "tests/**,main.Core/**,azure-functions/**,adapters/**,Jenkinsfile"
                 }
             }
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_VERSION}"
-                    reuseNode true
-                }
-            }
             steps {
                 sh '''
                   echo "Running all unit tests (excluding integration tests)..."
                   mkdir -p test-results
-                  dotnet test "$TEST_PROJECT" \
+                  docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test "$TEST_PROJECT" \
                     --configuration "$BUILD_CONFIGURATION" \
                     --verbosity normal \
                     --filter "FullyQualifiedName!~Integration" \
@@ -113,20 +90,12 @@ pipeline {
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
                 }
             }
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_VERSION}"
-                    reuseNode true
-                }
-            }
             steps {
                 sh '''
                   echo "Packaging .NET artifacts..."
                   mkdir -p "$ARTIFACTS_PATH"
-                  cd azure-functions/main
-                  dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../../$ARTIFACTS_PATH/azure-functions"
-                  cd ../../main.Core
-                  dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../$ARTIFACTS_PATH/main.Core"
+                  docker run --rm -v "$PWD:/workspace" -w /workspace/azure-functions/main mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../../$ARTIFACTS_PATH/azure-functions"
+                  docker run --rm -v "$PWD:/workspace" -w /workspace/main.Core mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../$ARTIFACTS_PATH/main.Core"
                   echo "Packaging completed"
                 '''
             }
@@ -137,12 +106,6 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
-                }
-            }
-            agent {
-                docker {
-                    image "node:${env.NODE_VERSION}"
-                    reuseNode true
                 }
             }
             steps {
@@ -162,12 +125,6 @@ pipeline {
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
                 }
             }
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_VERSION}"
-                    reuseNode true
-                }
-            }
             environment {
                 AZURE_CLIENT_ID       = credentials('AZURE_CLIENT_ID')
                 AZURE_CLIENT_SECRET   = credentials('AZURE_CLIENT_SECRET')
@@ -179,46 +136,49 @@ pipeline {
             steps {
                 sh '''
                   echo "Setting up deployment environment..."
-                  apt-get update
-                  apt-get install -y curl gnupg lsb-release
-                  echo "Installing Azure CLI..."
-                  curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-                  echo "Installing Azure Functions Core Tools..."
-                  curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg
-                  sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-$(lsb_release -cs)-prod $(lsb_release -cs) main" > /etc/apt/sources.list.d/dotnetdev.list'
-                  apt-get update
-                  apt-get install -y azure-functions-core-tools-4
-                  echo "Logging in to Azure..."
-
-                  if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_TENANT_ID" ]; then
-                    az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
-                    if [ -n "$AZURE_SUBSCRIPTION_ID" ]; then
-                      az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+                  docker run --rm -v "$PWD:/workspace" -w /workspace \
+                    -e AZURE_CLIENT_ID="$AZURE_CLIENT_ID" \
+                    -e AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
+                    -e AZURE_TENANT_ID="$AZURE_TENANT_ID" \
+                    -e AZURE_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID" \
+                    -e AZURE_FUNCTION_APP_NAME="$AZURE_FUNCTION_APP_NAME" \
+                    -e AZURE_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP" \
+                    mcr.microsoft.com/dotnet/sdk:8.0 bash -c "
+                    apt-get update && apt-get install -y curl gnupg lsb-release
+                    echo 'Installing Azure CLI...'
+                    curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+                    echo 'Installing Azure Functions Core Tools...'
+                    curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg
+                    sh -c 'echo \"deb [arch=amd64] https://packages.microsoft.com/repos/microsoft-ubuntu-\$(lsb_release -cs)-prod \$(lsb_release -cs) main\" > /etc/apt/sources.list.d/dotnetdev.list'
+                    apt-get update && apt-get install -y azure-functions-core-tools-4
+                    echo 'Logging in to Azure...'
+                    if [ -n \"\$AZURE_CLIENT_ID\" ] && [ -n \"\$AZURE_CLIENT_SECRET\" ] && [ -n \"\$AZURE_TENANT_ID\" ]; then
+                      az login --service-principal -u \"\$AZURE_CLIENT_ID\" -p \"\$AZURE_CLIENT_SECRET\" --tenant \"\$AZURE_TENANT_ID\"
+                      if [ -n \"\$AZURE_SUBSCRIPTION_ID\" ]; then
+                        az account set --subscription \"\$AZURE_SUBSCRIPTION_ID\"
+                      fi
+                      echo 'Azure login successful'
+                      az account show
+                    else
+                      echo 'Azure credentials not set. Please configure Jenkins credentials.'
+                      exit 1
                     fi
-                    echo "Azure login successful"
-                    az account show
-                  else
-                    echo "Azure credentials not set. Please configure Jenkins credentials: AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID"
-                    exit 1
-                  fi
-
-                  echo "Deploying Azure Function App to production..."
-                  cd azure-functions/main
-                  echo "Step 1: Publishing Function App (--self-contained false)..."
-                  dotnet publish --self-contained false --configuration "$BUILD_CONFIGURATION" --output ./publish
-                  echo "Publish completed"
-
-                  if [ -z "$AZURE_FUNCTION_APP_NAME" ] || [ -z "$AZURE_RESOURCE_GROUP" ]; then
-                    echo "Required variables not set: AZURE_FUNCTION_APP_NAME, AZURE_RESOURCE_GROUP"
-                    exit 1
-                  fi
-
-                  echo "Step 2: Deploying to Azure Function App..."
-                  echo "Function App: $AZURE_FUNCTION_APP_NAME"
-                  echo "Resource Group: $AZURE_RESOURCE_GROUP"
-                  func azure functionapp publish "$AZURE_FUNCTION_APP_NAME" --dotnet-isolated
-                  echo "Deployment completed successfully"
-                  echo "Function App URL: https://${AZURE_FUNCTION_APP_NAME}.azurewebsites.net"
+                    echo 'Deploying Azure Function App to production...'
+                    cd azure-functions/main
+                    echo 'Step 1: Publishing Function App (--self-contained false)...'
+                    dotnet publish --self-contained false --configuration Release --output ./publish
+                    echo 'Publish completed'
+                    if [ -z \"\$AZURE_FUNCTION_APP_NAME\" ] || [ -z \"\$AZURE_RESOURCE_GROUP\" ]; then
+                      echo 'Required variables not set: AZURE_FUNCTION_APP_NAME, AZURE_RESOURCE_GROUP'
+                      exit 1
+                    fi
+                    echo 'Step 2: Deploying to Azure Function App...'
+                    echo \"Function App: \$AZURE_FUNCTION_APP_NAME\"
+                    echo \"Resource Group: \$AZURE_RESOURCE_GROUP\"
+                    func azure functionapp publish \"\$AZURE_FUNCTION_APP_NAME\" --dotnet-isolated
+                    echo 'Deployment completed successfully'
+                    echo \"Function App URL: https://\${AZURE_FUNCTION_APP_NAME}.azurewebsites.net\"
+                  "
                 '''
             }
         }
