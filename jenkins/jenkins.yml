@@ -1,0 +1,44 @@
+jenkins:
+  systemMessage: "Jenkins for interface-configurator (migrated from GitLab CI)"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              id: "git-credentials"
+              username: "${GIT_USERNAME:-git}"
+              password: "${GIT_PASSWORD:-changeme}"
+              description: "Git credentials for interface-configurator repository"
+          - string:
+              id: "AZURE_CLIENT_ID"
+              secret: "${AZURE_CLIENT_ID:-}"
+              description: "Azure AD application (client) ID for service principal"
+          - string:
+              id: "AZURE_CLIENT_SECRET"
+              secret: "${AZURE_CLIENT_SECRET:-}"
+              description: "Azure AD application client secret"
+          - string:
+              id: "AZURE_TENANT_ID"
+              secret: "${AZURE_TENANT_ID:-}"
+              description: "Azure AD tenant ID"
+          - string:
+              id: "AZURE_SUBSCRIPTION_ID"
+              secret: "${AZURE_SUBSCRIPTION_ID:-}"
+              description: "Azure subscription ID"
+
+
