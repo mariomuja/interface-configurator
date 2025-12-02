@@ -46,8 +46,7 @@ import { AuthService } from '../../services/auth.service';
             Als Demo-Benutzer anmelden
           </button>
           <p class="demo-description">
-            Als Demo-Benutzer können Sie die Anwendung sofort testen. 
-            Sie können Features ansehen, aber keine Features für andere Benutzer freischalten.
+            Als Demo-Benutzer können Sie die Anwendung sofort testen.
           </p>
         </div>
 
@@ -60,7 +59,7 @@ import { AuthService } from '../../services/auth.service';
           <h3>Admin-Anmeldung</h3>
           <p class="admin-info">
             <mat-icon>admin_panel_settings</mat-icon>
-            Als Admin-Benutzer können Sie Features für andere Benutzer freischalten.
+            Als Admin-Benutzer haben Sie vollen Zugriff auf alle Funktionen.
             Verwenden Sie Ihre Admin-Anmeldedaten.
           </p>
           

@@ -31,7 +31,6 @@ import { TransportService } from '../../services/transport.service';
 import { TranslationService } from '../../services/translation.service';
 import { ErrorTrackingService } from '../../services/error-tracking.service';
 import { ErrorDialogComponent } from '../error-dialog/error-dialog.component';
-import { FeatureService, Feature } from '../../services/feature.service';
 import { CsvRecord, SqlRecord, ProcessLog } from '../../models/data.model';
 import { interval, Subscription, firstValueFrom } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -332,16 +331,12 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   sqlDisplayedColumns: string[] = []; // Will be populated dynamically from SQL data
   logDisplayedColumns: string[] = ['timestamp', 'level', 'component', 'message', 'details'];
 
-  // Feature flag for Destination Adapter UI
-  isDestinationAdapterUIEnabled: boolean = true; // Enable by default for SQL Server testing
-
   constructor(
     private transportService: TransportService,
     private translationService: TranslationService,
     private snackBar: MatSnackBar,
     public dialog: MatDialog,
-    private errorTrackingService: ErrorTrackingService,
-    private featureService: FeatureService
+    private errorTrackingService: ErrorTrackingService
   ) {}
 
   /**
@@ -382,8 +377,8 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadProcessLogs();
     this.loadInterfaceConfigurations();
     this.loadBlobContainerFolders();
-    // Check feature first, then load destination adapters if enabled
-    this.checkDestinationAdapterUIFeature();
+    // Load destination adapter instances
+    this.loadDestinationAdapterInstances();
     // TEMPORARILY DISABLED: Auto-refresh disabled - only manual refresh via reload button
     // this.startAutoRefresh();
     
@@ -396,48 +391,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.showWelcomeDialogIfNeeded();
   }
 
-  /**
-   * Check if Destination Adapter UI feature is enabled
-   */
-  private checkDestinationAdapterUIFeature(): void {
-    this.featureService.getFeatures().subscribe({
-      next: (features) => {
-        const destinationAdapterUIFeature = features.find(f => 
-          f.title === 'Destination Adapter UI' || 
-          f.featureNumber === 8
-        );
-        this.isDestinationAdapterUIEnabled = destinationAdapterUIFeature?.isEnabled ?? false;
-        
-        // Only load destination adapter instances if feature is enabled
-        if (this.isDestinationAdapterUIEnabled) {
-          this.loadDestinationAdapterInstances();
-        } else {
-          // Clear destination adapter instances if feature is disabled
-          this.destinationAdapterInstances = [];
-        }
-      },
-      error: (error) => {
-        console.error('Error loading features:', error);
-        // Default to disabled if feature check fails
-        this.isDestinationAdapterUIEnabled = false;
-        this.destinationAdapterInstances = [];
-      }
-    });
-  }
-
-  /**
-   * Check if feature is enabled before allowing destination adapter operations
-   */
-  private ensureDestinationAdapterUIFeatureEnabled(): boolean {
-    if (!this.isDestinationAdapterUIEnabled) {
-      this.snackBar.open('Destination Adapter UI feature is not enabled. Please contact an administrator.', 'OK', { 
-        duration: 5000,
-        panelClass: ['error-snackbar']
-      });
-      return false;
-    }
-    return true;
-  }
 
   showWelcomeDialogIfNeeded(): void {
     const welcomeDialogShown = localStorage.getItem('welcomeDialogShown');
@@ -2711,10 +2664,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationAdapterSettings(): void {
-    // Check if feature is enabled
-    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
-      return;
-    }
     // Reload configuration to ensure we have the latest values from the backend
     const interfaceName = this.getActiveInterfaceName();
     if (!interfaceName) {
@@ -3990,11 +3939,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   loadDestinationAdapterInstances(): void {
-    // Don't load if feature is disabled
-    if (!this.isDestinationAdapterUIEnabled) {
-      this.destinationAdapterInstances = [];
-      return;
-    }
     
     const interfaceName = this.getActiveInterfaceName();
     const activeConfig = this.getInterfaceConfig(interfaceName);
@@ -4213,10 +4157,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addDestinationAdapter(adapterName: 'CSV' | 'FILE' | 'SFTP' | 'SqlServer' | 'SAP' | 'Dynamics365' | 'CRM'): void {
-    // Check if feature is enabled
-    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
-      return;
-    }
 
     // Validate that source adapter exists
     if (!this.hasSourceAdapter()) {
@@ -4361,10 +4301,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   removeDestinationAdapter(adapterInstanceGuid: string, instanceName: string): void {
-    // Check if feature is enabled
-    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
-      return;
-    }
     
     const confirmMessage = `Are you sure you want to remove destination adapter "${instanceName}"?`;
     if (!confirm(confirmMessage)) return;
@@ -4567,10 +4503,6 @@ export class TransportComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openDestinationInstanceSettings(instance: DestinationAdapterInstance): void {
-    // Check if feature is enabled
-    if (!this.ensureDestinationAdapterUIFeatureEnabled()) {
-      return;
-    }
     
     const interfaceName = this.getActiveInterfaceName();
     const activeConfig = this.getInterfaceConfig(interfaceName);

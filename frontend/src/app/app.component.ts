@@ -14,7 +14,6 @@ import { DocumentationDialogComponent } from './components/documentation/documen
 import { TranslationService, Language } from './services/translation.service';
 import { VersionService } from './services/version.service';
 import { AuthService } from './services/auth.service';
-import { FeaturesDialogComponent } from './components/features/features-dialog.component';
 import { LoginDialogComponent } from './components/login/login-dialog.component';
 import { Observable } from 'rxjs';
 
@@ -63,10 +62,6 @@ import { Observable } from 'rxjs';
           </div>
         </div>
         <div class="toolbar-right">
-          <button mat-button class="features-link" (click)="openFeatures()" *ngIf="authService.isAuthenticated()">
-            <mat-icon>featured_play_list</mat-icon>
-            Features
-          </button>
           <button mat-button class="login-link" (click)="openLogin()" *ngIf="!authService.isAuthenticated()">
             <mat-icon>login</mat-icon>
             Anmelden
@@ -703,19 +698,6 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  openFeatures(): void {
-    if (!this.authService.isAuthenticated()) {
-      this.openLogin();
-      return;
-    }
-    
-    this.dialog.open(FeaturesDialogComponent, {
-      width: '90%',
-      maxWidth: '1200px',
-      maxHeight: '90vh',
-      panelClass: 'features-dialog'
-    });
-  }
 
   openLogin(): void {
     const dialogRef = this.dialog.open(LoginDialogComponent, {
