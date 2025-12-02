@@ -19,6 +19,7 @@ pipeline {
         // GitHub repository information for auto-merge of ready/* → main
         GITHUB_OWNER         = "mariomuja"
         GITHUB_REPO          = "interface-configurator"
+        // Test change to trigger Jenkins pipeline
     }
 
     stages {
