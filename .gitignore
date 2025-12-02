@@ -35,3 +35,6 @@ function-app.zip
 */.env
 .env.local
 jenkins/.env
+
+# NuGet packages cache (shared across Docker containers in Jenkins)
+.nuget/
