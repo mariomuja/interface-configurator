@@ -30,19 +30,15 @@ pipeline {
             steps {
                 sh '''
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
+                  export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Current directory: $PWD"
                   echo "Solution path: $SOLUTION_PATH"
-                  echo "Checking if solution file exists on host..."
-                  ls -la azure-functions/ || echo "azure-functions directory not found"
-                  ls -la azure-functions/*.sln || echo "No .sln files found in azure-functions"
-                  echo "Checking what's mounted in Docker container..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/ | head -20
-                  echo "Checking azure-functions directory in container..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/azure-functions/ 2>&1 | head -20 || echo "azure-functions directory not found in container"
                   echo "Restoring NuGet packages..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore /workspace/azure-functions/azure-functions.sln
+                  # Jenkins runs in Docker container 'interface-configurator-jenkins'
+                  # Use --volumes-from to share the Jenkins container's volumes (including workspace)
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore azure-functions/azure-functions.sln
                   echo "Building solution..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build /workspace/azure-functions/azure-functions.sln --configuration "$BUILD_CONFIGURATION" --no-restore
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" mcr.microsoft.com/dotnet/sdk:8.0 dotnet build azure-functions/azure-functions.sln --configuration "$BUILD_CONFIGURATION" --no-restore
                   echo "Build completed successfully"
                 '''
             }
@@ -60,9 +56,9 @@ pipeline {
                     sh '''
                       export PATH="/usr/bin:/usr/local/bin:$PATH"
                       echo "Installing Node.js dependencies..."
-                      /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm ci
+                      /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD/$FRONTEND_PATH" node:22 npm ci
                       echo "Building Angular frontend..."
-                      /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace node:22 npm run build:prod
+                      /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD/$FRONTEND_PATH" node:22 npm run build:prod
                       echo "Frontend build completed successfully"
                     '''
                 }
@@ -81,7 +77,7 @@ pipeline {
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Running all unit tests (excluding integration tests)..."
                   mkdir -p test-results
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test /workspace/tests/main.Core.Tests/main.Core.Tests.csproj \
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" mcr.microsoft.com/dotnet/sdk:8.0 dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
                     --configuration "$BUILD_CONFIGURATION" \
                     --verbosity normal \
                     --filter "FullyQualifiedName!~Integration" \
@@ -108,8 +104,8 @@ pipeline {
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Packaging .NET artifacts..."
                   mkdir -p "$ARTIFACTS_PATH"
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish /workspace/azure-functions/main/main.csproj --configuration "$BUILD_CONFIGURATION" --output "/workspace/$ARTIFACTS_PATH/azure-functions"
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish /workspace/main.Core/main.Core.csproj --configuration "$BUILD_CONFIGURATION" --output "/workspace/$ARTIFACTS_PATH/main.Core"
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish azure-functions/main/main.csproj --configuration "$BUILD_CONFIGURATION" --output "$ARTIFACTS_PATH/azure-functions"
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish main.Core/main.Core.csproj --configuration "$BUILD_CONFIGURATION" --output "$ARTIFACTS_PATH/main.Core"
                   echo "Packaging completed"
                 '''
             }
@@ -151,7 +147,7 @@ pipeline {
                 sh '''
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Setting up deployment environment..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace \
+                  /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" \
                     -e AZURE_CLIENT_ID="$AZURE_CLIENT_ID" \
                     -e AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
                     -e AZURE_TENANT_ID="$AZURE_TENANT_ID" \
@@ -180,7 +176,8 @@ pipeline {
                     fi
                     echo 'Deploying Azure Function App to production...'
                     echo 'Step 1: Publishing Function App (--self-contained false)...'
-                    dotnet publish /workspace/azure-functions/main/main.csproj --self-contained false --configuration Release --output /workspace/azure-functions/main/publish
+                    cd azure-functions/main
+                    dotnet publish main.csproj --self-contained false --configuration Release --output ./publish
                     echo 'Publish completed'
                     if [ -z \"\$AZURE_FUNCTION_APP_NAME\" ] || [ -z \"\$AZURE_RESOURCE_GROUP\" ]; then
                       echo 'Required variables not set: AZURE_FUNCTION_APP_NAME, AZURE_RESOURCE_GROUP'
@@ -189,7 +186,7 @@ pipeline {
                     echo 'Step 2: Deploying to Azure Function App...'
                     echo \"Function App: \$AZURE_FUNCTION_APP_NAME\"
                     echo \"Resource Group: \$AZURE_RESOURCE_GROUP\"
-                    cd /workspace/azure-functions/main/publish
+                    cd publish
                     func azure functionapp publish \"\$AZURE_FUNCTION_APP_NAME\" --dotnet-isolated
                     echo 'Deployment completed successfully'
                     echo \"Function App URL: https://\${AZURE_FUNCTION_APP_NAME}.azurewebsites.net\"
