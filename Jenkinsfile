@@ -35,10 +35,12 @@ pipeline {
                   echo "Checking if solution file exists..."
                   ls -la azure-functions/ || echo "azure-functions directory not found"
                   ls -la azure-functions/*.sln || echo "No .sln files found in azure-functions"
+                  echo "Verifying file inside Docker container..."
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/azure-functions/azure-functions.sln || echo "File not found in container"
                   echo "Restoring NuGet packages..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore "$SOLUTION_PATH"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore /workspace/azure-functions/azure-functions.sln
                   echo "Building solution..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet build /workspace/azure-functions/azure-functions.sln --configuration "$BUILD_CONFIGURATION" --no-restore
                   echo "Build completed successfully"
                 '''
             }
