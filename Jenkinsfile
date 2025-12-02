@@ -32,11 +32,13 @@ pipeline {
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Current directory: $PWD"
                   echo "Solution path: $SOLUTION_PATH"
-                  echo "Checking if solution file exists..."
+                  echo "Checking if solution file exists on host..."
                   ls -la azure-functions/ || echo "azure-functions directory not found"
                   ls -la azure-functions/*.sln || echo "No .sln files found in azure-functions"
-                  echo "Verifying file inside Docker container..."
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/azure-functions/azure-functions.sln || echo "File not found in container"
+                  echo "Checking what's mounted in Docker container..."
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/ | head -20
+                  echo "Checking azure-functions directory in container..."
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 ls -la /workspace/azure-functions/ 2>&1 | head -20 || echo "azure-functions directory not found in container"
                   echo "Restoring NuGet packages..."
                   /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore /workspace/azure-functions/azure-functions.sln
                   echo "Building solution..."
