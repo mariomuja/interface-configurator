@@ -35,7 +35,7 @@ describe('TranslationService', () => {
   });
 
   it('should restore language from localStorage', () => {
-    localStorage.setItem('appLanguage', 'es');
+    localStorage.setItem('app-language', 'es');
     const newService = new TranslationService();
     expect(newService.getCurrentLanguageValue()).toBe('es');
   });
@@ -125,6 +125,71 @@ describe('TranslationService', () => {
       const translation = service.translate(key);
       expect(translation).toBeTruthy();
       expect(translation).not.toBe(key); // Should be translated, not return the key
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle invalid language in localStorage', () => {
+      localStorage.setItem('app-language', 'invalid');
+      const newService = new TranslationService();
+      // Should default to 'de' for invalid language
+      expect(newService.getCurrentLanguageValue()).toBe('de');
+    });
+
+    it('should fallback to English if translation missing for current language', () => {
+      service.setLanguage('de');
+      // If a key exists but German translation is missing, should fallback to English
+      const translation = service.translate('app.title');
+      expect(translation).toBeTruthy();
+    });
+
+    it('should handle empty translation key', () => {
+      expect(service.translate('')).toBe('');
+    });
+
+    it('should handle null/undefined translation key gracefully', () => {
+      expect(service.translate(null as any)).toBeTruthy();
+      expect(service.translate(undefined as any)).toBeTruthy();
+    });
+
+    it('should persist language changes correctly', () => {
+      service.setLanguage('fr');
+      expect(localStorage.getItem('app-language')).toBe('fr');
+      
+      service.setLanguage('it');
+      expect(localStorage.getItem('app-language')).toBe('it');
+    });
+
+    it('should emit language changes to all subscribers', (done) => {
+      let callCount = 0;
+      service.getCurrentLanguage().subscribe(() => {
+        callCount++;
+        if (callCount === 2) {
+          expect(callCount).toBe(2);
+          done();
+        }
+      });
+      
+      service.setLanguage('en');
+      service.setLanguage('de');
+    });
+
+    it('should handle rapid language changes', () => {
+      service.setLanguage('en');
+      service.setLanguage('fr');
+      service.setLanguage('es');
+      service.setLanguage('it');
+      service.setLanguage('de');
+      
+      expect(service.getCurrentLanguageValue()).toBe('de');
+      expect(localStorage.getItem('app-language')).toBe('de');
+    });
+
+    it('should return key with warning for missing translations', () => {
+      spyOn(console, 'warn');
+      const result = service.translate('missing.key');
+      expect(result).toBe('missing.key');
+      expect(console.warn).toHaveBeenCalled();
     });
   });
 });

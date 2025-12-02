@@ -11,6 +11,8 @@
     "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "version:bump": "node ../scripts/bump-version.js"
   },
   "private": true,
@@ -37,6 +39,7 @@
     "@angular-devkit/build-angular": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
+    "@playwright/test": "^1.40.0",
     "@types/jasmine": "~5.1.0",
     "@vercel/node": "^5.5.9",
     "jasmine-core": "~5.12.1",

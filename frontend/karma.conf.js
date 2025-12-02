@@ -22,12 +22,32 @@ module.exports = function (config) {
       subdir: '.',
       reporters: [
         { type: 'html' },
-        { type: 'text-summary' }
-      ]
+        { type: 'text-summary' },
+        { type: 'lcov' }
+      ],
+      check: {
+        global: {
+          statements: 70,
+          branches: 65,
+          functions: 70,
+          lines: 70
+        }
+      }
     },
-    reporters: ['progress', 'kjhtml'],
+    reporters: ['progress', 'kjhtml', 'coverage'],
     browsers: ['Chrome'],
-    restartOnFileChange: true
+    restartOnFileChange: true,
+    // Performance optimizations
+    concurrency: Infinity,
+    browserNoActivityTimeout: 60000,
+    browserDisconnectTimeout: 10000,
+    browserDisconnectTolerance: 3,
+    // Parallel execution
+    singleRun: false,
+    // Coverage optimization
+    preprocessors: {
+      '**/*.ts': ['coverage']
+    }
   });
 };
 

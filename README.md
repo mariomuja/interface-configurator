@@ -954,16 +954,14 @@ The frontend is deployed to Vercel. Configuration is in `vercel/vercel.json`.
 
 #### Azure Functions
 
-Azure Functions are automatically deployed via GitLab CI/CD using the **"Run from Package"** method (Microsoft's recommended approach).
+Azure Functions are deployed using the **"Run from Package"** method (Microsoft's recommended approach).
 
-**Quick Setup:**
-1. Configure GitLab CI/CD variables (see [GitLab Setup Guide](./GITLAB_SETUP.md))
-2. Push to GitLab to trigger the pipeline
-3. Manually trigger deployment jobs when ready
+**Deployment:**
+- Deploy manually using Azure Functions Core Tools or Azure Portal
+- Configure deployment via your CI/CD pipeline
+- See [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) for step-by-step instructions
 
 **Documentation:**
-- [GitLab CI/CD Setup](./GITLAB_SETUP.md) - Complete setup guide
-- [GitLab Pipeline Documentation](.gitlab/README.md) - Detailed pipeline documentation
 - [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) - Step-by-step checklist
 - [Documentation Index](./DOCUMENTATION_INDEX.md) - Complete documentation overview
 
@@ -1023,8 +1021,7 @@ Configured via Terraform in Function App settings:
 - **Build Errors**: Check Node.js version compatibility
 - **Environment Variables**: Verify all required variables are set
 - **CORS**: Check CORS configuration matches frontend URL
-- **Function App Deployment**: See [GitLab Setup Guide](./GITLAB_SETUP.md) and [GitLab Pipeline Documentation](.gitlab/README.md)
-- **GitLab CI/CD Variables**: Configure in GitLab project settings (see [GITLAB_SETUP.md](./GITLAB_SETUP.md))
+- **Function App Deployment**: See [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) for deployment instructions
 
 ## 🔧 Maintenance
 

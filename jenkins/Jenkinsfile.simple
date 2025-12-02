@@ -1,0 +1,62 @@
+// Simple Jenkins Pipeline
+// Minimal configuration for quick setup
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install') {
+            steps {
+                sh 'cd frontend && npm ci'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'cd frontend && npm run build'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'cd frontend && npm test -- --code-coverage --browsers=ChromeHeadless'
+            }
+            post {
+                always {
+                    publishHTML([
+                        reportDir: 'frontend/coverage/interface-configurator',
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report'
+                    ])
+                }
+            }
+        }
+        
+        stage('E2E') {
+            steps {
+                sh 'npx playwright install chromium && npm run test:e2e'
+            }
+            post {
+                always {
+                    publishHTML([
+                        reportDir: 'playwright-report',
+                        reportFiles: 'index.html',
+                        reportName: 'E2E Report'
+                    ])
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
