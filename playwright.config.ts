@@ -16,7 +16,9 @@ export default defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'],
-    ['junit', { outputFile: 'test-results/junit.xml' }]
+    ['junit', { outputFile: 'test-results/junit.xml' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['list']
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -25,6 +27,10 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    /* Video recording */
+    video: 'retain-on-failure',
+    /* Viewport size */
+    viewport: { width: 1280, height: 720 },
   },
 
   /* Configure projects for major browsers */
