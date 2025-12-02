@@ -52,9 +52,8 @@ All testing improvements have been successfully implemented. This document summa
 - **adapter-wizard.component.spec.ts** ✅ - Comprehensive wizard tests
 
 ### 6. CI/CD Updates
-- **File**: `.gitlab-ci.yml`
 - **Changes**: 
-  - Added coverage checking in `test:frontend` job
+  - Added coverage checking script (can be integrated into any CI/CD pipeline)
   - Tests now fail if coverage < 70%
   - Coverage artifacts are collected
 
@@ -83,7 +82,7 @@ All testing improvements have been successfully implemented. This document summa
 ## 🎯 Key Improvements
 
 1. **Security**: Authentication service now fully tested
-2. **Coverage Enforcement**: CI/CD will fail builds with low coverage
+2. **Coverage Enforcement**: Coverage thresholds configured (can be enforced in CI/CD)
 3. **E2E Testing**: Playwright infrastructure ready for end-to-end tests
 4. **Component Coverage**: All adapter settings components now have tests
 5. **Code Quality**: Removed obsolete backup files

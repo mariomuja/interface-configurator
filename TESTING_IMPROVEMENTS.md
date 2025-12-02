@@ -69,12 +69,11 @@ This document outlines areas for improvement in the testing infrastructure acros
 **Recommendation**: Add coverage thresholds to prevent regression
 
 ### 3. Missing Playwright Configuration (MEDIUM PRIORITY)
-**Problem**: CI references Playwright tests but no config exists
+**Problem**: E2E testing infrastructure was incomplete
 
 **Current State**:
-- `.gitlab-ci.yml` has `test:playwright` job
 - No `playwright.config.ts` found
-- Tests would fail if triggered
+- E2E tests were not configured
 
 **Impact**: E2E testing infrastructure incomplete
 
@@ -154,18 +153,16 @@ coverageReporter: {
 ```
 
 **Update CI to fail on low coverage**:
-```yaml
-test:frontend:
-  script:
-    - npm test -- --code-coverage --browsers=ChromeHeadless
-    - |
-      if [ -f "coverage/coverage-summary.json" ]; then
-        COVERAGE=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
-        if (( $(echo "$COVERAGE < 70" | bc -l) )); then
-          echo "Coverage $COVERAGE% is below 70% threshold"
-          exit 1
-        fi
-      fi
+```bash
+# Add to your CI/CD pipeline script
+npm test -- --code-coverage --browsers=ChromeHeadless
+if [ -f "coverage/coverage-summary.json" ]; then
+  COVERAGE=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
+  if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+    echo "Coverage $COVERAGE% is below 70% threshold"
+    exit 1
+  fi
+fi
 ```
 
 #### 3. Improve Test Quality
@@ -280,7 +277,7 @@ e2e/
 #### 1. Add Coverage Badges
 
 **Display coverage in README**:
-- Use GitLab coverage badges
+- Use coverage badges from your CI/CD platform
 - Show frontend and backend coverage separately
 
 #### 2. Parallel Test Execution
