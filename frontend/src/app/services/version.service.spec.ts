@@ -131,4 +131,71 @@ describe('VersionService', () => {
       httpMock.expectNone('/assets/version.json');
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle malformed version.json response', () => {
+      service.getVersion().subscribe(version => {
+        // Should fallback to default
+        expect(version.version).toBe('1.0.0');
+      });
+
+      const req = httpMock.expectOne('/assets/version.json');
+      req.flush('invalid json', { status: 200, statusText: 'OK' });
+    });
+
+    it('should handle partial version data', () => {
+      const partialVersion = {
+        version: '1.2.3'
+        // Missing buildNumber and lastUpdated
+      };
+
+      service.getVersion().subscribe(version => {
+        expect(version.version).toBe('1.2.3');
+      });
+
+      const req = httpMock.expectOne('/assets/version.json');
+      req.flush(partialVersion);
+    });
+
+    it('should handle HTTP 404 error', () => {
+      service.getVersion().subscribe(version => {
+        expect(version.version).toBe('1.0.0');
+      });
+
+      const req = httpMock.expectOne('/assets/version.json');
+      req.flush(null, { status: 404, statusText: 'Not Found' });
+    });
+
+    it('should handle HTTP 500 error', () => {
+      service.getVersion().subscribe(version => {
+        expect(version.version).toBe('1.0.0');
+      });
+
+      const req = httpMock.expectOne('/assets/version.json');
+      req.flush(null, { status: 500, statusText: 'Server Error' });
+    });
+
+    it('should handle concurrent version requests', () => {
+      const mockVersion: VersionInfo = {
+        version: '1.2.3',
+        buildNumber: 456,
+        lastUpdated: '2024-01-01T00:00:00Z'
+      };
+
+      // Make multiple concurrent requests
+      service.getVersion().subscribe();
+      service.getVersion().subscribe();
+      service.getVersion().subscribe();
+
+      // Should only make one HTTP request
+      const req = httpMock.expectOne('/assets/version.json');
+      req.flush(mockVersion);
+
+      // Subsequent requests should use cache
+      service.getVersion().subscribe(version => {
+        expect(version).toEqual(mockVersion);
+      });
+      httpMock.expectNone('/assets/version.json');
+    });
+  });
 });

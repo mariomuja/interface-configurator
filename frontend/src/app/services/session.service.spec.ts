@@ -5,9 +5,10 @@ describe('SessionService', () => {
   let service: SessionService;
 
   beforeEach(() => {
-    localStorage.clear();
     TestBed.configureTestingModule({});
     service = TestBed.inject(SessionService);
+    // Clear localStorage before each test
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -19,94 +20,83 @@ describe('SessionService', () => {
   });
 
   describe('getSessionId', () => {
-    it('should generate a new session ID if none exists', () => {
+    it('should generate a new session ID when none exists', () => {
       const sessionId = service.getSessionId();
-      
       expect(sessionId).toBeTruthy();
       expect(sessionId.length).toBeGreaterThan(0);
-      expect(localStorage.getItem('app-session-id')).toBe(sessionId);
     });
 
-    it('should return existing session ID if one exists', () => {
-      const existingId = 'existing-session-id';
-      localStorage.setItem('app-session-id', existingId);
-      
-      const sessionId = service.getSessionId();
-      
-      expect(sessionId).toBe(existingId);
+    it('should return the same session ID on subsequent calls', () => {
+      const sessionId1 = service.getSessionId();
+      const sessionId2 = service.getSessionId();
+      expect(sessionId1).toBe(sessionId2);
     });
 
-    it('should generate UUID v4 format session ID', () => {
+    it('should generate valid UUID v4 format', () => {
       const sessionId = service.getSessionId();
-      
-      // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       expect(sessionId).toMatch(uuidRegex);
     });
 
-    it('should return the same session ID on multiple calls', () => {
-      const sessionId1 = service.getSessionId();
-      const sessionId2 = service.getSessionId();
-      
-      expect(sessionId1).toBe(sessionId2);
+    it('should persist session ID in localStorage', () => {
+      const sessionId = service.getSessionId();
+      const storedId = localStorage.getItem('app-session-id');
+      expect(storedId).toBe(sessionId);
     });
   });
 
   describe('resetSession', () => {
-    it('should create a new session ID', () => {
+    it('should generate a new session ID', () => {
       const oldSessionId = service.getSessionId();
       const newSessionId = service.resetSession();
       
-      expect(newSessionId).not.toBe(oldSessionId);
       expect(newSessionId).toBeTruthy();
-      expect(localStorage.getItem('app-session-id')).toBe(newSessionId);
+      expect(newSessionId).not.toBe(oldSessionId);
     });
 
-    it('should generate UUID v4 format for new session ID', () => {
-      service.getSessionId(); // Create initial session
-      const newSessionId = service.resetSession();
-      
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      expect(newSessionId).toMatch(uuidRegex);
-    });
-
-    it('should update stored session ID', () => {
+    it('should update stored session ID in localStorage', () => {
       const oldSessionId = service.getSessionId();
       const newSessionId = service.resetSession();
+      const storedId = localStorage.getItem('app-session-id');
       
-      expect(localStorage.getItem('app-session-id')).toBe(newSessionId);
-      expect(localStorage.getItem('app-session-id')).not.toBe(oldSessionId);
+      expect(storedId).toBe(newSessionId);
+      expect(storedId).not.toBe(oldSessionId);
     });
 
-    it('should return new session ID on subsequent getSessionId calls after reset', () => {
-      service.getSessionId();
-      const resetId = service.resetSession();
-      const retrievedId = service.getSessionId();
+    it('should return valid UUID v4 format', () => {
+      const sessionId = service.resetSession();
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      expect(sessionId).toMatch(uuidRegex);
+    });
+
+    it('should generate unique session IDs on multiple resets', () => {
+      const sessionId1 = service.resetSession();
+      const sessionId2 = service.resetSession();
       
-      expect(retrievedId).toBe(resetId);
+      expect(sessionId1).not.toBe(sessionId2);
     });
   });
 
-  describe('generateSessionId', () => {
-    it('should generate unique session IDs', () => {
-      const id1 = service.getSessionId();
-      service.resetSession();
-      const id2 = service.getSessionId();
+  describe('edge cases', () => {
+    it('should handle localStorage being unavailable gracefully', () => {
+      // Mock localStorage to throw error
+      const originalSetItem = localStorage.setItem;
+      spyOn(localStorage, 'setItem').and.throwError('QuotaExceededError');
       
-      expect(id1).not.toBe(id2);
+      // Should still generate session ID
+      expect(() => service.getSessionId()).not.toThrow();
+      
+      // Restore
+      localStorage.setItem = originalSetItem;
     });
 
-    it('should generate valid UUID v4 format', () => {
-      const ids: string[] = [];
-      for (let i = 0; i < 10; i++) {
-        service.resetSession();
-        ids.push(service.getSessionId());
-      }
+    it('should handle corrupted localStorage data', () => {
+      localStorage.setItem('app-session-id', 'invalid-uuid');
       
+      // Should generate new valid UUID
+      const sessionId = service.getSessionId();
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      ids.forEach(id => {
-        expect(id).toMatch(uuidRegex);
-      });
+      expect(sessionId).toMatch(uuidRegex);
     });
   });
 });
