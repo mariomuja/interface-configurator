@@ -98,5 +98,67 @@ describe('StatisticsDashboardComponent', () => {
       
       expect(subscription?.closed).toBeTruthy();
     });
+
+    it('should handle ngOnDestroy when no subscription exists', () => {
+      component.refreshSubscription = undefined;
+      expect(() => component.ngOnDestroy()).not.toThrow();
+    });
+  });
+
+  describe('auto refresh toggle', () => {
+    it('should start auto refresh when enabled', () => {
+      component.autoRefresh = true;
+      transportService.getProcessingStatistics.and.returnValue(of({}));
+      
+      component.startAutoRefresh();
+      
+      expect(component.refreshSubscription).toBeDefined();
+    });
+
+    it('should stop auto refresh when disabled', () => {
+      component.startAutoRefresh();
+      component.autoRefresh = false;
+      component.stopAutoRefresh();
+      
+      expect(component.refreshSubscription?.closed).toBeTruthy();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle loadStatistics with date range', () => {
+      component.startDate = new Date('2024-01-01');
+      component.endDate = new Date('2024-01-31');
+      transportService.getProcessingStatistics.and.returnValue(of({ totalRows: 100 }));
+      
+      component.loadStatistics();
+      
+      expect(transportService.getProcessingStatistics).toHaveBeenCalled();
+    });
+
+    it('should handle loadStatistics for specific interface', () => {
+      component.interfaceName = 'TestInterface';
+      transportService.getProcessingStatistics.and.returnValue(of({ totalRows: 100 }));
+      
+      component.loadStatistics();
+      
+      expect(transportService.getProcessingStatistics).toHaveBeenCalledWith('TestInterface', undefined, undefined);
+    });
+
+    it('should handle empty statistics response', () => {
+      transportService.getProcessingStatistics.and.returnValue(of(null));
+      
+      component.loadStatistics();
+      
+      expect(component.statistics).toBeNull();
+    });
+
+    it('should handle statistics error gracefully', () => {
+      transportService.getProcessingStatistics.and.returnValue(throwError(() => ({ error: { error: 'Error' } })));
+      
+      component.loadStatistics();
+      
+      expect(component.error).toBeTruthy();
+      expect(component.isLoading).toBe(false);
+    });
   });
 });

@@ -91,6 +91,11 @@ describe('SchemaComparisonComponent', () => {
       expect(component.getTypeMismatchDataSource().length).toBe(0);
     });
 
+    it('should return empty array if comparisonResult is null', () => {
+      component.comparisonResult = null;
+      expect(component.getTypeMismatchDataSource().length).toBe(0);
+    });
+
     it('should return formatted mismatches', () => {
       component.comparisonResult = {
         typeMismatches: [
@@ -105,6 +110,67 @@ describe('SchemaComparisonComponent', () => {
       const result = component.getTypeMismatchDataSource();
       expect(result.length).toBe(1);
       expect(result[0].columnName).toBe('TestColumn');
+    });
+
+    it('should handle mismatches with all fields', () => {
+      component.comparisonResult = {
+        typeMismatches: [
+          {
+            columnName: 'TestColumn',
+            csvType: 'string',
+            sqlType: 'int',
+            csvSqlTypeDefinition: 'VARCHAR(255)',
+            sqlSqlTypeDefinition: 'INT'
+          }
+        ]
+      };
+      
+      const result = component.getTypeMismatchDataSource();
+      expect(result[0].csvSqlTypeDefinition).toBe('VARCHAR(255)');
+      expect(result[0].sqlSqlTypeDefinition).toBe('INT');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle comparison with custom table name', () => {
+      component.interfaceName = 'TestInterface';
+      component.csvBlobPath = 'test/path.csv';
+      component.tableName = 'CustomTable';
+      transportService.compareCsvSqlSchema.and.returnValue(of({ matches: [] }));
+      
+      component.compare();
+      
+      expect(transportService.compareCsvSqlSchema).toHaveBeenCalledWith(
+        'TestInterface',
+        'test/path.csv',
+        'CustomTable'
+      );
+    });
+
+    it('should handle partial input - only interfaceName', () => {
+      component.interfaceName = 'TestInterface';
+      component.csvBlobPath = '';
+      component.compare();
+      
+      expect(component.error).toBe('Interface name and CSV blob path are required');
+    });
+
+    it('should handle partial input - only csvBlobPath', () => {
+      component.interfaceName = '';
+      component.csvBlobPath = 'test/path.csv';
+      component.compare();
+      
+      expect(component.error).toBe('Interface name and CSV blob path are required');
+    });
+
+    it('should handle HTTP 404 error', () => {
+      component.interfaceName = 'TestInterface';
+      component.csvBlobPath = 'test/path.csv';
+      transportService.compareCsvSqlSchema.and.returnValue(throwError(() => ({ status: 404, error: { error: 'Not found' } })));
+      
+      component.compare();
+      
+      expect(component.error).toBeTruthy();
     });
   });
 });

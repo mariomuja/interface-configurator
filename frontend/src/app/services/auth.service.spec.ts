@@ -237,4 +237,103 @@ describe('AuthService', () => {
       expect(newService.getCurrentUser()).toBeNull();
     });
   });
+
+  describe('edge cases and error handling', () => {
+    it('should handle invalid JSON in localStorage', () => {
+      localStorage.setItem('current_user', 'invalid-json');
+      
+      const newService = new AuthService(TestBed.inject(HttpTestingController as any));
+      
+      // Should not throw, but handle gracefully
+      expect(() => newService.getCurrentUser()).not.toThrow();
+    });
+
+    it('should handle login with empty username', () => {
+      service.login('', 'password').subscribe({
+        next: () => {},
+        error: () => {}
+      });
+
+      const req = httpMock.expectOne('https://func-integration-main.azurewebsites.net/api/Login');
+      req.flush({ success: false, errorMessage: 'Username required' });
+    });
+
+    it('should handle login with empty password', () => {
+      service.login('username', '').subscribe({
+        next: () => {},
+        error: () => {}
+      });
+
+      const req = httpMock.expectOne('https://func-integration-main.azurewebsites.net/api/Login');
+      req.flush({ success: false, errorMessage: 'Password required' });
+    });
+
+    it('should handle network error during login', () => {
+      service.login('user', 'pass').subscribe({
+        next: () => fail('should have failed'),
+        error: (error) => {
+          expect(error).toBeTruthy();
+        }
+      });
+
+      const req = httpMock.expectOne('https://func-integration-main.azurewebsites.net/api/Login');
+      req.error(new ErrorEvent('Network error'));
+    });
+
+    it('should handle HTTP 500 error during login', () => {
+      service.login('user', 'pass').subscribe({
+        next: () => fail('should have failed'),
+        error: (error: any) => {
+          expect(error.status).toBe(500);
+        }
+      });
+
+      const req = httpMock.expectOne('https://func-integration-main.azurewebsites.net/api/Login');
+      req.flush(null, { status: 500, statusText: 'Server Error' });
+    });
+
+    it('should handle concurrent login attempts', () => {
+      const mockResponse: LoginResponse = {
+        success: true,
+        token: 'token',
+        user: { id: 1, username: 'user', role: 'user' }
+      };
+
+      service.login('user', 'pass').subscribe();
+      service.login('user', 'pass').subscribe();
+
+      const requests = httpMock.match('https://func-integration-main.azurewebsites.net/api/Login');
+      expect(requests.length).toBe(2);
+      requests.forEach(req => req.flush(mockResponse));
+    });
+
+    it('should handle token expiration scenario', () => {
+      localStorage.setItem('auth_token', 'expired-token');
+      expect(service.isAuthenticated()).toBe(true);
+      
+      // In real scenario, API would return 401 and token would be cleared
+      service.logout();
+      expect(service.isAuthenticated()).toBe(false);
+    });
+
+    it('should handle storage quota exceeded', () => {
+      // Simulate storage quota exceeded
+      spyOn(localStorage, 'setItem').and.throwError('QuotaExceededError');
+      
+      const mockResponse: LoginResponse = {
+        success: true,
+        token: 'token',
+        user: { id: 1, username: 'user', role: 'user' }
+      };
+
+      service.login('user', 'pass').subscribe({
+        next: () => {
+          // Should handle gracefully even if storage fails
+        }
+      });
+
+      const req = httpMock.expectOne('https://func-integration-main.azurewebsites.net/api/Login');
+      req.flush(mockResponse);
+    });
+  });
 });

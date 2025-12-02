@@ -107,4 +107,41 @@ describe('CsvValidationResultsComponent', () => {
       expect(component.getSeverityColor('Info: Message')).toBe('primary');
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle validation with delimiter parameter', () => {
+      component.blobPath = 'test/path.csv';
+      component.delimiter = ',';
+      transportService.validateCsvFile.and.returnValue(of({ valid: true }));
+      
+      component.validate();
+      
+      expect(transportService.validateCsvFile).toHaveBeenCalledWith('test/path.csv', ',');
+    });
+
+    it('should handle case-insensitive severity detection', () => {
+      expect(component.getSeverityIcon('ERROR: test')).toBe('error');
+      expect(component.getSeverityIcon('WARNING: test')).toBe('warning');
+      expect(component.getSeverityIcon('FAILED: test')).toBe('error');
+    });
+
+    it('should handle null or undefined validation result', () => {
+      component.blobPath = 'test/path.csv';
+      transportService.validateCsvFile.and.returnValue(of(null));
+      
+      component.validate();
+      
+      expect(component.validationResult).toBeNull();
+      expect(component.isLoading).toBe(false);
+    });
+
+    it('should handle network timeout error', () => {
+      component.blobPath = 'test/path.csv';
+      transportService.validateCsvFile.and.returnValue(throwError(() => ({ status: 0, message: 'Timeout' })));
+      
+      component.validate();
+      
+      expect(component.error).toBeTruthy();
+    });
+  });
 });

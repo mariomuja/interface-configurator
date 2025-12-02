@@ -101,4 +101,33 @@ describe('AdapterSelectDialogComponent', () => {
       expect(component.selectedAdapter).toBe('CSV');
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle adapters that support both Source and Destination', () => {
+      component.data.adapterType = 'Source';
+      const sourceAdapters = component.availableAdapters;
+      
+      component.data.adapterType = 'Destination';
+      const destAdapters = component.availableAdapters;
+      
+      // Some adapters should appear in both lists
+      const csvAdapter = sourceAdapters.find(a => a.name === 'CSV');
+      expect(csvAdapter).toBeTruthy();
+      expect(destAdapters.find(a => a.name === 'CSV')).toBeTruthy();
+    });
+
+    it('should handle selecting same adapter multiple times', () => {
+      const adapter = component.allAdapters[0];
+      component.selectAdapter(adapter);
+      expect(component.selectedAdapter).toBe(adapter.name);
+      
+      component.selectAdapter(adapter);
+      expect(component.selectedAdapter).toBe(adapter.name);
+    });
+
+    it('should handle empty adapter list gracefully', () => {
+      component.allAdapters = [];
+      expect(component.availableAdapters.length).toBe(0);
+    });
+  });
 });

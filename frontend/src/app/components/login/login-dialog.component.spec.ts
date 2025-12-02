@@ -147,4 +147,53 @@ describe('LoginDialogComponent', () => {
       expect(dialogRef.close).toHaveBeenCalledWith(false);
     });
   });
+
+  describe('error handling edge cases', () => {
+    it('should handle network timeout error', () => {
+      authService.login.and.returnValue(throwError(() => ({ status: 0, message: 'Timeout' })));
+      component.username = 'admin';
+      component.password = 'password';
+
+      component.login();
+
+      expect(component.errorMessage).toBeTruthy();
+      expect(component.loggingIn).toBe(false);
+    });
+
+    it('should handle 403 forbidden error', () => {
+      authService.login.and.returnValue(throwError(() => ({ status: 403, error: { errorMessage: 'Forbidden' } })));
+      component.username = 'admin';
+      component.password = 'password';
+
+      component.login();
+
+      expect(component.errorMessage).toBeTruthy();
+    });
+
+    it('should handle error with nested error object', () => {
+      authService.login.and.returnValue(throwError(() => ({ 
+        status: 500, 
+        error: { error: { message: 'Nested error' } } 
+      })));
+      component.username = 'admin';
+      component.password = 'password';
+
+      component.login();
+
+      expect(component.errorMessage).toBeTruthy();
+    });
+
+    it('should handle error with string message', () => {
+      authService.login.and.returnValue(throwError(() => ({ 
+        status: 500, 
+        error: 'String error message' 
+      })));
+      component.username = 'admin';
+      component.password = 'password';
+
+      component.login();
+
+      expect(component.errorMessage).toBeTruthy();
+    });
+  });
 });

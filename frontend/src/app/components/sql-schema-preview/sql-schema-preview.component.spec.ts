@@ -100,5 +100,45 @@ describe('SqlSchemaPreviewComponent', () => {
       expect(component.getDataTypeColor('DECIMAL')).toBe('primary');
       expect(component.getDataTypeColor('FLOAT')).toBe('primary');
     });
+
+    it('should handle case-insensitive type names', () => {
+      expect(component.getDataTypeColor('int')).toBe('primary');
+      expect(component.getDataTypeColor('varchar')).toBe('accent');
+      expect(component.getDataTypeColor('date')).toBe('warn');
+    });
+
+    it('should return empty string for unknown types', () => {
+      expect(component.getDataTypeColor('UNKNOWN_TYPE')).toBe('');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle loadSchema with custom table name', () => {
+      component.interfaceName = 'TestInterface';
+      component.tableName = 'CustomTable';
+      transportService.getSqlTableSchema.and.returnValue(of({ columns: [] }));
+      
+      component.loadSchema();
+      
+      expect(transportService.getSqlTableSchema).toHaveBeenCalledWith('TestInterface', 'CustomTable');
+    });
+
+    it('should handle empty schema response', () => {
+      component.interfaceName = 'TestInterface';
+      transportService.getSqlTableSchema.and.returnValue(of({ columns: [] }));
+      
+      component.loadSchema();
+      
+      expect(component.schema).toEqual({ columns: [] });
+    });
+
+    it('should handle HTTP 404 error', () => {
+      component.interfaceName = 'NonExistent';
+      transportService.getSqlTableSchema.and.returnValue(throwError(() => ({ status: 404, error: { error: 'Not found' } })));
+      
+      component.loadSchema();
+      
+      expect(component.error).toBeTruthy();
+    });
   });
 });

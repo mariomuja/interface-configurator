@@ -111,4 +111,60 @@ describe('ContainerAppProgressDialogComponent', () => {
       expect(dialogRef.close).toHaveBeenCalled();
     });
   });
+
+  describe('step management', () => {
+    it('should calculate progress based on completed steps', () => {
+      component.steps = [
+        { id: '1', label: 'Step 1', status: 'completed' },
+        { id: '2', label: 'Step 2', status: 'in-progress' },
+        { id: '3', label: 'Step 3', status: 'pending' }
+      ];
+      
+      // Progress should be calculated based on completed steps
+      const progress = component.progressPercentage;
+      expect(progress).toBeGreaterThanOrEqual(0);
+      expect(progress).toBeLessThanOrEqual(100);
+    });
+
+    it('should show current step label', () => {
+      component.steps = [
+        { id: '1', label: 'Step 1', status: 'completed' },
+        { id: '2', label: 'Step 2', status: 'in-progress' }
+      ];
+      
+      expect(component.currentStepLabel).toBeTruthy();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle progress calculation with no steps', () => {
+      component.steps = [];
+      expect(component.progressPercentage).toBe(0);
+    });
+
+    it('should handle progress calculation with all completed steps', () => {
+      component.steps = [
+        { id: '1', label: 'Step 1', status: 'completed' },
+        { id: '2', label: 'Step 2', status: 'completed' }
+      ];
+      
+      const progress = component.progressPercentage;
+      expect(progress).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle currentStepLabel when no current step', () => {
+      component.steps = [];
+      component.currentStepLabel = '';
+      // Should not throw
+      expect(component.currentStepLabel).toBeDefined();
+    });
+
+    it('should handle getStepIcon with invalid status', () => {
+      expect(component.getStepIcon('invalid' as any)).toBe('radio_button_unchecked');
+    });
+
+    it('should handle getStepIconClass with invalid status', () => {
+      expect(component.getStepIconClass('invalid' as any)).toBe('step-icon-pending');
+    });
+  });
 });

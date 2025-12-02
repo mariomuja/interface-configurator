@@ -151,4 +151,48 @@ describe('DestinationInstancesDialogComponent', () => {
       expect(guid1).not.toBe(guid2);
     });
   });
+
+  describe('edge cases', () => {
+    it('should handle removing non-existent adapter gracefully', () => {
+      component.instances = [
+        {
+          adapterInstanceGuid: 'guid-1',
+          instanceName: 'Instance1',
+          adapterName: 'CSV',
+          isEnabled: true
+        }
+      ];
+      
+      const initialCount = component.instances.length;
+      component.onRemoveAdapter('non-existent-guid');
+      
+      expect(component.instances.length).toBe(initialCount);
+    });
+
+    it('should handle adding multiple adapters of same type', () => {
+      component.data.hasSourceAdapter = true;
+      
+      component.onAddAdapter('CSV');
+      component.onAddAdapter('CSV');
+      
+      expect(component.instances.length).toBe(2);
+      expect(component.instances.every(i => i.adapterName === 'CSV')).toBe(true);
+    });
+
+    it('should handle empty instances list on save', () => {
+      component.instances = [];
+      component.onSave();
+      
+      expect(dialogRef.close).toHaveBeenCalledWith([]);
+    });
+
+    it('should handle getDefaultInstanceName for different adapters', () => {
+      component.data.hasSourceAdapter = true;
+      component.onAddAdapter('CSV');
+      component.onAddAdapter('SqlServer');
+      
+      expect(component.instances[0].instanceName).toContain('CSV');
+      expect(component.instances[1].instanceName).toContain('SqlServer');
+    });
+  });
 });
