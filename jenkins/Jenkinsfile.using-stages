@@ -1,0 +1,181 @@
+// Jenkins Pipeline using reusable stages
+// Load stages from stages-config.groovy
+
+@Library('shared-library') _ // Optional: if using shared library
+
+// Load stages configuration
+def stages = load 'jenkins/stages-config.groovy'
+
+pipeline {
+    agent any
+    
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        ansiColor('xterm')
+    }
+    
+    environment {
+        NODE_VERSION = '22.0.0'
+        NPM_VERSION = '10.0.0'
+        COVERAGE_THRESHOLD = '70'
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'unknown'}"
+    }
+    
+    stages {
+        // Use reusable stages
+        stage('Checkout') {
+            steps {
+                script {
+                    stages.checkout()
+                }
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                script {
+                    stages.setupEnvironment()
+                }
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    stages.installDependencies()
+                }
+            }
+        }
+        
+        stage('Lint & Code Quality') {
+            steps {
+                script {
+                    stages.lint()
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                script {
+                    stages.build()
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                script {
+                    stages.unitTests()
+                }
+            }
+        }
+        
+        stage('E2E Tests') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                script {
+                    stages.e2eTests()
+                }
+            }
+        }
+        
+        stage('Visual Regression') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    stages.visualRegression()
+                }
+            }
+        }
+        
+        stage('Accessibility Tests') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    stages.accessibilityTest()
+                }
+            }
+        }
+        
+        stage('Test Metrics') {
+            steps {
+                script {
+                    stages.testMetrics()
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            steps {
+                script {
+                    stages.securityScan()
+                }
+            }
+        }
+        
+        stage('Generate Report') {
+            steps {
+                script {
+                    stages.generateTestReport()
+                }
+            }
+        }
+        
+        stage('Deploy Preview') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                script {
+                    stages.deploy('preview')
+                }
+            }
+        }
+        
+        stage('Deploy Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    stages.deploy('production')
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                stages.cleanup()
+            }
+        }
+        success {
+            script {
+                stages.notification('SUCCESS')
+            }
+        }
+        failure {
+            script {
+                stages.notification('FAILURE')
+            }
+        }
+        unstable {
+            script {
+                stages.notification('UNSTABLE')
+            }
+        }
+    }
+}
