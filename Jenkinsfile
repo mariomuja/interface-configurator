@@ -30,6 +30,11 @@ pipeline {
             steps {
                 sh '''
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
+                  echo "Current directory: $PWD"
+                  echo "Solution path: $SOLUTION_PATH"
+                  echo "Checking if solution file exists..."
+                  ls -la azure-functions/ || echo "azure-functions directory not found"
+                  ls -la azure-functions/*.sln || echo "No .sln files found in azure-functions"
                   echo "Restoring NuGet packages..."
                   /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet restore "$SOLUTION_PATH"
                   echo "Building solution..."
