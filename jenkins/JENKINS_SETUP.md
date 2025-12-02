@@ -1,6 +1,8 @@
 # Jenkins Multibranch Pipeline Setup Guide
 
-This guide explains how to configure Jenkins to automatically run the pipeline for every branch pushed to GitHub.
+This guide explains how to configure Jenkins to automatically run the pipeline for branches starting with `ready/` pushed to GitHub.
+
+**Important**: The pipeline is configured to run **only for branches whose name starts with `ready/`** (e.g., `ready/feature-123`, `ready/bugfix-456`).
 
 ## Prerequisites
 
@@ -44,8 +46,10 @@ Install these plugins via Jenkins → Manage Jenkins → Manage Plugins:
    - **Repository**: Your repository name
    - **Behaviors**: 
      - Add **Discover branches** → Strategy: **All branches**
+     - Add **Filter by name (with regular expression)** → **Include**: `^ready/.*`
+       - This ensures only branches starting with `ready/` are discovered
      - Add **Discover pull requests** → Strategy: **Merging the pull request with the current target branch revision**
-     - Add **Filter by name** (optional): Exclude branches like `*-wip`, `*-temp`
+       - **Filter by name (with regular expression)** → **Include**: `^ready/.*` (for PR branches)
 
 ### 3. Configure Build Configuration
 
@@ -105,22 +109,25 @@ In the Multibranch Pipeline job:
 
 When configured as a Multibranch Pipeline:
 
-1. **Initial Scan**: Jenkins scans the repository and creates jobs for all existing branches
-2. **New Branch Detection**: When a new branch is pushed to GitHub:
+1. **Initial Scan**: Jenkins scans the repository and creates jobs for all branches matching `ready/*`
+2. **New Branch Detection**: When a new branch starting with `ready/` is pushed to GitHub:
    - GitHub webhook triggers Jenkins
    - Jenkins scans the repository
-   - A new job is created for the branch
+   - A new job is created for the branch (if it matches `ready/*`)
    - Pipeline runs automatically
+3. **Branch Filtering**: Branches not starting with `ready/` are ignored and won't trigger builds
 
 ### Branch-Specific Behavior
 
 The pipeline automatically adapts based on branch name:
 
-- **All Branches**: Run checkout, install, lint, build, unit tests, security scan
-- **main/develop/master**: Additionally run E2E tests, accessibility tests
-- **main only**: Additionally run visual regression tests
-- **develop**: Deploy preview
-- **main**: Deploy production
+- **All `ready/*` branches**: Run checkout, install, lint, build, unit tests, security scan, coverage enforcement
+- **`ready/*` branches targeting main/develop**: Additionally run E2E tests, accessibility tests
+- **`ready/*` branches targeting main**: Additionally run visual regression tests
+- **`ready/*` branches targeting develop**: Deploy preview
+- **`ready/*` branches targeting main**: Deploy production
+
+**Note**: Only branches starting with `ready/` will trigger the pipeline. Other branches are ignored.
 
 ### Pull Request Support
 
@@ -131,19 +138,21 @@ When a PR is opened targeting `main` or `develop`:
 
 ## Testing the Setup
 
-### Test 1: Create a New Branch
+### Test 1: Create a New Branch Starting with "ready/"
 
 ```bash
-git checkout -b test/jenkins-pipeline
-git push origin test/jenkins-pipeline
+git checkout -b ready/test-jenkins-pipeline
+git push origin ready/test-jenkins-pipeline
 ```
 
 Expected: Jenkins should detect the new branch and run the pipeline.
 
+**Note**: If you create a branch without `ready/` prefix, it will NOT trigger the pipeline.
+
 ### Test 2: Push Changes to Existing Branch
 
 ```bash
-git checkout test/jenkins-pipeline
+git checkout ready/test-jenkins-pipeline
 # Make a change
 git commit -am "Test Jenkins pipeline"
 git push
@@ -151,19 +160,25 @@ git push
 
 Expected: Jenkins should trigger a new build for the branch.
 
+**Note**: Only works if the branch name starts with `ready/`.
+
 ### Test 3: Create a Pull Request
 
-1. Create a PR from `test/jenkins-pipeline` to `main`
+1. Create a PR from `ready/test-jenkins-pipeline` to `main`
 2. Expected: Jenkins should run the pipeline with E2E tests included
+
+**Note**: The PR source branch must start with `ready/` for the pipeline to run.
 
 ## Troubleshooting
 
 ### Pipeline Not Running for New Branches
 
-1. **Check Webhook**: Verify GitHub webhook is configured and active
-2. **Check Scan**: Manually trigger "Scan Multibranch Pipeline Now" in Jenkins
-3. **Check Logs**: View "Scan Multibranch Pipeline" logs in Jenkins
-4. **Check Credentials**: Verify GitHub credentials are valid
+1. **Check Branch Name**: Ensure branch name starts with `ready/` (e.g., `ready/feature-123`)
+2. **Check Branch Filter**: Verify branch filter is set to `^ready/.*` in Jenkins job configuration
+3. **Check Webhook**: Verify GitHub webhook is configured and active
+4. **Check Scan**: Manually trigger "Scan Multibranch Pipeline Now" in Jenkins
+5. **Check Logs**: View "Scan Multibranch Pipeline" logs in Jenkins
+6. **Check Credentials**: Verify GitHub credentials are valid
 
 ### Builds Not Triggering on Push
 
@@ -174,27 +189,31 @@ Expected: Jenkins should trigger a new build for the branch.
 
 ### Coverage Thresholds Failing
 
-- Coverage thresholds are only enforced on `main`, `develop`, and `master` branches
-- Feature branches will show coverage but won't fail the build
-- Adjust `COVERAGE_THRESHOLD` in Jenkinsfile if needed
+- Coverage thresholds are enforced on **all** `ready/*` branches
+- This ensures code quality before merging
+- Adjust `COVERAGE_THRESHOLD` in Jenkinsfile if needed (default: 70%)
 
 ### E2E Tests Not Running
 
-- E2E tests only run on `main`, `develop`, `master` branches and PRs targeting them
+- E2E tests run on `ready/*` branches that target `main`, `develop`, or `master`
 - This is intentional to speed up builds on feature branches
-- To run E2E on all branches, remove the `when` condition in the E2E stage
+- To run E2E on all `ready/*` branches, modify the `when` condition in the E2E stage
 
 ## Advanced Configuration
 
 ### Custom Branch Patterns
 
-To include/exclude specific branch patterns, add to **Behaviors**:
+The pipeline is configured to only run for branches starting with `ready/`. To modify this:
 
-```
-Filter by name (with regular expression)
-- Include: ^(main|develop|feature/.*|bugfix/.*)$
-- Exclude: ^(wip/.*|temp/.*)$
-```
+1. **In Jenkins Job Configuration**:
+   - Update **Filter by name (with regular expression)** → **Include**: `^ready/.*`
+   - Change the pattern to match your needs (e.g., `^(ready|release)/.*`)
+
+2. **In Jenkinsfile**:
+   - Update the branch validation check in the Checkout stage
+   - Modify the `when` conditions in stages that check branch names
+
+**Current Configuration**: Only `ready/*` branches trigger builds.
 
 ### Parallel Execution
 

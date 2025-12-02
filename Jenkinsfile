@@ -1,6 +1,7 @@
-// Single Jenkins Pipeline for All Branches
-// Automatically runs for every branch pushed to GitHub
+// Single Jenkins Pipeline for Branches Starting with "ready/"
+// Automatically runs for every branch pushed to GitHub that starts with "ready/"
 // Configure as Multibranch Pipeline in Jenkins with GitHub webhook integration
+// Branch filtering: Only branches matching "ready/*" pattern will trigger builds
 
 pipeline {
     agent any
@@ -48,10 +49,15 @@ pipeline {
                         returnStdout: true
                     ).trim()
                     
+                    // Validate branch name starts with "ready/"
+                    if (!env.GIT_BRANCH.startsWith('ready/')) {
+                        error("Branch '${env.GIT_BRANCH}' does not match required pattern 'ready/*'. Pipeline will not run.")
+                    }
+                    
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                     echo "🔍 Build Information"
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "Branch: ${env.GIT_BRANCH}"
+                    echo "Branch: ${env.GIT_BRANCH} ✅ (matches ready/*)"
                     echo "Commit: ${env.GIT_COMMIT_SHORT}"
                     echo "Author: ${env.GIT_AUTHOR}"
                     echo "Message: ${env.GIT_MESSAGE}"
@@ -202,19 +208,14 @@ pipeline {
                                     echo "  Lines: ${lines}%"
                                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                                     
-                                    // Check thresholds (only enforce on main/develop)
+                                    // Check thresholds (enforce on all ready/ branches)
                                     def threshold = env.COVERAGE_THRESHOLD ?: '70'
-                                    def enforceThreshold = env.BRANCH_NAME in ['main', 'develop', 'master']
                                     
-                                    if (enforceThreshold) {
-                                        if (statements < threshold.toFloat() ||
-                                            branches < 65 ||
-                                            functions < threshold.toFloat() ||
-                                            lines < threshold.toFloat()) {
-                                            error("Coverage thresholds not met! Required: ${threshold}% statements, 65% branches, ${threshold}% functions, ${threshold}% lines")
-                                        }
-                                    } else {
-                                        echo "⚠️ Coverage thresholds not enforced on branch ${env.BRANCH_NAME}"
+                                    if (statements < threshold.toFloat() ||
+                                        branches < 65 ||
+                                        functions < threshold.toFloat() ||
+                                        lines < threshold.toFloat()) {
+                                        error("Coverage thresholds not met! Required: ${threshold}% statements, 65% branches, ${threshold}% functions, ${threshold}% lines")
                                     }
                                 } else {
                                     echo "⚠️ Coverage file not found, skipping threshold check"
@@ -257,14 +258,13 @@ pipeline {
         
         stage('E2E Tests') {
             when {
-                // Run E2E tests on main, develop, and PRs targeting them
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                    branch 'master'
-                    expression { 
-                        env.CHANGE_TARGET in ['main', 'develop', 'master'] 
-                    }
+                // Run E2E tests on ready/ branches that target main/develop
+                expression { 
+                    env.GIT_BRANCH.startsWith('ready/') && (
+                        env.CHANGE_TARGET in ['main', 'develop', 'master'] ||
+                        env.GIT_BRANCH.contains('main') ||
+                        env.GIT_BRANCH.contains('develop')
+                    )
                 }
             }
             steps {
@@ -307,8 +307,11 @@ pipeline {
         
         stage('Visual Regression') {
             when {
-                // Only run visual regression on main branch
-                branch 'main'
+                // Run visual regression on ready/ branches targeting main
+                expression { 
+                    env.GIT_BRANCH.startsWith('ready/') && 
+                    (env.CHANGE_TARGET == 'main' || env.GIT_BRANCH.contains('main'))
+                }
             }
             steps {
                 script {
@@ -325,11 +328,13 @@ pipeline {
         
         stage('Accessibility Tests') {
             when {
-                // Run accessibility tests on main and develop
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                    branch 'master'
+                // Run accessibility tests on ready/ branches
+                expression { 
+                    env.GIT_BRANCH.startsWith('ready/') && (
+                        env.CHANGE_TARGET in ['main', 'develop', 'master'] ||
+                        env.GIT_BRANCH.contains('main') ||
+                        env.GIT_BRANCH.contains('develop')
+                    )
                 }
             }
             steps {
@@ -367,8 +372,8 @@ pipeline {
 
 ## Test Results
 - Unit Tests: ${currentBuild.result == 'SUCCESS' ? '✅ Passed' : '❌ Failed'}
-- E2E Tests: ${env.BRANCH_NAME in ['main', 'develop', 'master'] ? '✅ Completed' : '⏭️ Skipped'}
-- Visual Regression: ${env.BRANCH_NAME == 'main' ? '✅ Completed' : '⏭️ Skipped'}
+- E2E Tests: ${env.GIT_BRANCH.startsWith('ready/') ? '✅ Completed' : '⏭️ Skipped'}
+- Visual Regression: ${env.GIT_BRANCH.startsWith('ready/') && env.GIT_BRANCH.contains('main') ? '✅ Completed' : '⏭️ Skipped'}
 
 ## Build Information
 - Node Version: ${env.NODE_VERSION ?: 'N/A'}
@@ -406,8 +411,11 @@ pipeline {
         
         stage('Deploy Preview') {
             when {
-                // Deploy preview for develop branch
-                branch 'develop'
+                // Deploy preview for ready/ branches targeting develop
+                expression { 
+                    env.GIT_BRANCH.startsWith('ready/') && 
+                    (env.CHANGE_TARGET == 'develop' || env.GIT_BRANCH.contains('develop'))
+                }
             }
             steps {
                 script {
@@ -438,8 +446,11 @@ pipeline {
         
         stage('Deploy Production') {
             when {
-                // Deploy production for main branch
-                branch 'main'
+                // Deploy production for ready/ branches targeting main
+                expression { 
+                    env.GIT_BRANCH.startsWith('ready/') && 
+                    (env.CHANGE_TARGET == 'main' || env.GIT_BRANCH.contains('main'))
+                }
             }
             steps {
                 script {
