@@ -79,7 +79,7 @@ pipeline {
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Running all unit tests (excluding integration tests)..."
                   mkdir -p test-results
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test "$TEST_PROJECT" \
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet test /workspace/tests/main.Core.Tests/main.Core.Tests.csproj \
                     --configuration "$BUILD_CONFIGURATION" \
                     --verbosity normal \
                     --filter "FullyQualifiedName!~Integration" \
@@ -106,8 +106,8 @@ pipeline {
                   export PATH="/usr/bin:/usr/local/bin:$PATH"
                   echo "Packaging .NET artifacts..."
                   mkdir -p "$ARTIFACTS_PATH"
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace/azure-functions/main mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../../$ARTIFACTS_PATH/azure-functions"
-                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace/main.Core mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish --configuration "$BUILD_CONFIGURATION" --output "../$ARTIFACTS_PATH/main.Core"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish /workspace/azure-functions/main/main.csproj --configuration "$BUILD_CONFIGURATION" --output "/workspace/$ARTIFACTS_PATH/azure-functions"
+                  /usr/bin/docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:8.0 dotnet publish /workspace/main.Core/main.Core.csproj --configuration "$BUILD_CONFIGURATION" --output "/workspace/$ARTIFACTS_PATH/main.Core"
                   echo "Packaging completed"
                 '''
             }
@@ -177,9 +177,8 @@ pipeline {
                       exit 1
                     fi
                     echo 'Deploying Azure Function App to production...'
-                    cd azure-functions/main
                     echo 'Step 1: Publishing Function App (--self-contained false)...'
-                    dotnet publish --self-contained false --configuration Release --output ./publish
+                    dotnet publish /workspace/azure-functions/main/main.csproj --self-contained false --configuration Release --output /workspace/azure-functions/main/publish
                     echo 'Publish completed'
                     if [ -z \"\$AZURE_FUNCTION_APP_NAME\" ] || [ -z \"\$AZURE_RESOURCE_GROUP\" ]; then
                       echo 'Required variables not set: AZURE_FUNCTION_APP_NAME, AZURE_RESOURCE_GROUP'
@@ -188,6 +187,7 @@ pipeline {
                     echo 'Step 2: Deploying to Azure Function App...'
                     echo \"Function App: \$AZURE_FUNCTION_APP_NAME\"
                     echo \"Resource Group: \$AZURE_RESOURCE_GROUP\"
+                    cd /workspace/azure-functions/main/publish
                     func azure functionapp publish \"\$AZURE_FUNCTION_APP_NAME\" --dotnet-isolated
                     echo 'Deployment completed successfully'
                     echo \"Function App URL: https://\${AZURE_FUNCTION_APP_NAME}.azurewebsites.net\"
