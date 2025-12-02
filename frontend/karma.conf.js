@@ -34,9 +34,20 @@ module.exports = function (config) {
         }
       }
     },
-    reporters: ['progress', 'kjhtml'],
+    reporters: ['progress', 'kjhtml', 'coverage'],
     browsers: ['Chrome'],
-    restartOnFileChange: true
+    restartOnFileChange: true,
+    // Performance optimizations
+    concurrency: Infinity,
+    browserNoActivityTimeout: 60000,
+    browserDisconnectTimeout: 10000,
+    browserDisconnectTolerance: 3,
+    // Parallel execution
+    singleRun: false,
+    // Coverage optimization
+    preprocessors: {
+      '**/*.ts': ['coverage']
+    }
   });
 };
 
