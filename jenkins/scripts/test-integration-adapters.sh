@@ -16,6 +16,12 @@ mkdir -p test-results
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -e AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING:-}" \
   -e AZURE_SERVICE_BUS_CONNECTION_STRING="${AZURE_SERVICE_BUS_CONNECTION_STRING:-}" \
+  -e AZURE_SQL_SERVER="${AZURE_SQL_SERVER:-}" \
+  -e AZURE_SQL_DATABASE="${AZURE_SQL_DATABASE:-}" \
+  -e AZURE_SQL_USER="${AZURE_SQL_USER:-}" \
+  -e AZURE_SQL_PASSWORD="${AZURE_SQL_PASSWORD:-}" \
+  -e AZURE_CONTAINER_REGISTRY="${ACR_NAME:-}" \
+  -e ACR_NAME="${ACR_NAME:-}" \
   -w "$PWD" \
   mcr.microsoft.com/dotnet/sdk:8.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \

@@ -221,13 +221,18 @@ pipeline {
                     environment {
                         AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
                         AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                        AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                        AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                        AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                        AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+                        ACR_NAME = "${env.ACR_NAME ?: 'myacr'}"
                     }
                     steps {
                         script {
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                             echo "🔄 INTEGRATION: Adapter Pipeline Tests"
-                            echo "   - Tests: 23 tests (adapters, containers)"
-                            echo "   - Requires: Storage + Service Bus"
+                            echo "   - Tests: 23 tests (end-to-end adapter flow)"
+                            echo "   - Requires: Storage + Service Bus + SQL Server"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
                         sh 'bash jenkins/scripts/test-integration-adapters.sh'
