@@ -143,6 +143,77 @@ pipeline {
             }
         }
 
+        stage('Provision Azure Resources') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { env.FORCE_ALL_STAGES == 'true' }
+                    expression { env.PROVISION_AZURE_RESOURCES == 'true' }
+                }
+            }
+            environment {
+                AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+                AZURE_CLIENT_ID = credentials('AZURE_CLIENT_ID')
+                AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
+                AZURE_TENANT_ID = credentials('AZURE_TENANT_ID')
+                AZURE_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
+                AZURE_RESOURCE_GROUP = "${env.AZURE_RESOURCE_GROUP}"
+                ACR_NAME = "${env.ACR_NAME ?: 'myacr'}"
+            }
+            steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🏗️  PROVISION: Setting Up Azure Resources for Tests"
+                    echo "   - Blob Storage: Global + adapter-data containers"
+                    echo "   - Service Bus: Topics and subscriptions"
+                    echo "   - SQL Server: Tables, indexes, schema"
+                    echo "   - ACR: Service Principal permissions"
+                    echo "   - Run once before first integration test execution"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
+                sh 'bash jenkins/scripts/provision-azure-resources.sh'
+            }
+        }
+
+        stage('Provision Azure Resources') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { env.FORCE_ALL_STAGES == 'true' }
+                    expression { env.PROVISION_AZURE_RESOURCES == 'true' }
+                }
+            }
+            environment {
+                AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+                AZURE_CLIENT_ID = credentials('AZURE_CLIENT_ID')
+                AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
+                AZURE_TENANT_ID = credentials('AZURE_TENANT_ID')
+                AZURE_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
+            }
+            steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🏗️  PROVISION: Deploying Integration Test Infrastructure"
+                    echo "   - Method: Azure Bicep (Infrastructure as Code)"
+                    echo "   - Resources: Blob containers, Service Bus topics, ACR roles"
+                    echo "   - SQL Schema: Via sqlcmd (tables, indexes)"
+                    echo "   - Run once: Set PROVISION_AZURE_RESOURCES=true to execute"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
+                sh 'bash jenkins/scripts/deploy-integration-test-infrastructure.sh'
+            }
+        }
+
         stage('Integration Tests') {
             when {
                 anyOf {
