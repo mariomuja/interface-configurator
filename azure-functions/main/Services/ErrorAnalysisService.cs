@@ -35,6 +35,12 @@ public class ErrorAnalysisService
 
         try
         {
+            // Declare variables at method scope to avoid redeclaration errors
+            string errorMessage;
+            string? errorName;
+            string functionName;
+            string component;
+            
             // Extract error information
             var currentError = errorReport.CurrentError;
             if (currentError == null)
@@ -46,10 +52,10 @@ public class ErrorAnalysisService
                     if (failedCall != null && failedCall.Error != null)
                     {
                         // Use the failed function call as the error source
-                        var errorMessage = failedCall.Error.Message ?? string.Empty;
-                        var errorName = failedCall.Error.Name;
-                        var functionName = failedCall.FunctionName ?? string.Empty;
-                        var component = failedCall.Component ?? string.Empty;
+                        errorMessage = failedCall.Error.Message ?? string.Empty;
+                        errorName = failedCall.Error.Name;
+                        functionName = failedCall.FunctionName ?? string.Empty;
+                        component = failedCall.Component ?? string.Empty;
                         
                         result.AffectedFiles = InferFileFromFunction(functionName, component) != null 
                             ? new List<AffectedFile> { InferFileFromFunction(functionName, component)! }
@@ -66,16 +72,16 @@ public class ErrorAnalysisService
                 return result;
             }
 
-            var errorMessage = currentError.Error?.Message ?? string.Empty;
+            errorMessage = currentError.Error?.Message ?? string.Empty;
             var stackTrace = currentError.Stack ?? string.Empty;
-            var functionName = currentError.FunctionName ?? string.Empty;
-            var component = currentError.Component ?? string.Empty;
+            functionName = currentError.FunctionName ?? string.Empty;
+            component = currentError.Component ?? string.Empty;
 
             // Analyze stack trace to identify file locations
             result.AffectedFiles = AnalyzeStackTrace(stackTrace, functionName, component);
 
             // Analyze error message to determine root cause
-            var errorName = currentError.Error?.Name;
+            errorName = currentError.Error?.Name;
             result.RootCause = AnalyzeRootCause(errorMessage, stackTrace, functionName, errorName);
 
             // Generate suggested fixes
@@ -472,7 +478,7 @@ public class ErrorAnalysisService
                 new CodeChange
                 {
                     FilePath = files.Count > 0 ? files[0].FilePath : "frontend/src/app/services/transport.service.ts",
-                    LineNumber = files.Count > 0 && files[0].LineNumber.HasValue ? files[0].LineNumber.Value : 0,
+                    LineNumber = files.Count > 0 ? (files[0].LineNumber ?? 0) : 0,
                     ChangeType = "AddRetryLogic",
                     OldCode = "// HTTP request",
                     NewCode = "// Add retry with exponential backoff"
