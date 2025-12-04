@@ -22,7 +22,7 @@ else
   echo "Running unit tests excluding performance tests (ready/* branch - saves ~30s)"
 fi
 
-# Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
+# Using latest .NET 9 SDK (9.0 tag pulls the latest 9.0.x patch version)
 # --no-build and --no-restore flags skip rebuild and restore since we already did them
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
@@ -31,7 +31,7 @@ fi
   -e BRANCH_NAME="${BRANCH_NAME:-}" \
   -e GIT_BRANCH="${GIT_BRANCH:-}" \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \
