@@ -145,7 +145,7 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        var blobDownloadResult = BlobsModelFactory.BlobDownloadResult(content: binaryData);
         mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
@@ -196,7 +196,7 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        var blobDownloadResult = BlobsModelFactory.BlobDownloadResult(content: binaryData);
         mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
@@ -249,7 +249,7 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        var blobDownloadResult = BlobsModelFactory.BlobDownloadResult(content: binaryData);
         mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
@@ -306,7 +306,7 @@ public class InterfaceConfigurationServiceTests
         
         var mockDownloadResponse = new Mock<Azure.Response<BlobDownloadResult>>();
         var binaryData = BinaryData.FromString(jsonContent);
-        var blobDownloadResult = BlobDownloadResult.FromStream(new MemoryStream(binaryData.ToBytes()));
+        var blobDownloadResult = BlobsModelFactory.BlobDownloadResult(content: binaryData);
         mockDownloadResponse.Setup(r => r.Value).Returns(blobDownloadResult);
         mockBlobClient
             .Setup(x => x.DownloadContentAsync(It.IsAny<CancellationToken>()))
