@@ -35,6 +35,7 @@ pipeline {
         
         // Pipeline optimization flags
         USE_PARALLEL_TESTS   = "true"   // Run tests in parallel (fast + slow categories)
+        USE_SELECTIVE_TESTS  = "false"  // Only run tests for changed code (experimental)
     }
 
     stages {
@@ -82,12 +83,18 @@ pipeline {
             }
             steps {
                 script {
-                    // Use parallel test execution for better performance
+                    // Determine test execution strategy
+                    def useSelective = env.USE_SELECTIVE_TESTS == 'true'
                     def useParallel = env.USE_PARALLEL_TESTS != 'false'
-                    if (useParallel) {
+                    
+                    if (useSelective) {
+                        echo "Using selective test execution based on changed files"
+                        sh 'bash jenkins/scripts/selective-test-runner.sh'
+                    } else if (useParallel) {
                         echo "Using parallel test execution for faster results"
                         sh 'bash jenkins/scripts/test-dotnet-unit-parallel.sh'
                     } else {
+                        echo "Using standard sequential test execution"
                         sh 'bash jenkins/scripts/test-dotnet-unit.sh'
                     }
                 }

@@ -25,7 +25,7 @@ echo "Restoring NuGet packages..."
   mcr.microsoft.com/dotnet/sdk:8.0 \
   dotnet restore azure-functions/azure-functions.sln
 
-echo "Building solution..."
+echo "Building solution (incremental build enabled for speed)..."
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
