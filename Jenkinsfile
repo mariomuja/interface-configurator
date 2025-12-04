@@ -366,7 +366,7 @@ pipeline {
             }
         }
 
-        stage('Package .NET') {
+        stage('Packaging (Parallel)') {
             when {
                 anyOf {
                     branch 'main'
@@ -374,19 +374,36 @@ pipeline {
                     expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "📦 PACKAGE .NET: Preparing deployment artifacts"
-                    echo "   - Output: artifacts/ directory"
-                    echo "   - Contents: Compiled Function App binaries"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            parallel {
+                stage('Package .NET') {
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "📦 PACKAGE .NET: Preparing deployment artifacts"
+                            echo "   - Output: artifacts/ directory"
+                            echo "   - Contents: Compiled Function App binaries"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/package-dotnet.sh'
+                    }
                 }
-                sh 'bash jenkins/scripts/package-dotnet.sh'
+
+                stage('Package Frontend') {
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "📦 PACKAGE FRONTEND: Preparing web artifacts"
+                            echo "   - Output: artifacts/frontend/"
+                            echo "   - Contents: Compiled Angular app (HTML, JS, CSS)"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/package-frontend.sh'
+                    }
+                }
             }
         }
 
-        stage('Package Frontend') {
+        stage('Deployments (Parallel)') {
             when {
                 anyOf {
                     branch 'main'
@@ -394,98 +411,64 @@ pipeline {
                     expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "📦 PACKAGE FRONTEND: Preparing web artifacts"
-                    echo "   - Output: artifacts/frontend/"
-                    echo "   - Contents: Compiled Angular app (HTML, JS, CSS)"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            parallel {
+                stage('Deploy: Static Web App') {
+                    environment {
+                        AZURE_STATIC_WEB_APP_TOKEN = credentials('AZURE_STATIC_WEB_APP_TOKEN')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🚀 DEPLOY FRONTEND: Azure Static Web App"
+                            echo "   - Source: frontend/dist/"
+                            echo "   - Tool: Azure Static Web Apps CLI (swa)"
+                            echo "   - Target: Production environment"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/deploy-static-web-app.sh'
+                    }
                 }
-                sh 'bash jenkins/scripts/package-frontend.sh'
-            }
-        }
 
-        stage('Deploy Static Web App (Frontend)') {
-            when {
-                anyOf {
-                    branch 'main'
-                    expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
-                    expression { env.FORCE_ALL_STAGES == 'true' }
+                stage('Deploy: Function App') {
+                    environment {
+                        AZURE_CLIENT_ID       = credentials('AZURE_CLIENT_ID')
+                        AZURE_CLIENT_SECRET   = credentials('AZURE_CLIENT_SECRET')
+                        AZURE_TENANT_ID       = credentials('AZURE_TENANT_ID')
+                        AZURE_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
+                        AZURE_FUNCTION_APP_NAME = "${AZURE_FUNCTION_APP_NAME}"
+                        AZURE_RESOURCE_GROUP    = "${AZURE_RESOURCE_GROUP}"
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "⚡ DEPLOY BACKEND: Azure Function App"
+                            echo "   - Target: ${env.AZURE_FUNCTION_APP_NAME}"
+                            echo "   - Runtime: .NET 8.0 Isolated Worker"
+                            echo "   - Tool: func azure functionapp publish"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/deploy-function-app.sh'
+                    }
                 }
-            }
-            environment {
-                AZURE_STATIC_WEB_APP_TOKEN = credentials('AZURE_STATIC_WEB_APP_TOKEN')
-            }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "🚀 DEPLOY FRONTEND: Deploying to Azure Static Web App"
-                    echo "   - Source: frontend/dist/interface-configuration/browser/"
-                    echo "   - Tool: Azure Static Web Apps CLI (swa)"
-                    echo "   - Target: Production environment"
-                    echo "   - CDN: Automatic global distribution"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                }
-                sh 'bash jenkins/scripts/deploy-static-web-app.sh'
-            }
-        }
 
-        stage('Deploy Function App (Azure)') {
-            when {
-                anyOf {
-                    branch 'main'
-                    expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
-                    expression { env.FORCE_ALL_STAGES == 'true' }
+                stage('Deploy: Adapter Images') {
+                    environment {
+                        ACR_NAME     = "${env.ACR_NAME ?: 'myacr'}"
+                        ACR_USERNAME = credentials('ACR_USERNAME')
+                        ACR_PASSWORD = credentials('ACR_PASSWORD')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🐳 DEPLOY IMAGES: Azure Container Registry"
+                            echo "   - Registry: ${env.ACR_NAME}.azurecr.io"
+                            echo "   - Images: Adapter containers (future)"
+                            echo "   - Note: Currently placeholder for future use"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/build-and-push-adapter-images.sh'
+                    }
                 }
-            }
-            environment {
-                AZURE_CLIENT_ID       = credentials('AZURE_CLIENT_ID')
-                AZURE_CLIENT_SECRET   = credentials('AZURE_CLIENT_SECRET')
-                AZURE_TENANT_ID       = credentials('AZURE_TENANT_ID')
-                AZURE_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
-                AZURE_FUNCTION_APP_NAME = "${AZURE_FUNCTION_APP_NAME}"
-                AZURE_RESOURCE_GROUP    = "${AZURE_RESOURCE_GROUP}"
-            }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "⚡ DEPLOY FUNCTION APP: Deploying Backend to Azure"
-                    echo "   - Target: ${env.AZURE_FUNCTION_APP_NAME}"
-                    echo "   - Runtime: .NET 8.0 Isolated Worker"
-                    echo "   - Tool: Azure Functions Core Tools (func)"
-                    echo "   - Method: Direct publish (--dotnet-isolated)"
-                    echo "   - Expected time: ~2-4 minutes"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                }
-                sh 'bash jenkins/scripts/deploy-function-app.sh'
-            }
-        }
-
-        stage('Build and Push Adapter Images') {
-            when {
-                anyOf {
-                    branch 'main'
-                    expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
-                    expression { env.FORCE_ALL_STAGES == 'true' }
-                }
-            }
-            environment {
-                ACR_NAME     = "${env.ACR_NAME ?: 'myacr'}"
-                ACR_USERNAME = credentials('ACR_USERNAME')
-                ACR_PASSWORD = credentials('ACR_PASSWORD')
-            }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "🐳 BUILD ADAPTER IMAGES: Docker → Azure Container Registry"
-                    echo "   - Registry: ${env.ACR_NAME}.azurecr.io"
-                    echo "   - Images: CSV adapter, SQL Server adapter (future)"
-                    echo "   - Note: Currently no-op (adapters in Function App)"
-                    echo "   - Ready for: Future containerization"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                }
-                sh 'bash jenkins/scripts/build-and-push-adapter-images.sh'
             }
         }
 
