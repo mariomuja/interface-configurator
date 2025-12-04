@@ -29,6 +29,7 @@ RUN groupadd -g 999 docker 2>/dev/null || groupadd docker && \
 # - git, github: Git and GitHub integration with commit status support
 # - configuration-as-code: load YAML config on startup
 # - blueocean: Modern UI for better pipeline visualization
+# - monitoring: System monitoring (CPU, memory, disk, network)
 RUN jenkins-plugin-cli --plugins \
     workflow-aggregator \
     workflow-multibranch \
@@ -39,7 +40,8 @@ RUN jenkins-plugin-cli --plugins \
     job-dsl \
     credentials \
     credentials-binding \
-    blueocean
+    blueocean \
+    monitoring
 
 # Copy Jenkins Configuration as Code (JCasC)
 # Build-Kontext ist das Projekt-Root (..), daher liegt die Datei unter jenkins/jenkins.yml
