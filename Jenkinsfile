@@ -127,28 +127,6 @@ pipeline {
             }
         }
 
-        stage('Manual Approval for Merge') {
-            when {
-                allOf {
-                    expression { isReadyBranch() }
-                    expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-                }
-            }
-            steps {
-                script {
-                    echo "⚠️  Ready to merge ${env.BRANCH_NAME} into main"
-                    echo "All tests have passed. Waiting for manual approval..."
-                    
-                    // Manual approval - timeout after 24 hours
-                    timeout(time: 24, unit: 'HOURS') {
-                        input message: 'Merge into main?', 
-                              ok: 'Yes, merge now',
-                              submitter: 'admin'
-                    }
-                }
-            }
-        }
-
         stage('Auto-merge ready/* into main') {
             when {
                 allOf {
@@ -165,7 +143,7 @@ pipeline {
                     if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
                         error("Cannot auto-merge: Build status is ${currentBuild.result}")
                     }
-                    echo "✅ Manual approval received. Proceeding with auto-merge..."
+                    echo "✅ All tests passed. Auto-merging ${env.BRANCH_NAME} into main..."
                 }
                 sh 'bash jenkins/scripts/auto-merge.sh'
             }
