@@ -143,7 +143,7 @@ pipeline {
             }
         }
 
-        stage('Integration Tests (Parallel)') {
+        stage('Integration Tests') {
             when {
                 anyOf {
                     branch 'main'
@@ -151,7 +151,7 @@ pipeline {
                 }
             }
             parallel {
-                stage('Test: Blob Storage') {
+                stage('Integration: Blob Storage') {
                     environment {
                         AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
                     }
@@ -159,9 +159,8 @@ pipeline {
                         script {
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                             echo "☁️  INTEGRATION: Blob Storage Tests"
-                            echo "   - Tests: Container access, blob operations, metadata"
+                            echo "   - Tests: 8 tests (containers, blobs, metadata)"
                             echo "   - Requires: AZURE_STORAGE_CONNECTION_STRING"
-                            echo "   - Expected time: ~30s-1min"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
                         sh 'bash jenkins/scripts/test-integration-blob-storage.sh'
@@ -173,7 +172,7 @@ pipeline {
                     }
                 }
 
-                stage('Test: Service Bus') {
+                stage('Integration: Service Bus') {
                     environment {
                         AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
                     }
@@ -181,9 +180,8 @@ pipeline {
                         script {
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                             echo "📨 INTEGRATION: Service Bus Tests"
-                            echo "   - Tests: Message sending, receiving, topics, subscriptions"
+                            echo "   - Tests: 10 tests (messaging, topics, subscriptions)"
                             echo "   - Requires: AZURE_SERVICE_BUS_CONNECTION_STRING"
-                            echo "   - Expected time: ~30s-1min"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
                         sh 'bash jenkins/scripts/test-integration-service-bus.sh'
@@ -195,7 +193,7 @@ pipeline {
                     }
                 }
 
-                stage('Test: SQL Server') {
+                stage('Integration: SQL Server') {
                     environment {
                         AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
                         AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
@@ -206,9 +204,8 @@ pipeline {
                         script {
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                             echo "🗄️  INTEGRATION: SQL Server Tests"
-                            echo "   - Tests: Tables, indexes, queries, performance"
-                            echo "   - Requires: SQL Server credentials (4 values)"
-                            echo "   - Expected time: ~1-2min"
+                            echo "   - Tests: 18 tests (tables, indexes, queries)"
+                            echo "   - Requires: SQL credentials (4 values)"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
                         sh 'bash jenkins/scripts/test-integration-sql-server.sh'
@@ -220,7 +217,7 @@ pipeline {
                     }
                 }
 
-                stage('Test: Adapters & Containers') {
+                stage('Integration: Adapters') {
                     environment {
                         AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
                         AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
@@ -228,10 +225,9 @@ pipeline {
                     steps {
                         script {
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo "🔄 INTEGRATION: Adapter Pipeline & Container Tests"
-                            echo "   - Tests: End-to-end adapter flow, container apps"
+                            echo "🔄 INTEGRATION: Adapter Pipeline Tests"
+                            echo "   - Tests: 23 tests (adapters, containers)"
                             echo "   - Requires: Storage + Service Bus"
-                            echo "   - Expected time: ~30s-1min"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
                         sh 'bash jenkins/scripts/test-integration-adapters.sh'
