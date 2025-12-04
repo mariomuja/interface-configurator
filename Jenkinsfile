@@ -67,7 +67,10 @@ pipeline {
 
                 stage('Build Frontend') {
                     when {
-                        changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
+                        anyOf {
+                            changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
+                            expression { env.FORCE_ALL_STAGES == 'true' }
+                        }
                     }
                     steps {
                         dir(env.FRONTEND_PATH) {
