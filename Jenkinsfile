@@ -143,37 +143,104 @@ pipeline {
             }
         }
 
-        stage('Test .NET integration') {
+        stage('Integration Tests (Parallel)') {
             when {
                 anyOf {
                     branch 'main'
                     expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
-            environment {
-                AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
-                AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
-                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
-                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
-                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
-                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
-            }
-            steps {
-                script {
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "🔌 TEST INTEGRATION: Testing Azure Resources"
-                    echo "   - Total: 59 tests"
-                    echo "   - Tests: Blob Storage, Service Bus, SQL Server"
-                    echo "   - Requires: Real Azure connections"
-                    echo "   - Expected time: ~2-5 minutes"
-                    echo "   - Note: BLOCKING - fails pipeline if fails"
-                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            parallel {
+                stage('Test: Blob Storage') {
+                    environment {
+                        AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "☁️  INTEGRATION: Blob Storage Tests"
+                            echo "   - Tests: Container access, blob operations, metadata"
+                            echo "   - Requires: AZURE_STORAGE_CONNECTION_STRING"
+                            echo "   - Expected time: ~30s-1min"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/test-integration-blob-storage.sh'
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'test-results/**/*blob*.xml'
+                        }
+                    }
                 }
-                sh 'bash jenkins/scripts/test-dotnet-integration.sh'
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'test-results/**/*integration*.xml'
+
+                stage('Test: Service Bus') {
+                    environment {
+                        AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "📨 INTEGRATION: Service Bus Tests"
+                            echo "   - Tests: Message sending, receiving, topics, subscriptions"
+                            echo "   - Requires: AZURE_SERVICE_BUS_CONNECTION_STRING"
+                            echo "   - Expected time: ~30s-1min"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/test-integration-service-bus.sh'
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'test-results/**/*servicebus*.xml'
+                        }
+                    }
+                }
+
+                stage('Test: SQL Server') {
+                    environment {
+                        AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                        AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                        AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                        AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🗄️  INTEGRATION: SQL Server Tests"
+                            echo "   - Tests: Tables, indexes, queries, performance"
+                            echo "   - Requires: SQL Server credentials (4 values)"
+                            echo "   - Expected time: ~1-2min"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/test-integration-sql-server.sh'
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'test-results/**/*sql*.xml'
+                        }
+                    }
+                }
+
+                stage('Test: Adapters & Containers') {
+                    environment {
+                        AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                        AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                    }
+                    steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🔄 INTEGRATION: Adapter Pipeline & Container Tests"
+                            echo "   - Tests: End-to-end adapter flow, container apps"
+                            echo "   - Requires: Storage + Service Bus"
+                            echo "   - Expected time: ~30s-1min"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
+                        sh 'bash jenkins/scripts/test-integration-adapters.sh'
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'test-results/**/*adapters*.xml'
+                        }
+                    }
                 }
             }
         }
