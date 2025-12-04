@@ -36,7 +36,7 @@ pipeline {
         // Pipeline optimization flags
         USE_PARALLEL_TESTS   = "true"   // Run tests in parallel (fast + slow categories)
         USE_SELECTIVE_TESTS  = "false"  // Only run tests for changed code (experimental)
-        // Azure SQL Server credentials updated
+        // Azure credentials updated: Service Bus + ACR_NAME
     }
 
     stages {
