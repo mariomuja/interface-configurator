@@ -78,8 +78,38 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'test-results/**/*.xml'
+                    junit allowEmptyResults: true, testResults: 'test-results/**/*junit*.xml'
                 }
+            }
+        }
+
+        stage('Test .NET integration') {
+            when {
+                branch 'main'
+            }
+            environment {
+                AZURE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+            }
+            steps {
+                sh 'bash jenkins/scripts/test-dotnet-integration.sh'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'test-results/**/*integration*.xml'
+                }
+            }
+        }
+
+        stage('Test E2E') {
+            when {
+                branch 'main'
+            }
+            environment {
+                E2E_BASE_URL = "${env.STATIC_WEB_APP_URL ?: 'https://your-static-web-app.azurestaticapps.net'}"
+                E2E_API_URL  = "${env.AZURE_FUNCTION_APP_URL ?: 'https://func-integration-main.azurewebsites.net'}"
+            }
+            steps {
+                sh 'bash jenkins/scripts/test-e2e.sh'
             }
         }
 
