@@ -16,13 +16,17 @@ public class InterfaceConfiguration
     /// <summary>
     /// Dictionary of source adapter instances, keyed by instance name
     /// Allows multiple source adapters per interface (for future use)
+    /// Note: NotMapped because EF Core can't map Dictionary to relational DB
     /// </summary>
+    [NotMapped]
     public Dictionary<string, SourceAdapterInstance> Sources { get; set; } = new Dictionary<string, SourceAdapterInstance>();
 
     /// <summary>
     /// Dictionary of destination adapter instances, keyed by instance name
     /// Multiple destination adapters can subscribe to the same MessageBox data
+    /// Note: NotMapped because EF Core can't map Dictionary to relational DB
     /// </summary>
+    [NotMapped]
     public Dictionary<string, DestinationAdapterInstance> Destinations { get; set; } = new Dictionary<string, DestinationAdapterInstance>();
 
     // ========== DEPRECATED PROPERTIES - Kept for backward compatibility and migration ==========

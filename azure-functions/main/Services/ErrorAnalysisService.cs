@@ -197,15 +197,15 @@ public class ErrorAnalysisService
                 }
             }
 
-            // Pattern 2: Try to find file name in parentheses
-            var parenMatch = System.Text.RegularExpressions.Regex.Match(line, @"\(([^)]+\.(ts|js|cs|tsx|jsx)):(\d+)\)");
+            // Pattern 2: Try to find file name in parentheses (with optional column number)
+            var parenMatch = System.Text.RegularExpressions.Regex.Match(line, @"\(([^)]+\.(ts|js|cs|tsx|jsx)):(\d+)(?::(\d+))?\)");
             if (parenMatch.Success)
             {
                 return new AffectedFile
                 {
                     FilePath = parenMatch.Groups[1].Value,
                     LineNumber = int.Parse(parenMatch.Groups[3].Value),
-                    ColumnNumber = null,
+                    ColumnNumber = parenMatch.Groups[4].Success ? int.Parse(parenMatch.Groups[4].Value) : null,
                     FunctionName = ExtractFunctionName(line),
                     Severity = DetermineSeverity(line)
                 };

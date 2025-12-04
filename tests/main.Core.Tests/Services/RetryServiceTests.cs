@@ -72,7 +72,8 @@ public class RetryServiceTests
         Func<Task<bool>> operation = () =>
         {
             attemptCount++;
-            return Task.FromException<bool>(new Exception($"Attempt {attemptCount} failed"));
+            // Use TimeoutException which is retryable according to RetryPolicy.ShouldRetry
+            return Task.FromException<bool>(new TimeoutException($"Attempt {attemptCount} failed"));
         };
 
         var retryPolicy = new RetryPolicy
@@ -84,7 +85,7 @@ public class RetryServiceTests
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(async () =>
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>  // RetryService wraps in InvalidOperationException
         {
             await _retryService.ExecuteWithRetryAsync(operation, "test-operation", retryPolicy);
         });

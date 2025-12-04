@@ -126,8 +126,11 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _mockLogger.Object,
             null!); // statisticsService
 
-        var headers = new List<string>();
-        var records = new List<Dictionary<string, string>>();
+        var headers = new List<string>();  // Empty headers
+        var records = new List<Dictionary<string, string>>
+        {
+            new() { { "SomeColumn", "SomeValue" } }  // Add record so validation is reached
+        };
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => adapter.WriteAsync("TransportData", headers, records, CancellationToken.None));
@@ -161,7 +164,10 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             _mockLogger.Object,
             null!); // statisticsService
 
-        var records = new List<Dictionary<string, string>>();
+        var records = new List<Dictionary<string, string>>
+        {
+            new() { { "SomeColumn", "SomeValue" } }  // Add record so validation is reached
+        };
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => adapter.WriteAsync("TransportData", null!, records, CancellationToken.None));
@@ -250,14 +256,13 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
 
         // Act
         var adapter = new SqlServerAdapter(
-            null!,
+            null!,  // context (null because using connectionString)
             _mockDynamicTableService.Object,
             _mockDataService.Object,
-            null, // messageBoxService
-            null, // subscriptionService
+            null, // serviceBusService
             null, // interfaceName
             null, // adapterInstanceGuid
-            connectionString,
+            connectionString,  // connectionString
             null, // pollingStatement
             null, // pollingInterval
             null, // tableName
@@ -266,6 +271,7 @@ public class SqlServerAdapterEdgeCasesTests : IDisposable
             null, // commandTimeout
             null, // failOnBadStatement
             null, // configService
+            "Source", // adapterRole
             _mockLogger.Object,
             null!); // statisticsService
 

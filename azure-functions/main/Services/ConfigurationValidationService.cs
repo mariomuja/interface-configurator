@@ -78,6 +78,12 @@ public class ConfigurationValidationService : IConfigurationValidationService
             // Additional adapter-specific validation
             ValidateAdapterSpecificRules(jsonNode, adapterName, adapterType, result);
 
+            // Update IsValid based on whether errors were found
+            if (result.Errors.Count > 0)
+            {
+                result.IsValid = false;
+            }
+
             return result;
         }
         catch (JsonException ex)

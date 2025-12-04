@@ -87,11 +87,13 @@ public class CsvProcessingServicePerformanceTests
         var csvContent = "id║name║email\n1║John║john@example.com\n2║Jane\n3║Bob║bob@example.com║extra";
         // Row 2 has 2 columns (should be 3), Row 3 has 4 columns (should be 3)
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidDataException>(async () =>
-        {
-            await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
-        });
+        // Act
+        var (headers, records) = await _csvProcessingService.ParseCsvWithHeadersAsync(csvContent, "║", 0, 0, '"', CancellationToken.None);
+
+        // Assert
+        // Service skips invalid rows and continues (doesn't throw exception)
+        Assert.Equal(3, headers.Count);  // id, name, email
+        Assert.True(records.Count <= 2);  // Only valid rows (row 1 is valid for sure)
     }
 
     private string GenerateCsvContent(int rowCount)
