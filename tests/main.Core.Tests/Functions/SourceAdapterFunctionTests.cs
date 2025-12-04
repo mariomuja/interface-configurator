@@ -147,17 +147,31 @@ public class SourceAdapterFunctionTests
         var config1 = new InterfaceConfiguration
         {
             InterfaceName = "TestInterface1",
-            SourceAdapterName = "CSV",
-            SourceConfiguration = "{\"source\": \"csv-files/csv-incoming\"}",
-            SourceIsEnabled = true
+            Sources = new Dictionary<string, SourceAdapterInstance>
+            {
+                ["CSV Source"] = new SourceAdapterInstance
+                {
+                    InstanceName = "CSV Source",
+                    AdapterName = "CSV",
+                    IsEnabled = true,
+                    Configuration = "{\"source\": \"csv-files/csv-incoming\"}"
+                }
+            }
         };
 
         var config2 = new InterfaceConfiguration
         {
             InterfaceName = "TestInterface2",
-            SourceAdapterName = "SqlServer",
-            SourceConfiguration = "{\"source\": \"TransportData\"}",
-            SourceIsEnabled = true
+            Sources = new Dictionary<string, SourceAdapterInstance>
+            {
+                ["SQL Source"] = new SourceAdapterInstance
+                {
+                    InstanceName = "SQL Source",
+                    AdapterName = "SqlServer",
+                    IsEnabled = true,
+                    Configuration = "{\"source\": \"TransportData\"}"
+                }
+            }
         };
 
         var headers = new List<string> { "Name" };
