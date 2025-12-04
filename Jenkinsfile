@@ -27,7 +27,10 @@ pipeline {
         // GitHub repository information for auto-merge of ready/* → main
         GITHUB_OWNER         = "mariomuja"
         GITHUB_REPO          = "interface-configurator"
-        // Test: periodic scanning should detect this change automatically
+        
+        // Set FORCE_ALL_STAGES=true to run all deployment stages regardless of branch
+        // Useful for testing the complete pipeline on ready/* branches
+        // FORCE_ALL_STAGES     = "true"
     }
 
     stages {
@@ -85,7 +88,10 @@ pipeline {
 
         stage('Test .NET integration') {
             when {
-                branch 'main'
+                anyOf {
+                    branch 'main'
+                    expression { env.FORCE_ALL_STAGES == 'true' }
+                }
             }
             environment {
                 AZURE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
@@ -102,7 +108,10 @@ pipeline {
 
         stage('Test E2E') {
             when {
-                branch 'main'
+                anyOf {
+                    branch 'main'
+                    expression { env.FORCE_ALL_STAGES == 'true' }
+                }
             }
             environment {
                 E2E_BASE_URL = "${env.STATIC_WEB_APP_URL ?: 'https://your-static-web-app.azurestaticapps.net'}"
@@ -115,12 +124,15 @@ pipeline {
 
         stage('Terraform Apply (Infrastructure)') {
             when {
-                allOf {
-                    branch 'main'
-                    anyOf {
-                        changeset "**/terraform/**"
-                        expression { env.FORCE_TERRAFORM == 'true' }
+                anyOf {
+                    allOf {
+                        branch 'main'
+                        anyOf {
+                            changeset "**/terraform/**"
+                            expression { env.FORCE_TERRAFORM == 'true' }
+                        }
                     }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             environment {
@@ -142,6 +154,7 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             steps {
@@ -154,6 +167,7 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             steps {
@@ -166,6 +180,7 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             environment {
@@ -181,6 +196,7 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             environment {
@@ -201,6 +217,7 @@ pipeline {
                 anyOf {
                     branch 'main'
                     expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                    expression { env.FORCE_ALL_STAGES == 'true' }
                 }
             }
             environment {
