@@ -16,7 +16,7 @@ mkdir -p test-results
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -e AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING:-}" \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \

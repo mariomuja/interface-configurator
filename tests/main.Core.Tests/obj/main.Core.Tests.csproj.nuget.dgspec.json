@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {}
+    "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {}
   },
   "projects": {
-    "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
         "projectName": "adapters",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\adapters\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\adapters\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -23,18 +23,18 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {
-              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }
@@ -52,8 +52,8 @@
         "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "Azure.Messaging.ServiceBus": {
               "target": "Package",
@@ -65,7 +65,7 @@
             },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
-              "version": "[8.0.2, )"
+              "version": "[9.0.0, )"
             },
             "SSH.NET": {
               "target": "Package",
@@ -73,11 +73,11 @@
             },
             "System.Net.Http.Json": {
               "target": "Package",
-              "version": "[8.0.1, )"
+              "version": "[9.0.0, )"
             },
             "System.Text.Json": {
               "target": "Package",
-              "version": "[8.0.5, )"
+              "version": "[9.0.0, )"
             }
           },
           "imports": [
@@ -94,15 +94,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {
@@ -114,14 +114,14 @@
         }
       }
     },
-    "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
         "projectName": "main",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -133,24 +133,24 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {
-              "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
+              "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
               },
-              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               },
-              "C:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj"
+              "c:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj"
               }
             }
           }
@@ -168,8 +168,8 @@
         "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "Azure.Identity": {
               "target": "Package",
@@ -266,19 +266,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {
@@ -290,14 +290,14 @@
         }
       }
     },
-    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "projectName": "main.Core",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -309,15 +309,15 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {}
           }
         },
@@ -334,8 +334,8 @@
         "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "Azure.Messaging.ServiceBus": {
               "target": "Package",
@@ -347,15 +347,15 @@
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
-              "version": "[8.0.11, )"
+              "version": "[9.0.0, )"
             },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
-              "version": "[8.0.2, )"
+              "version": "[9.0.0, )"
             },
             "System.Text.Json": {
               "target": "Package",
-              "version": "[8.0.5, )"
+              "version": "[9.0.0, )"
             }
           },
           "imports": [
@@ -372,15 +372,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {
@@ -392,14 +392,14 @@
         }
       }
     },
-    "C:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj",
         "projectName": "services",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\services\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\services\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -411,18 +411,18 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {
-              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }
@@ -440,8 +440,8 @@
         "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "Microsoft.Data.SqlClient": {
               "target": "Package",
@@ -449,11 +449,11 @@
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
-              "version": "[8.0.11, )"
+              "version": "[9.0.0, )"
             },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
-              "version": "[8.0.2, )"
+              "version": "[9.0.0, )"
             }
           },
           "imports": [
@@ -470,15 +470,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {
@@ -490,14 +490,14 @@
         }
       }
     },
-    "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {
+    "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
         "projectName": "main.Core.Tests",
-        "projectPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+        "projectPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
+        "outputPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -509,24 +509,24 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {
-              "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
+              "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
               },
-              "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
+              "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
               },
-              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }
@@ -544,8 +544,8 @@
         "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "Azure.Containers.ContainerRegistry": {
               "target": "Package",
@@ -567,11 +567,11 @@
             },
             "Microsoft.EntityFrameworkCore.InMemory": {
               "target": "Package",
-              "version": "[8.0.11, )"
+              "version": "[9.0.0, )"
             },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
-              "version": "[8.0.2, )"
+              "version": "[9.0.0, )"
             },
             "Microsoft.NET.Test.Sdk": {
               "target": "Package",
@@ -618,15 +618,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {

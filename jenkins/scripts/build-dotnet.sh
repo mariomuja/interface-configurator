@@ -16,13 +16,13 @@ echo "Restoring NuGet packages..."
 # Jenkins runs in Docker container 'interface-configurator-jenkins'
 # Use --volumes-from to share the Jenkins container's volumes (including workspace)
 # Mount shared NuGet packages directory and set NUGET_PACKAGES environment variable
-# Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
+# Using latest .NET 9 SDK (9.0 tag pulls the latest 9.0.x patch version)
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet restore azure-functions/azure-functions.sln
 
 echo "Building solution (incremental build enabled for speed)..."

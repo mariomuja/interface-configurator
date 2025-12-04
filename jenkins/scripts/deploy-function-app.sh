@@ -5,7 +5,7 @@ export PATH="/usr/bin:/usr/local/bin:$PATH"
 
 echo "Setting up deployment environment..."
 
-# Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
+# Using latest .NET 9 SDK (9.0 tag pulls the latest 9.0.x patch version)
 /usr/bin/docker run --rm --volumes-from interface-configurator-jenkins -w "$PWD" \
   -e AZURE_CLIENT_ID="$AZURE_CLIENT_ID" \
   -e AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET" \
@@ -13,7 +13,7 @@ echo "Setting up deployment environment..."
   -e AZURE_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID" \
   -e AZURE_FUNCTION_APP_NAME="$AZURE_FUNCTION_APP_NAME" \
   -e AZURE_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP" \
-  mcr.microsoft.com/dotnet/sdk:8.0 bash -c "
+  mcr.microsoft.com/dotnet/sdk:9.0 bash -c "
   apt-get update && apt-get install -y curl gnupg lsb-release
   echo 'Installing Azure CLI...'
   curl -sL https://aka.ms/InstallAzureCLIDeb | bash

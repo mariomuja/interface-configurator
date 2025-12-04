@@ -26,7 +26,7 @@ mkdir -p test-results
   -e AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET:-}" \
   -e AZURE_TENANT_ID="${AZURE_TENANT_ID:-}" \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \

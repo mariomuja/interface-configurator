@@ -14,7 +14,7 @@ pipeline {
     }
 
     environment {
-        DOTNET_VERSION       = "8.0"
+        DOTNET_VERSION       = "9.0"
         NODE_VERSION         = "22"
         NPM_VERSION          = "10"
         SOLUTION_PATH        = "azure-functions/azure-functions.sln"
