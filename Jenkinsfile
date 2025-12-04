@@ -107,6 +107,21 @@ pipeline {
             }
         }
 
+        stage('Deploy Static Web App (Frontend)') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                }
+            }
+            environment {
+                AZURE_STATIC_WEB_APP_TOKEN = credentials('AZURE_STATIC_WEB_APP_TOKEN')
+            }
+            steps {
+                sh 'bash jenkins/scripts/deploy-static-web-app.sh'
+            }
+        }
+
         stage('Deploy Function App (Azure)') {
             when {
                 anyOf {
@@ -124,6 +139,23 @@ pipeline {
             }
             steps {
                 sh 'bash jenkins/scripts/deploy-function-app.sh'
+            }
+        }
+
+        stage('Build and Push Adapter Images') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { env.GIT_TAG && env.GIT_TAG.trim() != '' }
+                }
+            }
+            environment {
+                ACR_NAME     = "${env.ACR_NAME ?: 'myacr'}"
+                ACR_USERNAME = credentials('ACR_USERNAME')
+                ACR_PASSWORD = credentials('ACR_PASSWORD')
+            }
+            steps {
+                sh 'bash jenkins/scripts/build-and-push-adapter-images.sh'
             }
         }
 
