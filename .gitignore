@@ -38,3 +38,6 @@ jenkins/.env
 
 # NuGet packages cache (shared across Docker containers in Jenkins)
 .nuget/
+
+# npm cache (shared across Docker containers in Jenkins)
+.npm-cache/

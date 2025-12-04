@@ -8,6 +8,9 @@ pipeline {
 
     options {
         timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '10'))  // Keep only last 10 builds
+        disableConcurrentBuilds()  // Prevent concurrent builds of same branch
+        skipDefaultCheckout()  // We'll do a shallow checkout for speed
     }
 
     environment {
@@ -28,25 +31,40 @@ pipeline {
     }
 
     stages {
-        stage('Build .NET') {
-            when {
-                expression { isReadyOrMain() }
-            }
+        stage('Checkout') {
             steps {
-                sh 'bash jenkins/scripts/build-dotnet.sh'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: scm.branches,
+                    extensions: [
+                        [$class: 'CloneOption', depth: 1, shallow: true],  // Shallow clone for speed
+                        [$class: 'CleanBeforeCheckout']
+                    ],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                ])
             }
         }
 
-        stage('Build Frontend') {
+        stage('Parallel Builds') {
             when {
-                allOf {
-                    expression { isReadyOrMain() }
-                    changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
-                }
+                expression { isReadyOrMain() }
             }
-            steps {
-                dir(env.FRONTEND_PATH) {
-                    sh 'bash jenkins/scripts/build-frontend.sh'
+            parallel {
+                stage('Build .NET') {
+                    steps {
+                        sh 'bash jenkins/scripts/build-dotnet.sh'
+                    }
+                }
+
+                stage('Build Frontend') {
+                    when {
+                        changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
+                    }
+                    steps {
+                        dir(env.FRONTEND_PATH) {
+                            sh 'bash jenkins/scripts/build-frontend.sh'
+                        }
+                    }
                 }
             }
         }
