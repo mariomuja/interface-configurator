@@ -3,10 +3,16 @@ set -e
 
 export PATH="/usr/bin:/usr/local/bin:$PATH"
 
+echo "Current directory: $PWD"
+echo "Frontend path: $FRONTEND_PATH"
+
 # Create shared npm cache directory
-NPM_CACHE_DIR="$PWD/../.npm-cache"
+NPM_CACHE_DIR="$PWD/.npm-cache"
 mkdir -p "$NPM_CACHE_DIR"
 echo "Using shared npm cache: $NPM_CACHE_DIR"
+
+# Change to frontend directory
+cd "$FRONTEND_PATH" || cd frontend
 
 echo "Installing Node.js dependencies..."
 /usr/bin/docker run --rm \
@@ -25,3 +31,4 @@ echo "Building Angular frontend..."
   npm run build:prod
 
 echo "Frontend build completed successfully"
+

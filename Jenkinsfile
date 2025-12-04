@@ -98,9 +98,8 @@ pipeline {
                             echo "   - npm cache: Cached in .npm-cache/"
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                         }
-                        dir(env.FRONTEND_PATH) {
-                            sh 'bash jenkins/scripts/build-frontend.sh'
-                        }
+                        // Run from workspace root, not from frontend directory
+                        sh 'bash jenkins/scripts/build-frontend.sh'
                     }
                 }
             }
