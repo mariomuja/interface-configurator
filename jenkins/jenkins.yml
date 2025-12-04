@@ -25,6 +25,14 @@ credentials:
               password: "${GIT_PASSWORD:-changeme}"
               description: "Git credentials for interface-configurator repository"
           - string:
+              id: "github-token"
+              secret: "${GITHUB_TOKEN:-}"
+              description: "GitHub Personal Access Token for API access (commit status, auto-merge)"
+          - string:
+              id: "githubtokenall"
+              secret: "${GITHUB_TOKEN_ALL:-}"
+              description: "GitHub Personal Access Token with all permissions"
+          - string:
               id: "AZURE_CLIENT_ID"
               secret: "${AZURE_CLIENT_ID:-}"
               description: "Azure AD application (client) ID for service principal"
@@ -40,5 +48,21 @@ credentials:
               id: "AZURE_SUBSCRIPTION_ID"
               secret: "${AZURE_SUBSCRIPTION_ID:-}"
               description: "Azure subscription ID"
+          - string:
+              id: "AZURE_STORAGE_CONNECTION_STRING"
+              secret: "${AZURE_STORAGE_CONNECTION_STRING:-}"
+              description: "Azure Storage connection string for integration tests"
+          - string:
+              id: "AZURE_STATIC_WEB_APP_TOKEN"
+              secret: "${AZURE_STATIC_WEB_APP_TOKEN:-}"
+              description: "Azure Static Web App deployment token"
+          - string:
+              id: "ACR_USERNAME"
+              secret: "${ACR_USERNAME:-}"
+              description: "Azure Container Registry username"
+          - string:
+              id: "ACR_PASSWORD"
+              secret: "${ACR_PASSWORD:-}"
+              description: "Azure Container Registry password"
 
 
