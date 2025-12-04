@@ -1,11 +1,9 @@
 name: Trigger Jenkins Build
 
 on:
-  push:
-    branches:
-      - 'ready/**'
-      - 'main'
-  workflow_dispatch:
+  # Disabled: Only works if Jenkins is publicly accessible
+  # For local Jenkins, use manual builds or SCM polling instead
+  workflow_dispatch:  # Keep manual trigger only
 
 jobs:
   trigger-jenkins:
