@@ -31,7 +31,7 @@ echo "Building solution (incremental build enabled for speed)..."
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet build azure-functions/azure-functions.sln --configuration "$BUILD_CONFIGURATION" --no-restore
 
 echo "Build completed successfully"
