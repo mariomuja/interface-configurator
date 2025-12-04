@@ -2,9 +2,10 @@ FROM jenkins/jenkins:lts-jdk21
 
 USER root
 
-# Optional: install Docker CLI to allow Jenkins to run Docker-based agents/builds
+# Install Docker CLI and Azure CLI
 RUN apt-get update && \
     apt-get install -y ca-certificates curl gnupg lsb-release && \
+    # Docker CLI
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     echo \
@@ -12,6 +13,9 @@ RUN apt-get update && \
       $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \
     apt-get install -y docker-ce-cli && \
+    # Azure CLI (for Bicep deployments and Azure resource management)
+    curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
+    # Cleanup to reduce image size
     rm -rf /var/lib/apt/lists/*
 
 # Add jenkins user to docker group to allow access to Docker socket
