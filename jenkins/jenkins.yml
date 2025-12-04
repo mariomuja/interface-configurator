@@ -53,6 +53,26 @@ credentials:
               secret: "${AZURE_STORAGE_CONNECTION_STRING:-}"
               description: "Azure Storage connection string for integration tests"
           - string:
+              id: "AZURE_SERVICE_BUS_CONNECTION_STRING"
+              secret: "${AZURE_SERVICE_BUS_CONNECTION_STRING:-}"
+              description: "Azure Service Bus connection string for integration tests"
+          - string:
+              id: "AZURE_SQL_SERVER"
+              secret: "${AZURE_SQL_SERVER:-}"
+              description: "Azure SQL Server name for integration tests"
+          - string:
+              id: "AZURE_SQL_DATABASE"
+              secret: "${AZURE_SQL_DATABASE:-}"
+              description: "Azure SQL Database name for integration tests"
+          - string:
+              id: "AZURE_SQL_USER"
+              secret: "${AZURE_SQL_USER:-}"
+              description: "Azure SQL username for integration tests"
+          - string:
+              id: "AZURE_SQL_PASSWORD"
+              secret: "${AZURE_SQL_PASSWORD:-}"
+              description: "Azure SQL password for integration tests"
+          - string:
               id: "AZURE_STATIC_WEB_APP_TOKEN"
               secret: "${AZURE_STATIC_WEB_APP_TOKEN:-}"
               description: "Azure Static Web App deployment token"

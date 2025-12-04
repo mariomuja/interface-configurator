@@ -11,8 +11,8 @@ echo "Running integration tests..."
 mkdir -p test-results
 
 # Check if Azure credentials are available
-if [ -z "$AZURE_CONNECTION_STRING" ]; then
-    echo "WARNING: AZURE_CONNECTION_STRING not set - some integration tests may be skipped"
+if [ -z "$AZURE_STORAGE_CONNECTION_STRING" ]; then
+    echo "WARNING: AZURE_STORAGE_CONNECTION_STRING not set - some integration tests may be skipped"
 fi
 
 # Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
@@ -21,7 +21,12 @@ fi
   --volumes-from interface-configurator-jenkins \
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
-  -e AZURE_CONNECTION_STRING="${AZURE_CONNECTION_STRING:-}" \
+  -e AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING:-}" \
+  -e AZURE_SERVICE_BUS_CONNECTION_STRING="${AZURE_SERVICE_BUS_CONNECTION_STRING:-}" \
+  -e AZURE_SQL_SERVER="${AZURE_SQL_SERVER:-}" \
+  -e AZURE_SQL_DATABASE="${AZURE_SQL_DATABASE:-}" \
+  -e AZURE_SQL_USER="${AZURE_SQL_USER:-}" \
+  -e AZURE_SQL_PASSWORD="${AZURE_SQL_PASSWORD:-}" \
   -w "$PWD" \
   mcr.microsoft.com/dotnet/sdk:8.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \

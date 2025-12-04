@@ -94,7 +94,12 @@ pipeline {
                 }
             }
             environment {
-                AZURE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
+                AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
+                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
             }
             steps {
                 sh 'bash jenkins/scripts/test-dotnet-integration.sh'
