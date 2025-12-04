@@ -30,7 +30,7 @@ fi
   -e AZURE_SQL_USER="${AZURE_SQL_USER:-}" \
   -e AZURE_SQL_PASSWORD="${AZURE_SQL_PASSWORD:-}" \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \

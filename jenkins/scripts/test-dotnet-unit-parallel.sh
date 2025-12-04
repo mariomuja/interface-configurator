@@ -29,7 +29,7 @@ echo "Starting fast tests in background..."
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \
@@ -52,7 +52,7 @@ fi
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
     --configuration "$BUILD_CONFIGURATION" \
     --no-build \

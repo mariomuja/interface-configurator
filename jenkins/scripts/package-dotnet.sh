@@ -16,7 +16,7 @@ mkdir -p "$ARTIFACTS_PATH"
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet publish azure-functions/main/main.csproj --configuration "$BUILD_CONFIGURATION" --output "$ARTIFACTS_PATH/azure-functions"
 
 /usr/bin/docker run --rm \
@@ -24,7 +24,7 @@ mkdir -p "$ARTIFACTS_PATH"
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \
   -e NUGET_PACKAGES=/root/.nuget/packages \
   -w "$PWD" \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet publish main.Core/main.Core.csproj --configuration "$BUILD_CONFIGURATION" --output "$ARTIFACTS_PATH/main.Core"
 
 echo "Packaging completed"
