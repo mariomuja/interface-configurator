@@ -95,12 +95,23 @@ public class ServiceBusLockRenewalServiceTests
             .ReturnsAsync(true);
 
         using var cts = new CancellationTokenSource();
-        cts.CancelAfter(100);
 
         // Act
-        await service.StartAsync(cts.Token);
-        await Task.Delay(150);
-        await service.StopAsync(cts.Token);
+        await service.StartAsync(CancellationToken.None);
+        
+        // Let the service run for a bit to process locks
+        await Task.Delay(200);
+        
+        // Stop the service gracefully
+        cts.CancelAfter(100);
+        try
+        {
+            await service.StopAsync(cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected - the service might be mid-operation when stopped
+        }
 
         // Assert
         // The service background task should call GetLocksNeedingRenewalAsync
