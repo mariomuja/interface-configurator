@@ -42,6 +42,13 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "📥 CHECKOUT: Cloning repository with shallow fetch"
+                    echo "   - Depth: 1 (latest commit only)"
+                    echo "   - Tags: Skipped for speed"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 checkout([
                     $class: 'GitSCM',
                     branches: scm.branches,
@@ -61,6 +68,15 @@ pipeline {
             parallel {
                 stage('Build .NET') {
                     steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🔨 BUILD .NET: Compiling Azure Functions & Libraries"
+                            echo "   - Solution: azure-functions.sln"
+                            echo "   - Projects: main.Core, adapters, services, main"
+                            echo "   - Configuration: Release"
+                            echo "   - NuGet: Cached in .nuget/packages/"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
                         sh 'bash jenkins/scripts/build-dotnet.sh'
                     }
                 }
@@ -73,6 +89,15 @@ pipeline {
                         }
                     }
                     steps {
+                        script {
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "🎨 BUILD FRONTEND: Compiling Angular Application"
+                            echo "   - Framework: Angular (latest)"
+                            echo "   - Output: frontend/dist/"
+                            echo "   - Target: Azure Static Web App"
+                            echo "   - npm cache: Cached in .npm-cache/"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                        }
                         dir(env.FRONTEND_PATH) {
                             sh 'bash jenkins/scripts/build-frontend.sh'
                         }
@@ -87,18 +112,27 @@ pipeline {
             }
             steps {
                 script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🧪 TEST UNIT: Running C# Unit Tests (xUnit)"
+                    echo "   - Total: 158 tests"
+                    echo "   - Excludes: Integration & Performance tests (on ready/*)"
+                    echo "   - Framework: xUnit.net"
+                    echo "   - Execution: Parallel (fast + slow categories)"
+                    echo "   - Expected time: ~20-30s"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    
                     // Determine test execution strategy
                     def useSelective = env.USE_SELECTIVE_TESTS == 'true'
                     def useParallel = env.USE_PARALLEL_TESTS != 'false'
                     
                     if (useSelective) {
-                        echo "Using selective test execution based on changed files"
+                        echo "Strategy: Selective (only changed code)"
                         sh 'bash jenkins/scripts/selective-test-runner.sh'
                     } else if (useParallel) {
-                        echo "Using parallel test execution for faster results"
+                        echo "Strategy: Parallel execution"
                         sh 'bash jenkins/scripts/test-dotnet-unit-parallel.sh'
                     } else {
-                        echo "Using standard sequential test execution"
+                        echo "Strategy: Sequential execution"
                         sh 'bash jenkins/scripts/test-dotnet-unit.sh'
                     }
                 }
@@ -126,6 +160,16 @@ pipeline {
                 AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🔌 TEST INTEGRATION: Testing Azure Resources"
+                    echo "   - Total: 59 tests"
+                    echo "   - Tests: Blob Storage, Service Bus, SQL Server"
+                    echo "   - Requires: Real Azure connections"
+                    echo "   - Expected time: ~2-5 minutes"
+                    echo "   - Note: BLOCKING - fails pipeline if fails"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/test-dotnet-integration.sh'
             }
             post {
@@ -147,6 +191,16 @@ pipeline {
                 E2E_API_URL  = "${env.AZURE_FUNCTION_APP_URL ?: 'https://func-integration-main.azurewebsites.net'}"
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🌐 TEST E2E: End-to-End Browser Testing (Playwright)"
+                    echo "   - Framework: Playwright (TypeScript)"
+                    echo "   - Tests: UI workflows, API endpoints, authentication"
+                    echo "   - Target: Deployed applications (Static Web App + Functions)"
+                    echo "   - Expected time: ~1-3 minutes"
+                    echo "   - Files: tests/end-to-end/*.spec.ts"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/test-e2e.sh'
             }
         }
@@ -172,7 +226,14 @@ pipeline {
             }
             steps {
                 script {
-                    echo "🏗️  Terraform changes detected. Deploying infrastructure..."
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🏗️  TERRAFORM: Deploying Azure Infrastructure"
+                    echo "   - Provider: Azure (azurerm)"
+                    echo "   - Resources: Function App, Storage, SQL, Service Bus"
+                    echo "   - Actions: init → validate → plan → apply"
+                    echo "   - Only runs when: terraform/*.tf files changed"
+                    echo "   - Expected time: ~2-5 minutes"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 }
                 sh 'bash jenkins/scripts/terraform-apply.sh'
             }
@@ -187,6 +248,13 @@ pipeline {
                 }
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "📦 PACKAGE .NET: Preparing deployment artifacts"
+                    echo "   - Output: artifacts/ directory"
+                    echo "   - Contents: Compiled Function App binaries"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/package-dotnet.sh'
             }
         }
@@ -200,6 +268,13 @@ pipeline {
                 }
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "📦 PACKAGE FRONTEND: Preparing web artifacts"
+                    echo "   - Output: artifacts/frontend/"
+                    echo "   - Contents: Compiled Angular app (HTML, JS, CSS)"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/package-frontend.sh'
             }
         }
@@ -216,6 +291,15 @@ pipeline {
                 AZURE_STATIC_WEB_APP_TOKEN = credentials('AZURE_STATIC_WEB_APP_TOKEN')
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🚀 DEPLOY FRONTEND: Deploying to Azure Static Web App"
+                    echo "   - Source: frontend/dist/interface-configuration/browser/"
+                    echo "   - Tool: Azure Static Web Apps CLI (swa)"
+                    echo "   - Target: Production environment"
+                    echo "   - CDN: Automatic global distribution"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/deploy-static-web-app.sh'
             }
         }
@@ -237,6 +321,16 @@ pipeline {
                 AZURE_RESOURCE_GROUP    = "${AZURE_RESOURCE_GROUP}"
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "⚡ DEPLOY FUNCTION APP: Deploying Backend to Azure"
+                    echo "   - Target: ${env.AZURE_FUNCTION_APP_NAME}"
+                    echo "   - Runtime: .NET 8.0 Isolated Worker"
+                    echo "   - Tool: Azure Functions Core Tools (func)"
+                    echo "   - Method: Direct publish (--dotnet-isolated)"
+                    echo "   - Expected time: ~2-4 minutes"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/deploy-function-app.sh'
             }
         }
@@ -255,6 +349,15 @@ pipeline {
                 ACR_PASSWORD = credentials('ACR_PASSWORD')
             }
             steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🐳 BUILD ADAPTER IMAGES: Docker → Azure Container Registry"
+                    echo "   - Registry: ${env.ACR_NAME}.azurecr.io"
+                    echo "   - Images: CSV adapter, SQL Server adapter (future)"
+                    echo "   - Note: Currently no-op (adapters in Function App)"
+                    echo "   - Ready for: Future containerization"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
                 sh 'bash jenkins/scripts/build-and-push-adapter-images.sh'
             }
         }
@@ -271,11 +374,19 @@ pipeline {
             }
             steps {
                 script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🔀 AUTO-MERGE: Merging to main branch"
+                    echo "   - Source: ${env.BRANCH_NAME}"
+                    echo "   - Target: main"
+                    echo "   - Method: GitHub API merge"
+                    echo "   - Trigger: All tests passed"
+                    echo "   - Next: Triggers deployment pipeline on main"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    
                     // Double-check: only merge if all previous stages succeeded
                     if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
                         error("Cannot auto-merge: Build status is ${currentBuild.result}")
                     }
-                    echo "✅ All tests passed. Auto-merging ${env.BRANCH_NAME} into main..."
                 }
                 sh 'bash jenkins/scripts/auto-merge.sh'
             }
