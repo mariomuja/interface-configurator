@@ -22,13 +22,14 @@ RUN groupadd -g 999 docker 2>/dev/null || groupadd docker && \
 
 # Install Jenkins plugins including:
 # - workflow-multibranch: multibranch pipelines for ready/* and main
-# - git, gitlab-plugin: Git integration
+# - git, github: Git and GitHub integration with commit status support
 # - configuration-as-code: load YAML config on startup
 RUN jenkins-plugin-cli --plugins \
     workflow-aggregator \
     workflow-multibranch \
     git \
-    gitlab-plugin \
+    github \
+    github-branch-source \
     configuration-as-code \
     job-dsl \
     credentials \
