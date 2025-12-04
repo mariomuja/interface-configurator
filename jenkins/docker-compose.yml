@@ -2,7 +2,9 @@ version: "3.8"
 
 services:
   jenkins:
-    image: jenkins/jenkins:lts-jdk17
+    build:
+      context: ..
+      dockerfile: jenkins/Dockerfile
     container_name: interface-configurator-jenkins
     ports:
       - "8080:8080"
@@ -36,6 +38,8 @@ services:
       - jenkins_home:/var/jenkins_home
       # Optional: allow Jenkins to use host Docker daemon for Docker builds
       - /var/run/docker.sock:/var/run/docker.sock
+    # Fix Docker socket permissions by ensuring jenkins user has access
+    # The docker group GID will be set dynamically in the container
 
 volumes:
   jenkins_home:

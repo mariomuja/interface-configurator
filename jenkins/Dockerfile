@@ -1,4 +1,4 @@
-FROM jenkins/jenkins:lts-jdk17
+FROM jenkins/jenkins:lts-jdk21
 
 USER root
 
@@ -13,6 +13,12 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
+
+# Add jenkins user to docker group to allow access to Docker socket
+# Create docker group and add jenkins user to it
+# The GID will be matched when the socket is mounted
+RUN groupadd -g 999 docker 2>/dev/null || groupadd docker && \
+    usermod -aG docker jenkins
 
 # Install Jenkins plugins including:
 # - workflow-multibranch: multibranch pipelines for ready/* and main
@@ -32,8 +38,14 @@ RUN jenkins-plugin-cli --plugins \
 # Build-Kontext ist das Projekt-Root (..), daher liegt die Datei unter jenkins/jenkins.yml
 COPY jenkins/jenkins.yml /usr/share/jenkins/ref/jenkins.yml
 
+# Copy and set up Docker entrypoint script to fix socket permissions
+COPY jenkins/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 ENV CASC_JENKINS_CONFIG=/usr/share/jenkins/ref/jenkins.yml
 
-USER jenkins
+# Keep as root - entrypoint will switch to jenkins user after fixing permissions
+# Use custom entrypoint that fixes Docker permissions
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 

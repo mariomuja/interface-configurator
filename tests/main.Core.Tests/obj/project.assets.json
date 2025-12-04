@@ -302,6 +302,12 @@
           }
         }
       },
+      "JunitXml.TestLogger/3.1.12": {
+        "type": "package",
+        "build": {
+          "build/netstandard1.5/JUnitXml.TestLogger.props": {}
+        }
+      },
       "Microsoft.Azure.Amqp/2.6.7": {
         "type": "package",
         "compile": {
@@ -4430,6 +4436,23 @@
         "lib/netstandard2.0/Humanizer.dll",
         "lib/netstandard2.0/Humanizer.xml",
         "logo.png"
+      ]
+    },
+    "JunitXml.TestLogger/3.1.12": {
+      "sha512": "XHeSTfBj6/kLNcfbOoaoVogamaOcKXOENQ3epo616EjnnGJHFNzuNFI6TGXgL+lYwtX4E8cpCGu6UfhYrOtHGQ==",
+      "type": "package",
+      "path": "junitxml.testlogger/3.1.12",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "build/_common/Microsoft.VisualStudio.TestPlatform.Extension.JUnit.Xml.TestAdapter.dll",
+        "build/_common/Microsoft.VisualStudio.TestPlatform.Extension.JUnit.Xml.TestLogger.dll",
+        "build/_common/Spekt.TestLogger.dll",
+        "build/net46/JUnitXml.TestLogger.props",
+        "build/netstandard1.5/JUnitXml.TestLogger.props",
+        "junitxml.testlogger.3.1.12.nupkg.sha512",
+        "junitxml.testlogger.nuspec",
+        "packageIcon.png"
       ]
     },
     "Microsoft.Azure.Amqp/2.6.7": {
@@ -11522,6 +11545,7 @@
     "net8.0": [
       "Azure.Containers.ContainerRegistry >= 1.2.0",
       "Azure.ResourceManager.AppContainers >= 1.2.0",
+      "JunitXml.TestLogger >= 3.1.12",
       "Microsoft.Data.SqlClient >= 5.2.2",
       "Microsoft.EntityFrameworkCore.InMemory >= 8.0.11",
       "Microsoft.Extensions.Logging.Abstractions >= 8.0.2",
@@ -11605,6 +11629,12 @@
           "Azure.ResourceManager.AppContainers": {
             "target": "Package",
             "version": "[1.2.0, )"
+          },
+          "JunitXml.TestLogger": {
+            "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+            "suppressParent": "All",
+            "target": "Package",
+            "version": "[3.1.12, )"
           },
           "Microsoft.Data.SqlClient": {
             "target": "Package",

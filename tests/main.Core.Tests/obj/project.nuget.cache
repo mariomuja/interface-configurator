@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "JEmyIomWQk8=",
+  "dgSpecHash": "yEghF6SzvIQ=",
   "success": true,
   "projectFilePath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
   "expectedPackageFiles": [
@@ -22,6 +22,7 @@
     "C:\\Users\\mario\\.nuget\\packages\\grpc.net.clientfactory\\2.60.0\\grpc.net.clientfactory.2.60.0.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\grpc.net.common\\2.60.0\\grpc.net.common.2.60.0.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
+    "C:\\Users\\mario\\.nuget\\packages\\junitxml.testlogger\\3.1.12\\junitxml.testlogger.3.1.12.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\microsoft.azure.amqp\\2.6.7\\microsoft.azure.amqp.2.6.7.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\microsoft.azure.functions.worker\\1.23.0\\microsoft.azure.functions.worker.1.23.0.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\microsoft.azure.functions.worker.core\\1.19.0\\microsoft.azure.functions.worker.core.1.19.0.nupkg.sha512",
