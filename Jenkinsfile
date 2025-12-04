@@ -83,6 +83,30 @@ pipeline {
             }
         }
 
+        stage('Terraform Apply (Infrastructure)') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset "**/terraform/**"
+                        expression { env.FORCE_TERRAFORM == 'true' }
+                    }
+                }
+            }
+            environment {
+                ARM_CLIENT_ID       = credentials('AZURE_CLIENT_ID')
+                ARM_CLIENT_SECRET   = credentials('AZURE_CLIENT_SECRET')
+                ARM_TENANT_ID       = credentials('AZURE_TENANT_ID')
+                ARM_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
+            }
+            steps {
+                script {
+                    echo "🏗️  Terraform changes detected. Deploying infrastructure..."
+                }
+                sh 'bash jenkins/scripts/terraform-apply.sh'
+            }
+        }
+
         stage('Package .NET') {
             when {
                 anyOf {
