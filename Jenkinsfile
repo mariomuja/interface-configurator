@@ -180,7 +180,7 @@ pipeline {
             }
         }
 
-        stage('Provision Azure Resources') {
+        stage('Provision Azure Infrastructure') {
             when {
                 anyOf {
                     branch 'main'
@@ -189,12 +189,6 @@ pipeline {
                 }
             }
             environment {
-                AZURE_STORAGE_CONNECTION_STRING = credentials('AZURE_STORAGE_CONNECTION_STRING')
-                AZURE_SERVICE_BUS_CONNECTION_STRING = credentials('AZURE_SERVICE_BUS_CONNECTION_STRING')
-                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
-                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
-                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
-                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
                 AZURE_CLIENT_ID = credentials('AZURE_CLIENT_ID')
                 AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
                 AZURE_TENANT_ID = credentials('AZURE_TENANT_ID')
@@ -203,14 +197,43 @@ pipeline {
             steps {
                 script {
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    echo "🏗️  PROVISION: Deploying Integration Test Infrastructure"
+                    echo "🏗️  PROVISION: Deploying Infrastructure (Bicep)"
                     echo "   - Method: Azure Bicep (Infrastructure as Code)"
                     echo "   - Resources: Blob containers, Service Bus topics, ACR roles"
-                    echo "   - SQL Schema: Via sqlcmd (tables, indexes)"
-                    echo "   - Run once: Set PROVISION_AZURE_RESOURCES=true to execute"
+                    echo "   - Excludes: Database schema (separate stage)"
+                    echo "   - Run once: Set PROVISION_AZURE_RESOURCES=true"
                     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 }
                 sh 'bash jenkins/scripts/deploy-integration-test-infrastructure.sh'
+            }
+        }
+
+        stage('Initialize Database') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { env.FORCE_ALL_STAGES == 'true' }
+                    expression { env.INITIALIZE_DATABASE == 'true' }
+                }
+            }
+            environment {
+                AZURE_SQL_SERVER = credentials('AZURE_SQL_SERVER')
+                AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
+                AZURE_SQL_USER = credentials('AZURE_SQL_USER')
+                AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+            }
+            steps {
+                script {
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "🗄️  DATABASE INIT: Creating Schema (Tables & Indexes)"
+                    echo "   - Tables: 7 (TransportData, Configurations, Logs, etc.)"
+                    echo "   - Indexes: 13 (optimized for queries)"
+                    echo "   - Foreign Keys: AdapterSubscriptions → AdapterInstances"
+                    echo "   - Idempotent: Safe to run multiple times"
+                    echo "   - Run once: Set INITIALIZE_DATABASE=true"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
+                sh 'bash jenkins/scripts/initialize-database.sh'
             }
         }
 
