@@ -33,10 +33,13 @@ pipeline {
         // All Azure credentials are now configured in Jenkins
         FORCE_ALL_STAGES     = "true"
         
+        // Azure resource provisioning flags (run once to set up infrastructure)
+        PROVISION_AZURE_RESOURCES = "true"   // Deploy Bicep template for blob containers, Service Bus topics, ACR roles
+        INITIALIZE_DATABASE       = "true"   // Create SQL Server tables, indexes, and schema
+        
         // Pipeline optimization flags
         USE_PARALLEL_TESTS   = "true"   // Run tests in parallel (fast + slow categories)
         USE_SELECTIVE_TESTS  = "false"  // Only run tests for changed code (experimental)
-        // Azure credentials updated: Service Bus + ACR_NAME
     }
 
     stages {
