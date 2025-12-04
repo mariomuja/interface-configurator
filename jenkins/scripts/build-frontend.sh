@@ -3,12 +3,11 @@ set -e
 
 export PATH="/usr/bin:/usr/local/bin:$PATH"
 
-# Create shared npm cache directory in workspace (persists across containers)
+# Create shared npm cache directory
 NPM_CACHE_DIR="$PWD/../.npm-cache"
 mkdir -p "$NPM_CACHE_DIR"
 echo "Using shared npm cache: $NPM_CACHE_DIR"
 
-# We're already in the frontend directory via dir() in Jenkinsfile
 echo "Installing Node.js dependencies..."
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
@@ -26,4 +25,3 @@ echo "Building Angular frontend..."
   npm run build:prod
 
 echo "Frontend build completed successfully"
-
