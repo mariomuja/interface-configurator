@@ -39,7 +39,10 @@ pipeline {
 
         stage('Build Frontend') {
             when {
-                expression { isReadyOrMain() }
+                allOf {
+                    expression { isReadyOrMain() }
+                    changeset "**/frontend/**,package.json,package-lock.json,Jenkinsfile"
+                }
             }
             steps {
                 dir(env.FRONTEND_PATH) {
