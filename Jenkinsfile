@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    triggers {
+        // Poll SCM every minute for new commits
+        pollSCM('* * * * *')
+    }
+
     options {
         timestamps()
     }
