@@ -138,6 +138,9 @@ pipeline {
                     expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
                 }
             }
+            environment {
+                GITHUB_TOKEN = credentials('github-token')
+            }
             steps {
                 script {
                     // Double-check: only merge if all previous stages succeeded
