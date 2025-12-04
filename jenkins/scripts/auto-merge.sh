@@ -23,8 +23,20 @@ HTTP_CODE="${MERGE_RESPONSE: -3}"
 echo "GitHub merge API HTTP status: ${HTTP_CODE}"
 
 if [ "${HTTP_CODE}" != "201" ] && [ "${HTTP_CODE}" != "200" ]; then
-  echo "Merge failed or not needed. Response: ${MERGE_RESPONSE}"
-  exit 1
+  echo "⚠️  Merge failed or not needed. Response: ${MERGE_RESPONSE}"
+  echo ""
+  echo "This is likely because:"
+  echo "  - GIT_PASSWORD (GitHub PAT) is not configured in Jenkins"
+  echo "  - The token doesn't have 'repo' permissions"
+  echo "  - The merge is not possible (conflicts, up-to-date, etc.)"
+  echo ""
+  echo "To enable auto-merge, configure a GitHub Personal Access Token:"
+  echo "  1. Go to GitHub → Settings → Developer settings → Personal access tokens"
+  echo "  2. Create token with 'repo' scope"
+  echo "  3. Add as GIT_PASSWORD in Jenkins credentials"
+  echo ""
+  echo "⚠️  Skipping auto-merge (non-fatal)"
+  exit 0
 fi
 
 echo "Deleting branch ${BRANCH_NAME} via GitHub API..."
