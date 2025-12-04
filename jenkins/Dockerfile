@@ -24,6 +24,7 @@ RUN groupadd -g 999 docker 2>/dev/null || groupadd docker && \
 # - workflow-multibranch: multibranch pipelines for ready/* and main
 # - git, github: Git and GitHub integration with commit status support
 # - configuration-as-code: load YAML config on startup
+# - blueocean: Modern UI for better pipeline visualization
 RUN jenkins-plugin-cli --plugins \
     workflow-aggregator \
     workflow-multibranch \
@@ -33,7 +34,8 @@ RUN jenkins-plugin-cli --plugins \
     configuration-as-code \
     job-dsl \
     credentials \
-    credentials-binding
+    credentials-binding \
+    blueocean
 
 # Copy Jenkins Configuration as Code (JCasC)
 # Build-Kontext ist das Projekt-Root (..), daher liegt die Datei unter jenkins/jenkins.yml
