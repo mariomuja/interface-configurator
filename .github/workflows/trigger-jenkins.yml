@@ -1,0 +1,43 @@
+name: Trigger Jenkins Build
+
+on:
+  push:
+    branches:
+      - 'ready/**'
+      - 'main'
+  workflow_dispatch:
+
+jobs:
+  trigger-jenkins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Jenkins Build
+        run: |
+          echo "Triggering Jenkins build for branch: ${{ github.ref_name }}"
+          
+          # Jenkins URL and job path
+          JENKINS_URL="${{ secrets.JENKINS_URL }}"
+          JENKINS_JOB="interface-configurator/job/${{ github.ref_name }}"
+          
+          # Option 1: Trigger via generic webhook (if installed)
+          # curl -X POST "${JENKINS_URL}/generic-webhook-trigger/invoke" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"ref": "${{ github.ref }}", "repository": "${{ github.repository }}"}'
+          
+          # Option 2: Trigger via crumbIssuer + build API (requires auth)
+          # Get Jenkins crumb for CSRF protection
+          CRUMB=$(curl -s -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+            "${JENKINS_URL}/crumbIssuer/api/json" | jq -r '.crumb')
+          
+          # Trigger the multibranch pipeline scan
+          curl -X POST -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+            -H "Jenkins-Crumb: ${CRUMB}" \
+            "${JENKINS_URL}/job/interface-configurator/build?delay=0sec"
+          
+          echo "✅ Jenkins build triggered successfully"
+
+      - name: Notify
+        run: |
+          echo "Jenkins should now build branch: ${{ github.ref_name }}"
+          echo "Check Jenkins at: ${{ secrets.JENKINS_URL }}"
+
