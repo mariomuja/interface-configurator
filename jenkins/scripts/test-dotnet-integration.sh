@@ -8,6 +8,8 @@ NUGET_PACKAGES_DIR="$PWD/.nuget/packages"
 mkdir -p "$NUGET_PACKAGES_DIR"
 
 echo "Running integration tests..."
+# Clean old integration test results
+rm -f test-results/junit-integration-*.xml
 mkdir -p test-results
 
 # Check if Azure credentials are available

@@ -8,6 +8,8 @@ NUGET_PACKAGES_DIR="$PWD/.nuget/packages"
 mkdir -p "$NUGET_PACKAGES_DIR"
 
 echo "Running all unit tests (excluding integration tests)..."
+# Clean old test results to avoid false UNSTABLE status
+rm -rf test-results
 mkdir -p test-results
 
 # Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
