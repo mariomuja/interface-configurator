@@ -37,8 +37,8 @@ pipeline {
                     $class: 'GitSCM',
                     branches: scm.branches,
                     extensions: [
-                        [$class: 'CloneOption', depth: 1, shallow: true],  // Shallow clone for speed
-                        [$class: 'CleanBeforeCheckout']
+                        [$class: 'CloneOption', depth: 1, shallow: true]  // Shallow clone for speed
+                        // Note: CleanBeforeCheckout removed - Docker creates root-owned files that Jenkins can't delete
                     ],
                     userRemoteConfigs: scm.userRemoteConfigs
                 ])
