@@ -21,8 +21,11 @@ mkdir -p test-results
     --configuration "$BUILD_CONFIGURATION" \
     --verbosity normal \
     --filter "FullyQualifiedName!~Integration" \
-    --logger "trx;LogFileName=junit-unit.trx"
+    --logger "junit;LogFilePath=$PWD/test-results/junit-{assembly}.xml" \
+    --results-directory "$PWD/test-results"
 
 echo "Unit tests completed"
+echo "Test results location: $PWD/test-results"
+ls -la test-results/ || echo "No test results found"
 
 
