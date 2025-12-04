@@ -30,6 +30,7 @@ pipeline {
         
         // Set FORCE_ALL_STAGES=true to run all deployment stages regardless of branch
         // Useful for testing the complete pipeline on ready/* branches
+        // All Azure credentials are now configured in Jenkins
         FORCE_ALL_STAGES     = "true"
     }
 
