@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    triggers {
-        // Check for SCM changes every minute
-        pollSCM('* * * * *')
-    }
-
     options {
         timestamps()
     }
