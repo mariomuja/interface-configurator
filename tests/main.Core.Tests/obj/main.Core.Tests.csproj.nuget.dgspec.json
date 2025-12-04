@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {}
+    "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {}
   },
   "projects": {
-    "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
         "projectName": "adapters",
-        "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\mario\\interface-configurator\\adapters\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\adapters\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -33,8 +33,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }
@@ -114,14 +114,14 @@
         }
       }
     },
-    "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
         "projectName": "main",
-        "projectPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -143,14 +143,14 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
+              "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
               },
-              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               },
-              "c:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj"
+              "C:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj"
               }
             }
           }
@@ -290,14 +290,14 @@
         }
       }
     },
-    "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "projectName": "main.Core",
-        "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -392,14 +392,14 @@
         }
       }
     },
-    "c:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\services\\services.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj",
         "projectName": "services",
-        "projectPath": "c:\\Users\\mario\\interface-configurator\\services\\services.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\services\\services.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\mario\\interface-configurator\\services\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\services\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -421,8 +421,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }
@@ -490,14 +490,14 @@
         }
       }
     },
-    "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {
+    "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+        "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
         "projectName": "main.Core.Tests",
-        "projectPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+        "projectPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
         "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
+        "outputPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -519,14 +519,14 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
+              "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
               },
-              "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
+              "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
               },
-              "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-                "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+              "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+                "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
               }
             }
           }

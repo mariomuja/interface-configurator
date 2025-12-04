@@ -30,3 +30,10 @@ C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.Assem
 C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.AssemblyInfo.cs
 C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.csproj.CoreCompileInputs.cache
 C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.sourcelink.json
+C:\Users\mario\interface-configurator\main.Core\bin\Debug\net8.0\main.Core.deps.json
+C:\Users\mario\interface-configurator\main.Core\bin\Debug\net8.0\main.Core.dll
+C:\Users\mario\interface-configurator\main.Core\bin\Debug\net8.0\main.Core.pdb
+C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.dll
+C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\refint\main.Core.dll
+C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\main.Core.pdb
+C:\Users\mario\interface-configurator\main.Core\obj\Debug\net8.0\ref\main.Core.dll

@@ -11568,11 +11568,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+      "projectUniqueName": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
       "projectName": "main.Core.Tests",
-      "projectPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+      "projectPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
       "packagesPath": "C:\\Users\\mario\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
+      "outputPath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -11594,14 +11594,14 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
-              "projectPath": "c:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
+            "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj": {
+              "projectPath": "C:\\Users\\mario\\interface-configurator\\adapters\\adapters.csproj"
             },
-            "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
-              "projectPath": "c:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
+            "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj": {
+              "projectPath": "C:\\Users\\mario\\interface-configurator\\azure-functions\\main\\main.csproj"
             },
-            "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
-              "projectPath": "c:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
+            "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj": {
+              "projectPath": "C:\\Users\\mario\\interface-configurator\\main.Core\\main.Core.csproj"
             }
           }
         }

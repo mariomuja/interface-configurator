@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "yEghF6SzvIQ=",
+  "dgSpecHash": "KF9zj/woX+8=",
   "success": true,
-  "projectFilePath": "c:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
+  "projectFilePath": "C:\\Users\\mario\\interface-configurator\\tests\\main.Core.Tests\\main.Core.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\mario\\.nuget\\packages\\azure.containers.containerregistry\\1.2.0\\azure.containers.containerregistry.1.2.0.nupkg.sha512",
     "C:\\Users\\mario\\.nuget\\packages\\azure.core\\1.44.1\\azure.core.1.44.1.nupkg.sha512",
