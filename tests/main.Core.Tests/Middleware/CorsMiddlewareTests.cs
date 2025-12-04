@@ -14,7 +14,7 @@ namespace InterfaceConfigurator.Main.Core.Tests.Middleware;
 public class CorsMiddlewareTests
 {
     [Fact]
-    public async Task Invoke_OPTIONS_Request_ShouldReturnCorsHeadersAndNotCallNext()
+    public void Invoke_OPTIONS_Request_ShouldReturnCorsHeadersAndNotCallNext()
     {
         // Arrange - Skip this test
         // CreateResponse is an extension method and cannot be mocked with Moq
@@ -23,7 +23,7 @@ public class CorsMiddlewareTests
     }
 
     [Fact]
-    public async Task Invoke_NonOPTIONS_Request_ShouldCallNextAndAddCorsHeaders()
+    public void Invoke_NonOPTIONS_Request_ShouldCallNextAndAddCorsHeaders()
     {
         // Arrange - Skip this test
         // CreateResponse is an extension method and cannot be mocked with Moq

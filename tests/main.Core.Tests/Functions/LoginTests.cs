@@ -43,7 +43,7 @@ public class LoginTests
     }
 
     [Fact]
-    public async Task Login_OPTIONS_Request_ShouldReturnCorsHeaders()
+    public void Login_OPTIONS_Request_ShouldReturnCorsHeaders()
     {
         // Arrange - Skip this test
         // CreateResponse is an extension method and cannot be mocked with Moq
@@ -52,7 +52,7 @@ public class LoginTests
     }
 
     [Fact]
-    public async Task Login_EmptyBody_ShouldReturnValidationError()
+    public void Login_EmptyBody_ShouldReturnValidationError()
     {
         // Arrange - Skip this test
         // CreateResponse is an extension method and cannot be mocked with Moq
@@ -61,7 +61,7 @@ public class LoginTests
     }
 
     [Fact]
-    public async Task Login_DemoUser_WithoutPassword_ShouldSucceed()
+    public void Login_DemoUser_WithoutPassword_ShouldSucceed()
     {
         // Arrange - Skip this test
         // CreateResponse is an extension method and cannot be mocked with Moq

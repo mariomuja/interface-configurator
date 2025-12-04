@@ -133,7 +133,7 @@ public class SourceAdapterFunctionTests
     }
 
     [Fact]
-    public async Task Run_WithAdapterNotSupportingRead_ShouldThrowNotSupportedException()
+    public void Run_WithAdapterNotSupportingRead_ShouldThrowNotSupportedException()
     {
         // Arrange - Skip this test (function was refactored to use Sources dictionary)
         // This test needs to be rewritten for the new dictionary-based format

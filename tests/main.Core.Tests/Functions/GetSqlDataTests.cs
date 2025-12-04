@@ -28,7 +28,7 @@ public class GetSqlDataTests
     }
 
     [Fact]
-    public async Task GetSqlData_OPTIONS_Request_ShouldReturnCorsHeaders()
+    public void GetSqlData_OPTIONS_Request_ShouldReturnCorsHeaders()
     {
         // Arrange
         var function = new GetSqlDataFunction(_mockLogger.Object);
