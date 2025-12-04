@@ -53,10 +53,7 @@ pipeline {
 
         stage('Test .NET unit') {
             when {
-                allOf {
-                    expression { isReadyOrMain() }
-                    changeset "tests/**,main.Core/**,azure-functions/**,adapters/**,Jenkinsfile"
-                }
+                expression { isReadyOrMain() }
             }
             steps {
                 sh 'bash jenkins/scripts/test-dotnet-unit.sh'
@@ -112,11 +109,43 @@ pipeline {
             }
         }
 
-        stage('Auto-merge ready/* into main') {
+        stage('Manual Approval for Merge') {
             when {
-                expression { isReadyBranch() }
+                allOf {
+                    expression { isReadyBranch() }
+                    expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+                }
             }
             steps {
+                script {
+                    echo "⚠️  Ready to merge ${env.BRANCH_NAME} into main"
+                    echo "All tests have passed. Waiting for manual approval..."
+                    
+                    // Manual approval - timeout after 24 hours
+                    timeout(time: 24, unit: 'HOURS') {
+                        input message: 'Merge into main?', 
+                              ok: 'Yes, merge now',
+                              submitter: 'admin'
+                    }
+                }
+            }
+        }
+
+        stage('Auto-merge ready/* into main') {
+            when {
+                allOf {
+                    expression { isReadyBranch() }
+                    expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+                }
+            }
+            steps {
+                script {
+                    // Double-check: only merge if all previous stages succeeded
+                    if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
+                        error("Cannot auto-merge: Build status is ${currentBuild.result}")
+                    }
+                    echo "✅ Manual approval received. Proceeding with auto-merge..."
+                }
                 sh 'bash jenkins/scripts/auto-merge.sh'
             }
         }
