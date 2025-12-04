@@ -32,6 +32,9 @@ pipeline {
         // Useful for testing the complete pipeline on ready/* branches
         // All Azure credentials are now configured in Jenkins
         FORCE_ALL_STAGES     = "true"
+        
+        // Pipeline optimization flags
+        USE_PARALLEL_TESTS   = "true"   // Run tests in parallel (fast + slow categories)
     }
 
     stages {
@@ -78,7 +81,16 @@ pipeline {
                 expression { isReadyOrMain() }
             }
             steps {
-                sh 'bash jenkins/scripts/test-dotnet-unit.sh'
+                script {
+                    // Use parallel test execution for better performance
+                    def useParallel = env.USE_PARALLEL_TESTS != 'false'
+                    if (useParallel) {
+                        echo "Using parallel test execution for faster results"
+                        sh 'bash jenkins/scripts/test-dotnet-unit-parallel.sh'
+                    } else {
+                        sh 'bash jenkins/scripts/test-dotnet-unit.sh'
+                    }
+                }
             }
             post {
                 always {
