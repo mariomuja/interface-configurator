@@ -30,7 +30,7 @@ pipeline {
         
         // Set FORCE_ALL_STAGES=true to run all deployment stages regardless of branch
         // Useful for testing the complete pipeline on ready/* branches
-        // FORCE_ALL_STAGES     = "true"
+        FORCE_ALL_STAGES     = "true"  // ENABLED FOR TESTING - Comment out after first successful run
     }
 
     stages {
