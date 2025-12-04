@@ -10,7 +10,7 @@ mkdir -p "$NUGET_PACKAGES_DIR"
 echo "Packaging .NET artifacts..."
 mkdir -p "$ARTIFACTS_PATH"
 
-# Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
+# Using latest .NET 9 SDK (9.0 tag pulls the latest 9.0.x patch version)
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
   -v "$NUGET_PACKAGES_DIR:/root/.nuget/packages" \

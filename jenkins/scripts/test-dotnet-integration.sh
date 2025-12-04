@@ -17,7 +17,7 @@ if [ -z "$AZURE_STORAGE_CONNECTION_STRING" ]; then
     echo "WARNING: AZURE_STORAGE_CONNECTION_STRING not set - some integration tests may be skipped"
 fi
 
-# Using latest .NET 8 SDK (8.0 tag pulls the latest 8.0.x patch version)
+# Using latest .NET 9 SDK (9.0 tag pulls the latest 9.0.x patch version)
 # --no-build and --no-restore flags skip rebuild and restore since we already did them
 /usr/bin/docker run --rm \
   --volumes-from interface-configurator-jenkins \
