@@ -225,6 +225,9 @@ pipeline {
                         AZURE_SQL_DATABASE = credentials('AZURE_SQL_DATABASE')
                         AZURE_SQL_USER = credentials('AZURE_SQL_USER')
                         AZURE_SQL_PASSWORD = credentials('AZURE_SQL_PASSWORD')
+                        AZURE_CLIENT_ID = credentials('AZURE_CLIENT_ID')
+                        AZURE_CLIENT_SECRET = credentials('AZURE_CLIENT_SECRET')
+                        AZURE_TENANT_ID = credentials('AZURE_TENANT_ID')
                         ACR_NAME = "${env.ACR_NAME ?: 'myacr'}"
                     }
                     steps {

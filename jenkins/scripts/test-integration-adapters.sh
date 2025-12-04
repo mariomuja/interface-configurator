@@ -22,6 +22,9 @@ mkdir -p test-results
   -e AZURE_SQL_PASSWORD="${AZURE_SQL_PASSWORD:-}" \
   -e AZURE_CONTAINER_REGISTRY="${ACR_NAME:-}" \
   -e ACR_NAME="${ACR_NAME:-}" \
+  -e AZURE_CLIENT_ID="${AZURE_CLIENT_ID:-}" \
+  -e AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET:-}" \
+  -e AZURE_TENANT_ID="${AZURE_TENANT_ID:-}" \
   -w "$PWD" \
   mcr.microsoft.com/dotnet/sdk:8.0 \
   dotnet test tests/main.Core.Tests/main.Core.Tests.csproj \
