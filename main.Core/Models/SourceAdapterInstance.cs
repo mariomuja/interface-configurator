@@ -20,6 +20,7 @@ public class SourceAdapterInstance
     [Required]
     public bool IsEnabled { get; set; } = true;
 
+    [Key]
     [Required]
     public Guid AdapterInstanceGuid { get; set; } = Guid.NewGuid();
 

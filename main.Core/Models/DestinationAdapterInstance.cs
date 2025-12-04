@@ -12,6 +12,7 @@ public class DestinationAdapterInstance
     /// <summary>
     /// Unique GUID identifying this destination adapter instance
     /// </summary>
+    [Key]
     [Required]
     public Guid AdapterInstanceGuid { get; set; } = Guid.NewGuid();
 

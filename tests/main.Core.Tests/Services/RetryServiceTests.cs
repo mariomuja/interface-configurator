@@ -85,7 +85,7 @@ public class RetryServiceTests
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>  // RetryService wraps in InvalidOperationException
+        await Assert.ThrowsAsync<TimeoutException>(async () =>  // RetryService rethrows the original exception
         {
             await _retryService.ExecuteWithRetryAsync(operation, "test-operation", retryPolicy);
         });

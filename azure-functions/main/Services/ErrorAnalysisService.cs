@@ -293,10 +293,22 @@ public class ErrorAnalysisService
         var lowerMessage = errorMessage.ToLowerInvariant();
         var lowerName = errorName?.ToLowerInvariant() ?? string.Empty;
 
+        // Type errors (check name and "TypeError:" prefix in message FIRST before null checks)
+        if (lowerName.Contains("typeerror") || lowerName.Contains("type error") ||
+            lowerMessage.StartsWith("typeerror:") ||
+            (lowerMessage.Contains("typeerror") || (lowerMessage.Contains("type") && lowerMessage.Contains("error"))))
+        {
+            analysis.Category = "TypeError";
+            analysis.Summary = "Type mismatch or incorrect type usage";
+            analysis.LikelyCauses.Add("Incorrect type casting");
+            analysis.LikelyCauses.Add("Property type mismatch");
+            analysis.LikelyCauses.Add("Function parameter type mismatch");
+            analysis.ErrorPattern = "TypeError";
+        }
         // Null reference errors (check name first, then message)
-        if (lowerName.Contains("nullreference") || lowerName.Contains("null reference") ||
-            (lowerMessage.Contains("null") && !lowerMessage.Contains("typeerror")) ||
-            (lowerMessage.Contains("undefined") && !lowerMessage.Contains("typeerror")) ||
+        else if (lowerName.Contains("nullreference") || lowerName.Contains("null reference") ||
+            lowerMessage.Contains("null") ||
+            lowerMessage.Contains("undefined") ||
             (lowerMessage.Contains("cannot read") && lowerMessage.Contains("undefined")) ||
             (lowerMessage.Contains("cannot access") && lowerMessage.Contains("null")))
         {
@@ -306,17 +318,6 @@ public class ErrorAnalysisService
             analysis.LikelyCauses.Add("Object not initialized before use");
             analysis.LikelyCauses.Add("Optional property accessed without checking");
             analysis.ErrorPattern = "NullReference";
-        }
-        // Type errors (check name first, then message)
-        else if (lowerName.Contains("typeerror") || lowerName.Contains("type error") ||
-                 (lowerMessage.Contains("typeerror") || (lowerMessage.Contains("type") && lowerMessage.Contains("error"))))
-        {
-            analysis.Category = "TypeError";
-            analysis.Summary = "Type mismatch or incorrect type usage";
-            analysis.LikelyCauses.Add("Incorrect type casting");
-            analysis.LikelyCauses.Add("Property type mismatch");
-            analysis.LikelyCauses.Add("Function parameter type mismatch");
-            analysis.ErrorPattern = "TypeError";
         }
         // Network/HTTP errors (including timeout)
         else if (lowerMessage.Contains("network") || lowerMessage.Contains("fetch") || 

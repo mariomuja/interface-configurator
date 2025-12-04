@@ -7,3 +7,4 @@ cp -r frontend/dist "$ARTIFACTS_PATH/frontend"
 echo "Frontend packaging completed"
 
 
+
